@@ -1,0 +1,18 @@
+# BasicEmbedFlow
+
+main: kit: flow: BasicEmbedFlow:
+{
+  entity: "embed",
+  kind: "basic",
+  name: "BasicEmbedFlow",
+  step: [
+    {
+      input: {
+        ref: "embed_ref01"
+      }
+
+      op: "create"
+    }
+  ],
+  "key$": "BasicEmbedFlow"
+}

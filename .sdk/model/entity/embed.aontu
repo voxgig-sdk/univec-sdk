@@ -1,0 +1,66 @@
+# Entity: embed
+
+main: kit: entity: embed: {
+
+  alias: field: {}
+
+  fields: [
+    {
+      name: "data"
+      req: true
+      type: "`$OBJECT`"
+    }
+    {
+      name: "model"
+      req: true
+      type: "`$STRING`"
+    }
+    {
+      name: "success"
+      req: true
+      type: "`$BOOLEAN`"
+    }
+    {
+      name: "text"
+      req: true
+      type: "`$ARRAY`"
+    }
+  ]
+
+  name: "embed"
+  op: {
+    create: {
+      name: "create"
+      points: [
+        {
+          method: "POST"
+          orig: "/v1/embed"
+          parts: [
+            "v1"
+            "embed"
+          ]
+          transform: {
+            req: "`reqdata`"
+            res: "`body`"
+          }
+        }
+        {
+          method: "POST"
+          orig: "/v1/ephemeral/embed"
+          parts: [
+            "v1"
+            "ephemeral"
+            "embed"
+          ]
+          transform: {
+            req: "`reqdata`"
+            res: "`body`"
+          }
+        }
+      ]
+    }
+  }
+
+
+
+}

@@ -1,0 +1,106 @@
+# Entity: convert
+
+main: kit: entity: convert: {
+
+  alias: field: {}
+
+  fields: [
+    {
+      name: "bridge_model"
+      req: true
+      type: "`$STRING`"
+    }
+    {
+      name: "data"
+      req: true
+      type: "`$OBJECT`"
+    }
+    {
+      name: "embedding"
+      req: true
+      type: "`$ARRAY`"
+    }
+    {
+      name: "source_model"
+      req: true
+      type: "`$STRING`"
+    }
+    {
+      name: "success"
+      req: true
+      type: "`$BOOLEAN`"
+    }
+    {
+      name: "target_model"
+      req: true
+      type: "`$STRING`"
+    }
+    {
+      name: "text"
+      req: true
+      type: "`$ARRAY`"
+    }
+  ]
+
+  name: "convert"
+  op: {
+    create: {
+      name: "create"
+      points: [
+        {
+          method: "POST"
+          orig: "/v1/convert"
+          parts: [
+            "v1"
+            "convert"
+          ]
+          transform: {
+            req: "`reqdata`"
+            res: "`body`"
+          }
+        }
+        {
+          method: "POST"
+          orig: "/v1/embed-bridge"
+          parts: [
+            "v1"
+            "embed-bridge"
+          ]
+          transform: {
+            req: "`reqdata`"
+            res: "`body`"
+          }
+        }
+        {
+          method: "POST"
+          orig: "/v1/ephemeral/convert"
+          parts: [
+            "v1"
+            "ephemeral"
+            "convert"
+          ]
+          transform: {
+            req: "`reqdata`"
+            res: "`body`"
+          }
+        }
+        {
+          method: "POST"
+          orig: "/v1/ephemeral/embed-bridge"
+          parts: [
+            "v1"
+            "ephemeral"
+            "embed-bridge"
+          ]
+          transform: {
+            req: "`reqdata`"
+            res: "`body`"
+          }
+        }
+      ]
+    }
+  }
+
+
+
+}

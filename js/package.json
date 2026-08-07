@@ -1,0 +1,40 @@
+{
+  "name": "@voxgig-sdk/univec-js",
+  "version": "0.0.1",
+  "description": "Unofficial generated JavaScript SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.",
+  "keywords": [
+    "voxgig",
+    "sdk",
+    "generated-sdk",
+    "openapi",
+    "api-client",
+    "univec"
+  ],
+  "homepage": "https://github.com/voxgig-sdk/univec-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/voxgig-sdk/univec-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/voxgig-sdk/univec-sdk/issues"
+  },
+  "main": "src/UnivecSDK.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test 'test/**/*.test.js'",
+    "test-some": "node --experimental-test-isolation=none --test-name-pattern=\"$TEST_PATTERN\" --test 'test/**/*.test.js'",
+    "test-utility": "node --test test/utility/*.test.js",
+    "clean": "rm -rf node_modules yarn.lock package-lock.json",
+    "reset": "npm run clean && npm i && npm test"
+  },
+  "author": {
+    "name": "Voxgig",
+    "url": "https://voxgig.com"
+  },
+  "license": "MIT",
+  "dependencies": {},
+  "peerDependencies": {},
+  "devDependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

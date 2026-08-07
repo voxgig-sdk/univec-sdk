@@ -1,0 +1,35 @@
+{
+  "name": "build-univec-sdk",
+  "version": "0.0.1",
+  "description": "Univec SDK Project",
+  "scripts": {
+    "generate": "tsc --build src && voxgig-model model/sdk.aontu",
+    "watch-generate": "voxgig-model -w model/sdk.aontu",
+    "dry-generate": "tsc --build src && voxgig-model -y model/sdk.aontu",
+    "watch-dry-generate": "voxgig-model -w -y model/sdk.aontu",
+    "test-model": "voxgig-model test/test.aontu",
+    "watch-test-model": "voxgig-model -w test/test.aontu",
+    "watch": "tsc --build src -w",
+    "build": "tsc --build src",
+    "test": "echo no-test",
+    "clean": "rm -rf dist dist-test node_modules yarn.lock package-lock.json",
+    "reset": "npm run clean && npm i && npm run build && npm test",
+    "add-target": "voxgig-sdkgen target add",
+    "dry-add-target": "voxgig-sdkgen -y target add",
+    "add-feature": "voxgig-sdkgen feature add",
+    "dry-add-feature": "voxgig-sdkgen -y feature add"
+  },
+  "author": "Univec",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": ">=25.6",
+    "typescript": ">=6.0",
+    "@voxgig/apidef": ">=5.8",
+    "@voxgig/model": ">=8.1",
+    "@voxgig/sdkgen": ">=0.40",
+    "@voxgig/util": ">=0.4",
+    "@voxgig/struct": ">=0.1.0",
+    "jostraca": ">=0.29",
+    "aontu": ">=0.44"
+  }
+}

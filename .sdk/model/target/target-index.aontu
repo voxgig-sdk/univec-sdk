@@ -1,0 +1,11 @@
+# SDK Targets.
+
+
+@"ts.aontu"
+@"js.aontu"
+@"go.aontu"
+@"py.aontu"
+@"php.aontu"
+@"lua.aontu"
+@"go-cli.aontu"
+@"go-mcp.aontu"

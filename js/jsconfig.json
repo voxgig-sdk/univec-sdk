@@ -1,0 +1,12 @@
+{
+  // Establishes the SDK folder as ONE JS program so the global JSDoc typedefs
+  // in src/*Types.js resolve from every file (op @param/@returns annotations
+  // reference them by bare name). checkJs stays off — add // @ts-check per
+  // file (or flip checkJs) to opt in to editor type-checking.
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2021",
+    "checkJs": false
+  },
+  "include": ["src", "test"]
+}

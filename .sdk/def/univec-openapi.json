@@ -1,0 +1,412 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "UniVec API",
+    "version": "1.0.0",
+    "description": "UniVec embedding interoperability API. Translate embeddings between model spaces without rebuilding a vector index, generate embeddings with open-source models, and bridge text into a target model space.\n\nUnofficial definition authored by Voxgig from UniVec's public web application and verified against the live public API. Not an official UniVec document.",
+    "contact": { "name": "UniVec", "url": "https://univec.ai" }
+  },
+  "servers": [
+    { "url": "https://api.univec.ai", "description": "Production" }
+  ],
+  "security": [ { "bearerAuth": [] } ],
+  "tags": [
+    { "name": "model", "description": "Available embed and convert models" },
+    { "name": "embed", "description": "Generate embeddings with open-source models" },
+    { "name": "convert", "description": "Translate embeddings between model spaces" },
+    { "name": "bridge", "description": "Embed text directly into a target model space" },
+    { "name": "ephemeral", "description": "Free self-serve tier: rate-limited keys and routes" }
+  ],
+  "paths": {
+    "/v1/models": {
+      "get": {
+        "operationId": "listModels",
+        "tags": ["model"],
+        "summary": "List available models",
+        "description": "Returns every embed model and every convert (translation) model pair available on the platform, including evaluation metrics and model cards for convert models.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Model list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ModelListResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/embed": {
+      "post": {
+        "operationId": "createEmbedding",
+        "tags": ["embed"],
+        "summary": "Generate embeddings",
+        "description": "Generate embeddings for one or more texts using an open-source embed model. Requires a standard UniVec API key; ephemeral keys must use /v1/ephemeral/embed.",
+        "requestBody": { "$ref": "#/components/requestBodies/EmbedRequest" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/EmbedResponse" },
+          "401": { "$ref": "#/components/responses/ErrorResponse" },
+          "422": { "$ref": "#/components/responses/ErrorResponse" }
+        }
+      }
+    },
+    "/v1/convert": {
+      "post": {
+        "operationId": "convertEmbedding",
+        "tags": ["convert"],
+        "summary": "Translate embeddings between model spaces",
+        "description": "Translate existing embedding vectors from a source model space into a target model space, so a vector index can be migrated without re-embedding the source documents. Requires a standard UniVec API key; ephemeral keys must use /v1/ephemeral/convert.",
+        "requestBody": { "$ref": "#/components/requestBodies/ConvertRequest" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/ConvertResponse" },
+          "401": { "$ref": "#/components/responses/ErrorResponse" },
+          "422": { "$ref": "#/components/responses/ErrorResponse" }
+        }
+      }
+    },
+    "/v1/embed-bridge": {
+      "post": {
+        "operationId": "embedBridge",
+        "tags": ["bridge"],
+        "summary": "Embed text into a target model space via a bridge model",
+        "description": "Embed text with a bridge (source) model and translate the result into the target model space in a single call. Requires a converter pair to exist between the bridge model and the target model — see listModels.",
+        "requestBody": { "$ref": "#/components/requestBodies/EmbedBridgeRequest" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/ConvertResponse" },
+          "401": { "$ref": "#/components/responses/ErrorResponse" },
+          "422": { "$ref": "#/components/responses/ErrorResponse" }
+        }
+      }
+    },
+    "/v1/ephemeral/key": {
+      "post": {
+        "operationId": "createEphemeralKey",
+        "tags": ["ephemeral"],
+        "summary": "Issue a free ephemeral API key",
+        "description": "Issue a rate-limited ephemeral key for evaluating the API without signing up. The key carries a daily call allowance and may only be used against the /v1/ephemeral/* routes.",
+        "security": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "additionalProperties": false },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Issued key",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EphemeralKeyResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/ephemeral/embed": {
+      "post": {
+        "operationId": "createEphemeralEmbedding",
+        "tags": ["ephemeral", "embed"],
+        "summary": "Generate embeddings (ephemeral tier)",
+        "description": "Free-tier equivalent of createEmbedding, callable with an ephemeral key.",
+        "requestBody": { "$ref": "#/components/requestBodies/EmbedRequest" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/EmbedResponse" },
+          "401": { "$ref": "#/components/responses/ErrorResponse" },
+          "422": { "$ref": "#/components/responses/ErrorResponse" },
+          "429": { "$ref": "#/components/responses/ErrorResponse" }
+        }
+      }
+    },
+    "/v1/ephemeral/convert": {
+      "post": {
+        "operationId": "convertEphemeralEmbedding",
+        "tags": ["ephemeral", "convert"],
+        "summary": "Translate embeddings between model spaces (ephemeral tier)",
+        "description": "Free-tier equivalent of convertEmbedding, callable with an ephemeral key.",
+        "requestBody": { "$ref": "#/components/requestBodies/ConvertRequest" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/ConvertResponse" },
+          "401": { "$ref": "#/components/responses/ErrorResponse" },
+          "422": { "$ref": "#/components/responses/ErrorResponse" },
+          "429": { "$ref": "#/components/responses/ErrorResponse" }
+        }
+      }
+    },
+    "/v1/ephemeral/embed-bridge": {
+      "post": {
+        "operationId": "embedBridgeEphemeral",
+        "tags": ["ephemeral", "bridge"],
+        "summary": "Embed text into a target model space via a bridge model (ephemeral tier)",
+        "description": "Free-tier equivalent of embedBridge, callable with an ephemeral key.",
+        "requestBody": { "$ref": "#/components/requestBodies/EmbedBridgeRequest" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/ConvertResponse" },
+          "401": { "$ref": "#/components/responses/ErrorResponse" },
+          "422": { "$ref": "#/components/responses/ErrorResponse" },
+          "429": { "$ref": "#/components/responses/ErrorResponse" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes."
+      }
+    },
+    "requestBodies": {
+      "EmbedRequest": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/EmbedRequest" },
+            "example": { "model": "baai-bge-base-en-v1.5", "texts": ["hello world"] }
+          }
+        }
+      },
+      "ConvertRequest": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ConvertRequest" },
+            "example": {
+              "source_model": "alibaba-nlp-gte-large-en-v1.5",
+              "target_model": "nomic-embed-text-v1.5",
+              "embeddings": [[0.01, 0.02, 0.03]]
+            }
+          }
+        }
+      },
+      "EmbedBridgeRequest": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/EmbedBridgeRequest" },
+            "example": {
+              "bridge_model": "alibaba-nlp-gte-large-en-v1.5",
+              "target_model": "nomic-embed-text-v1.5",
+              "texts": ["hello world"]
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "EmbedResponse": {
+        "description": "Generated embeddings",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/EmbedResponse" }
+          }
+        }
+      },
+      "ConvertResponse": {
+        "description": "Translated embeddings",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ConvertResponse" }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "description": "Error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Embedding": {
+        "type": "array",
+        "description": "A single embedding vector.",
+        "items": { "type": "number", "format": "float" }
+      },
+      "EmbedRequest": {
+        "type": "object",
+        "required": ["model", "texts"],
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Name of an embed model, as returned by listModels.",
+            "example": "baai-bge-base-en-v1.5"
+          },
+          "texts": {
+            "type": "array",
+            "description": "Texts to embed. One vector is returned per text, in order.",
+            "items": { "type": "string" },
+            "example": ["hello world"]
+          }
+        }
+      },
+      "EmbedResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "required": ["embeddings", "model"],
+            "properties": {
+              "embeddings": {
+                "type": "array",
+                "description": "One vector per input text, in input order.",
+                "items": { "$ref": "#/components/schemas/Embedding" }
+              },
+              "model": { "type": "string", "description": "Model that produced the vectors." }
+            }
+          }
+        }
+      },
+      "ConvertRequest": {
+        "type": "object",
+        "required": ["source_model", "target_model", "embeddings"],
+        "properties": {
+          "source_model": {
+            "type": "string",
+            "description": "Model space the supplied vectors are currently in.",
+            "example": "alibaba-nlp-gte-large-en-v1.5"
+          },
+          "target_model": {
+            "type": "string",
+            "description": "Model space to translate into. A converter must exist for the source/target pair — see listModels.",
+            "example": "nomic-embed-text-v1.5"
+          },
+          "embeddings": {
+            "type": "array",
+            "description": "Vectors to translate. Each must match the source model's dimension exactly.",
+            "items": { "$ref": "#/components/schemas/Embedding" }
+          }
+        }
+      },
+      "EmbedBridgeRequest": {
+        "type": "object",
+        "required": ["bridge_model", "target_model", "texts"],
+        "properties": {
+          "bridge_model": {
+            "type": "string",
+            "description": "Embed model used to vectorise the text before translation.",
+            "example": "alibaba-nlp-gte-large-en-v1.5"
+          },
+          "target_model": {
+            "type": "string",
+            "description": "Model space to translate into.",
+            "example": "nomic-embed-text-v1.5"
+          },
+          "texts": {
+            "type": "array",
+            "description": "Texts to embed and translate.",
+            "items": { "type": "string" },
+            "example": ["hello world"]
+          }
+        }
+      },
+      "ConvertResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "required": ["embeddings", "source_model", "target_model"],
+            "properties": {
+              "embeddings": {
+                "type": "array",
+                "description": "Translated vectors, in the target model's dimension.",
+                "items": { "$ref": "#/components/schemas/Embedding" }
+              },
+              "source_model": { "type": "string" },
+              "target_model": { "type": "string" }
+            }
+          }
+        }
+      },
+      "EphemeralKeyResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "type": "object",
+            "required": ["key", "dailyLimit", "dailyUsed", "resetsAt"],
+            "properties": {
+              "key": { "type": "string", "description": "The ephemeral API key, prefixed `eph_`." },
+              "dailyLimit": { "type": "integer", "description": "Calls permitted per day." },
+              "dailyUsed": { "type": "integer", "description": "Calls already used today." },
+              "resetsAt": { "type": "string", "format": "date-time", "description": "When the daily allowance resets." }
+            }
+          }
+        }
+      },
+      "ModelListResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Model" } }
+        }
+      },
+      "Model": {
+        "type": "object",
+        "required": ["name", "modelType", "targetModel", "targetDim"],
+        "properties": {
+          "name": { "type": "string", "description": "Model identifier used in requests." },
+          "modelType": {
+            "type": "string",
+            "description": "`embed` for text-to-vector models, `convert` for space-translation models.",
+            "enum": ["embed", "convert"]
+          },
+          "executionProvider": { "type": "string", "description": "Hardware backend, e.g. `cpu`." },
+          "sourceModel": { "type": "string", "description": "Convert models only: the source model space." },
+          "targetModel": { "type": "string", "description": "The model space produced." },
+          "sourceDim": { "type": "integer", "description": "Convert models only: source vector dimension." },
+          "targetDim": { "type": "integer", "description": "Dimension of the produced vectors." },
+          "sequenceLen": { "type": "integer", "description": "Embed models only: maximum input sequence length." },
+          "eval": { "$ref": "#/components/schemas/ModelEval" },
+          "modelCard": {
+            "type": "object",
+            "description": "Convert models only: training provenance and architecture detail.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ModelEval": {
+        "type": "object",
+        "description": "Retrieval-fidelity metrics for a convert model.",
+        "properties": {
+          "cosine_mean": { "type": "number", "format": "float" },
+          "cosine_median": { "type": "number", "format": "float" },
+          "cosine_std": { "type": "number", "format": "float" },
+          "kendall_tau": { "type": "number", "format": "float" },
+          "kendall_p_value": { "type": "number", "format": "float" },
+          "mrr": { "type": "number", "format": "float", "description": "Mean reciprocal rank." },
+          "p_at_1": { "type": "number", "format": "float" },
+          "p_at_5": { "type": "number", "format": "float" },
+          "p_at_10": { "type": "number", "format": "float" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["success", "error"],
+        "properties": {
+          "success": { "type": "boolean", "description": "Always false on an error." },
+          "error": {
+            "type": "object",
+            "required": ["message"],
+            "properties": {
+              "message": { "type": "string", "description": "Human-readable error detail." }
+            }
+          }
+        }
+      }
+    }
+  }
+}

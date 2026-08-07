@@ -1,0 +1,29 @@
+{
+  "existing": {
+    "ephemeral_key": {
+      "EPHEMERAL_KEY00": {
+        "data": {},
+        "success": false,
+        "id": "EPHEMERAL_KEY00"
+      },
+      "EPHEMERAL_KEY01": {
+        "data": {},
+        "success": false,
+        "id": "EPHEMERAL_KEY01"
+      },
+      "EPHEMERAL_KEY02": {
+        "data": {},
+        "success": false,
+        "id": "EPHEMERAL_KEY02"
+      }
+    }
+  },
+  "new": {
+    "ephemeral_key": {
+      "ephemeral_key_ref01": {
+        "data": {},
+        "success": false
+      }
+    }
+  }
+}

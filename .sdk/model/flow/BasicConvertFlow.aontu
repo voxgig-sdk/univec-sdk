@@ -1,0 +1,18 @@
+# BasicConvertFlow
+
+main: kit: flow: BasicConvertFlow:
+{
+  entity: "convert",
+  kind: "basic",
+  name: "BasicConvertFlow",
+  step: [
+    {
+      input: {
+        ref: "convert_ref01"
+      }
+
+      op: "create"
+    }
+  ],
+  "key$": "BasicConvertFlow"
+}

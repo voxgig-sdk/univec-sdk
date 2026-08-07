@@ -1,0 +1,44 @@
+# Guide
+
+guide: {
+  metrics: count: entity: 4
+  metrics: count: path: 8
+  metrics: count: method: 8
+
+  entity: convert: {
+    path: "/v1/convert": {
+      op: create: method: *POST
+    }
+    path: "/v1/embed-bridge": {
+      op: create: method: *POST
+    }
+    path: "/v1/ephemeral/convert": {
+      op: create: method: *POST
+    }
+    path: "/v1/ephemeral/embed-bridge": {
+      op: create: method: *POST
+    }
+  }
+
+  entity: embed: {
+    path: "/v1/embed": {
+      op: create: method: *POST
+    }
+    path: "/v1/ephemeral/embed": {
+      op: create: method: *POST
+    }
+  }
+
+  entity: ephemeral_key: {
+    path: "/v1/ephemeral/key": {
+      op: create: method: *POST
+    }
+  }
+
+  entity: model: {
+    path: "/v1/models": {
+      op: list: method: *GET
+    }
+  }
+
+}

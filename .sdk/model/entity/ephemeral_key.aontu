@@ -1,0 +1,44 @@
+# Entity: ephemeral_key
+
+main: kit: entity: ephemeral_key: {
+
+  alias: field: {}
+
+  fields: [
+    {
+      name: "data"
+      req: true
+      type: "`$OBJECT`"
+    }
+    {
+      name: "success"
+      req: true
+      type: "`$BOOLEAN`"
+    }
+  ]
+
+  name: "ephemeral_key"
+  op: {
+    create: {
+      name: "create"
+      points: [
+        {
+          method: "POST"
+          orig: "/v1/ephemeral/key"
+          parts: [
+            "v1"
+            "ephemeral"
+            "key"
+          ]
+          transform: {
+            req: "`reqdata`"
+            res: "`body`"
+          }
+        }
+      ]
+    }
+  }
+
+
+
+}

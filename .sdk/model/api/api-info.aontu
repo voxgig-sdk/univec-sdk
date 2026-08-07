@@ -1,0 +1,34 @@
+# API Information
+
+
+main: {
+  kit: {
+    info: {
+      contact: {
+        name: "UniVec"
+        url: "https://univec.ai"
+      }
+      description: `UniVec embedding interoperability API. Translate embeddings between model spaces without rebuilding a vector index, generate embeddings with open-source models, and bridge text into a target model space.
+
+Unofficial definition authored by Voxgig from UniVec's public web application and verified against the live public API. Not an official UniVec document.`
+      security: {
+        in: "header"
+        name: "Authorization"
+        prefix: "Bearer"
+        scheme: "bearerAuth"
+        type: "http"
+      }
+      servers: [
+        {
+          description: "Production"
+          url: "https://api.univec.ai"
+        }
+      ]
+      summary: "UniVec embedding interoperability API."
+      title: "UniVec API"
+      version: "1.0.0"
+      website: "https://univec.ai"
+    }
+  }
+}
+

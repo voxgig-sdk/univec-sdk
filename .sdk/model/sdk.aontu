@@ -1,0 +1,35 @@
+
+# Model definitions.
+@"@voxgig/apidef/model/apidef.aontu"
+@"@voxgig/sdkgen/model/sdkgen.aontu"
+
+
+# SDK Details.
+name: 'univec'
+origin: 'voxgig-sdk'
+def: 'univec-openapi.json'
+
+
+# API Information
+@"api/api-info.aontu"
+
+
+# SDK Configuration.
+@"config.aontu"
+
+
+# SDK Entities
+@"entity/entity-index.aontu"
+
+
+# SDK Features.
+@"feature/feature-index.aontu"
+ 
+
+# SDK Targets.
+@"target/target-index.aontu"
+
+
+# Operation workflows.
+@"flow/flow-index.aontu"
+

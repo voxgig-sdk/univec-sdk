@@ -1,0 +1,46 @@
+{
+  "name": "@voxgig-sdk/univec",
+  "version": "0.0.1",
+  "description": "Unofficial generated TypeScript SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.",
+  "keywords": [
+    "voxgig",
+    "sdk",
+    "generated-sdk",
+    "openapi",
+    "api-client",
+    "univec"
+  ],
+  "homepage": "https://github.com/voxgig-sdk/univec-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/voxgig-sdk/univec-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/voxgig-sdk/univec-sdk/issues"
+  },
+  "main": "dist/UnivecSDK.js",
+  "type": "commonjs",
+  "types": "dist/UnivecSDK.d.ts",
+  "scripts": {
+    "test": "node --enable-source-maps --test-concurrency=1 --test 'dist-test/**/*.test.js'",
+    "test-some": "node --enable-source-maps --experimental-test-isolation=none --test-name-pattern=\"$TEST_PATTERN\" --test 'dist-test/**/*.test.js'",
+    "test-utility": "node --enable-source-maps --test test/utility/*.test.ts",
+    "test-coverage": "node --test-concurrency=1 --experimental-test-coverage --test-coverage-exclude='**/dist-test/**' --test-coverage-lines=85 --test-coverage-branches=68 --test-coverage-functions=88 --test 'dist-test/**/*.test.js'",
+    "watch": "tsc --build src test -w",
+    "build": "rm -rf dist dist-test && tsc --build src test",
+    "clean": "rm -rf node_modules yarn.lock package-lock.json dist dist-test",
+    "reset": "npm run clean && npm i && npm run build && npm test"
+  },
+  "author": {
+    "name": "Voxgig",
+    "url": "https://voxgig.com"
+  },
+  "license": "MIT",
+  "dependencies": {},
+  "peerDependencies": {},
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "dotenv": "^17.4.2",
+    "typescript": "^5.9.3"
+  }
+}

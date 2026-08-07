@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voxgig-sdk-univec"
+version = "0.0.1"
+description = "Unofficial generated Python SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+keywords = ["voxgig", "sdk", "generated-sdk", "openapi", "api-client", "univec"]
+dependencies = [
+    "requests>=2.33",
+]
+
+[project.urls]
+Homepage = "https://github.com/voxgig-sdk/univec-sdk"
+Repository = "https://github.com/voxgig-sdk/univec-sdk"
+Issues = "https://github.com/voxgig-sdk/univec-sdk/issues"
+
+# Ship the top-level single-file modules (setuptools find only discovers
+# package dirs, never these) so the documented import actually installs.
+# univec_types holds the generated @dataclass models.
+[tool.setuptools]
+py-modules = ["univec_sdk", "univec_types", "config", "features"]
+
+# Explicit package list — setuptools auto-discovery refuses to pick when
+# multiple top-level dirs (core/entity/feature/utility) are present.
+[tool.setuptools.packages.find]
+include = ["core*", "entity*", "feature*", "utility*"]
+
+# Ship the PEP 561 py.typed marker(s) so the inline type hints reach consumers.
+[tool.setuptools.package-data]
+"*" = ["py.typed"]

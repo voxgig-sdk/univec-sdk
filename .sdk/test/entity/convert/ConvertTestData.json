@@ -1,0 +1,49 @@
+{
+  "existing": {
+    "convert": {
+      "CONVERT00": {
+        "bridge_model": "s46",
+        "data": {},
+        "embedding": [],
+        "source_model": "s49",
+        "success": true,
+        "target_model": "s4b",
+        "text": [],
+        "id": "CONVERT00"
+      },
+      "CONVERT01": {
+        "bridge_model": "s8c",
+        "data": {},
+        "embedding": [],
+        "source_model": "s8f",
+        "success": true,
+        "target_model": "s91",
+        "text": [],
+        "id": "CONVERT01"
+      },
+      "CONVERT02": {
+        "bridge_model": "sd2",
+        "data": {},
+        "embedding": [],
+        "source_model": "sd5",
+        "success": true,
+        "target_model": "sd7",
+        "text": [],
+        "id": "CONVERT02"
+      }
+    }
+  },
+  "new": {
+    "convert": {
+      "convert_ref01": {
+        "bridge_model": "s118",
+        "data": {},
+        "embedding": [],
+        "source_model": "s11b",
+        "success": true,
+        "target_model": "s11d",
+        "text": []
+      }
+    }
+  }
+}

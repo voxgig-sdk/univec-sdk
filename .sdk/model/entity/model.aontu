@@ -1,0 +1,83 @@
+# Entity: model
+
+main: kit: entity: model: {
+
+  alias: field: {}
+
+  fields: [
+    {
+      name: "eval"
+      req: false
+      type: "`$OBJECT`"
+    }
+    {
+      name: "execution_provider"
+      req: false
+      type: "`$STRING`"
+    }
+    {
+      name: "model_card"
+      req: false
+      type: "`$OBJECT`"
+    }
+    {
+      name: "model_type"
+      req: true
+      type: "`$STRING`"
+    }
+    {
+      name: "name"
+      req: true
+      type: "`$STRING`"
+    }
+    {
+      name: "sequence_len"
+      req: false
+      type: "`$INTEGER`"
+    }
+    {
+      name: "source_dim"
+      req: false
+      type: "`$INTEGER`"
+    }
+    {
+      name: "source_model"
+      req: false
+      type: "`$STRING`"
+    }
+    {
+      name: "target_dim"
+      req: true
+      type: "`$INTEGER`"
+    }
+    {
+      name: "target_model"
+      req: true
+      type: "`$STRING`"
+    }
+  ]
+
+  name: "model"
+  op: {
+    list: {
+      name: "list"
+      points: [
+        {
+          method: "GET"
+          orig: "/v1/models"
+          parts: [
+            "v1"
+            "models"
+          ]
+          transform: {
+            req: "`reqdata`"
+            res: "`body`"
+          }
+        }
+      ]
+    }
+  }
+
+
+
+}

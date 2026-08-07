@@ -1,0 +1,36 @@
+
+main: kit: target: js: {
+  
+  title: JavaScript
+  ext: js
+  comment: line: "//"
+  module: name: 'univec'
+
+  deps: &: {
+    # TODO: fix aontu disjunctions!
+    kind: *'prod' | string # 'peer' |'dev'
+  }
+  
+  deps: {
+    'dotenv': { active: true, version: '^17.4.2', kind: dev }
+  }
+}
+
+
+main: kit: feature: &: target: js: deps: &: {
+  # TODO: fix aontu disjunctions!
+  kind: *'prod' | string # 'peer' |'dev'
+}
+
+
+# Publication: npm registry (declared, publish pending — git-tag only).
+main: kit: target: js: publish: {
+  tag: { active: true }
+  registry: {
+    state: 'pending'
+    active: false
+    name: 'npm'
+    url: 'https://registry.npmjs.org'
+    vault: { recipe: 'npm', alias: 'npm' }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "voxgig-sdk/univec",
+  "description": "Unofficial generated PHP SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.",
+  "type": "library",
+  "keywords": ["voxgig", "sdk", "generated-sdk", "openapi", "api-client", "univec"],
+  "homepage": "https://github.com/voxgig-sdk/univec-sdk",
+  "license": "MIT",
+  "authors": [
+    { "name": "Voxgig", "homepage": "https://voxgig.com" }
+  ],
+  "support": {
+    "issues": "https://github.com/voxgig-sdk/univec-sdk/issues",
+    "source": "https://github.com/voxgig-sdk/univec-sdk"
+  },
+  "minimum-stability": "stable",
+  "require": {
+    "php": ">=8.2"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.0"
+  },
+  "autoload": {
+    "files": ["univec_sdk.php"],
+    "classmap": ["core/", "entity/", "feature/", "types/", "utility/", "config.php", "features.php"]
+  },
+  "autoload-dev": {
+    "classmap": ["test/"]
+  }
+}
