@@ -64,6 +64,13 @@ const Package = cmp(async function Package(props: any) {
     type: 'commonjs',
     types: `dist/${SdkName}SDK.d.ts`,
     scripts: {
+      // `test` and `test-coverage` run the COMPILED suite in dist-test/, which
+      // a fresh clone does not have — the glob then matches nothing and the
+      // run reports "tests 0, pass 0, fail 0" and exits 0. A green suite that
+      // asserted nothing is worse than a red one, so build first. npm runs a
+      // `pre<script>` automatically, which keeps the test commands readable
+      // and cannot be forgotten by a caller invoking `npm test` directly.
+      'pretest': 'npm run build',
       'test': 'node --enable-source-maps --test-concurrency=1 --test \'dist-test/**/*.test.js\'',
       'test-some': 'node --enable-source-maps --experimental-test-isolation=none ' +
         '--test-name-pattern=\"$TEST_PATTERN\" --test \'dist-test/**/*.test.js\'',
@@ -76,6 +83,7 @@ const Package = cmp(async function Package(props: any) {
       // regressions. Thresholds are a conservative floor (well under a
       // healthy SDK's ~92% lines) so they hold across API shapes; raise them
       // for a stricter local policy.
+      'pretest-coverage': 'npm run build',
       'test-coverage': 'node --test-concurrency=1 --experimental-test-coverage ' +
         '--test-coverage-exclude=\'**/dist-test/**\' ' +
         '--test-coverage-lines=85 --test-coverage-branches=68 --test-coverage-functions=88 ' +

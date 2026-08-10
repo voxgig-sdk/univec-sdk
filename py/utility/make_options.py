@@ -84,6 +84,13 @@ def make_options_util(ctx):
         "clean": {
             "keys": "key,token,id",
         },
+        # Server-variable values for a templated base URL (OpenAPI server
+        # variables): {name} placeholders in "base" are substituted from this
+        # map at construction. Spec defaults arrive via the generated config;
+        # user values override them.
+        "server": {
+            "`$CHILD`": "",
+        },
     }
 
     # Preserve system.fetch before merge/validate.
@@ -94,6 +101,41 @@ def make_options_util(ctx):
     if not isinstance(validated, dict):
         validated = {}
     opts = validated
+
+    # Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
+    # Every placeholder must resolve to a non-empty value: from
+    # options["server"] (user), else the config default. A placeholder that
+    # resolves to "" is a construction ERROR in live mode — the URL cannot
+    # work — but in test mode substitutes the deterministic value
+    # "test-<name>" so offline tests need no configuration.
+    base = opts.get("base")
+    if isinstance(base, str) and "{" in base:
+        import re as _re
+        testmode = (
+            vs.getpath(opts, "test.active") is True
+            or vs.getpath(opts, "feature.test.active") is True
+        )
+        server = opts.get("server") if isinstance(opts.get("server"), dict) else {}
+        sdkname = "SDK"
+        if isinstance(config, dict):
+            mn = vs.getpath(config, "main.name")
+            if isinstance(mn, str) and mn != "":
+                sdkname = mn
+
+        def _sub(m):
+            name = m.group(1)
+            val = server.get(name)
+            val = val if isinstance(val, str) else ""
+            if val == "":
+                if testmode:
+                    return "test-" + name
+                raise ValueError(
+                    sdkname + ": the server variable '" + name + "' is required: "
+                    "the API base URL is '" + base + "' — pass "
+                    '{"server": {"' + name + '": "..."}} in the SDK options')
+            return val
+
+        opts["base"] = _re.sub(r"\{([A-Za-z0-9_]+)\}", _sub, base)
 
     # Restore system.fetch.
     if sys_fetch is not None:

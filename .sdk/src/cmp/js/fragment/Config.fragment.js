@@ -19,7 +19,7 @@ class Config {
 
 
   main = {
-    name: 'ProjectName',
+    name: 'Univec',
   }
 
 
@@ -29,9 +29,9 @@ class Config {
 
 
   options = {
-    base: '$$main.kit.info.servers.0.url$$',
+    base: 'https://api.univec.ai',
 
-    'AUTHBLOCK'headers: 'HEADERS',
+    'SERVERBLOCK''AUTHBLOCK'headers: 'HEADERS',
 
     entity: {
       // #EntityConfigs

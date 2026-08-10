@@ -4,7 +4,7 @@
 #
 # Every port gets a git release tag <target>/vX.Y.Z. Ports with an ACTIVE
 # registry also publish a package there. Credentials are injected at exec
-# time by the aql key vault (https://github.com/aql-lang/aql) — never
+# time by the boru key vault (https://github.com/boru-lang/boru) — never
 # stored on disk or passed on the command line.
 #
 # Publication state (from the model):
@@ -22,7 +22,7 @@
 #                             registry upload is irreversible); while a
 #                             registry is pending this publishes the
 #                             port's git tag only
-#   make deploy-dry           rehearse EVERY target: aql --dry-run
+#   make deploy-dry           rehearse EVERY target: boru --dry-run
 #                             injects a filler token that each publish
 #                             recipe detects, so build + test run in full
 #                             but nothing is uploaded and no tag is cut
@@ -39,7 +39,7 @@ PYPI_ALIAS ?= pypi
 
 # Lockstep SDK version, read from the canonical ts manifest.
 VERSION := $(shell node -p "require('./ts/package.json').version" 2>/dev/null || echo 0.0.0)
-AQL_DRY_RUN_FILLER := AQL-DRY-RUN-FILLER-NOT-A-REAL-SECRET
+BORU_DRY_RUN_FILLER := BORU-DRY-RUN-FILLER-NOT-A-REAL-SECRET
 
 TARGETS := go go-cli go-mcp js lua php py ts
 
@@ -65,24 +65,24 @@ deploy-dry: $(addprefix deploy-dry-,$(TARGETS))
 	@echo "deploy-dry: all targets rehearsed OK ($(TARGETS))"
 
 deploy-go:
-	aql vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) -C go publish
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) -C go publish
 
 deploy-dry-go:
-	aql vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) -C go publish
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) -C go publish
 
 deploy-go-cli:
 	@echo "deploy-go-cli: tag-only port — publishing the git tag."
-	aql vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-go-cli
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-go-cli
 
 deploy-dry-go-cli:
-	aql vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-go-cli
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-go-cli
 
 tag-push-go-cli:
 	@set -e; tag="go-cli/v$(VERSION)"; \
 	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
-	if [ "$$token" = "$(AQL_DRY_RUN_FILLER)" ]; then \
-	  echo "[dry-run] aql filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
-	if [ -z "$$token" ]; then echo "tag-push-go-cli: no GITHUB_TOKEN in env — run via make deploy-go-cli (aql vault exec)"; exit 1; fi; \
+	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
+	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
+	if [ -z "$$token" ]; then echo "tag-push-go-cli: no GITHUB_TOKEN in env — run via make deploy-go-cli (boru vault exec)"; exit 1; fi; \
 	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
 	  echo "tag $$tag already exists — pushing existing tag"; \
 	else git tag -a "$$tag" -m "Release $$tag"; fi; \
@@ -93,17 +93,17 @@ tag-push-go-cli:
 
 deploy-go-mcp:
 	@echo "deploy-go-mcp: tag-only port — publishing the git tag."
-	aql vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-go-mcp
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-go-mcp
 
 deploy-dry-go-mcp:
-	aql vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-go-mcp
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-go-mcp
 
 tag-push-go-mcp:
 	@set -e; tag="go-mcp/v$(VERSION)"; \
 	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
-	if [ "$$token" = "$(AQL_DRY_RUN_FILLER)" ]; then \
-	  echo "[dry-run] aql filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
-	if [ -z "$$token" ]; then echo "tag-push-go-mcp: no GITHUB_TOKEN in env — run via make deploy-go-mcp (aql vault exec)"; exit 1; fi; \
+	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
+	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
+	if [ -z "$$token" ]; then echo "tag-push-go-mcp: no GITHUB_TOKEN in env — run via make deploy-go-mcp (boru vault exec)"; exit 1; fi; \
 	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
 	  echo "tag $$tag already exists — pushing existing tag"; \
 	else git tag -a "$$tag" -m "Release $$tag"; fi; \
@@ -114,17 +114,17 @@ tag-push-go-mcp:
 
 deploy-js:
 	@echo "deploy-js: npm publication is pending — publishing the git tag only."
-	aql vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-js
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-js
 
 deploy-dry-js:
-	aql vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-js
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-js
 
 tag-push-js:
 	@set -e; tag="js/v$(VERSION)"; \
 	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
-	if [ "$$token" = "$(AQL_DRY_RUN_FILLER)" ]; then \
-	  echo "[dry-run] aql filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
-	if [ -z "$$token" ]; then echo "tag-push-js: no GITHUB_TOKEN in env — run via make deploy-js (aql vault exec)"; exit 1; fi; \
+	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
+	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
+	if [ -z "$$token" ]; then echo "tag-push-js: no GITHUB_TOKEN in env — run via make deploy-js (boru vault exec)"; exit 1; fi; \
 	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
 	  echo "tag $$tag already exists — pushing existing tag"; \
 	else git tag -a "$$tag" -m "Release $$tag"; fi; \
@@ -135,17 +135,17 @@ tag-push-js:
 
 deploy-lua:
 	@echo "deploy-lua: luarocks publication is pending — publishing the git tag only."
-	aql vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-lua
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-lua
 
 deploy-dry-lua:
-	aql vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-lua
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-lua
 
 tag-push-lua:
 	@set -e; tag="lua/v$(VERSION)"; \
 	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
-	if [ "$$token" = "$(AQL_DRY_RUN_FILLER)" ]; then \
-	  echo "[dry-run] aql filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
-	if [ -z "$$token" ]; then echo "tag-push-lua: no GITHUB_TOKEN in env — run via make deploy-lua (aql vault exec)"; exit 1; fi; \
+	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
+	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
+	if [ -z "$$token" ]; then echo "tag-push-lua: no GITHUB_TOKEN in env — run via make deploy-lua (boru vault exec)"; exit 1; fi; \
 	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
 	  echo "tag $$tag already exists — pushing existing tag"; \
 	else git tag -a "$$tag" -m "Release $$tag"; fi; \
@@ -156,17 +156,17 @@ tag-push-lua:
 
 deploy-php:
 	@echo "deploy-php: packagist publication is pending — publishing the git tag only."
-	aql vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-php
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-php
 
 deploy-dry-php:
-	aql vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-php
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-php
 
 tag-push-php:
 	@set -e; tag="php/v$(VERSION)"; \
 	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
-	if [ "$$token" = "$(AQL_DRY_RUN_FILLER)" ]; then \
-	  echo "[dry-run] aql filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
-	if [ -z "$$token" ]; then echo "tag-push-php: no GITHUB_TOKEN in env — run via make deploy-php (aql vault exec)"; exit 1; fi; \
+	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
+	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
+	if [ -z "$$token" ]; then echo "tag-push-php: no GITHUB_TOKEN in env — run via make deploy-php (boru vault exec)"; exit 1; fi; \
 	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
 	  echo "tag $$tag already exists — pushing existing tag"; \
 	else git tag -a "$$tag" -m "Release $$tag"; fi; \
@@ -177,17 +177,17 @@ tag-push-php:
 
 deploy-py:
 	@echo "deploy-py: pypi publication is pending — publishing the git tag only."
-	aql vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-py
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-py
 
 deploy-dry-py:
-	aql vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-py
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-py
 
 tag-push-py:
 	@set -e; tag="py/v$(VERSION)"; \
 	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
-	if [ "$$token" = "$(AQL_DRY_RUN_FILLER)" ]; then \
-	  echo "[dry-run] aql filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
-	if [ -z "$$token" ]; then echo "tag-push-py: no GITHUB_TOKEN in env — run via make deploy-py (aql vault exec)"; exit 1; fi; \
+	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
+	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
+	if [ -z "$$token" ]; then echo "tag-push-py: no GITHUB_TOKEN in env — run via make deploy-py (boru vault exec)"; exit 1; fi; \
 	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
 	  echo "tag $$tag already exists — pushing existing tag"; \
 	else git tag -a "$$tag" -m "Release $$tag"; fi; \
@@ -198,17 +198,17 @@ tag-push-py:
 
 deploy-ts:
 	@echo "deploy-ts: npm publication is pending — publishing the git tag only."
-	aql vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-ts
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-ts
 
 deploy-dry-ts:
-	aql vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-ts
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-ts
 
 tag-push-ts:
 	@set -e; tag="ts/v$(VERSION)"; \
 	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
-	if [ "$$token" = "$(AQL_DRY_RUN_FILLER)" ]; then \
-	  echo "[dry-run] aql filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
-	if [ -z "$$token" ]; then echo "tag-push-ts: no GITHUB_TOKEN in env — run via make deploy-ts (aql vault exec)"; exit 1; fi; \
+	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
+	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
+	if [ -z "$$token" ]; then echo "tag-push-ts: no GITHUB_TOKEN in env — run via make deploy-ts (boru vault exec)"; exit 1; fi; \
 	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
 	  echo "tag $$tag already exists — pushing existing tag"; \
 	else git tag -a "$$tag" -m "Release $$tag"; fi; \

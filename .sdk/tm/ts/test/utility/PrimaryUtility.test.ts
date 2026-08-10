@@ -229,6 +229,8 @@ describe('PrimaryUtility', async () => {
       body: 'present',
     })
     const reqClient = new (SDK as any)({
+      // Concrete base: a live construction must satisfy any server variables a templated base URL declares; a literal base sidesteps the requirement.
+      base: 'http://localhost:8080',
       system: { fetch: mockFetch }
     })
     const reqUtility = reqClient.utility()
@@ -410,6 +412,7 @@ describe('PrimaryUtility', async () => {
   test('fetcher-live', async () => {
     const calls: any[] = []
     const liveClient = new (SDK as any)({
+      base: 'http://localhost:8080',
       system: {
         fetch: async (url: string, init: any) => {
           calls.push({ url, init })
@@ -431,6 +434,7 @@ describe('PrimaryUtility', async () => {
 
   test('fetcher-blocked-test-mode', async () => {
     const blockedClient = new (SDK as any)({
+      base: 'http://localhost:8080',
       system: { fetch: async () => ({}) }
     })
     blockedClient._mode = 'test'

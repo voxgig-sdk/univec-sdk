@@ -28,8 +28,8 @@ main: kit: target: 'go-cli': {
 
   # No external module deps declared here; the generated go.mod uses
   # a relative replace to the sibling SDK at ../go and (until
-  # aql/eng is published with a subdir tag) a local replace for the
-  # AQL engine. See Main_go-cli.ts.
+  # boru/eng is published with a subdir tag) a local replace for the
+  # boru engine. See Main_go-cli.ts.
   deps: {}
 }
 

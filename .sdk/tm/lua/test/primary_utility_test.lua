@@ -576,6 +576,9 @@ describe("PrimaryUtility", function()
   it("fetcher-live", function()
     local calls = {}
     local live_client = sdk.new({
+      -- Concrete base: a live construction must satisfy any server variables
+      -- a templated base URL declares; a literal base sidesteps the requirement.
+      base = "http://localhost:8080",
       system = {
         fetch = function(url, fetchdef)
           table.insert(calls, { url = url, init = fetchdef })
@@ -600,6 +603,7 @@ describe("PrimaryUtility", function()
 
   it("fetcher-blocked-test-mode", function()
     local blocked_client = sdk.new({
+      base = "http://localhost:8080",
       system = {
         fetch = function(url, fetchdef)
           return {}, nil

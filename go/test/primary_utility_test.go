@@ -252,6 +252,10 @@ func TestPrimaryUtility(t *testing.T) {
 	t.Run("fetcher-live", func(t *testing.T) {
 		calls := []map[string]any{}
 		liveClient := sdk.NewUnivecSDK(map[string]any{
+			// Concrete base: a live construction must satisfy any server
+			// variables a templated base URL declares; a literal base
+			// sidesteps the requirement.
+			"base": "http://localhost:8080",
 			"system": map[string]any{
 				"fetch": func(url string, fetchdef map[string]any) (map[string]any, error) {
 					calls = append(calls, map[string]any{"url": url, "init": fetchdef})
@@ -282,6 +286,7 @@ func TestPrimaryUtility(t *testing.T) {
 	t.Run("fetcher-blocked-test-mode", func(t *testing.T) {
 		// Create a live SDK then set mode to test (not using TestSDK, which installs test feature)
 		blockedClient := sdk.NewUnivecSDK(map[string]any{
+			"base": "http://localhost:8080",
 			"system": map[string]any{
 				"fetch": func(url string, fetchdef map[string]any) (map[string]any, error) {
 					return map[string]any{}, nil

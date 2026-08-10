@@ -24,12 +24,12 @@
   "devDependencies": {
     "@types/node": ">=25.6",
     "typescript": ">=6.0",
-    "@voxgig/apidef": ">=5.8",
-    "@voxgig/model": ">=8.1",
-    "@voxgig/sdkgen": ">=0.40",
+    "@voxgig/apidef": "^6.5.1",
+    "@voxgig/model": "^9.4.1",
+    "@voxgig/sdkgen": "^1.5.1",
     "@voxgig/util": ">=0.4",
     "@voxgig/struct": ">=0.1.0",
     "jostraca": ">=0.29",
-    "aontu": ">=0.44"
+    "aontu": "^0.50.1"
   }
 }
