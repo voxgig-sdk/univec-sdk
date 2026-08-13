@@ -39,45 +39,31 @@ func MakeConfig() map[string]any {
 					},
 					map[string]any{
 						"active": true,
-						"name": "data",
-						"req": true,
-						"type": "`$OBJECT`",
-						"index$": 1,
-					},
-					map[string]any{
-						"active": true,
-						"name": "embedding",
+						"name": "embeddings",
 						"req": true,
 						"type": "`$ARRAY`",
-						"index$": 2,
+						"index$": 1,
 					},
 					map[string]any{
 						"active": true,
 						"name": "source_model",
 						"req": true,
 						"type": "`$STRING`",
-						"index$": 3,
-					},
-					map[string]any{
-						"active": true,
-						"name": "success",
-						"req": true,
-						"type": "`$BOOLEAN`",
-						"index$": 4,
+						"index$": 2,
 					},
 					map[string]any{
 						"active": true,
 						"name": "target_model",
 						"req": true,
 						"type": "`$STRING`",
-						"index$": 5,
+						"index$": 3,
 					},
 					map[string]any{
 						"active": true,
-						"name": "text",
+						"name": "texts",
 						"req": true,
 						"type": "`$ARRAY`",
-						"index$": 6,
+						"index$": 4,
 					},
 				},
 				"name": "convert",
@@ -89,6 +75,7 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"active": true,
 								"args": map[string]any{},
+								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/convert",
 								"parts": []any{
@@ -98,13 +85,14 @@ func MakeConfig() map[string]any {
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
-									"res": "`body`",
+									"res": "`body.data`",
 								},
 								"index$": 0,
 							},
 							map[string]any{
 								"active": true,
 								"args": map[string]any{},
+								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/embed-bridge",
 								"parts": []any{
@@ -114,13 +102,14 @@ func MakeConfig() map[string]any {
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
-									"res": "`body`",
+									"res": "`body.data`",
 								},
 								"index$": 1,
 							},
 							map[string]any{
 								"active": true,
 								"args": map[string]any{},
+								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/ephemeral/convert",
 								"parts": []any{
@@ -131,13 +120,14 @@ func MakeConfig() map[string]any {
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
-									"res": "`body`",
+									"res": "`body.data`",
 								},
 								"index$": 2,
 							},
 							map[string]any{
 								"active": true,
 								"args": map[string]any{},
+								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/ephemeral/embed-bridge",
 								"parts": []any{
@@ -148,12 +138,11 @@ func MakeConfig() map[string]any {
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
-									"res": "`body`",
+									"res": "`body.data`",
 								},
 								"index$": 3,
 							},
 						},
-						"key$": "create",
 					},
 				},
 				"relations": map[string]any{
@@ -164,9 +153,9 @@ func MakeConfig() map[string]any {
 				"fields": []any{
 					map[string]any{
 						"active": true,
-						"name": "data",
+						"name": "embeddings",
 						"req": true,
-						"type": "`$OBJECT`",
+						"type": "`$ARRAY`",
 						"index$": 0,
 					},
 					map[string]any{
@@ -178,17 +167,10 @@ func MakeConfig() map[string]any {
 					},
 					map[string]any{
 						"active": true,
-						"name": "success",
-						"req": true,
-						"type": "`$BOOLEAN`",
-						"index$": 2,
-					},
-					map[string]any{
-						"active": true,
-						"name": "text",
+						"name": "texts",
 						"req": true,
 						"type": "`$ARRAY`",
-						"index$": 3,
+						"index$": 2,
 					},
 				},
 				"name": "embed",
@@ -200,6 +182,7 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"active": true,
 								"args": map[string]any{},
+								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/embed",
 								"parts": []any{
@@ -209,13 +192,14 @@ func MakeConfig() map[string]any {
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
-									"res": "`body`",
+									"res": "`body.data`",
 								},
 								"index$": 0,
 							},
 							map[string]any{
 								"active": true,
 								"args": map[string]any{},
+								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/ephemeral/embed",
 								"parts": []any{
@@ -226,12 +210,11 @@ func MakeConfig() map[string]any {
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
-									"res": "`body`",
+									"res": "`body.data`",
 								},
 								"index$": 1,
 							},
 						},
-						"key$": "create",
 					},
 				},
 				"relations": map[string]any{
@@ -242,17 +225,31 @@ func MakeConfig() map[string]any {
 				"fields": []any{
 					map[string]any{
 						"active": true,
-						"name": "data",
+						"name": "dailyLimit",
 						"req": true,
-						"type": "`$OBJECT`",
+						"type": "`$INTEGER`",
 						"index$": 0,
 					},
 					map[string]any{
 						"active": true,
-						"name": "success",
+						"name": "dailyUsed",
 						"req": true,
-						"type": "`$BOOLEAN`",
+						"type": "`$INTEGER`",
 						"index$": 1,
+					},
+					map[string]any{
+						"active": true,
+						"name": "key",
+						"req": true,
+						"type": "`$STRING`",
+						"index$": 2,
+					},
+					map[string]any{
+						"active": true,
+						"name": "resetsAt",
+						"req": true,
+						"type": "`$STRING`",
+						"index$": 3,
 					},
 				},
 				"name": "ephemeral_key",
@@ -264,6 +261,7 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"active": true,
 								"args": map[string]any{},
+								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/ephemeral/key",
 								"parts": []any{
@@ -274,12 +272,11 @@ func MakeConfig() map[string]any {
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
-									"res": "`body`",
+									"res": "`body.data`",
 								},
 								"index$": 0,
 							},
 						},
-						"key$": "create",
 					},
 				},
 				"relations": map[string]any{
@@ -297,21 +294,21 @@ func MakeConfig() map[string]any {
 					},
 					map[string]any{
 						"active": true,
-						"name": "execution_provider",
+						"name": "executionProvider",
 						"req": false,
 						"type": "`$STRING`",
 						"index$": 1,
 					},
 					map[string]any{
 						"active": true,
-						"name": "model_card",
+						"name": "modelCard",
 						"req": false,
 						"type": "`$OBJECT`",
 						"index$": 2,
 					},
 					map[string]any{
 						"active": true,
-						"name": "model_type",
+						"name": "modelType",
 						"req": true,
 						"type": "`$STRING`",
 						"index$": 3,
@@ -325,35 +322,35 @@ func MakeConfig() map[string]any {
 					},
 					map[string]any{
 						"active": true,
-						"name": "sequence_len",
+						"name": "sequenceLen",
 						"req": false,
 						"type": "`$INTEGER`",
 						"index$": 5,
 					},
 					map[string]any{
 						"active": true,
-						"name": "source_dim",
+						"name": "sourceDim",
 						"req": false,
 						"type": "`$INTEGER`",
 						"index$": 6,
 					},
 					map[string]any{
 						"active": true,
-						"name": "source_model",
+						"name": "sourceModel",
 						"req": false,
 						"type": "`$STRING`",
 						"index$": 7,
 					},
 					map[string]any{
 						"active": true,
-						"name": "target_dim",
+						"name": "targetDim",
 						"req": true,
 						"type": "`$INTEGER`",
 						"index$": 8,
 					},
 					map[string]any{
 						"active": true,
-						"name": "target_model",
+						"name": "targetModel",
 						"req": true,
 						"type": "`$STRING`",
 						"index$": 9,
@@ -368,6 +365,7 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"active": true,
 								"args": map[string]any{},
+								"kind": "http",
 								"method": "GET",
 								"orig": "/v1/models",
 								"parts": []any{
@@ -377,12 +375,11 @@ func MakeConfig() map[string]any {
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
-									"res": "`body`",
+									"res": "`body.data`",
 								},
 								"index$": 0,
 							},
 						},
-						"key$": "list",
 					},
 				},
 				"relations": map[string]any{

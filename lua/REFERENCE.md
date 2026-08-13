@@ -104,12 +104,10 @@ local convert = client:Convert(nil)
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `bridge_model` | `string` | Yes |  |
-| `data` | `table` | Yes |  |
-| `embedding` | `table` | Yes |  |
+| `embeddings` | `table` | Yes |  |
 | `source_model` | `string` | Yes |  |
-| `success` | `boolean` | Yes |  |
 | `target_model` | `string` | Yes |  |
-| `text` | `table` | Yes |  |
+| `texts` | `table` | Yes |  |
 
 ### Operations
 
@@ -120,12 +118,10 @@ Create a new entity with the given data.
 ```lua
 local result, err = client:Convert():create({
   bridge_model = --[[ string ]],
-  data = --[[ table ]],
-  embedding = --[[ table ]],
+  embeddings = --[[ table ]],
   source_model = --[[ string ]],
-  success = --[[ boolean ]],
   target_model = --[[ string ]],
-  text = --[[ table ]],
+  texts = --[[ table ]],
 })
 ```
 
@@ -169,10 +165,9 @@ local embed = client:Embed(nil)
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `table` | Yes |  |
+| `embeddings` | `table` | Yes |  |
 | `model` | `string` | Yes |  |
-| `success` | `boolean` | Yes |  |
-| `text` | `table` | Yes |  |
+| `texts` | `table` | Yes |  |
 
 ### Operations
 
@@ -182,10 +177,9 @@ Create a new entity with the given data.
 
 ```lua
 local result, err = client:Embed():create({
-  data = --[[ table ]],
+  embeddings = --[[ table ]],
   model = --[[ string ]],
-  success = --[[ boolean ]],
-  text = --[[ table ]],
+  texts = --[[ table ]],
 })
 ```
 
@@ -229,8 +223,10 @@ local ephemeral_key = client:EphemeralKey(nil)
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `table` | Yes |  |
-| `success` | `boolean` | Yes |  |
+| `dailyLimit` | `number` | Yes |  |
+| `dailyUsed` | `number` | Yes |  |
+| `key` | `string` | Yes |  |
+| `resetsAt` | `string` | Yes |  |
 
 ### Operations
 
@@ -240,8 +236,10 @@ Create a new entity with the given data.
 
 ```lua
 local result, err = client:EphemeralKey():create({
-  data = --[[ table ]],
-  success = --[[ boolean ]],
+  dailyLimit = --[[ number ]],
+  dailyUsed = --[[ number ]],
+  key = --[[ string ]],
+  resetsAt = --[[ string ]],
 })
 ```
 
@@ -286,15 +284,15 @@ local model = client:Model(nil)
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `eval` | `table` | No |  |
-| `execution_provider` | `string` | No |  |
-| `model_card` | `table` | No |  |
-| `model_type` | `string` | Yes |  |
+| `executionProvider` | `string` | No |  |
+| `modelCard` | `table` | No |  |
+| `modelType` | `string` | Yes |  |
 | `name` | `string` | Yes |  |
-| `sequence_len` | `number` | No |  |
-| `source_dim` | `number` | No |  |
-| `source_model` | `string` | No |  |
-| `target_dim` | `number` | Yes |  |
-| `target_model` | `string` | Yes |  |
+| `sequenceLen` | `number` | No |  |
+| `sourceDim` | `number` | No |  |
+| `sourceModel` | `string` | No |  |
+| `targetDim` | `number` | Yes |  |
+| `targetModel` | `string` | Yes |  |
 
 ### Operations
 

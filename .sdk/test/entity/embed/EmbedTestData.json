@@ -2,24 +2,21 @@
   "existing": {
     "embed": {
       "EMBED00": {
-        "data": {},
-        "model": "s29",
-        "success": true,
-        "text": [],
+        "embeddings": [],
+        "model": "s1f",
+        "texts": [],
         "id": "EMBED00"
       },
       "EMBED01": {
-        "data": {},
-        "model": "s51",
-        "success": true,
-        "text": [],
+        "embeddings": [],
+        "model": "s3d",
+        "texts": [],
         "id": "EMBED01"
       },
       "EMBED02": {
-        "data": {},
-        "model": "s79",
-        "success": true,
-        "text": [],
+        "embeddings": [],
+        "model": "s5b",
+        "texts": [],
         "id": "EMBED02"
       }
     }
@@ -27,10 +24,9 @@
   "new": {
     "embed": {
       "embed_ref01": {
-        "data": {},
-        "model": "sa1",
-        "success": true,
-        "text": []
+        "embeddings": [],
+        "model": "s79",
+        "texts": []
       }
     }
   }

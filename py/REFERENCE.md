@@ -101,12 +101,10 @@ convert = client.Convert()
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `bridge_model` | `str` | Yes |  |
-| `data` | `dict` | Yes |  |
-| `embedding` | `list` | Yes |  |
+| `embeddings` | `list` | Yes |  |
 | `source_model` | `str` | Yes |  |
-| `success` | `bool` | Yes |  |
 | `target_model` | `str` | Yes |  |
-| `text` | `list` | Yes |  |
+| `texts` | `list` | Yes |  |
 
 ### Operations
 
@@ -117,12 +115,10 @@ Create a new entity with the given data. Returns the created entity data and rai
 ```python
 result = client.Convert().create({
     "bridge_model": "example_bridge_model",  # str
-    "data": {},  # dict
-    "embedding": [],  # list
+    "embeddings": [],  # list
     "source_model": "example_source_model",  # str
-    "success": True,  # bool
     "target_model": "example_target_model",  # str
-    "text": [],  # list
+    "texts": [],  # list
 })
 ```
 
@@ -165,10 +161,9 @@ embed = client.Embed()
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `dict` | Yes |  |
+| `embeddings` | `list` | Yes |  |
 | `model` | `str` | Yes |  |
-| `success` | `bool` | Yes |  |
-| `text` | `list` | Yes |  |
+| `texts` | `list` | Yes |  |
 
 ### Operations
 
@@ -178,10 +173,9 @@ Create a new entity with the given data. Returns the created entity data and rai
 
 ```python
 result = client.Embed().create({
-    "data": {},  # dict
+    "embeddings": [],  # list
     "model": "example_model",  # str
-    "success": True,  # bool
-    "text": [],  # list
+    "texts": [],  # list
 })
 ```
 
@@ -224,8 +218,10 @@ ephemeral_key = client.EphemeralKey()
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `dict` | Yes |  |
-| `success` | `bool` | Yes |  |
+| `dailyLimit` | `int` | Yes |  |
+| `dailyUsed` | `int` | Yes |  |
+| `key` | `str` | Yes |  |
+| `resetsAt` | `str` | Yes |  |
 
 ### Operations
 
@@ -235,8 +231,10 @@ Create a new entity with the given data. Returns the created entity data and rai
 
 ```python
 result = client.EphemeralKey().create({
-    "data": {},  # dict
-    "success": True,  # bool
+    "dailyLimit": 1,  # int
+    "dailyUsed": 1,  # int
+    "key": "example_key",  # str
+    "resetsAt": "example_resetsAt",  # str
 })
 ```
 
@@ -280,15 +278,15 @@ model = client.Model()
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `eval` | `dict` | No |  |
-| `execution_provider` | `str` | No |  |
-| `model_card` | `dict` | No |  |
-| `model_type` | `str` | Yes |  |
+| `executionProvider` | `str` | No |  |
+| `modelCard` | `dict` | No |  |
+| `modelType` | `str` | Yes |  |
 | `name` | `str` | Yes |  |
-| `sequence_len` | `int` | No |  |
-| `source_dim` | `int` | No |  |
-| `source_model` | `str` | No |  |
-| `target_dim` | `int` | Yes |  |
-| `target_model` | `str` | Yes |  |
+| `sequenceLen` | `int` | No |  |
+| `sourceDim` | `int` | No |  |
+| `sourceModel` | `str` | No |  |
+| `targetDim` | `int` | Yes |  |
+| `targetModel` | `str` | Yes |  |
 
 ### Operations
 

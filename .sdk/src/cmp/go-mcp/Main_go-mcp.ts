@@ -3,7 +3,7 @@ import * as Path from 'node:path'
 
 import {
   cmp, each, deriveEntityNames,
-  File, Content, Fragment, Slot,
+  File, Content, Fragment, Slot, goModule, goVersion
 } from '@voxgig/sdkgen'
 
 import type {
@@ -50,8 +50,8 @@ const Main = cmp(function Main(props: any) {
   const { model } = props.ctx$
 
   const org = model.origin || 'voxgig-sdk'
-  const sdkModule = `github.com/${org}/${model.name}-sdk/go`
-  const mcpModule = `github.com/${org}/${model.name}-sdk/go-mcp`
+  const sdkModule = goModule(model, 'go')
+  const mcpModule = goModule(model, 'go-mcp')
 
   const entityMap: any = getModelPath(model, `main.${KIT}.entity`)
   // Derive each entity's PascalCase `Name` here rather than relying on another
@@ -319,7 +319,7 @@ this repo, or upstream at
   // the public proxy. The MCP Go SDK requires go >= 1.25.
   File({ name: 'go.mod' }, () => Content(`module ${mcpModule}
 
-go 1.25.0
+go ${goVersion(model, 'go-mcp', '1.25.0')}
 
 require ${sdkModule} v0.0.0
 require github.com/modelcontextprotocol/go-sdk ${MCP_GO_SDK_VERSION}

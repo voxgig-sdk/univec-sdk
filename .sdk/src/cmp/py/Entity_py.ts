@@ -41,14 +41,20 @@ const Entity = cmp(function Entity(props: any) {
       typeNames.push(opTypeName(entity.Name, opname))
     }
   })
-  const typesModule = model.const.Name.toLowerCase() + '_types'
+  // The generated dataclasses live inside the SDK package alongside
+  // everything else, so the import is package-qualified.
+  const typesModule = model.const.Name.toLowerCase() + '_sdk.' +
+    model.const.Name.toLowerCase() + '_types'
   const typeImport =
     'from ' + typesModule + ' import (\n    ' +
     typeNames.join(',\n    ') + ',\n)'
 
   const ff = Path.normalize(__dirname + '/../../../src/cmp/py/fragment/')
 
-  // Entity files go to entity/ folder
+  // Entity files go to <name>_sdk/entity/ — inside the SDK package, not at
+  // the language root. See the note in Main_py.ts: a top-level `entity`
+  // package is shadowable by any entity.py sitting beside the caller.
+  Folder({ name: model.const.Name.toLowerCase() + '_sdk' }, () => {
   Folder({ name: 'entity' }, () => {
 
     File({ name: entity.name + '_entity.' + target.ext }, () => {
@@ -94,6 +100,7 @@ const Entity = cmp(function Entity(props: any) {
       })
 
     })
+  })
   })
 })
 

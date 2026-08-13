@@ -37,7 +37,7 @@ class ModelEntity extends UnivecEntityBase<Model> {
 
 
 
-  async list(this: any, reqmatch?: ModelListMatch, ctrl?: Control): Promise<Model[]> {
+  async list(this: any, reqmatch?: ModelListMatch, ctrl?: Control): Promise<ModelEntity[]> {
 
     const utility = this._utility
 

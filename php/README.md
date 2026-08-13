@@ -36,8 +36,8 @@ $client = new UnivecSDK([
 ### 4. Create, update, and remove
 
 ```php
-// create() returns the bare created Convert record.
-$created = $client->Convert()->create(["bridge_model" => "example_bridge_model", "data" => [], "embedding" => [], "source_model" => "example_source_model", "success" => true, "target_model" => "example_target_model", "text" => []]);
+// create() returns the ENTITY — call data_get() for the created Convert record.
+$created = $client->Convert()->create(["bridge_model" => "example_bridge_model", "embeddings" => [], "source_model" => "example_source_model", "target_model" => "example_target_model", "texts" => []]);
 
 ```
 
@@ -121,7 +121,8 @@ Create a mock client for unit testing — no server required:
 ```php
 $client = UnivecSDK::test();
 
-// Entity ops return the bare mock record (throws on error).
+// Entity ops return the ENTITY (throws on error);
+// call data_get() for the mock record.
 $model = $client->Model()->list();
 print_r($model);
 ```
@@ -226,7 +227,7 @@ All entities share the same interface.
 
 ### Result shape
 
-Entity operations return the bare result data (an `array` for single-entity
+Entity operations return the ENTITY (call data_get() for the record) (an `array` for single-entity
 ops, a `list` for `list`) and throw on error. Wrap calls in
 `try`/`catch` to handle failures.
 
@@ -249,12 +250,10 @@ On error, `ok` is `false` and `$err` contains the error value.
 | Field | Description |
 | --- | --- |
 | `bridge_model` |  |
-| `data` |  |
-| `embedding` |  |
+| `embeddings` |  |
 | `source_model` |  |
-| `success` |  |
 | `target_model` |  |
-| `text` |  |
+| `texts` |  |
 
 Operations: Create.
 
@@ -264,10 +263,9 @@ API path: `/v1/convert`
 
 | Field | Description |
 | --- | --- |
-| `data` |  |
+| `embeddings` |  |
 | `model` |  |
-| `success` |  |
-| `text` |  |
+| `texts` |  |
 
 Operations: Create.
 
@@ -277,8 +275,10 @@ API path: `/v1/embed`
 
 | Field | Description |
 | --- | --- |
-| `data` |  |
-| `success` |  |
+| `dailyLimit` |  |
+| `dailyUsed` |  |
+| `key` |  |
+| `resetsAt` |  |
 
 Operations: Create.
 
@@ -289,15 +289,15 @@ API path: `/v1/ephemeral/key`
 | Field | Description |
 | --- | --- |
 | `eval` |  |
-| `execution_provider` |  |
-| `model_card` |  |
-| `model_type` |  |
+| `executionProvider` |  |
+| `modelCard` |  |
+| `modelType` |  |
 | `name` |  |
-| `sequence_len` |  |
-| `source_dim` |  |
-| `source_model` |  |
-| `target_dim` |  |
-| `target_model` |  |
+| `sequenceLen` |  |
+| `sourceDim` |  |
+| `sourceModel` |  |
+| `targetDim` |  |
+| `targetModel` |  |
 
 Operations: List.
 
@@ -323,24 +323,20 @@ Create an instance: `$convert = $client->Convert();`
 | Field | Type | Description |
 | --- | --- | --- |
 | `bridge_model` | `string` |  |
-| `data` | `array` |  |
-| `embedding` | `array` |  |
+| `embeddings` | `array` |  |
 | `source_model` | `string` |  |
-| `success` | `bool` |  |
 | `target_model` | `string` |  |
-| `text` | `array` |  |
+| `texts` | `array` |  |
 
 #### Example: Create
 
 ```php
 $convert = $client->Convert()->create([
     "bridge_model" => null, // string
-    "data" => null, // array
-    "embedding" => null, // array
+    "embeddings" => null, // array
     "source_model" => null, // string
-    "success" => null, // bool
     "target_model" => null, // string
-    "text" => null, // array
+    "texts" => null, // array
 ]);
 ```
 
@@ -359,19 +355,17 @@ Create an instance: `$embed = $client->Embed();`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `array` |  |
+| `embeddings` | `array` |  |
 | `model` | `string` |  |
-| `success` | `bool` |  |
-| `text` | `array` |  |
+| `texts` | `array` |  |
 
 #### Example: Create
 
 ```php
 $embed = $client->Embed()->create([
-    "data" => null, // array
+    "embeddings" => null, // array
     "model" => null, // string
-    "success" => null, // bool
-    "text" => null, // array
+    "texts" => null, // array
 ]);
 ```
 
@@ -390,15 +384,19 @@ Create an instance: `$ephemeral_key = $client->EphemeralKey();`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `array` |  |
-| `success` | `bool` |  |
+| `dailyLimit` | `int` |  |
+| `dailyUsed` | `int` |  |
+| `key` | `string` |  |
+| `resetsAt` | `string` |  |
 
 #### Example: Create
 
 ```php
 $ephemeral_key = $client->EphemeralKey()->create([
-    "data" => null, // array
-    "success" => null, // bool
+    "dailyLimit" => null, // int
+    "dailyUsed" => null, // int
+    "key" => null, // string
+    "resetsAt" => null, // string
 ]);
 ```
 
@@ -418,15 +416,15 @@ Create an instance: `$model = $client->Model();`
 | Field | Type | Description |
 | --- | --- | --- |
 | `eval` | `array` |  |
-| `execution_provider` | `string` |  |
-| `model_card` | `array` |  |
-| `model_type` | `string` |  |
+| `executionProvider` | `string` |  |
+| `modelCard` | `array` |  |
+| `modelType` | `string` |  |
 | `name` | `string` |  |
-| `sequence_len` | `int` |  |
-| `source_dim` | `int` |  |
-| `source_model` | `string` |  |
-| `target_dim` | `int` |  |
-| `target_model` | `string` |  |
+| `sequenceLen` | `int` |  |
+| `sourceDim` | `int` |  |
+| `sourceModel` | `string` |  |
+| `targetDim` | `int` |  |
+| `targetModel` | `string` |  |
 
 #### Example: List
 

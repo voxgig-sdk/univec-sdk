@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, File, isAuthActive, entityIdField, opRequestShape, safeVarName, exampleVarName, jsKey } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, File, isAuthActive, entityIdField, entityActions, opRequestShape, safeVarName, exampleVarName, jsKey, matchArg, idLiteral } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -7,6 +7,17 @@ import {
 } from '@voxgig/apidef'
 
 import { exampleValue } from './utility_ts'
+
+
+// A `list()` on a NESTED entity needs its parent path params. The
+// quickstart used to emit `client.Moon().list()` for an entity at
+// `/planet/{planet_id}/moon`, which 404s against a live server from a
+// half-built URL — indistinguishable from "no such record". The model
+// already marks those params `reqd: true`; matchArg renders exactly them.
+function listMatchArg(ent: any): string {
+  const idF = entityIdField(ent)
+  return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))
+}
 
 
 const OP_SIGNATURES: Record<string, { sig: string, returns: string, desc: string }> = {
@@ -254,6 +265,45 @@ const ${eVar} = client.${ent.Name}()
       }
 
 
+      // Custom actions.
+      //
+      // A POST route like `/api/planet/{id}/terraform` is folded into the
+      // `create` op as an alternative point, selected at call time by
+      // `$action`. The mechanism was implemented and documented NOWHERE — so
+      // for an API with two such routes, two of its six endpoints were
+      // unreachable by anyone reading the docs. A user who wanted `terraform`
+      // had to fall back to `direct()` and rebuild the URL by hand, which is
+      // exactly what the entity model exists to spare them.
+      const actions = entityActions(ent)
+      if (0 < actions.length) {
+        Content(`### Actions
+
+This entity exposes custom API actions in addition to the standard
+operations. Select one with \`$action\` in the call's argument; the
+remaining keys are sent as that action's payload.
+
+| Action | Route | Call |
+| --- | --- | --- |
+`)
+        actions.forEach((a: any) => {
+          Content(`| \`${a.action}\` | \`${a.path}\` | \`client.${ent.Name}().${a.op}({ $action: '${a.action}', ... })\` |
+`)
+        })
+
+        Content(`
+An action returns that action's OWN response, which is not necessarily a
+${ent.Name} record — check the API definition for its shape.
+
+\`\`\`ts
+const result = await client.${ent.Name}().${actions[0].op}({
+  $action: '${actions[0].action}',
+  /* ...the action's own arguments */
+})
+\`\`\`
+
+`)
+      }
+
       // Operation details
       if (opnames.length > 0) {
         Content(`### Operations
@@ -292,7 +342,7 @@ const result = await client.${ent.Name}().${opname}(${arg})
           }
           else if ('list' === opname) {
             Content(`\`\`\`ts
-const results = await client.${ent.Name}().${opname}()
+const results = await client.${ent.Name}().${opname}(${listMatchArg(ent)})
 \`\`\`
 
 `)

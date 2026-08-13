@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Univec SDK Project",
   "scripts": {
-    "generate": "tsc --build src && voxgig-model model/sdk.aontu",
+    "generate": "tsc --build src && voxgig-model model/sdk.aontu && voxgig-model test/test.aontu",
     "watch-generate": "voxgig-model -w model/sdk.aontu",
     "dry-generate": "tsc --build src && voxgig-model -y model/sdk.aontu",
     "watch-dry-generate": "voxgig-model -w -y model/sdk.aontu",
@@ -24,12 +24,12 @@
   "devDependencies": {
     "@types/node": ">=25.6",
     "typescript": ">=6.0",
-    "@voxgig/apidef": "^6.5.1",
-    "@voxgig/model": "^9.4.1",
-    "@voxgig/sdkgen": "^1.5.1",
+    "@voxgig/apidef": ">=5.8",
+    "@voxgig/model": ">=8.1",
+    "@voxgig/sdkgen": ">=0.40",
     "@voxgig/util": ">=0.4",
     "@voxgig/struct": ">=0.1.0",
     "jostraca": ">=0.29",
-    "aontu": "^0.50.1"
+    "aontu": ">=0.44"
   }
 }

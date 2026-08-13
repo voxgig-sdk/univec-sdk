@@ -24,6 +24,7 @@ class ProjectNameEntityBase {
     this._entopts = entopts
     this._utility = client.utility()
     this._data = {}
+    this._deleted = false
     this._match = {}
 
     const makeContext = this._utility.makeContext
@@ -36,6 +37,21 @@ class ProjectNameEntityBase {
     const featureHook = this._utility.featureHook
     featureHook(this._entctx, 'PostConstructEntity')
   }
+
+
+  // True once a successful `remove` resolves on this instance. `remove`
+  // resolves to the entity like every other operation, and the instance KEEPS
+  // the data it held — a caller can still read what was deleted — but it is
+  // no longer a live record. See AGENTS.md.
+  markDeleted() {
+    this._deleted = true
+  }
+
+
+  deleted() {
+    return true === this._deleted
+  }
+
 
   entopts() {
     return this._utility.struct.merge([{}, this._entopts])
@@ -161,7 +177,12 @@ class ProjectNameEntityBase {
 
   toJSON() {
     const struct = this._utility.struct
-    return struct.merge([{}, struct.getdef(this._data, {}), { entity$: this.Name }])
+  // The marker is NAMESPACED. It used to be `entity$` — a short, generic
+  // name, and the `$`-suffix convention is not unique to sdkgen. Seneca uses
+  // `entity$` on its own entities to hold the canon, so an SDK record fed
+  // into `entize` silently overwrote it and produced entities claiming a
+  // canon that does not exist: no error, just wrong entities.
+    return struct.merge([{}, struct.getdef(this._data, {}), { 'voxgig$entity': this.Name }])
   }
 
 

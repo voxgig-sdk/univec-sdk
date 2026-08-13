@@ -782,6 +782,76 @@
             "ctx": {
               "opname": "bad"
             }
+          },
+          {
+            "ctx": {
+              "opname": "update",
+              "point": {
+                "method": "POST"
+              }
+            },
+            "out": "POST"
+          },
+          {
+            "ctx": {
+              "opname": "update",
+              "point": {
+                "method": "PATCH"
+              }
+            },
+            "out": "PATCH"
+          },
+          {
+            "ctx": {
+              "opname": "remove",
+              "point": {
+                "method": "POST"
+              }
+            },
+            "out": "POST"
+          },
+          {
+            "ctx": {
+              "opname": "load",
+              "point": {
+                "method": "POST"
+              }
+            },
+            "out": "POST"
+          },
+          {
+            "ctx": {
+              "opname": "create",
+              "point": {
+                "method": "POST"
+              }
+            },
+            "out": "POST"
+          },
+          {
+            "ctx": {
+              "opname": "update",
+              "point": {
+                "method": "post"
+              }
+            },
+            "out": "POST"
+          },
+          {
+            "ctx": {
+              "opname": "update",
+              "point": {
+                "method": ""
+              }
+            },
+            "out": "PUT"
+          },
+          {
+            "ctx": {
+              "opname": "remove",
+              "point": {}
+            },
+            "out": "DELETE"
           }
         ]
       }

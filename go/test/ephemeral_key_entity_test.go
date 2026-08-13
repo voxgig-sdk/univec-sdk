@@ -58,7 +58,7 @@ func TestEphemeralKeyEntity(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create failed: %v", err)
 		}
-		ephemeralKeyRef01Data = core.ToMapAny(ephemeralKeyRef01DataResult)
+		ephemeralKeyRef01Data = core.ToMapAny(entityData(ephemeralKeyRef01DataResult))
 		if ephemeralKeyRef01Data == nil {
 			t.Fatal("expected create result to be a map")
 		}

@@ -54,7 +54,7 @@ func main() {
     })
 
     // Create a convert.
-    created, err := client.Convert(nil).Create(map[string]any{"bridge_model": "example_bridge_model", "data": map[string]any{}, "embedding": []any{}, "source_model": "example_source_model", "success": true, "target_model": "example_target_model", "text": []any{}}, nil)
+    created, err := client.Convert(nil).Create(map[string]any{"bridge_model": "example_bridge_model", "embeddings": []any{}, "source_model": "example_source_model", "target_model": "example_target_model", "texts": []any{}}, nil)
     if err != nil {
         panic(err)
     }
@@ -269,12 +269,10 @@ Only `Direct()` returns a response envelope — a `map[string]any` with
 | Field | Description |
 | --- | --- |
 | `"bridge_model"` |  |
-| `"data"` |  |
-| `"embedding"` |  |
+| `"embeddings"` |  |
 | `"source_model"` |  |
-| `"success"` |  |
 | `"target_model"` |  |
-| `"text"` |  |
+| `"texts"` |  |
 
 Operations: Create.
 
@@ -284,10 +282,9 @@ API path: `/v1/convert`
 
 | Field | Description |
 | --- | --- |
-| `"data"` |  |
+| `"embeddings"` |  |
 | `"model"` |  |
-| `"success"` |  |
-| `"text"` |  |
+| `"texts"` |  |
 
 Operations: Create.
 
@@ -297,8 +294,10 @@ API path: `/v1/embed`
 
 | Field | Description |
 | --- | --- |
-| `"data"` |  |
-| `"success"` |  |
+| `"dailyLimit"` |  |
+| `"dailyUsed"` |  |
+| `"key"` |  |
+| `"resetsAt"` |  |
 
 Operations: Create.
 
@@ -309,15 +308,15 @@ API path: `/v1/ephemeral/key`
 | Field | Description |
 | --- | --- |
 | `"eval"` |  |
-| `"execution_provider"` |  |
-| `"model_card"` |  |
-| `"model_type"` |  |
+| `"executionProvider"` |  |
+| `"modelCard"` |  |
+| `"modelType"` |  |
 | `"name"` |  |
-| `"sequence_len"` |  |
-| `"source_dim"` |  |
-| `"source_model"` |  |
-| `"target_dim"` |  |
-| `"target_model"` |  |
+| `"sequenceLen"` |  |
+| `"sourceDim"` |  |
+| `"sourceModel"` |  |
+| `"targetDim"` |  |
+| `"targetModel"` |  |
 
 Operations: List.
 
@@ -343,24 +342,20 @@ Create an instance: `convert := client.Convert(nil)`
 | Field | Type | Description |
 | --- | --- | --- |
 | `bridge_model` | `string` |  |
-| `data` | `map[string]any` |  |
-| `embedding` | `[]any` |  |
+| `embeddings` | `[]any` |  |
 | `source_model` | `string` |  |
-| `success` | `bool` |  |
 | `target_model` | `string` |  |
-| `text` | `[]any` |  |
+| `texts` | `[]any` |  |
 
 #### Example: Create
 
 ```go
 result, err := client.Convert(nil).Create(map[string]any{
     "bridge_model": "example_bridge_model",
-    "data": map[string]any{},
-    "embedding": []any{},
+    "embeddings": []any{},
     "source_model": "example_source_model",
-    "success": true,
     "target_model": "example_target_model",
-    "text": []any{},
+    "texts": []any{},
 }, nil)
 if err != nil {
     panic(err)
@@ -383,19 +378,17 @@ Create an instance: `embed := client.Embed(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `map[string]any` |  |
+| `embeddings` | `[]any` |  |
 | `model` | `string` |  |
-| `success` | `bool` |  |
-| `text` | `[]any` |  |
+| `texts` | `[]any` |  |
 
 #### Example: Create
 
 ```go
 result, err := client.Embed(nil).Create(map[string]any{
-    "data": map[string]any{},
+    "embeddings": []any{},
     "model": "example_model",
-    "success": true,
-    "text": []any{},
+    "texts": []any{},
 }, nil)
 if err != nil {
     panic(err)
@@ -418,15 +411,19 @@ Create an instance: `ephemeralKey := client.EphemeralKey(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `map[string]any` |  |
-| `success` | `bool` |  |
+| `dailyLimit` | `int` |  |
+| `dailyUsed` | `int` |  |
+| `key` | `string` |  |
+| `resetsAt` | `string` |  |
 
 #### Example: Create
 
 ```go
 result, err := client.EphemeralKey(nil).Create(map[string]any{
-    "data": map[string]any{},
-    "success": true,
+    "dailyLimit": 1,
+    "dailyUsed": 1,
+    "key": "example_key",
+    "resetsAt": "example_resetsAt",
 }, nil)
 if err != nil {
     panic(err)
@@ -450,15 +447,15 @@ Create an instance: `model := client.Model(nil)`
 | Field | Type | Description |
 | --- | --- | --- |
 | `eval` | `map[string]any` |  |
-| `execution_provider` | `string` |  |
-| `model_card` | `map[string]any` |  |
-| `model_type` | `string` |  |
+| `executionProvider` | `string` |  |
+| `modelCard` | `map[string]any` |  |
+| `modelType` | `string` |  |
 | `name` | `string` |  |
-| `sequence_len` | `int` |  |
-| `source_dim` | `int` |  |
-| `source_model` | `string` |  |
-| `target_dim` | `int` |  |
-| `target_model` | `string` |  |
+| `sequenceLen` | `int` |  |
+| `sourceDim` | `int` |  |
+| `sourceModel` | `string` |  |
+| `targetDim` | `int` |  |
+| `targetModel` | `string` |  |
 
 #### Example: List
 

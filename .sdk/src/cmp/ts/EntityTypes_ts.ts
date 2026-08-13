@@ -21,7 +21,7 @@ import {
   File, Content,
 } from '@voxgig/sdkgen'
 
-import { canonToType, opTypeName, opRequestShape, warnEntityTypeCollisions , deriveEntityNames } from '@voxgig/sdkgen'
+import { canonToType, opTypeName, opRequestShape, warnEntityTypeCollisions , deriveEntityNames, opActions } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -108,6 +108,23 @@ const EntityTypes = cmp(function EntityTypes(props: any) {
           Content(`  ${propKey(it.name)}${opt}: ${canonToType(it.type, LANG)}
 `)
         })
+
+        // Custom actions are selected with `$action` in the call's argument
+        // (see the Actions section of REFERENCE.md). Without it in the type,
+        // the ONLY documented way to reach those endpoints does not compile,
+        // and a TypeScript caller has to cast — which is how two of one API's
+        // six endpoints came to be unreachable from the typed interface.
+        const actions = opActions(ops[opname])
+        if (0 < actions.length) {
+          Content(`
+  // Selects a custom action instead of the plain ${opname}:
+  //   ${actions.map((a: any) => `'` + a.action + `'`).join(' | ')}
+  // The remaining keys are that action's own payload.
+  $action?: string
+  [action: string]: any
+`)
+        }
+
         Content(`}
 
 `)

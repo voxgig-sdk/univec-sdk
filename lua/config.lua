@@ -39,45 +39,31 @@ local function make_config()
           },
           {
             ["active"] = true,
-            ["name"] = "data",
-            ["req"] = true,
-            ["type"] = "`$OBJECT`",
-            ["index$"] = 1,
-          },
-          {
-            ["active"] = true,
-            ["name"] = "embedding",
+            ["name"] = "embeddings",
             ["req"] = true,
             ["type"] = "`$ARRAY`",
-            ["index$"] = 2,
+            ["index$"] = 1,
           },
           {
             ["active"] = true,
             ["name"] = "source_model",
             ["req"] = true,
             ["type"] = "`$STRING`",
-            ["index$"] = 3,
-          },
-          {
-            ["active"] = true,
-            ["name"] = "success",
-            ["req"] = true,
-            ["type"] = "`$BOOLEAN`",
-            ["index$"] = 4,
+            ["index$"] = 2,
           },
           {
             ["active"] = true,
             ["name"] = "target_model",
             ["req"] = true,
             ["type"] = "`$STRING`",
-            ["index$"] = 5,
+            ["index$"] = 3,
           },
           {
             ["active"] = true,
-            ["name"] = "text",
+            ["name"] = "texts",
             ["req"] = true,
             ["type"] = "`$ARRAY`",
-            ["index$"] = 6,
+            ["index$"] = 4,
           },
         },
         ["name"] = "convert",
@@ -89,6 +75,7 @@ local function make_config()
               {
                 ["active"] = true,
                 ["args"] = {},
+                ["kind"] = "http",
                 ["method"] = "POST",
                 ["orig"] = "/v1/convert",
                 ["parts"] = {
@@ -98,13 +85,14 @@ local function make_config()
                 ["select"] = {},
                 ["transform"] = {
                   ["req"] = "`reqdata`",
-                  ["res"] = "`body`",
+                  ["res"] = "`body.data`",
                 },
                 ["index$"] = 0,
               },
               {
                 ["active"] = true,
                 ["args"] = {},
+                ["kind"] = "http",
                 ["method"] = "POST",
                 ["orig"] = "/v1/embed-bridge",
                 ["parts"] = {
@@ -114,13 +102,14 @@ local function make_config()
                 ["select"] = {},
                 ["transform"] = {
                   ["req"] = "`reqdata`",
-                  ["res"] = "`body`",
+                  ["res"] = "`body.data`",
                 },
                 ["index$"] = 1,
               },
               {
                 ["active"] = true,
                 ["args"] = {},
+                ["kind"] = "http",
                 ["method"] = "POST",
                 ["orig"] = "/v1/ephemeral/convert",
                 ["parts"] = {
@@ -131,13 +120,14 @@ local function make_config()
                 ["select"] = {},
                 ["transform"] = {
                   ["req"] = "`reqdata`",
-                  ["res"] = "`body`",
+                  ["res"] = "`body.data`",
                 },
                 ["index$"] = 2,
               },
               {
                 ["active"] = true,
                 ["args"] = {},
+                ["kind"] = "http",
                 ["method"] = "POST",
                 ["orig"] = "/v1/ephemeral/embed-bridge",
                 ["parts"] = {
@@ -148,7 +138,7 @@ local function make_config()
                 ["select"] = {},
                 ["transform"] = {
                   ["req"] = "`reqdata`",
-                  ["res"] = "`body`",
+                  ["res"] = "`body.data`",
                 },
                 ["index$"] = 3,
               },
@@ -164,9 +154,9 @@ local function make_config()
         ["fields"] = {
           {
             ["active"] = true,
-            ["name"] = "data",
+            ["name"] = "embeddings",
             ["req"] = true,
-            ["type"] = "`$OBJECT`",
+            ["type"] = "`$ARRAY`",
             ["index$"] = 0,
           },
           {
@@ -178,17 +168,10 @@ local function make_config()
           },
           {
             ["active"] = true,
-            ["name"] = "success",
-            ["req"] = true,
-            ["type"] = "`$BOOLEAN`",
-            ["index$"] = 2,
-          },
-          {
-            ["active"] = true,
-            ["name"] = "text",
+            ["name"] = "texts",
             ["req"] = true,
             ["type"] = "`$ARRAY`",
-            ["index$"] = 3,
+            ["index$"] = 2,
           },
         },
         ["name"] = "embed",
@@ -200,6 +183,7 @@ local function make_config()
               {
                 ["active"] = true,
                 ["args"] = {},
+                ["kind"] = "http",
                 ["method"] = "POST",
                 ["orig"] = "/v1/embed",
                 ["parts"] = {
@@ -209,13 +193,14 @@ local function make_config()
                 ["select"] = {},
                 ["transform"] = {
                   ["req"] = "`reqdata`",
-                  ["res"] = "`body`",
+                  ["res"] = "`body.data`",
                 },
                 ["index$"] = 0,
               },
               {
                 ["active"] = true,
                 ["args"] = {},
+                ["kind"] = "http",
                 ["method"] = "POST",
                 ["orig"] = "/v1/ephemeral/embed",
                 ["parts"] = {
@@ -226,7 +211,7 @@ local function make_config()
                 ["select"] = {},
                 ["transform"] = {
                   ["req"] = "`reqdata`",
-                  ["res"] = "`body`",
+                  ["res"] = "`body.data`",
                 },
                 ["index$"] = 1,
               },
@@ -242,17 +227,31 @@ local function make_config()
         ["fields"] = {
           {
             ["active"] = true,
-            ["name"] = "data",
+            ["name"] = "dailyLimit",
             ["req"] = true,
-            ["type"] = "`$OBJECT`",
+            ["type"] = "`$INTEGER`",
             ["index$"] = 0,
           },
           {
             ["active"] = true,
-            ["name"] = "success",
+            ["name"] = "dailyUsed",
             ["req"] = true,
-            ["type"] = "`$BOOLEAN`",
+            ["type"] = "`$INTEGER`",
             ["index$"] = 1,
+          },
+          {
+            ["active"] = true,
+            ["name"] = "key",
+            ["req"] = true,
+            ["type"] = "`$STRING`",
+            ["index$"] = 2,
+          },
+          {
+            ["active"] = true,
+            ["name"] = "resetsAt",
+            ["req"] = true,
+            ["type"] = "`$STRING`",
+            ["index$"] = 3,
           },
         },
         ["name"] = "ephemeral_key",
@@ -264,6 +263,7 @@ local function make_config()
               {
                 ["active"] = true,
                 ["args"] = {},
+                ["kind"] = "http",
                 ["method"] = "POST",
                 ["orig"] = "/v1/ephemeral/key",
                 ["parts"] = {
@@ -274,7 +274,7 @@ local function make_config()
                 ["select"] = {},
                 ["transform"] = {
                   ["req"] = "`reqdata`",
-                  ["res"] = "`body`",
+                  ["res"] = "`body.data`",
                 },
                 ["index$"] = 0,
               },
@@ -297,21 +297,21 @@ local function make_config()
           },
           {
             ["active"] = true,
-            ["name"] = "execution_provider",
+            ["name"] = "executionProvider",
             ["req"] = false,
             ["type"] = "`$STRING`",
             ["index$"] = 1,
           },
           {
             ["active"] = true,
-            ["name"] = "model_card",
+            ["name"] = "modelCard",
             ["req"] = false,
             ["type"] = "`$OBJECT`",
             ["index$"] = 2,
           },
           {
             ["active"] = true,
-            ["name"] = "model_type",
+            ["name"] = "modelType",
             ["req"] = true,
             ["type"] = "`$STRING`",
             ["index$"] = 3,
@@ -325,35 +325,35 @@ local function make_config()
           },
           {
             ["active"] = true,
-            ["name"] = "sequence_len",
+            ["name"] = "sequenceLen",
             ["req"] = false,
             ["type"] = "`$INTEGER`",
             ["index$"] = 5,
           },
           {
             ["active"] = true,
-            ["name"] = "source_dim",
+            ["name"] = "sourceDim",
             ["req"] = false,
             ["type"] = "`$INTEGER`",
             ["index$"] = 6,
           },
           {
             ["active"] = true,
-            ["name"] = "source_model",
+            ["name"] = "sourceModel",
             ["req"] = false,
             ["type"] = "`$STRING`",
             ["index$"] = 7,
           },
           {
             ["active"] = true,
-            ["name"] = "target_dim",
+            ["name"] = "targetDim",
             ["req"] = true,
             ["type"] = "`$INTEGER`",
             ["index$"] = 8,
           },
           {
             ["active"] = true,
-            ["name"] = "target_model",
+            ["name"] = "targetModel",
             ["req"] = true,
             ["type"] = "`$STRING`",
             ["index$"] = 9,
@@ -368,6 +368,7 @@ local function make_config()
               {
                 ["active"] = true,
                 ["args"] = {},
+                ["kind"] = "http",
                 ["method"] = "GET",
                 ["orig"] = "/v1/models",
                 ["parts"] = {
@@ -377,7 +378,7 @@ local function make_config()
                 ["select"] = {},
                 ["transform"] = {
                   ["req"] = "`reqdata`",
-                  ["res"] = "`body`",
+                  ["res"] = "`body.data`",
                 },
                 ["index$"] = 0,
               },

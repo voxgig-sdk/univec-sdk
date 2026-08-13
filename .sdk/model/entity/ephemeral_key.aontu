@@ -6,14 +6,24 @@ main: kit: entity: ephemeral_key: {
 
   fields: [
     {
-      name: "data"
+      name: "dailyLimit"
       req: true
-      type: "`$OBJECT`"
+      type: "`$INTEGER`"
     }
     {
-      name: "success"
+      name: "dailyUsed"
       req: true
-      type: "`$BOOLEAN`"
+      type: "`$INTEGER`"
+    }
+    {
+      name: "key"
+      req: true
+      type: "`$STRING`"
+    }
+    {
+      name: "resetsAt"
+      req: true
+      type: "`$STRING`"
     }
   ]
 
@@ -32,7 +42,7 @@ main: kit: entity: ephemeral_key: {
           ]
           transform: {
             req: "`reqdata`"
-            res: "`body`"
+            res: "`body.data`"
           }
         }
       ]

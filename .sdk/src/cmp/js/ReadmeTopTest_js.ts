@@ -51,7 +51,8 @@ const client = ${model.const.Name}SDK.test()
         `${jsKey(it.name)}: ${exampleValue(exampleEntity, primaryOpDef, it.name, 'example_' + it.name)}`).join(', ')} }`
     }
     Content(`const ${eVar} = await client.${eName}().${primaryOp}(${arg})
-// ${eVar} is ${'list' === primaryOp ? 'an array of bare entities' : 'a bare entity'} populated with mock data
+// ${eVar} is ${'list' === primaryOp ? 'an array of entities' : 'the entity'}, populated with mock data
+// — call ${eVar}${'list' === primaryOp ? '[0]' : ''}.data() for the record itself
 console.log(${eVar})
 `)
   }

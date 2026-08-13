@@ -106,12 +106,10 @@ $convert = $client->Convert();
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `bridge_model` | `string` | Yes |  |
-| `data` | `array` | Yes |  |
-| `embedding` | `array` | Yes |  |
+| `embeddings` | `array` | Yes |  |
 | `source_model` | `string` | Yes |  |
-| `success` | `bool` | Yes |  |
 | `target_model` | `string` | Yes |  |
-| `text` | `array` | Yes |  |
+| `texts` | `array` | Yes |  |
 
 ### Operations
 
@@ -122,12 +120,10 @@ Create a new entity with the given data. Throws on error.
 ```php
 $result = $client->Convert()->create([
   "bridge_model" => null, // string
-  "data" => null, // array
-  "embedding" => null, // array
+  "embeddings" => null, // array
   "source_model" => null, // string
-  "success" => null, // bool
   "target_model" => null, // string
-  "text" => null, // array
+  "texts" => null, // array
 ]);
 ```
 
@@ -171,10 +167,9 @@ $embed = $client->Embed();
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `array` | Yes |  |
+| `embeddings` | `array` | Yes |  |
 | `model` | `string` | Yes |  |
-| `success` | `bool` | Yes |  |
-| `text` | `array` | Yes |  |
+| `texts` | `array` | Yes |  |
 
 ### Operations
 
@@ -184,10 +179,9 @@ Create a new entity with the given data. Throws on error.
 
 ```php
 $result = $client->Embed()->create([
-  "data" => null, // array
+  "embeddings" => null, // array
   "model" => null, // string
-  "success" => null, // bool
-  "text" => null, // array
+  "texts" => null, // array
 ]);
 ```
 
@@ -231,8 +225,10 @@ $ephemeral_key = $client->EphemeralKey();
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `array` | Yes |  |
-| `success` | `bool` | Yes |  |
+| `dailyLimit` | `int` | Yes |  |
+| `dailyUsed` | `int` | Yes |  |
+| `key` | `string` | Yes |  |
+| `resetsAt` | `string` | Yes |  |
 
 ### Operations
 
@@ -242,8 +238,10 @@ Create a new entity with the given data. Throws on error.
 
 ```php
 $result = $client->EphemeralKey()->create([
-  "data" => null, // array
-  "success" => null, // bool
+  "dailyLimit" => null, // int
+  "dailyUsed" => null, // int
+  "key" => null, // string
+  "resetsAt" => null, // string
 ]);
 ```
 
@@ -288,15 +286,15 @@ $model = $client->Model();
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `eval` | `array` | No |  |
-| `execution_provider` | `string` | No |  |
-| `model_card` | `array` | No |  |
-| `model_type` | `string` | Yes |  |
+| `executionProvider` | `string` | No |  |
+| `modelCard` | `array` | No |  |
+| `modelType` | `string` | Yes |  |
 | `name` | `string` | Yes |  |
-| `sequence_len` | `int` | No |  |
-| `source_dim` | `int` | No |  |
-| `source_model` | `string` | No |  |
-| `target_dim` | `int` | Yes |  |
-| `target_model` | `string` | Yes |  |
+| `sequenceLen` | `int` | No |  |
+| `sourceDim` | `int` | No |  |
+| `sourceModel` | `string` | No |  |
+| `targetDim` | `int` | Yes |  |
+| `targetModel` | `string` | Yes |  |
 
 ### Operations
 

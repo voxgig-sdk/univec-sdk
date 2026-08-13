@@ -1,11 +1,22 @@
 
-import { cmp, each, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName } from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, matchArg, idLiteral } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
   nom,
 } from '@voxgig/apidef'
+
+
+// A `list()` on a NESTED entity needs its parent path params. The
+// quickstart used to emit `client.Moon().list()` for an entity at
+// `/planet/{planet_id}/moon`, which 404s against a live server from a
+// half-built URL — indistinguishable from "no such record". The model
+// already marks those params `reqd: true`; matchArg renders exactly them.
+function listMatchArg(ent: any): string {
+  const idF = entityIdField(ent)
+  return matchArg('py', ent, 'list', idF, idLiteral(ent, 'list', idF))
+}
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -78,7 +89,7 @@ error — iterate it directly.
 
 \`\`\`python
 try:
-    ${eVar}s = client.${eName}().list()
+    ${eVar}s = client.${eName}().list(${listMatchArg(exampleEntity)})
     for ${eVar} in ${eVar}s:
         print(${eVar})
 except Exception as err:
@@ -111,7 +122,7 @@ except Exception as err:
       Content(`### 3. Load ${neArticle} ${neName.toLowerCase()}
 
 ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
-\`load()\` returns the bare record (a \`dict\`) and raises on error.
+\`load()\` returns the ENTITY — call data_get() for the record — and raises on error.
 
 \`\`\`python
 try:
@@ -139,7 +150,7 @@ except Exception as err:
 
       Content(`### 3. Load ${article} ${eName.toLowerCase()}
 
-\`load()\` returns the bare record (a \`dict\`) and raises on error.
+\`load()\` returns the ENTITY — call data_get() for the record — and raises on error.
 
 \`\`\`python
 try:
@@ -180,7 +191,7 @@ except Exception as err:
       return it && it.type
     }
     const idValueFor = (opname: string): string => (null != dataIdF && opnames.includes('create'))
-      ? `created["${dataIdF}"]`
+      ? `created.data_get()["${dataIdF}"]`
       : pyLit(idParamType(opname), 'example_id')
 
     if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
@@ -189,7 +200,7 @@ except Exception as err:
 \`\`\`python
 `)
       if (opnames.includes('create')) {
-        Content(`# Create — returns the bare created record (a dict)
+        Content(`# Create — returns the ENTITY (call data_get() for the record)
 created = client.${eName}().create({${examplePairs('create').join(', ')}})
 
 `)

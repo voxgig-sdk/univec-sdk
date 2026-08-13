@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-// Univec SDK test feature
+// ProjectName SDK test feature
 
 require_once __DIR__ . '/BaseFeature.php';
 require_once __DIR__ . '/../utility/Param.php';
 
-class UnivecTestFeature extends UnivecBaseFeature
+class ProjectNameTestFeature extends ProjectNameBaseFeature
 {
     private mixed $client;
     private ?array $options;
@@ -23,7 +23,7 @@ class UnivecTestFeature extends UnivecBaseFeature
         $this->_netcalls = 0;
     }
 
-    public function init(UnivecContext $ctx, array $options): void
+    public function init(ProjectNameContext $ctx, array $options): void
     {
         $this->client = $ctx->client;
         $this->options = $options;
@@ -47,7 +47,7 @@ class UnivecTestFeature extends UnivecBaseFeature
         $entity = new \stdClass();
         $entity->data = $entity_data;
 
-        $test_fetcher = function (UnivecContext $fctx, string $_fullurl, array $_fetchdef) use ($entity): array {
+        $test_fetcher = function (ProjectNameContext $fctx, string $_fullurl, array $_fetchdef) use ($entity): array {
             // Shape the mock payload the way the real API would, so the op's
             // response transform recovers the entity from it. A point carrying
             // transform.res of `body.item` describes an API that answers
@@ -239,7 +239,7 @@ class UnivecTestFeature extends UnivecBaseFeature
                 return $respond(200, null);
 
             } elseif ($op->name === 'create') {
-                $id = UnivecParam::call($fctx, 'id');
+                $id = ProjectNameParam::call($fctx, 'id');
                 if ($id === null || $id === '__UNDEFINED__') {
                     $id = sprintf('%04x%04x%04x%04x',
                         random_int(0, 0xFFFF), random_int(0, 0xFFFF),
@@ -309,7 +309,7 @@ class UnivecTestFeature extends UnivecBaseFeature
             usleep((int)($ms * 1000));
         };
 
-        return function (UnivecContext $fctx, string $url, array $fetchdef) use ($net, $inner, $pick_latency, $sleep): array {
+        return function (ProjectNameContext $fctx, string $url, array $fetchdef) use ($net, $inner, $pick_latency, $sleep): array {
             $this->_netcalls++;
             $call = $this->_netcalls;
 
@@ -347,7 +347,7 @@ class UnivecTestFeature extends UnivecBaseFeature
      * current operation point, emit a `$OR` clause matching the key (and
      * its alias, if any) against the supplied value.
      */
-    public function buildArgs(UnivecContext $ctx, $op, $args): array
+    public function buildArgs(ProjectNameContext $ctx, $op, $args): array
     {
         // If args is empty/missing, return an empty $AND so select() matches
         // every entry — the TS test feature relies on this for empty-match
@@ -394,7 +394,7 @@ class UnivecTestFeature extends UnivecBaseFeature
             $is_id = ($k === 'id');
             $in_reqd = in_array($k, $reqd_names, true);
             if ($is_id || $in_reqd) {
-                $v = UnivecParam::call($ctx, $k);
+                $v = ProjectNameParam::call($ctx, $k);
                 $ka = \Voxgig\Struct\Struct::getprop($alias, $k);
 
                 $qor = [[$k => $v]];

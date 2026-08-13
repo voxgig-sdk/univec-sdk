@@ -20,6 +20,9 @@
   },
   "main": "src/UnivecSDK.js",
   "type": "commonjs",
+  "files": [
+    "src"
+  ],
   "scripts": {
     "test": "node --test 'test/**/*.test.js'",
     "test-some": "node --experimental-test-isolation=none --test-name-pattern=\"$TEST_PATTERN\" --test 'test/**/*.test.js'",

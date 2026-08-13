@@ -42,8 +42,8 @@ client = UnivecSDK({
 ### 4. Create, update, and remove
 
 ```python
-# Create — returns the bare created record (a dict)
-created = client.Convert().create({"bridge_model": "example_bridge_model", "data": {}, "embedding": [], "source_model": "example_source_model", "success": True, "target_model": "example_target_model", "text": []})
+# Create — returns the ENTITY (call data_get() for the record)
+created = client.Convert().create({"bridge_model": "example_bridge_model", "embeddings": [], "source_model": "example_source_model", "target_model": "example_target_model", "texts": []})
 
 ```
 
@@ -121,7 +121,8 @@ Create a mock client for unit testing — no server required:
 ```python
 client = UnivecSDK.test()
 
-# Entity ops return the bare record and raise on error.
+# Entity ops return the ENTITY and raises on error;
+# call data_get() for the record.
 model = client.Model().list()
 # model contains the mock response record
 ```
@@ -223,7 +224,7 @@ All entities share the same interface.
 
 ### Result shape
 
-Entity operations return the bare result data (a `dict` for single-entity
+Entity operations return the ENTITY (call data_get() for the record) (a `dict` for single-entity
 ops, a `list` for `list`) and raise on error. Wrap calls in
 `try`/`except` to handle failures.
 
@@ -246,12 +247,10 @@ On error, `ok` is `False` and `err` contains the error value.
 | Field | Description |
 | --- | --- |
 | `bridge_model` |  |
-| `data` |  |
-| `embedding` |  |
+| `embeddings` |  |
 | `source_model` |  |
-| `success` |  |
 | `target_model` |  |
-| `text` |  |
+| `texts` |  |
 
 Operations: Create.
 
@@ -261,10 +260,9 @@ API path: `/v1/convert`
 
 | Field | Description |
 | --- | --- |
-| `data` |  |
+| `embeddings` |  |
 | `model` |  |
-| `success` |  |
-| `text` |  |
+| `texts` |  |
 
 Operations: Create.
 
@@ -274,8 +272,10 @@ API path: `/v1/embed`
 
 | Field | Description |
 | --- | --- |
-| `data` |  |
-| `success` |  |
+| `dailyLimit` |  |
+| `dailyUsed` |  |
+| `key` |  |
+| `resetsAt` |  |
 
 Operations: Create.
 
@@ -286,15 +286,15 @@ API path: `/v1/ephemeral/key`
 | Field | Description |
 | --- | --- |
 | `eval` |  |
-| `execution_provider` |  |
-| `model_card` |  |
-| `model_type` |  |
+| `executionProvider` |  |
+| `modelCard` |  |
+| `modelType` |  |
 | `name` |  |
-| `sequence_len` |  |
-| `source_dim` |  |
-| `source_model` |  |
-| `target_dim` |  |
-| `target_model` |  |
+| `sequenceLen` |  |
+| `sourceDim` |  |
+| `sourceModel` |  |
+| `targetDim` |  |
+| `targetModel` |  |
 
 Operations: List.
 
@@ -320,24 +320,20 @@ Create an instance: `convert = client.Convert()`
 | Field | Type | Description |
 | --- | --- | --- |
 | `bridge_model` | `str` |  |
-| `data` | `dict` |  |
-| `embedding` | `list` |  |
+| `embeddings` | `list` |  |
 | `source_model` | `str` |  |
-| `success` | `bool` |  |
 | `target_model` | `str` |  |
-| `text` | `list` |  |
+| `texts` | `list` |  |
 
 #### Example: Create
 
 ```python
 convert = client.Convert().create({
     "bridge_model": "example_bridge_model",  # str
-    "data": {},  # dict
-    "embedding": [],  # list
+    "embeddings": [],  # list
     "source_model": "example_source_model",  # str
-    "success": True,  # bool
     "target_model": "example_target_model",  # str
-    "text": [],  # list
+    "texts": [],  # list
 })
 ```
 
@@ -356,19 +352,17 @@ Create an instance: `embed = client.Embed()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `dict` |  |
+| `embeddings` | `list` |  |
 | `model` | `str` |  |
-| `success` | `bool` |  |
-| `text` | `list` |  |
+| `texts` | `list` |  |
 
 #### Example: Create
 
 ```python
 embed = client.Embed().create({
-    "data": {},  # dict
+    "embeddings": [],  # list
     "model": "example_model",  # str
-    "success": True,  # bool
-    "text": [],  # list
+    "texts": [],  # list
 })
 ```
 
@@ -387,15 +381,19 @@ Create an instance: `ephemeral_key = client.EphemeralKey()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `dict` |  |
-| `success` | `bool` |  |
+| `dailyLimit` | `int` |  |
+| `dailyUsed` | `int` |  |
+| `key` | `str` |  |
+| `resetsAt` | `str` |  |
 
 #### Example: Create
 
 ```python
 ephemeral_key = client.EphemeralKey().create({
-    "data": {},  # dict
-    "success": True,  # bool
+    "dailyLimit": 1,  # int
+    "dailyUsed": 1,  # int
+    "key": "example_key",  # str
+    "resetsAt": "example_resetsAt",  # str
 })
 ```
 
@@ -415,15 +413,15 @@ Create an instance: `model = client.Model()`
 | Field | Type | Description |
 | --- | --- | --- |
 | `eval` | `dict` |  |
-| `execution_provider` | `str` |  |
-| `model_card` | `dict` |  |
-| `model_type` | `str` |  |
+| `executionProvider` | `str` |  |
+| `modelCard` | `dict` |  |
+| `modelType` | `str` |  |
 | `name` | `str` |  |
-| `sequence_len` | `int` |  |
-| `source_dim` | `int` |  |
-| `source_model` | `str` |  |
-| `target_dim` | `int` |  |
-| `target_model` | `str` |  |
+| `sequenceLen` | `int` |  |
+| `sourceDim` | `int` |  |
+| `sourceModel` | `str` |  |
+| `targetDim` | `int` |  |
+| `targetModel` | `str` |  |
 
 #### Example: List
 

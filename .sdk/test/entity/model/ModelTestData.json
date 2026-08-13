@@ -3,39 +3,39 @@
     "model": {
       "MODEL00": {
         "eval": {},
-        "execution_provider": "s65",
-        "model_card": {},
-        "model_type": "s67",
+        "executionProvider": "s65",
+        "modelCard": {},
+        "modelType": "s67",
         "name": "s68",
-        "sequence_len": "s69",
-        "source_dim": "s6a",
-        "source_model": "s6b",
-        "target_dim": "s6c",
-        "target_model": "s6d"
+        "sequenceLen": "s69",
+        "sourceDim": "s6a",
+        "sourceModel": "s6b",
+        "targetDim": "s6c",
+        "targetModel": "s6d"
       },
       "MODEL01": {
         "eval": {},
-        "execution_provider": "sc9",
-        "model_card": {},
-        "model_type": "scb",
+        "executionProvider": "sc9",
+        "modelCard": {},
+        "modelType": "scb",
         "name": "scc",
-        "sequence_len": "scd",
-        "source_dim": "sce",
-        "source_model": "scf",
-        "target_dim": "sd0",
-        "target_model": "sd1"
+        "sequenceLen": "scd",
+        "sourceDim": "sce",
+        "sourceModel": "scf",
+        "targetDim": "sd0",
+        "targetModel": "sd1"
       },
       "MODEL02": {
         "eval": {},
-        "execution_provider": "s12d",
-        "model_card": {},
-        "model_type": "s12f",
+        "executionProvider": "s12d",
+        "modelCard": {},
+        "modelType": "s12f",
         "name": "s130",
-        "sequence_len": "s131",
-        "source_dim": "s132",
-        "source_model": "s133",
-        "target_dim": "s134",
-        "target_model": "s135"
+        "sequenceLen": "s131",
+        "sourceDim": "s132",
+        "sourceModel": "s133",
+        "targetDim": "s134",
+        "targetModel": "s135"
       }
     }
   },
@@ -43,15 +43,15 @@
     "model": {
       "model_ref01": {
         "eval": {},
-        "execution_provider": "s191",
-        "model_card": {},
-        "model_type": "s193",
+        "executionProvider": "s191",
+        "modelCard": {},
+        "modelType": "s193",
         "name": "s194",
-        "sequence_len": "s195",
-        "source_dim": "s196",
-        "source_model": "s197",
-        "target_dim": "s198",
-        "target_model": "s199"
+        "sequenceLen": "s195",
+        "sourceDim": "s196",
+        "sourceModel": "s197",
+        "targetDim": "s198",
+        "targetModel": "s199"
       }
     }
   }

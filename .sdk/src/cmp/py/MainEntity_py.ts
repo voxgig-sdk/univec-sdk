@@ -20,7 +20,7 @@ const MainEntity = cmp(async function MainEntity(props: any) {
   Content(`
     def ${entity.Name}(self, data=None) -> "${cls}":
         """Entity factory: client.${entity.Name}().list() / client.${entity.Name}().load({"id": ...})."""
-        from entity.${entity.name}_entity import ${cls}
+        from ${model.const.Name.toLowerCase()}_sdk.entity.${entity.name}_entity import ${cls}
         return ${cls}(self, data)
 
 `)

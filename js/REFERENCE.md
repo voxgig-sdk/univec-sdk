@@ -154,12 +154,10 @@ const convert = client.Convert()
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `bridge_model` | `string` | Yes |  |
-| `data` | `Object` | Yes |  |
-| `embedding` | `Array` | Yes |  |
+| `embeddings` | `Array` | Yes |  |
 | `source_model` | `string` | Yes |  |
-| `success` | `boolean` | Yes |  |
 | `target_model` | `string` | Yes |  |
-| `text` | `Array` | Yes |  |
+| `texts` | `Array` | Yes |  |
 
 ### Operations
 
@@ -170,12 +168,10 @@ Create a new entity with the given data.
 ```ts
 const result = await client.Convert().create({
   bridge_model: 'example_bridge_model',
-  data: {},
-  embedding: [],
+  embeddings: [],
   source_model: 'example_source_model',
-  success: true,
   target_model: 'example_target_model',
-  text: [],
+  texts: [],
 })
 ```
 
@@ -217,10 +213,9 @@ const embed = client.Embed()
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `Object` | Yes |  |
+| `embeddings` | `Array` | Yes |  |
 | `model` | `string` | Yes |  |
-| `success` | `boolean` | Yes |  |
-| `text` | `Array` | Yes |  |
+| `texts` | `Array` | Yes |  |
 
 ### Operations
 
@@ -230,10 +225,9 @@ Create a new entity with the given data.
 
 ```ts
 const result = await client.Embed().create({
-  data: {},
+  embeddings: [],
   model: 'example_model',
-  success: true,
-  text: [],
+  texts: [],
 })
 ```
 
@@ -275,8 +269,10 @@ const ephemeral_key = client.EphemeralKey()
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `Object` | Yes |  |
-| `success` | `boolean` | Yes |  |
+| `dailyLimit` | `number` | Yes |  |
+| `dailyUsed` | `number` | Yes |  |
+| `key` | `string` | Yes |  |
+| `resetsAt` | `string` | Yes |  |
 
 ### Operations
 
@@ -286,8 +282,10 @@ Create a new entity with the given data.
 
 ```ts
 const result = await client.EphemeralKey().create({
-  data: {},
-  success: true,
+  dailyLimit: 1,
+  dailyUsed: 1,
+  key: 'example_key',
+  resetsAt: 'example_resetsAt',
 })
 ```
 
@@ -330,15 +328,15 @@ const model = client.Model()
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `eval` | `Object` | No |  |
-| `execution_provider` | `string` | No |  |
-| `model_card` | `Object` | No |  |
-| `model_type` | `string` | Yes |  |
+| `executionProvider` | `string` | No |  |
+| `modelCard` | `Object` | No |  |
+| `modelType` | `string` | Yes |  |
 | `name` | `string` | Yes |  |
-| `sequence_len` | `number` | No |  |
-| `source_dim` | `number` | No |  |
-| `source_model` | `string` | No |  |
-| `target_dim` | `number` | Yes |  |
-| `target_model` | `string` | Yes |  |
+| `sequenceLen` | `number` | No |  |
+| `sourceDim` | `number` | No |  |
+| `sourceModel` | `string` | No |  |
+| `targetDim` | `number` | Yes |  |
+| `targetModel` | `string` | Yes |  |
 
 ### Operations
 

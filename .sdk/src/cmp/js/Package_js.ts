@@ -11,6 +11,8 @@ import {
   repoInfo,
   PUBLISHER,
   PUBLISHER_URL,
+  packageVersion,
+  authorInfo,
 } from '@voxgig/sdkgen'
 
 
@@ -27,6 +29,12 @@ const Package = cmp(async function Package(props: any) {
   const target = props.target
 
   const model: Model = ctx$.model
+
+  // WHO WROTE THIS PACKAGE. Per target, falling back to the model-wide value
+  // and then to the publisher — so a manifest cannot go on naming Voxgig
+  // while the model names someone else, which is exactly what the hardcoded
+  // constant here did.
+  const author = authorInfo(model, target.name)
 
   const feature = getModelPath(model, `main.${KIT}.feature`)
 
@@ -56,7 +64,7 @@ const Package = cmp(async function Package(props: any) {
     // The ts target publishes the canonical scoped npm name; the js target
     // appends `-js` so the two never collide on npm.
     name: packageName(model, 'js'),
-    version: `0.0.1`,
+    version: packageVersion(model, target.name),
     description: pkgDescription(model, target.name),
     keywords: keywords(model),
     homepage: `${repoUrl}#readme`,
@@ -64,6 +72,11 @@ const Package = cmp(async function Package(props: any) {
     bugs: { url: issuesUrl },
     main: `src/${SdkName}SDK.js`,
     type: 'commonjs',
+
+    // What actually ships. Without `files`, `npm publish` packs the test
+    // suite and the build scaffolding too. The js target runs from `src`
+    // directly (no build step), so that is the whole package.
+    files: ['src'],
     scripts: {
       'test': 'node --test \'test/**/*.test.js\'',
       'test-some': 'node --experimental-test-isolation=none ' +
@@ -73,7 +86,7 @@ const Package = cmp(async function Package(props: any) {
       "clean": "rm -rf node_modules yarn.lock package-lock.json",
       "reset": "npm run clean && npm i && npm test",
     },
-    author: { name: PUBLISHER, url: PUBLISHER_URL },
+    author,
 
     // TODO: needs to be config
     license: 'MIT',

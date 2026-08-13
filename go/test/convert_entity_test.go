@@ -58,7 +58,7 @@ func TestConvertEntity(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create failed: %v", err)
 		}
-		convertRef01Data = core.ToMapAny(convertRef01DataResult)
+		convertRef01Data = core.ToMapAny(entityData(convertRef01DataResult))
 		if convertRef01Data == nil {
 			t.Fatal("expected create result to be a map")
 		}

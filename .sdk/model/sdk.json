@@ -1,19 +1,14 @@
 {
-  "NAME": "UNIVEC",
-  "Name": "Univec",
   "def": "univec-openapi.json",
   "main": {
-    "api": {
-      "entity": {},
-      "guide": {}
-    },
-    "custom": {
-      "plurals": {}
-    },
     "def": {
       "desc": ""
     },
     "kit": {
+      "author": {
+        "name": "",
+        "url": ""
+      },
       "config": {
         "docs_order": [
           "ts",
@@ -27,6 +22,7 @@
           "content-type": "application/json"
         }
       },
+      "contributor": {},
       "entity": {
         "convert": {
           "active": true,
@@ -42,13 +38,7 @@
             },
             {
               "active": true,
-              "name": "data",
-              "req": true,
-              "type": "`$OBJECT`"
-            },
-            {
-              "active": true,
-              "name": "embedding",
+              "name": "embeddings",
               "req": true,
               "type": "`$ARRAY`"
             },
@@ -60,19 +50,13 @@
             },
             {
               "active": true,
-              "name": "success",
-              "req": true,
-              "type": "`$BOOLEAN`"
-            },
-            {
-              "active": true,
               "name": "target_model",
               "req": true,
               "type": "`$STRING`"
             },
             {
               "active": true,
-              "name": "text",
+              "name": "texts",
               "req": true,
               "type": "`$ARRAY`"
             }
@@ -86,6 +70,7 @@
                 {
                   "active": true,
                   "args": {},
+                  "kind": "http",
                   "method": "POST",
                   "orig": "/v1/convert",
                   "parts": [
@@ -95,12 +80,13 @@
                   "select": {},
                   "transform": {
                     "req": "`reqdata`",
-                    "res": "`body`"
+                    "res": "`body.data`"
                   }
                 },
                 {
                   "active": true,
                   "args": {},
+                  "kind": "http",
                   "method": "POST",
                   "orig": "/v1/embed-bridge",
                   "parts": [
@@ -110,12 +96,13 @@
                   "select": {},
                   "transform": {
                     "req": "`reqdata`",
-                    "res": "`body`"
+                    "res": "`body.data`"
                   }
                 },
                 {
                   "active": true,
                   "args": {},
+                  "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/convert",
                   "parts": [
@@ -126,12 +113,13 @@
                   "select": {},
                   "transform": {
                     "req": "`reqdata`",
-                    "res": "`body`"
+                    "res": "`body.data`"
                   }
                 },
                 {
                   "active": true,
                   "args": {},
+                  "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/embed-bridge",
                   "parts": [
@@ -142,7 +130,7 @@
                   "select": {},
                   "transform": {
                     "req": "`reqdata`",
-                    "res": "`body`"
+                    "res": "`body.data`"
                   }
                 }
               ]
@@ -160,9 +148,9 @@
           "fields": [
             {
               "active": true,
-              "name": "data",
+              "name": "embeddings",
               "req": true,
-              "type": "`$OBJECT`"
+              "type": "`$ARRAY`"
             },
             {
               "active": true,
@@ -172,13 +160,7 @@
             },
             {
               "active": true,
-              "name": "success",
-              "req": true,
-              "type": "`$BOOLEAN`"
-            },
-            {
-              "active": true,
-              "name": "text",
+              "name": "texts",
               "req": true,
               "type": "`$ARRAY`"
             }
@@ -192,6 +174,7 @@
                 {
                   "active": true,
                   "args": {},
+                  "kind": "http",
                   "method": "POST",
                   "orig": "/v1/embed",
                   "parts": [
@@ -201,12 +184,13 @@
                   "select": {},
                   "transform": {
                     "req": "`reqdata`",
-                    "res": "`body`"
+                    "res": "`body.data`"
                   }
                 },
                 {
                   "active": true,
                   "args": {},
+                  "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/embed",
                   "parts": [
@@ -217,7 +201,7 @@
                   "select": {},
                   "transform": {
                     "req": "`reqdata`",
-                    "res": "`body`"
+                    "res": "`body.data`"
                   }
                 }
               ]
@@ -235,15 +219,27 @@
           "fields": [
             {
               "active": true,
-              "name": "data",
+              "name": "dailyLimit",
               "req": true,
-              "type": "`$OBJECT`"
+              "type": "`$INTEGER`"
             },
             {
               "active": true,
-              "name": "success",
+              "name": "dailyUsed",
               "req": true,
-              "type": "`$BOOLEAN`"
+              "type": "`$INTEGER`"
+            },
+            {
+              "active": true,
+              "name": "key",
+              "req": true,
+              "type": "`$STRING`"
+            },
+            {
+              "active": true,
+              "name": "resetsAt",
+              "req": true,
+              "type": "`$STRING`"
             }
           ],
           "name": "ephemeral_key",
@@ -255,6 +251,7 @@
                 {
                   "active": true,
                   "args": {},
+                  "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/key",
                   "parts": [
@@ -265,7 +262,7 @@
                   "select": {},
                   "transform": {
                     "req": "`reqdata`",
-                    "res": "`body`"
+                    "res": "`body.data`"
                   }
                 }
               ]
@@ -289,19 +286,19 @@
             },
             {
               "active": true,
-              "name": "execution_provider",
+              "name": "executionProvider",
               "req": false,
               "type": "`$STRING`"
             },
             {
               "active": true,
-              "name": "model_card",
+              "name": "modelCard",
               "req": false,
               "type": "`$OBJECT`"
             },
             {
               "active": true,
-              "name": "model_type",
+              "name": "modelType",
               "req": true,
               "type": "`$STRING`"
             },
@@ -313,31 +310,31 @@
             },
             {
               "active": true,
-              "name": "sequence_len",
+              "name": "sequenceLen",
               "req": false,
               "type": "`$INTEGER`"
             },
             {
               "active": true,
-              "name": "source_dim",
+              "name": "sourceDim",
               "req": false,
               "type": "`$INTEGER`"
             },
             {
               "active": true,
-              "name": "source_model",
+              "name": "sourceModel",
               "req": false,
               "type": "`$STRING`"
             },
             {
               "active": true,
-              "name": "target_dim",
+              "name": "targetDim",
               "req": true,
               "type": "`$INTEGER`"
             },
             {
               "active": true,
-              "name": "target_model",
+              "name": "targetModel",
               "req": true,
               "type": "`$STRING`"
             }
@@ -351,6 +348,7 @@
                 {
                   "active": true,
                   "args": {},
+                  "kind": "http",
                   "method": "GET",
                   "orig": "/v1/models",
                   "parts": [
@@ -360,7 +358,7 @@
                   "select": {},
                   "transform": {
                     "req": "`reqdata`",
-                    "res": "`body`"
+                    "res": "`body.data`"
                   }
                 }
               ]
@@ -580,18 +578,41 @@
         "website": "https://univec.ai"
       },
       "option": {},
+      "repo": {
+        "host": "github.com",
+        "path": ""
+      },
       "target": {
         "go": {
           "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
           "comment": {
             "line": "//"
           },
           "deps": {},
           "ext": "go",
+          "feature": {
+            "fullset": [
+              "test/feature_test.go"
+            ],
+            "trim": true
+          },
           "module": {
-            "name": "univec"
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
           },
           "name": "go",
+          "output": {
+            "adopt": false,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -613,22 +634,40 @@
                 "recipe": "github"
               },
               "via": "port"
-            }
+            },
+            "version": "0.0.1"
           },
           "srcfeature": false,
           "title": "Golang"
         },
         "go-cli": {
           "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
           "comment": {
             "line": "//"
           },
           "deps": {},
           "ext": "go",
+          "feature": {
+            "fullset": [],
+            "trim": true
+          },
           "module": {
-            "name": "univec"
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
           },
           "name": "go-cli",
+          "output": {
+            "adopt": false,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
           "phase": {
             "agentguide": {
               "active": false
@@ -667,21 +706,39 @@
                 "recipe": "github"
               },
               "via": "root"
-            }
+            },
+            "version": "0.0.1"
           },
           "title": "Go CLI"
         },
         "go-mcp": {
           "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
           "comment": {
             "line": "//"
           },
           "deps": {},
           "ext": "go",
+          "feature": {
+            "fullset": [],
+            "trim": true
+          },
           "module": {
-            "name": "univec"
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
           },
           "name": "go-mcp",
+          "output": {
+            "adopt": false,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
           "phase": {
             "agentguide": {
               "active": false
@@ -720,12 +777,17 @@
                 "recipe": "github"
               },
               "via": "root"
-            }
+            },
+            "version": "0.0.1"
           },
           "title": "Go MCP server"
         },
         "js": {
           "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
           "comment": {
             "line": "//"
           },
@@ -737,10 +799,23 @@
             }
           },
           "ext": "js",
+          "feature": {
+            "fullset": [],
+            "trim": true
+          },
           "module": {
-            "name": "univec"
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
           },
           "name": "js",
+          "output": {
+            "adopt": false,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -762,12 +837,17 @@
                 "recipe": "github"
               },
               "via": "port"
-            }
+            },
+            "version": "0.0.1"
           },
           "title": "JavaScript"
         },
         "lua": {
           "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
           "comment": {
             "line": "--"
           },
@@ -779,10 +859,23 @@
             }
           },
           "ext": "lua",
+          "feature": {
+            "fullset": [],
+            "trim": true
+          },
           "module": {
-            "name": "univec"
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
           },
           "name": "lua",
+          "output": {
+            "adopt": false,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -804,22 +897,40 @@
                 "recipe": "github"
               },
               "via": "port"
-            }
+            },
+            "version": "0.0.1"
           },
           "srcfeature": false,
           "title": "Lua"
         },
         "php": {
           "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
           "comment": {
             "line": "//"
           },
           "deps": {},
           "ext": "php",
+          "feature": {
+            "fullset": [],
+            "trim": true
+          },
           "module": {
-            "name": "univec"
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
           },
           "name": "php",
+          "output": {
+            "adopt": false,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -841,13 +952,18 @@
                 "recipe": "github"
               },
               "via": "port"
-            }
+            },
+            "version": "0.0.1"
           },
           "srcfeature": false,
           "title": "PHP"
         },
         "py": {
           "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
           "comment": {
             "line": "#"
           },
@@ -859,10 +975,23 @@
             }
           },
           "ext": "py",
+          "feature": {
+            "fullset": [],
+            "trim": true
+          },
           "module": {
-            "name": "univec"
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
           },
           "name": "py",
+          "output": {
+            "adopt": false,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -884,13 +1013,18 @@
                 "recipe": "github"
               },
               "via": "port"
-            }
+            },
+            "version": "0.0.1"
           },
           "srcfeature": false,
           "title": "Python"
         },
         "ts": {
           "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
           "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "comment": {
             "line": "//"
@@ -913,10 +1047,23 @@
             }
           },
           "ext": "ts",
+          "feature": {
+            "fullset": [],
+            "trim": true
+          },
           "module": {
-            "name": "univec"
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
           },
           "name": "ts",
+          "output": {
+            "adopt": false,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -938,16 +1085,21 @@
                 "recipe": "github"
               },
               "via": "port"
-            }
+            },
+            "version": "0.0.1"
           },
           "title": "TypeScript"
+        }
+      },
+      "test": {
+        "live": {
+          "app": false,
+          "base": "",
+          "strict": false
         }
       }
     }
   },
   "name": "univec",
-  "name-": "univec",
-  "name_": "univec",
-  "name__orig": "univec",
   "origin": "voxgig-sdk"
 }

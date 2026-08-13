@@ -11,6 +11,8 @@ import {
   repoInfo,
   PUBLISHER,
   PUBLISHER_URL,
+  packageVersion,
+  authorInfo,
 } from '@voxgig/sdkgen'
 
 
@@ -27,6 +29,12 @@ const Package = cmp(async function Package(props: any) {
   const target = props.target
 
   const model: Model = ctx$.model
+
+  // WHO WROTE THIS PACKAGE. Per target, falling back to the model-wide value
+  // and then to the publisher — so a manifest cannot go on naming Voxgig
+  // while the model names someone else, which is exactly what the hardcoded
+  // constant here did.
+  const author = authorInfo(model, target.name)
 
   const feature = getModelPath(model, `main.${KIT}.feature`)
 
@@ -54,7 +62,7 @@ const Package = cmp(async function Package(props: any) {
 
   const pkg = {
     name: packageName(model, 'npm'),
-    version: `0.0.1`,
+    version: packageVersion(model, target.name),
     description: pkgDescription(model, target.name),
     keywords: keywords(model),
     homepage: `${repoUrl}#readme`,
@@ -63,6 +71,14 @@ const Package = cmp(async function Package(props: any) {
     main: `dist/${SdkName}SDK.js`,
     type: 'commonjs',
     types: `dist/${SdkName}SDK.d.ts`,
+
+    // What actually ships. Without `files`, `npm publish` packs everything
+    // not gitignored — the test suite, dist-test/, the Makefile, the agent
+    // guides — into the published tarball. `src` IS included: the emitted
+    // .js.map files point back at it, so shipping it is what makes stack
+    // traces in a consumer resolve to SDK source. README/LICENSE/package.json
+    // are always included by npm and need no entry.
+    files: ['dist', 'src'],
     scripts: {
       // `test` and `test-coverage` run the COMPILED suite in dist-test/, which
       // a fresh clone does not have — the glob then matches nothing and the
@@ -97,7 +113,7 @@ const Package = cmp(async function Package(props: any) {
       "clean": "rm -rf node_modules yarn.lock package-lock.json dist dist-test",
       "reset": "npm run clean && npm i && npm run build && npm test",
     },
-    author: { name: PUBLISHER, url: PUBLISHER_URL },
+    author,
 
     // TODO: needs to be config
     license: 'MIT',

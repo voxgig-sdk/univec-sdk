@@ -11,12 +11,7 @@ main: kit: entity: convert: {
       type: "`$STRING`"
     }
     {
-      name: "data"
-      req: true
-      type: "`$OBJECT`"
-    }
-    {
-      name: "embedding"
+      name: "embeddings"
       req: true
       type: "`$ARRAY`"
     }
@@ -26,17 +21,12 @@ main: kit: entity: convert: {
       type: "`$STRING`"
     }
     {
-      name: "success"
-      req: true
-      type: "`$BOOLEAN`"
-    }
-    {
       name: "target_model"
       req: true
       type: "`$STRING`"
     }
     {
-      name: "text"
+      name: "texts"
       req: true
       type: "`$ARRAY`"
     }
@@ -56,7 +46,7 @@ main: kit: entity: convert: {
           ]
           transform: {
             req: "`reqdata`"
-            res: "`body`"
+            res: "`body.data`"
           }
         }
         {
@@ -68,7 +58,7 @@ main: kit: entity: convert: {
           ]
           transform: {
             req: "`reqdata`"
-            res: "`body`"
+            res: "`body.data`"
           }
         }
         {
@@ -81,7 +71,7 @@ main: kit: entity: convert: {
           ]
           transform: {
             req: "`reqdata`"
-            res: "`body`"
+            res: "`body.data`"
           }
         }
         {
@@ -94,7 +84,7 @@ main: kit: entity: convert: {
           ]
           transform: {
             req: "`reqdata`"
-            res: "`body`"
+            res: "`body.data`"
           }
         }
       ]

@@ -58,7 +58,7 @@ func TestEmbedEntity(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create failed: %v", err)
 		}
-		embedRef01Data = core.ToMapAny(embedRef01DataResult)
+		embedRef01Data = core.ToMapAny(entityData(embedRef01DataResult))
 		if embedRef01Data == nil {
 			t.Fatal("expected create result to be a map")
 		}

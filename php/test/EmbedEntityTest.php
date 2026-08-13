@@ -44,7 +44,7 @@ class EmbedEntityTest extends TestCase
             Vs::getpath($setup["data"], "new.embed"), "embed_ref01"));
 
         $embed_ref01_data_result = $embed_ref01_ent->create($embed_ref01_data, null);
-        $embed_ref01_data = Helpers::to_map($embed_ref01_data_result);
+        $embed_ref01_data = Helpers::to_map(is_object($embed_ref01_data_result) && method_exists($embed_ref01_data_result, 'data_get') ? $embed_ref01_data_result->data_get() : $embed_ref01_data_result);
         $this->assertNotNull($embed_ref01_data);
 
     }

@@ -29,7 +29,7 @@ class Config {
 
 
   options = {
-    base: 'https://api.univec.ai',
+    base: '$$main.kit.info.servers.0.url$$',
 
     'SERVERBLOCK''AUTHBLOCK'headers: 'HEADERS',
 

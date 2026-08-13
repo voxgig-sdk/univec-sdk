@@ -11,17 +11,17 @@ main: kit: entity: model: {
       type: "`$OBJECT`"
     }
     {
-      name: "execution_provider"
+      name: "executionProvider"
       req: false
       type: "`$STRING`"
     }
     {
-      name: "model_card"
+      name: "modelCard"
       req: false
       type: "`$OBJECT`"
     }
     {
-      name: "model_type"
+      name: "modelType"
       req: true
       type: "`$STRING`"
     }
@@ -31,27 +31,27 @@ main: kit: entity: model: {
       type: "`$STRING`"
     }
     {
-      name: "sequence_len"
+      name: "sequenceLen"
       req: false
       type: "`$INTEGER`"
     }
     {
-      name: "source_dim"
+      name: "sourceDim"
       req: false
       type: "`$INTEGER`"
     }
     {
-      name: "source_model"
+      name: "sourceModel"
       req: false
       type: "`$STRING`"
     }
     {
-      name: "target_dim"
+      name: "targetDim"
       req: true
       type: "`$INTEGER`"
     }
     {
-      name: "target_model"
+      name: "targetModel"
       req: true
       type: "`$STRING`"
     }
@@ -71,7 +71,7 @@ main: kit: entity: model: {
           ]
           transform: {
             req: "`reqdata`"
-            res: "`body`"
+            res: "`body.data`"
           }
         }
       ]

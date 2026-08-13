@@ -86,7 +86,7 @@ func makeOptionsUtil(ctx *core.Context) map[string]any {
 		},
 		"allow": map[string]any{
 			"method": "GET,PUT,POST,PATCH,DELETE,OPTIONS",
-			"op":     "create,update,load,list,remove,command,direct",
+			"op":     "create,update,load,list,remove,command,direct,graphql",
 		},
 		"entity": map[string]any{
 			"`$CHILD`": map[string]any{

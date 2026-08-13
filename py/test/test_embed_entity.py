@@ -6,9 +6,9 @@ import time
 
 import pytest
 
-from utility.voxgig_struct import voxgig_struct as vs
+from univec_sdk.utility.voxgig_struct import voxgig_struct as vs
 from univec_sdk import UnivecSDK
-from core import helpers
+from univec_sdk.core import helpers
 
 _TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 from test import runner
@@ -44,7 +44,7 @@ class TestEmbedEntity:
         embed_ref01_data = helpers.to_map(vs.getprop(
             vs.getpath(setup["data"], "new.embed"), "embed_ref01"))
 
-        embed_ref01_data = helpers.to_map(embed_ref01_ent.create(embed_ref01_data, None))
+        embed_ref01_data = helpers.to_map(runner.entity_data(embed_ref01_ent.create(embed_ref01_data, None)))
         assert embed_ref01_data is not None
 
 

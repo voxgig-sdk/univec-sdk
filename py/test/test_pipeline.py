@@ -16,11 +16,11 @@
 import pytest
 
 from univec_sdk import UnivecSDK
-from core.error import UnivecError
-from core.result import UnivecResult
-from core.response import UnivecResponse
-from core.spec import UnivecSpec
-from feature.base_feature import UnivecBaseFeature
+from univec_sdk.core.error import UnivecError
+from univec_sdk.core.result import UnivecResult
+from univec_sdk.core.response import UnivecResponse
+from univec_sdk.core.spec import UnivecSpec
+from univec_sdk.feature.base_feature import UnivecBaseFeature
 
 
 def _client():

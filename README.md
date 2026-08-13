@@ -23,12 +23,10 @@ support (`list`, `create`):
 const client = new UnivecSDK()
 const convert = await client.Convert().create({
   bridge_model: 'example',
-  data: {},
-  embedding: [],
+  embeddings: [],
   source_model: 'example',
-  success: true,
   target_model: 'example',
-  text: [],
+  texts: [],
 })
 ```
 
@@ -44,9 +42,18 @@ network, and no credentials:
 ### TypeScript
 
 ```ts
-const client = UnivecSDK.test()
+// The offline mock starts EMPTY — seed it with the records the test needs.
+// Shape: { entity: { <entity-name>: { <id>: <record> } } }
+const client = UnivecSDK.test({
+  entity: {
+    model: {
+      test01: { id: 'test01' },
+    },
+  },
+})
 const models = await client.Model().list()
-// models is an array of bare Model records populated with mock data
+// models is an array of Model entities, populated with mock data
+// — call models[0].data() for the record itself
 console.log(models)
 ```
 
@@ -89,7 +96,8 @@ local results, err = client:Model():list()
 ```js
 const client = UnivecSDK.test()
 const models = await client.Model().list()
-// models is an array of bare entities populated with mock data
+// models is an array of entities, populated with mock data
+// — call models[0].data() for the record itself
 console.log(models)
 ```
 

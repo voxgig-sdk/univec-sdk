@@ -4,7 +4,7 @@ import * as Path from 'node:path'
 import {
   cmp, each, names, cmap,
   List, File, Content, Copy, Folder, Fragment, Line, FeatureHook,
-  entityClassName, entityCollection,
+  entityClassName, entityCollection, srcFeatureExcludes,
 } from '@voxgig/sdkgen'
 
 
@@ -43,6 +43,9 @@ const Main = cmp(async function Main(props: any) {
 
   Copy({
     from: 'tm/' + target.name,
+    // Root copies src/feature/<name>/ per ACTIVE feature; keep this blanket
+    // copy from restoring one that was switched off after `target add`.
+    exclude: srcFeatureExcludes(model),
     replace: {
       ...props.ctx$.stdrep,
     }

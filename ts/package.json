@@ -21,6 +21,10 @@
   "main": "dist/UnivecSDK.js",
   "type": "commonjs",
   "types": "dist/UnivecSDK.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "pretest": "npm run build",
     "test": "node --enable-source-maps --test-concurrency=1 --test 'dist-test/**/*.test.js'",

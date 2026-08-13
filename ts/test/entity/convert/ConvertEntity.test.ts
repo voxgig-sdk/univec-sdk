@@ -62,7 +62,7 @@ describe('ConvertEntity', async () => {
     const convert_ref01_ent = client.Convert()
     let convert_ref01_data = setup.data.new.convert['convert_ref01']
 
-    convert_ref01_data = await convert_ref01_ent.create(convert_ref01_data)
+    convert_ref01_data = (await convert_ref01_ent.create(convert_ref01_data)).data()
     assert(null != convert_ref01_data)
 
 

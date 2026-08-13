@@ -6,15 +6,15 @@ import re
 
 import pytest
 
-from utility.voxgig_struct import voxgig_struct as vs
+from univec_sdk.utility.voxgig_struct import voxgig_struct as vs
 from univec_sdk import UnivecSDK
-from core.spec import UnivecSpec
-from core.result import UnivecResult
-from core.response import UnivecResponse
-from core.operation import UnivecOperation
-from core.error import UnivecError
-from core import helpers
-from feature.base_feature import UnivecBaseFeature
+from univec_sdk.core.spec import UnivecSpec
+from univec_sdk.core.result import UnivecResult
+from univec_sdk.core.response import UnivecResponse
+from univec_sdk.core.operation import UnivecOperation
+from univec_sdk.core.error import UnivecError
+from univec_sdk.core import helpers
+from univec_sdk.feature.base_feature import UnivecBaseFeature
 
 _TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 

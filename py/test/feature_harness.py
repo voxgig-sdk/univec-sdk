@@ -14,12 +14,12 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from config import make_config
-from features import _make_feature
-from core.control import UnivecControl
-from core.error import UnivecError
-from core.result import UnivecResult
-from core.spec import UnivecSpec
+from univec_sdk.config import make_config
+from univec_sdk.features import _make_feature
+from univec_sdk.core.control import UnivecControl
+from univec_sdk.core.error import UnivecError
+from univec_sdk.core.result import UnivecResult
+from univec_sdk.core.spec import UnivecSpec
 
 
 # True when this SDK was generated with the named feature.

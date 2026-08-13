@@ -44,7 +44,7 @@ describe('EphemeralKeyEntity', async () => {
     const ephemeral_key_ref01_ent = client.EphemeralKey()
     let ephemeral_key_ref01_data = setup.data.new.ephemeral_key['ephemeral_key_ref01']
 
-    ephemeral_key_ref01_data = await ephemeral_key_ref01_ent.create(ephemeral_key_ref01_data)
+    ephemeral_key_ref01_data = (await ephemeral_key_ref01_ent.create(ephemeral_key_ref01_data)).data()
     assert(null != ephemeral_key_ref01_data)
 
 

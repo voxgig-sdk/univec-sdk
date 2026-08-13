@@ -24,7 +24,7 @@ import {
   buildIdNames,
   getMatchEntries,
   isAuthActive,
-  entityDataIdField,
+  entityDataIdField, envName, envToken
 } from '@voxgig/sdkgen'
 
 
@@ -67,7 +67,7 @@ const TestEntity = cmp(function TestEntity(props: any) {
     return
   }
 
-  const PROJUPPER = nom(model.const, 'Name').toUpperCase().replace(/[^A-Z_]/g, '_')
+  const PROJUPPER = envName(model)
 
   const authActive = isAuthActive(model)
   const apikeyEnvEntry = authActive
@@ -194,7 +194,7 @@ ${hasList ? `
 		// The basic flow consumes synthetic IDs from the fixture. In live mode
 		// without an *_ENTID env override, those IDs hit the live API and 4xx.
 		if setup.syntheticOnly {
-			t.Skip("live entity test uses synthetic IDs from fixture — set ${PROJUPPER}_TEST_${entity.name.toUpperCase().replace(/[^A-Z_]/g, '_')}_ENTID JSON to run live")
+			t.Skip("live entity test uses synthetic IDs from fixture — set ${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID JSON to run live")
 			return
 		}
 ${allSteps.length > 0 ? '\t\tclient := setup.client\n\n' : ''}`)
@@ -281,16 +281,16 @@ ${allSteps.length > 0 ? '\t\tclient := setup.client\n\n' : ''}`)
 	// Detect ENTID env override before envOverride consumes it. When live
 	// mode is on without a real override, the basic test runs against synthetic
 	// IDs from the fixture and 4xx's. Surface this so the test can skip.
-	entidEnvRaw := os.Getenv("${PROJUPPER}_TEST_${entity.name.toUpperCase().replace(/[^A-Z_]/g, '_')}_ENTID")
+	entidEnvRaw := os.Getenv("${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID")
 	idmapOverridden := entidEnvRaw != "" && strings.HasPrefix(strings.TrimSpace(entidEnvRaw), "{")
 
 	env := envOverride(map[string]any{
-		"${PROJUPPER}_TEST_${entity.name.toUpperCase().replace(/[^A-Z_]/g, '_')}_ENTID": idmap,
+		"${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID": idmap,
 		"${PROJUPPER}_TEST_LIVE":      "FALSE",
 		"${PROJUPPER}_TEST_EXPLAIN":   "FALSE",${apikeyEnvEntry}
 	})
 
-	idmapResolved := core.ToMapAny(env["${PROJUPPER}_TEST_${entity.name.toUpperCase().replace(/[^A-Z_]/g, '_')}_ENTID"])
+	idmapResolved := core.ToMapAny(env["${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID"])
 	if idmapResolved == nil {
 		idmapResolved = core.ToMapAny(idmap)
 	}
@@ -381,7 +381,7 @@ const generateCreate: OpGen = (ctx, step, index) => {
 		if err != nil {
 			t.Fatalf("create failed: %v", err)
 		}
-		${datavar} = core.ToMapAny(${datavar}Result)
+		${datavar} = core.ToMapAny(entityData(${datavar}Result))
 		if ${datavar} == nil {
 			t.Fatal("expected create result to be a map")
 		}
@@ -546,7 +546,7 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 		if err != nil {
 			t.Fatalf("update failed: %v", err)
 		}
-		${resdatavar} := core.ToMapAny(${resdatavar}Result)
+		${resdatavar} := core.ToMapAny(entityData(${resdatavar}Result))
 		if ${resdatavar} == nil {
 			t.Fatal("expected update result to be a map")
 		}
@@ -621,7 +621,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
 		if err != nil {
 			t.Fatalf("load failed: %v", err)
 		}
-		${datavar}LoadResult := core.ToMapAny(${datavar}Loaded)
+		${datavar}LoadResult := core.ToMapAny(entityData(${datavar}Loaded))
 		if ${datavar}LoadResult == nil {
 			t.Fatal("expected load result to be a map")
 		}

@@ -1,4 +1,4 @@
-# ProjectName SDK exists test
+# Univec SDK exists test
 
 import pytest
 from univec_sdk import UnivecSDK

@@ -112,12 +112,10 @@ fmt.Println(convert.GetName()) // "convert"
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `bridge_model` | `string` | Yes |  |
-| `data` | `map[string]any` | Yes |  |
-| `embedding` | `[]any` | Yes |  |
+| `embeddings` | `[]any` | Yes |  |
 | `source_model` | `string` | Yes |  |
-| `success` | `bool` | Yes |  |
 | `target_model` | `string` | Yes |  |
-| `text` | `[]any` | Yes |  |
+| `texts` | `[]any` | Yes |  |
 
 ### Operations
 
@@ -128,12 +126,10 @@ Create a new entity with the given data.
 ```go
 result, err := client.Convert(nil).Create(map[string]any{
     "bridge_model": "example_bridge_model",
-    "data": map[string]any{},
-    "embedding": []any{},
+    "embeddings": []any{},
     "source_model": "example_source_model",
-    "success": true,
     "target_model": "example_target_model",
-    "text": []any{},
+    "texts": []any{},
 }, nil)
 if err != nil {
     panic(err)
@@ -176,10 +172,9 @@ fmt.Println(embed.GetName()) // "embed"
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `map[string]any` | Yes |  |
+| `embeddings` | `[]any` | Yes |  |
 | `model` | `string` | Yes |  |
-| `success` | `bool` | Yes |  |
-| `text` | `[]any` | Yes |  |
+| `texts` | `[]any` | Yes |  |
 
 ### Operations
 
@@ -189,10 +184,9 @@ Create a new entity with the given data.
 
 ```go
 result, err := client.Embed(nil).Create(map[string]any{
-    "data": map[string]any{},
+    "embeddings": []any{},
     "model": "example_model",
-    "success": true,
-    "text": []any{},
+    "texts": []any{},
 }, nil)
 if err != nil {
     panic(err)
@@ -235,8 +229,10 @@ fmt.Println(ephemeralKey.GetName()) // "ephemeral_key"
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `data` | `map[string]any` | Yes |  |
-| `success` | `bool` | Yes |  |
+| `dailyLimit` | `int` | Yes |  |
+| `dailyUsed` | `int` | Yes |  |
+| `key` | `string` | Yes |  |
+| `resetsAt` | `string` | Yes |  |
 
 ### Operations
 
@@ -246,8 +242,10 @@ Create a new entity with the given data.
 
 ```go
 result, err := client.EphemeralKey(nil).Create(map[string]any{
-    "data": map[string]any{},
-    "success": true,
+    "dailyLimit": 1,
+    "dailyUsed": 1,
+    "key": "example_key",
+    "resetsAt": "example_resetsAt",
 }, nil)
 if err != nil {
     panic(err)
@@ -291,15 +289,15 @@ fmt.Println(model.GetName()) // "model"
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `eval` | `map[string]any` | No |  |
-| `execution_provider` | `string` | No |  |
-| `model_card` | `map[string]any` | No |  |
-| `model_type` | `string` | Yes |  |
+| `executionProvider` | `string` | No |  |
+| `modelCard` | `map[string]any` | No |  |
+| `modelType` | `string` | Yes |  |
 | `name` | `string` | Yes |  |
-| `sequence_len` | `int` | No |  |
-| `source_dim` | `int` | No |  |
-| `source_model` | `string` | No |  |
-| `target_dim` | `int` | Yes |  |
-| `target_model` | `string` | Yes |  |
+| `sequenceLen` | `int` | No |  |
+| `sourceDim` | `int` | No |  |
+| `sourceModel` | `string` | No |  |
+| `targetDim` | `int` | Yes |  |
+| `targetModel` | `string` | Yes |  |
 
 ### Operations
 

@@ -8,36 +8,44 @@ guide: {
   entity: convert: {
     path: "/v1/convert": {
       op: create: method: *POST
+      op: create: transform: res: *("`body.data`")|top
     }
     path: "/v1/embed-bridge": {
       op: create: method: *POST
+      op: create: transform: res: *("`body.data`")|top
     }
     path: "/v1/ephemeral/convert": {
       op: create: method: *POST
+      op: create: transform: res: *("`body.data`")|top
     }
     path: "/v1/ephemeral/embed-bridge": {
       op: create: method: *POST
+      op: create: transform: res: *("`body.data`")|top
     }
   }
 
   entity: embed: {
     path: "/v1/embed": {
       op: create: method: *POST
+      op: create: transform: res: *("`body.data`")|top
     }
     path: "/v1/ephemeral/embed": {
       op: create: method: *POST
+      op: create: transform: res: *("`body.data`")|top
     }
   }
 
   entity: ephemeral_key: {
     path: "/v1/ephemeral/key": {
       op: create: method: *POST
+      op: create: transform: res: *("`body.data`")|top
     }
   }
 
   entity: model: {
     path: "/v1/models": {
       op: list: method: *GET
+      op: list: transform: res: *("`body.data`")|top
     }
   }
 

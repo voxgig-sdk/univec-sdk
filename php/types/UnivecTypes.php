@@ -16,85 +16,83 @@ declare(strict_types=1);
 class Convert
 {
     public string $bridge_model;
-    public array $data;
-    public array $embedding;
+    public array $embeddings;
     public string $source_model;
-    public bool $success;
     public string $target_model;
-    public array $text;
+    public array $texts;
 }
 
 /** Request payload for Convert#create. */
 class ConvertCreateData
 {
     public string $bridge_model;
-    public array $data;
-    public array $embedding;
+    public array $embeddings;
     public string $source_model;
-    public bool $success;
     public string $target_model;
-    public array $text;
+    public array $texts;
 }
 
 /** Embed entity data model. */
 class Embed
 {
-    public array $data;
+    public array $embeddings;
     public string $model;
-    public bool $success;
-    public array $text;
+    public array $texts;
 }
 
 /** Request payload for Embed#create. */
 class EmbedCreateData
 {
-    public array $data;
+    public array $embeddings;
     public string $model;
-    public bool $success;
-    public array $text;
+    public array $texts;
 }
 
 /** EphemeralKey entity data model. */
 class EphemeralKey
 {
-    public array $data;
-    public bool $success;
+    public int $dailyLimit;
+    public int $dailyUsed;
+    public string $key;
+    public string $resetsAt;
 }
 
 /** Request payload for EphemeralKey#create. */
 class EphemeralKeyCreateData
 {
-    public array $data;
-    public bool $success;
+    public int $dailyLimit;
+    public int $dailyUsed;
+    public string $key;
+    public string $resetsAt;
 }
 
 /** Model entity data model. */
 class Model
 {
     public ?array $eval = null;
-    public ?string $execution_provider = null;
-    public ?array $model_card = null;
-    public string $model_type;
+    public ?string $executionProvider = null;
+    public ?array $modelCard = null;
+    public string $modelType;
     public string $name;
-    public ?int $sequence_len = null;
-    public ?int $source_dim = null;
-    public ?string $source_model = null;
-    public int $target_dim;
-    public string $target_model;
+    public ?int $sequenceLen = null;
+    public ?int $sourceDim = null;
+    public ?string $sourceModel = null;
+    public int $targetDim;
+    public string $targetModel;
 }
 
 /** Request payload for Model#list. */
 class ModelListMatch
 {
     public ?array $eval = null;
-    public ?string $execution_provider = null;
-    public ?array $model_card = null;
-    public ?string $model_type = null;
+    public ?string $executionProvider = null;
+    public ?array $modelCard = null;
+    public ?string $modelType = null;
     public ?string $name = null;
-    public ?int $sequence_len = null;
-    public ?int $source_dim = null;
-    public ?string $source_model = null;
-    public ?int $target_dim = null;
-    public ?string $target_model = null;
+    public ?int $sequenceLen = null;
+    public ?int $sourceDim = null;
+    public ?string $sourceModel = null;
+    public ?int $targetDim = null;
+    public ?string $targetModel = null;
 }
 

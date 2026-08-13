@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, packageName, envName, entityIdField, entityOps, opRequestShape, safeVarName, exampleVarName, jsKey } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, packageName, envName, entityIdField, entityOps, opRequestShape, safeVarName, exampleVarName, jsKey, matchArg, idLiteral } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -8,6 +8,17 @@ import {
 } from '@voxgig/apidef'
 
 import { exampleValue } from './utility_ts'
+
+
+// A `list()` on a NESTED entity needs its parent path params. The
+// quickstart used to emit `client.Moon().list()` for an entity at
+// `/planet/{planet_id}/moon`, which 404s against a live server from a
+// half-built URL — indistinguishable from "no such record". The model
+// already marks those params `reqd: true`; matchArg renders exactly them.
+function listMatchArg(ent: any): string {
+  const idF = entityIdField(ent)
+  return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))
+}
 
 
 const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
@@ -36,8 +47,8 @@ const client = ${ctor}
     let hasCall = false
 
     if (opnames.includes('list')) {
-      Content(`// List all ${eName.toLowerCase()}s (returns ${eName}[])
-const ${eVar}s = await client.${eName}().list()
+      Content(`// List all ${eName.toLowerCase()}s (returns ${eName}Entity[] — .data() for the record)
+const ${eVar}s = await client.${eName}().list(${listMatchArg(exampleEntity)})
 for (const ${eVar} of ${eVar}s) {
   console.log(${eVar})
 }

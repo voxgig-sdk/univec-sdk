@@ -8,65 +8,63 @@
 
 ---@class Convert
 ---@field bridge_model string
----@field data table
----@field embedding table
+---@field embeddings table
 ---@field source_model string
----@field success boolean
 ---@field target_model string
----@field text table
+---@field texts table
 
 ---@class ConvertCreateData
 ---@field bridge_model string
----@field data table
----@field embedding table
+---@field embeddings table
 ---@field source_model string
----@field success boolean
 ---@field target_model string
----@field text table
+---@field texts table
 
 ---@class Embed
----@field data table
+---@field embeddings table
 ---@field model string
----@field success boolean
----@field text table
+---@field texts table
 
 ---@class EmbedCreateData
----@field data table
+---@field embeddings table
 ---@field model string
----@field success boolean
----@field text table
+---@field texts table
 
 ---@class EphemeralKey
----@field data table
----@field success boolean
+---@field dailyLimit number
+---@field dailyUsed number
+---@field key string
+---@field resetsAt string
 
 ---@class EphemeralKeyCreateData
----@field data table
----@field success boolean
+---@field dailyLimit number
+---@field dailyUsed number
+---@field key string
+---@field resetsAt string
 
 ---@class Model
 ---@field eval? table
----@field execution_provider? string
----@field model_card? table
----@field model_type string
+---@field executionProvider? string
+---@field modelCard? table
+---@field modelType string
 ---@field name string
----@field sequence_len? number
----@field source_dim? number
----@field source_model? string
----@field target_dim number
----@field target_model string
+---@field sequenceLen? number
+---@field sourceDim? number
+---@field sourceModel? string
+---@field targetDim number
+---@field targetModel string
 
 ---@class ModelListMatch
 ---@field eval? table
----@field execution_provider? string
----@field model_card? table
----@field model_type? string
+---@field executionProvider? string
+---@field modelCard? table
+---@field modelType? string
 ---@field name? string
----@field sequence_len? number
----@field source_dim? number
----@field source_model? string
----@field target_dim? number
----@field target_model? string
+---@field sequenceLen? number
+---@field sourceDim? number
+---@field sourceModel? string
+---@field targetDim? number
+---@field targetModel? string
 
 local M = {}
 

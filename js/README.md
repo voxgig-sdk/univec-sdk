@@ -38,12 +38,10 @@ const client = new UnivecSDK({
 ```js
 const created = await client.Convert().create({
   bridge_model: 'example_bridge_model',
-  data: {},
-  embedding: [],
+  embeddings: [],
   source_model: 'example_source_model',
-  success: true,
   target_model: 'example_target_model',
-  text: [],
+  texts: [],
 })
 console.log(created)
 ```
@@ -139,7 +137,8 @@ Create a mock client for unit testing — no server required:
 const client = UnivecSDK.test()
 
 const model = await client.Model().list()
-// model is a bare entity populated with mock response data
+// model is the entity, populated with mock response data
+// — call model.data() for the record itself
 console.log(model)
 ```
 
@@ -306,12 +305,10 @@ The `prepare()` method returns:
 | Field | Description |
 | --- | --- |
 | `bridge_model` |  |
-| `data` |  |
-| `embedding` |  |
+| `embeddings` |  |
 | `source_model` |  |
-| `success` |  |
 | `target_model` |  |
-| `text` |  |
+| `texts` |  |
 
 Operations: create.
 
@@ -321,10 +318,9 @@ API path: `/v1/convert`
 
 | Field | Description |
 | --- | --- |
-| `data` |  |
+| `embeddings` |  |
 | `model` |  |
-| `success` |  |
-| `text` |  |
+| `texts` |  |
 
 Operations: create.
 
@@ -334,8 +330,10 @@ API path: `/v1/embed`
 
 | Field | Description |
 | --- | --- |
-| `data` |  |
-| `success` |  |
+| `dailyLimit` |  |
+| `dailyUsed` |  |
+| `key` |  |
+| `resetsAt` |  |
 
 Operations: create.
 
@@ -346,15 +344,15 @@ API path: `/v1/ephemeral/key`
 | Field | Description |
 | --- | --- |
 | `eval` |  |
-| `execution_provider` |  |
-| `model_card` |  |
-| `model_type` |  |
+| `executionProvider` |  |
+| `modelCard` |  |
+| `modelType` |  |
 | `name` |  |
-| `sequence_len` |  |
-| `source_dim` |  |
-| `source_model` |  |
-| `target_dim` |  |
-| `target_model` |  |
+| `sequenceLen` |  |
+| `sourceDim` |  |
+| `sourceModel` |  |
+| `targetDim` |  |
+| `targetModel` |  |
 
 Operations: list.
 
@@ -380,24 +378,20 @@ Create an instance: `const convert = client.Convert()`
 | Field | Type | Description |
 | --- | --- | --- |
 | `bridge_model` | `string` |  |
-| `data` | `Object` |  |
-| `embedding` | `Array` |  |
+| `embeddings` | `Array` |  |
 | `source_model` | `string` |  |
-| `success` | `boolean` |  |
 | `target_model` | `string` |  |
-| `text` | `Array` |  |
+| `texts` | `Array` |  |
 
 #### Example: Create
 
 ```ts
 const convert = await client.Convert().create({
   bridge_model: 'example_bridge_model',
-  data: {},
-  embedding: [],
+  embeddings: [],
   source_model: 'example_source_model',
-  success: true,
   target_model: 'example_target_model',
-  text: [],
+  texts: [],
 })
 ```
 
@@ -416,19 +410,17 @@ Create an instance: `const embed = client.Embed()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `Object` |  |
+| `embeddings` | `Array` |  |
 | `model` | `string` |  |
-| `success` | `boolean` |  |
-| `text` | `Array` |  |
+| `texts` | `Array` |  |
 
 #### Example: Create
 
 ```ts
 const embed = await client.Embed().create({
-  data: {},
+  embeddings: [],
   model: 'example_model',
-  success: true,
-  text: [],
+  texts: [],
 })
 ```
 
@@ -447,15 +439,19 @@ Create an instance: `const ephemeral_key = client.EphemeralKey()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `Object` |  |
-| `success` | `boolean` |  |
+| `dailyLimit` | `number` |  |
+| `dailyUsed` | `number` |  |
+| `key` | `string` |  |
+| `resetsAt` | `string` |  |
 
 #### Example: Create
 
 ```ts
 const ephemeral_key = await client.EphemeralKey().create({
-  data: {},
-  success: true,
+  dailyLimit: 1,
+  dailyUsed: 1,
+  key: 'example_key',
+  resetsAt: 'example_resetsAt',
 })
 ```
 
@@ -475,15 +471,15 @@ Create an instance: `const model = client.Model()`
 | Field | Type | Description |
 | --- | --- | --- |
 | `eval` | `Object` |  |
-| `execution_provider` | `string` |  |
-| `model_card` | `Object` |  |
-| `model_type` | `string` |  |
+| `executionProvider` | `string` |  |
+| `modelCard` | `Object` |  |
+| `modelType` | `string` |  |
 | `name` | `string` |  |
-| `sequence_len` | `number` |  |
-| `source_dim` | `number` |  |
-| `source_model` | `string` |  |
-| `target_dim` | `number` |  |
-| `target_model` | `string` |  |
+| `sequenceLen` | `number` |  |
+| `sourceDim` | `number` |  |
+| `sourceModel` | `string` |  |
+| `targetDim` | `number` |  |
+| `targetModel` | `string` |  |
 
 #### Example: List
 

@@ -41,7 +41,7 @@ describe("ConvertEntity", function()
 
     local convert_ref01_data_result, err = convert_ref01_ent:create(convert_ref01_data, nil)
     assert.is_nil(err)
-    convert_ref01_data = helpers.to_map(convert_ref01_data_result)
+    convert_ref01_data = helpers.to_map(type(convert_ref01_data_result) == 'table' and convert_ref01_data_result.data_get and convert_ref01_data_result:data_get() or convert_ref01_data_result)
     assert.is_not_nil(convert_ref01_data)
 
   end)

@@ -41,7 +41,7 @@ describe("EphemeralKeyEntity", function()
 
     local ephemeral_key_ref01_data_result, err = ephemeral_key_ref01_ent:create(ephemeral_key_ref01_data, nil)
     assert.is_nil(err)
-    ephemeral_key_ref01_data = helpers.to_map(ephemeral_key_ref01_data_result)
+    ephemeral_key_ref01_data = helpers.to_map(type(ephemeral_key_ref01_data_result) == 'table' and ephemeral_key_ref01_data_result.data_get and ephemeral_key_ref01_data_result:data_get() or ephemeral_key_ref01_data_result)
     assert.is_not_nil(ephemeral_key_ref01_data)
 
   end)

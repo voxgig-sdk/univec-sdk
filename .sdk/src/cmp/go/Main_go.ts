@@ -4,7 +4,7 @@ import * as Path from 'node:path'
 import {
   cmp, each, names, cmap,
   List, File, Content, Copy, Folder, Fragment, Line, FeatureHook,
-  entityClassName, entityCollection,
+  entityClassName, entityCollection, goModule, goPackageIdent
 } from '@voxgig/sdkgen'
 
 
@@ -37,11 +37,10 @@ const Main = cmp(async function Main(props: any) {
 
   // Go module path == the repo path on GitHub (org from model.origin),
   // e.g. github.com/voxgig-sdk/<slug>-sdk. Used in go.mod and every import.
-  const gomodule = `github.com/${model.origin || 'voxgig-sdk'}/${model.name}-sdk/go`
+  const gomodule = goModule(model, 'go')
   // The root package name must be a plain Go identifier (can't be a path),
-  // so it stays as the concatenated-lowercase form (e.g. voxgigdogsdk).
-  const gopackage = (model.origin || 'voxgig-sdk').replace(/-sdk$/, '').replace(/[^a-z0-9]/gi, '') +
-    model.name.replace(/[^a-z0-9]/gi, '').toLowerCase() + 'sdk'
+  // so it stays a concatenated-lowercase form (e.g. voxgigdogsdk).
+  const gopackage = goPackageIdent(model, 'go')
 
   Package({ target })
 

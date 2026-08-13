@@ -551,6 +551,18 @@ func ctxToMatchMap(ctx *sdk.Context) map[string]any {
 	return m
 }
 
+// entityData extracts the data map from an op result.
+//
+// Every entity operation resolves to the ENTITY (see AGENTS.md), so a flow
+// test that wants the record takes this hop. A plain map passes through
+// unchanged, so this is safe for the direct/prepare results too.
+func entityData(v any) any {
+	if ent, ok := v.(sdk.Entity); ok {
+		return ent.Data()
+	}
+	return v
+}
+
 // entityListToData extracts data maps from a list of Entity objects.
 func entityListToData(list []any) []any {
 	var out []any

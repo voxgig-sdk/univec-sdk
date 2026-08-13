@@ -64,8 +64,20 @@ class TestFeature extends BaseFeature {
         if (null == data || 'string' !== typeof restf) {
           return data
         }
-        const m = restf.match(/^`body\.([^`.]+)`$/)
-        return null == m ? data : { [m[1]]: data }
+        // Rebuild whatever nesting the op's response transform unwraps, so
+        // the mock agrees with the model. Multi-segment on purpose: GraphQL
+        // ops unwrap `body.data.<field>` (and `body.data.<field>.<entity>`
+        // for mutation payloads), not just a single envelope property.
+        const m = restf.match(/^`body\.(.+)`$/)
+        if (null == m) {
+          return data
+        }
+        let out: any = data
+        const segs = m[1].split('.')
+        for (let i = segs.length - 1; 0 <= i; i--) {
+          out = { [segs[i]]: out }
+        }
+        return out
       }
 
       function respond(status: number, data?: any, res?: any) {

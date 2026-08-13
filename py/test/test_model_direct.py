@@ -3,9 +3,9 @@
 import json
 import pytest
 
-from utility.voxgig_struct import voxgig_struct as vs
+from univec_sdk.utility.voxgig_struct import voxgig_struct as vs
 from univec_sdk import UnivecSDK
-from core import helpers
+from univec_sdk.core import helpers
 from test import runner
 
 

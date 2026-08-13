@@ -62,7 +62,7 @@ describe('EmbedEntity', async () => {
     const embed_ref01_ent = client.Embed()
     let embed_ref01_data = setup.data.new.embed['embed_ref01']
 
-    embed_ref01_data = await embed_ref01_ent.create(embed_ref01_data)
+    embed_ref01_data = (await embed_ref01_ent.create(embed_ref01_data)).data()
     assert(null != embed_ref01_data)
 
 

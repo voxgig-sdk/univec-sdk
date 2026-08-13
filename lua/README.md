@@ -39,7 +39,7 @@ local client = sdk.new({
 
 ```lua
 -- Create
-local created, err = client:Convert():create({ bridge_model = "example_bridge_model", data = {}, embedding = {}, source_model = "example_source_model", success = true, target_model = "example_target_model", text = {} })
+local created, err = client:Convert():create({ bridge_model = "example_bridge_model", embeddings = {}, source_model = "example_source_model", target_model = "example_target_model", texts = {} })
 if err then error(err) end
 
 ```
@@ -222,9 +222,9 @@ data **directly** — there is no wrapper:
 
 Check `err` first (it is non-`nil` on failure), then use `value`:
 
-    local convert, err = client:Convert():load()
+    local convert, err = client:Convert():list()
     if err then error(err) end
-    -- convert is the loaded record
+    -- convert is the record list
 
 Only `direct()` returns a response envelope — a `table` with `ok`,
 `status`, `headers`, and `data` keys.
@@ -236,12 +236,10 @@ Only `direct()` returns a response envelope — a `table` with `ok`,
 | Field | Description |
 | --- | --- |
 | `bridge_model` |  |
-| `data` |  |
-| `embedding` |  |
+| `embeddings` |  |
 | `source_model` |  |
-| `success` |  |
 | `target_model` |  |
-| `text` |  |
+| `texts` |  |
 
 Operations: Create.
 
@@ -251,10 +249,9 @@ API path: `/v1/convert`
 
 | Field | Description |
 | --- | --- |
-| `data` |  |
+| `embeddings` |  |
 | `model` |  |
-| `success` |  |
-| `text` |  |
+| `texts` |  |
 
 Operations: Create.
 
@@ -264,8 +261,10 @@ API path: `/v1/embed`
 
 | Field | Description |
 | --- | --- |
-| `data` |  |
-| `success` |  |
+| `dailyLimit` |  |
+| `dailyUsed` |  |
+| `key` |  |
+| `resetsAt` |  |
 
 Operations: Create.
 
@@ -276,15 +275,15 @@ API path: `/v1/ephemeral/key`
 | Field | Description |
 | --- | --- |
 | `eval` |  |
-| `execution_provider` |  |
-| `model_card` |  |
-| `model_type` |  |
+| `executionProvider` |  |
+| `modelCard` |  |
+| `modelType` |  |
 | `name` |  |
-| `sequence_len` |  |
-| `source_dim` |  |
-| `source_model` |  |
-| `target_dim` |  |
-| `target_model` |  |
+| `sequenceLen` |  |
+| `sourceDim` |  |
+| `sourceModel` |  |
+| `targetDim` |  |
+| `targetModel` |  |
 
 Operations: List.
 
@@ -310,24 +309,20 @@ Create an instance: `local convert = client:Convert(nil)`
 | Field | Type | Description |
 | --- | --- | --- |
 | `bridge_model` | `string` |  |
-| `data` | `table` |  |
-| `embedding` | `table` |  |
+| `embeddings` | `table` |  |
 | `source_model` | `string` |  |
-| `success` | `boolean` |  |
 | `target_model` | `string` |  |
-| `text` | `table` |  |
+| `texts` | `table` |  |
 
 #### Example: Create
 
 ```lua
 local convert, err = client:Convert():create({
   bridge_model = "example_bridge_model", -- string
-  data = {}, -- table
-  embedding = {}, -- table
+  embeddings = {}, -- table
   source_model = "example_source_model", -- string
-  success = true, -- boolean
   target_model = "example_target_model", -- string
-  text = {}, -- table
+  texts = {}, -- table
 })
 ```
 
@@ -346,19 +341,17 @@ Create an instance: `local embed = client:Embed(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `table` |  |
+| `embeddings` | `table` |  |
 | `model` | `string` |  |
-| `success` | `boolean` |  |
-| `text` | `table` |  |
+| `texts` | `table` |  |
 
 #### Example: Create
 
 ```lua
 local embed, err = client:Embed():create({
-  data = {}, -- table
+  embeddings = {}, -- table
   model = "example_model", -- string
-  success = true, -- boolean
-  text = {}, -- table
+  texts = {}, -- table
 })
 ```
 
@@ -377,15 +370,19 @@ Create an instance: `local ephemeral_key = client:EphemeralKey(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `data` | `table` |  |
-| `success` | `boolean` |  |
+| `dailyLimit` | `number` |  |
+| `dailyUsed` | `number` |  |
+| `key` | `string` |  |
+| `resetsAt` | `string` |  |
 
 #### Example: Create
 
 ```lua
 local ephemeral_key, err = client:EphemeralKey():create({
-  data = {}, -- table
-  success = true, -- boolean
+  dailyLimit = 1, -- number
+  dailyUsed = 1, -- number
+  key = "example_key", -- string
+  resetsAt = "example_resetsAt", -- string
 })
 ```
 
@@ -405,15 +402,15 @@ Create an instance: `local model = client:Model(nil)`
 | Field | Type | Description |
 | --- | --- | --- |
 | `eval` | `table` |  |
-| `execution_provider` | `string` |  |
-| `model_card` | `table` |  |
-| `model_type` | `string` |  |
+| `executionProvider` | `string` |  |
+| `modelCard` | `table` |  |
+| `modelType` | `string` |  |
 | `name` | `string` |  |
-| `sequence_len` | `number` |  |
-| `source_dim` | `number` |  |
-| `source_model` | `string` |  |
-| `target_dim` | `number` |  |
-| `target_model` | `string` |  |
+| `sequenceLen` | `number` |  |
+| `sourceDim` | `number` |  |
+| `sourceModel` | `string` |  |
+| `targetDim` | `number` |  |
+| `targetModel` | `string` |  |
 
 #### Example: List
 

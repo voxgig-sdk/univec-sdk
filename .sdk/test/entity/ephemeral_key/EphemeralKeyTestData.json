@@ -2,18 +2,24 @@
   "existing": {
     "ephemeral_key": {
       "EPHEMERAL_KEY00": {
-        "data": {},
-        "success": false,
+        "dailyLimit": "s28",
+        "dailyUsed": "s29",
+        "key": "s2a",
+        "resetsAt": "s2b",
         "id": "EPHEMERAL_KEY00"
       },
       "EPHEMERAL_KEY01": {
-        "data": {},
-        "success": false,
+        "dailyLimit": "s50",
+        "dailyUsed": "s51",
+        "key": "s52",
+        "resetsAt": "s53",
         "id": "EPHEMERAL_KEY01"
       },
       "EPHEMERAL_KEY02": {
-        "data": {},
-        "success": false,
+        "dailyLimit": "s78",
+        "dailyUsed": "s79",
+        "key": "s7a",
+        "resetsAt": "s7b",
         "id": "EPHEMERAL_KEY02"
       }
     }
@@ -21,8 +27,10 @@
   "new": {
     "ephemeral_key": {
       "ephemeral_key_ref01": {
-        "data": {},
-        "success": false
+        "dailyLimit": "sa0",
+        "dailyUsed": "sa1",
+        "key": "sa2",
+        "resetsAt": "sa3"
       }
     }
   }

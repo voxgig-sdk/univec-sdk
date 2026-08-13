@@ -4,7 +4,7 @@ import * as Path from 'node:path'
 import {
   cmp, each, camelify, names,
   File, Content, Folder, Fragment, Line, FeatureHook, Slot,
-  entityClassName, entityCollection,
+  entityClassName, entityCollection, goModule
 } from '@voxgig/sdkgen'
 
 import {
@@ -21,7 +21,7 @@ const Entity = cmp(function Entity(props: any) {
 
   // Module name: concatenated lowercase
   // Go module path == repo path on GitHub (org from model.origin).
-  const gomodule = `github.com/${model.origin || 'voxgig-sdk'}/${model.name}-sdk/go`
+  const gomodule = goModule(model, 'go')
 
   // Collision-free entity CLASS name (see entityClassName): normally
   // `<Name>Entity`, but disambiguated (e.g. `<Name>EntityClient`) when it would

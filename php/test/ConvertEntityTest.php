@@ -44,7 +44,7 @@ class ConvertEntityTest extends TestCase
             Vs::getpath($setup["data"], "new.convert"), "convert_ref01"));
 
         $convert_ref01_data_result = $convert_ref01_ent->create($convert_ref01_data, null);
-        $convert_ref01_data = Helpers::to_map($convert_ref01_data_result);
+        $convert_ref01_data = Helpers::to_map(is_object($convert_ref01_data_result) && method_exists($convert_ref01_data_result, 'data_get') ? $convert_ref01_data_result->data_get() : $convert_ref01_data_result);
         $this->assertNotNull($convert_ref01_data);
 
     }
