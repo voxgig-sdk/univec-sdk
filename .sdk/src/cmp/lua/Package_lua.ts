@@ -72,6 +72,7 @@ build = {
   modules = {
     ["${model.name}_sdk"] = "${model.name}_sdk.lua",
     ["config"] = "config.lua",
+    ["config_shared"] = "config_shared.lua",
     ["features"] = "features.lua",
   }
 }

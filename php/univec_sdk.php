@@ -40,7 +40,7 @@ class UnivecSDK
         $utility = new UnivecUtility();
         $this->_utility = $utility;
 
-        $config = UnivecConfig::make_config();
+        $config = UnivecConfig::shared_config();
 
         $this->_rootctx = ($utility->make_context)([
             "client" => $this,

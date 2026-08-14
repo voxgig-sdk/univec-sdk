@@ -104,7 +104,7 @@ const Config = cmp(async function Config(props: any) {
             name: n.name,
             op: n.op,
             relations: n.relations,
-          }), a), {}), { margin: 2 }).trim(),
+          }, true), a), {}), { margin: 2 }).trim(),
       }
     })
   })

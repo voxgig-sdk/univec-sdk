@@ -23,8 +23,8 @@ class UnivecSDK:
         utility = UnivecUtility()
         self._utility = utility
 
-        from univec_sdk.config import make_config
-        config = make_config()
+        from univec_sdk.config import shared_config
+        config = shared_config()
 
         self._rootctx = utility.make_context({
             "client": self,

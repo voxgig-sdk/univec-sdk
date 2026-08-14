@@ -65,6 +65,9 @@ const Config = cmp(async function Config(props: any) {
 
     Content(`-- ${model.const.Name} SDK configuration
 
+-- Build a fresh, fully materialised config table. Every call rebuilds the
+-- whole structure, so prefer require("config_shared") unless you need a
+-- private copy you intend to mutate.
 local function make_config()
   return {
     main = {
@@ -99,7 +102,7 @@ ${serverBlock}${authBlock}      headers = ${formatLuaTable(headers, 3)},
         name: n.name,
         op: n.op,
         relations: n.relations,
-      }), a), {}), 2)},
+      }, true), a), {}), 2)},
   }
 end
 
@@ -121,6 +124,32 @@ end
 
 
 return make_config
+`)
+  })
+
+  // A sibling module rather than a member of `config`: `config` returns a
+  // bare function (`require("config")()`), and turning it into a table would
+  // change its observable type for any consumer holding it as a factory.
+  File({ name: 'config_shared.' + target.ext }, () => {
+    Content(`-- ${model.const.Name} SDK shared configuration
+
+local make_config = require("config")
+
+local value = nil
+
+
+-- Return the config for this Lua state, built once on first use. The SDK
+-- reads the config on every request and never writes to it, so one instance
+-- is shared by every client rather than rebuilt per client.
+--
+-- The returned table is shared: treat it as read-only. Callers that need to
+-- mutate should use require("config")(), which always returns a fresh copy.
+return function()
+  if value == nil then
+    value = make_config()
+  end
+  return value
+end
 `)
   })
 })
