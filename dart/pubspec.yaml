@@ -1,0 +1,15 @@
+name: univec_sdk
+description: >-
+  Unofficial generated dart SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.
+version: 0.1.1
+homepage: https://github.com/voxgig-sdk/univec-sdk
+repository: https://github.com/voxgig-sdk/univec-sdk
+issue_tracker: https://github.com/voxgig-sdk/univec-sdk/issues
+topics:
+  - voxgig
+  - sdk
+  - generated-sdk
+  - openapi
+  - api-client
+environment:
+  sdk: '>=3.0.0 <4.0.0'

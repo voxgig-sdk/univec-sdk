@@ -1,0 +1,32 @@
+
+import {
+  Content,
+  File,
+  cmp,
+} from '@voxgig/sdkgen'
+
+
+const Gitignore = cmp(async function Gitignore(_props: any) {
+  File({ name: '.gitignore' }, () => {
+    Content(`# ExtUtils::MakeMaker / dist build artifacts
+.release/
+blib/
+pm_to_blib
+MYMETA.json
+MYMETA.yml
+Makefile.old
+*.tar.gz
+
+# Editor / OS
+*.bak
+.idea/
+.vscode/
+.DS_Store
+`)
+  })
+})
+
+
+export {
+  Gitignore
+}

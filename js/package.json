@@ -1,6 +1,6 @@
 {
   "name": "@voxgig-sdk/univec-js",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "description": "Unofficial generated JavaScript SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.",
   "keywords": [
     "voxgig",

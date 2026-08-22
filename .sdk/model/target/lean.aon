@@ -1,0 +1,75 @@
+
+main: kit: target: lean: {
+
+  title: Lean
+  ext: lean
+  comment: line: "--"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  # Entities are generic (config-driven F.makeEntity), so no per-entity or
+  # per-feature generated modules — the same model as the Haskell target. The
+  # readme + agentguide phases read the API model directly (not per-entity
+  # generated code), so they are active; entity/feature generation stays off.
+  phase: {
+    entity:     { active: false }
+    feature:    { active: false }
+    readme:     { active: true }
+    agentguide: { active: true }
+    test:       { active: true }
+  }
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct is vendored under src/ (VoxgigStruct.lean + Vregex.lean) and the
+  # runtime is dependency-free: it compiles with the stock Lean 4 toolchain
+  # (only the built-in prelude + Std), no Lake package dependencies. The HTTP
+  # transport shells out to `curl` via IO.Process, so there are no manifest
+  # deps.
+  deps: {}
+}
+
+
+main: kit: feature: &: target: lean: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: Reservoir (Lean package index) — declared, publish pending
+# (git-tag only for now).
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: lean: publish: {
+  registry: {
+    name: 'reservoir'
+    url: 'https://reservoir.lean-lang.org'
+    vault: { alias: 'reservoir', env: 'RESERVOIR_TOKEN' }
+  }
+}
+
+
+# Feature source is NOT trimmed to the model's selection here: every
+# feature lives inside a single generated module (src/SdkFeatures.lean),
+# not in per-feature source files, so there is nothing per-feature to
+# leave out. Trimming waits on that module becoming model-driven.
+main: kit: target: lean: feature: {
+  trim: false
+}

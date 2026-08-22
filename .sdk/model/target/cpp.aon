@@ -1,0 +1,60 @@
+
+main: kit: target: cpp: {
+
+  title: 'C++'
+  ext: hpp
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct is vendored under utility/voxgigstruct — no external dep. The SDK
+  # is header-only; JSON parsing is the vendored struct parser and the mock
+  # transport needs no network. Tests need only a C++17 compiler (g++).
+  deps: {}
+}
+
+
+main: kit: feature: &: target: cpp: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: header-only; publishing is the git tag cpp/vX.Y.Z (no registry).
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: cpp: publish: {
+  registry: {
+    name: 'none'
+    url: ''
+  }
+}
+
+
+# Feature source may be trimmed to the model's selection. The one template
+# needing the COMPLETE set is the cross-feature test suite, which includes
+# every feature/<name>.hpp — so it is dropped alongside the features it
+# exercises whenever the set is trimmed.
+main: kit: target: cpp: feature: {
+  trim: true
+  fullset: ['test/feature_test.cpp']
+}

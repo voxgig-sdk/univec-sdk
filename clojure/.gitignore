@@ -1,0 +1,10 @@
+# tools.deps / clojure build artifacts
+.cpcache/
+classes/
+target/
+pom.xml
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

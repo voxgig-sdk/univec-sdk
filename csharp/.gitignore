@@ -1,0 +1,20 @@
+# Build output
+bin/
+obj/
+out/
+
+# Test results
+TestResults/
+*.trx
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# IDE / OS
+.vs/
+.idea/
+.vscode/
+*.user
+.DS_Store

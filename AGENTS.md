@@ -12,18 +12,36 @@ There are companion guides deeper in the tree: one per language
 
 ## Project map
 
-**Targets** (8):
+**Targets** (26):
 
 | Target | Directory | Build guide |
 | --- | --- | --- |
+| `c` | `c/` | [`c/AGENTS.md`](./c/AGENTS.md) |
+| `clojure` | `clojure/` | [`clojure/AGENTS.md`](./clojure/AGENTS.md) |
+| `cpp` | `cpp/` | [`cpp/AGENTS.md`](./cpp/AGENTS.md) |
+| `csharp` | `csharp/` | [`csharp/AGENTS.md`](./csharp/AGENTS.md) |
+| `dart` | `dart/` | [`dart/AGENTS.md`](./dart/AGENTS.md) |
+| `elixir` | `elixir/` | [`elixir/AGENTS.md`](./elixir/AGENTS.md) |
 | `go` | `go/` | [`go/AGENTS.md`](./go/AGENTS.md) |
 | `go-cli` | `go-cli/` — A CLI surface, not an SDK client library. | [`go-cli/AGENTS.md`](./go-cli/AGENTS.md) |
 | `go-mcp` | `go-mcp/` — An MCP server surface for AI agents, not an SDK client library. | [`go-mcp/AGENTS.md`](./go-mcp/AGENTS.md) |
+| `java` | `java/` | [`java/AGENTS.md`](./java/AGENTS.md) |
 | `js` | `js/` | [`js/AGENTS.md`](./js/AGENTS.md) |
+| `kotlin` | `kotlin/` | [`kotlin/AGENTS.md`](./kotlin/AGENTS.md) |
+| `lean` | `lean/` | [`lean/AGENTS.md`](./lean/AGENTS.md) |
 | `lua` | `lua/` | [`lua/AGENTS.md`](./lua/AGENTS.md) |
+| `ocaml` | `ocaml/` | [`ocaml/AGENTS.md`](./ocaml/AGENTS.md) |
+| `perl` | `perl/` | [`perl/AGENTS.md`](./perl/AGENTS.md) |
 | `php` | `php/` | [`php/AGENTS.md`](./php/AGENTS.md) |
 | `py` | `py/` | [`py/AGENTS.md`](./py/AGENTS.md) |
+| `py-data` | `py-data/` — A pandas/notebook surface layered on the sibling Python SDK, not an SDK client library. | [`py-data/AGENTS.md`](./py-data/AGENTS.md) |
+| `rb` | `rb/` | [`rb/AGENTS.md`](./rb/AGENTS.md) |
+| `rust` | `rust/` | [`rust/AGENTS.md`](./rust/AGENTS.md) |
+| `scala` | `scala/` | [`scala/AGENTS.md`](./scala/AGENTS.md) |
+| `seneca-provider` | `seneca-provider/` | [`seneca-provider/AGENTS.md`](./seneca-provider/AGENTS.md) |
+| `swift` | `swift/` | [`swift/AGENTS.md`](./swift/AGENTS.md) |
 | `ts` | `ts/` | [`ts/AGENTS.md`](./ts/AGENTS.md) |
+| `zig` | `zig/` | [`zig/AGENTS.md`](./zig/AGENTS.md) |
 
 **Features** (1): `test`.
 
@@ -74,11 +92,11 @@ npm run build && npm run generate
 
 To author a **new** feature:
 
-1. Define its model at `.sdk/model/feature/<name>.aontu` — `name: key()`,
+1. Define its model at `.sdk/model/feature/<name>.aon` — `name: key()`,
    `title`, `version`, `active`, `config.options.active`, a `hook`
    map (`<Stage>: active: true`), and per-language `deps`.
-2. Register it in `.sdk/model/feature/feature-index.aontu` with
-   `@"<name>.aontu"`.
+2. Register it in `.sdk/model/feature/feature-index.aon` with
+   `@"<name>.aon"`.
 3. Provide the per-language runtime under that target's feature template dir
    (`.sdk/tm/<lang>/src/feature/<name>/` for ts/js, `.sdk/tm/<lang>/feature/`
    otherwise) — the `FEATURE_Name` / `FEATURE_VERSION` placeholders are
@@ -98,18 +116,18 @@ Each language target is generated from **two layers**:
 
 Placeholders substituted on copy: `ProjectName` (Pascal-case SDK name),
 `GOMODULE` (Go module path), `FEATURE_Name` / `FEATURE_VERSION`, and the
-`$$path$$` interpolation of a model value (such as the name) in `.aontu`.
+`$$path$$` interpolation of a model value (such as the name) in `.aon`.
 
 Propagate a change: edit the template/component → `npm run build` (only
 needed if you touched a component) → `npm run generate`. Target shape and
-deps live in `.sdk/model/target/<lang>.aontu`; features in
-`.sdk/model/feature/<name>.aontu`.
-## The model language (aontu, `.aontu` files)
+deps live in `.sdk/model/target/<lang>.aon`; features in
+`.sdk/model/feature/<name>.aon`.
+## The model language (aontu, `.aon` files)
 
 The model is one structured object assembled by **aontu** (a unification
 engine) from three sources: the API model (entities/operations, from the
 OpenAPI spec via `@voxgig/apidef`), the base schema, and the target/feature
-definitions in `.sdk/model/`. An `.aontu` file is a relaxed JSON (jsonic
+definitions in `.sdk/model/`. An `.aon` file is a relaxed JSON (jsonic
 syntax) with unification semantics:
 
 | Syntax | Meaning |
@@ -119,7 +137,7 @@ syntax) with unification semantics:
 | `*default \| type` | A default value unified against a type (e.g. `*true \| boolean`). |
 | `name: key()` | Bind a field to its map key (so `feature: log: {}` gets `name: 'log'`). |
 | `$$path$$` | Interpolate a model value into a string — e.g. the SDK `name`. |
-| `@"file.aontu"` | Include another fragment (how the index files work). |
+| `@"file.aon"` | Include another fragment (how the index files work). |
 | `x: .y` | Reference another path's value (e.g. `deps: ts: .js`). |
 
 For example, the schema for every feature entry:
@@ -141,7 +159,7 @@ do not "fix" these into literal disjunctions.
 
 ```
 .sdk/
-  model/          the model: target/, feature/, and index .aontu files
+  model/          the model: target/, feature/, and index .aon files
   src/cmp/<lang>/  components — TypeScript that generates API-specific source
   tm/<lang>/       templates — verbatim source copied with placeholders
   dist/            compiled components (npm run build)

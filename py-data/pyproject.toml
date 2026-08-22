@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voxgig-sdk-univec-data"
+version = "0.1.1"
+description = "Unofficial generated Python Data SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+keywords = ["voxgig", "sdk", "generated-sdk", "openapi", "api-client", "univec", "pandas", "dataframe", "notebook", "colab"]
+dependencies = [
+    "voxgig-sdk-univec",
+    "pandas>=2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/voxgig-sdk/univec-sdk"
+Repository = "https://github.com/voxgig-sdk/univec-sdk"
+Issues = "https://github.com/voxgig-sdk/univec-sdk/issues"
+
+# A single package, deliberately. Emitting auth/fetch/frames as top-level
+# modules would put names that are both real PyPI distributions and common
+# notebook scratch files onto sys.path, where Colab's working directory wins.
+[tool.setuptools.packages.find]
+include = ["univec_data*"]

@@ -15,7 +15,7 @@ const index_1 = require("./index");
 // indistinguishable from a fixture that passes.
 //
 // Deferral is therefore DATA (`basic.pending`), not a comment: comments do not
-// survive compilation to test.json, so a marker written only in the .aontu
+// survive compilation to test.json, so a marker written only in the .aon
 // source cannot be checked by the thing that consumes it. Being data, these
 // invariants hold for every port, not just this one.
 (0, node_test_1.describe)('Corpus', () => {
@@ -35,7 +35,7 @@ const index_1 = require("./index");
                 'string' !== typeof basic?.pending;
         });
         (0, node_assert_1.equal)(undeclared.join(','), '', 'these sections compile to ZERO cases and carry no `basic: pending` ' +
-            'reason — add cases, or state the blocker in .sdk/test/primary/<name>.aontu');
+            'reason — add cases, or state the blocker in .sdk/test/primary/<name>.aon');
     });
     // "PENDING" with no reason is just a way to keep a hole open.
     (0, node_test_1.test)('every deferral gives a real reason', () => {

@@ -1,0 +1,54 @@
+# Project overlay — YOURS. The scaffold creates this file once and never
+# overwrites it, unlike every other file it writes.
+#
+# Everything else under model/ is toolchain-derived and is deliberately
+# regenerated so that toolchain fixes propagate. Put anything here that is a
+# decision about THIS project rather than a fact about the API.
+#
+# Included LAST by sdk.aon, after target/target-index.aon, because a key
+# under main.kit.target.<t> can only refine a target that has already been
+# defined. Declared earlier, the model build fails with "Cannot unify value:
+# nil with value: string / key ext value was: nil", which names nothing that
+# would lead you here.
+#
+# The release version each generated manifest declares (package.json,
+# pyproject.toml, the gemspec, the rockspec) and that the port Makefiles tag:
+#
+#   main: kit: target: ts: publish: version: '1.2.3'
+#
+# Per target, because ports publish to different registries on different
+# clocks. Set every target to the same value for a lockstep repo.
+#
+# A published package name that does not follow the derivation:
+#
+#   main: kit: target: ts: publish: registry: package: '@scope/name'
+# --- cedar: release version (written by cedar-regen.sh, do not hand-edit)
+# Per target, because sdkgen keys the version per target; identical across
+# them because cedar tags a repo at one version.
+main: kit: target: 'c': publish: version: '0.1.1'
+main: kit: target: 'clojure': publish: version: '0.1.1'
+main: kit: target: 'cpp': publish: version: '0.1.1'
+main: kit: target: 'csharp': publish: version: '0.1.1'
+main: kit: target: 'dart': publish: version: '0.1.1'
+main: kit: target: 'elixir': publish: version: '0.1.1'
+main: kit: target: 'go': publish: version: '0.1.1'
+main: kit: target: 'go-cli': publish: version: '0.1.1'
+main: kit: target: 'go-mcp': publish: version: '0.1.1'
+main: kit: target: 'java': publish: version: '0.1.1'
+main: kit: target: 'js': publish: version: '0.1.1'
+main: kit: target: 'kotlin': publish: version: '0.1.1'
+main: kit: target: 'lean': publish: version: '0.1.1'
+main: kit: target: 'lua': publish: version: '0.1.1'
+main: kit: target: 'ocaml': publish: version: '0.1.1'
+main: kit: target: 'perl': publish: version: '0.1.1'
+main: kit: target: 'php': publish: version: '0.1.1'
+main: kit: target: 'py': publish: version: '0.1.1'
+main: kit: target: 'py-data': publish: version: '0.1.1'
+main: kit: target: 'rb': publish: version: '0.1.1'
+main: kit: target: 'rust': publish: version: '0.1.1'
+main: kit: target: 'scala': publish: version: '0.1.1'
+main: kit: target: 'seneca-provider': publish: version: '0.1.1'
+main: kit: target: 'swift': publish: version: '0.1.1'
+main: kit: target: 'ts': publish: version: '0.1.1'
+main: kit: target: 'zig': publish: version: '0.1.1'
+# --- end cedar: release version

@@ -1,0 +1,9 @@
+# Lake build output
+.lake/
+build/
+lake-packages/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

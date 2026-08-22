@@ -1,0 +1,11 @@
+# C build output
+*.o
+*.out
+*.a
+a.out
+corpus-scoreboard.json
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

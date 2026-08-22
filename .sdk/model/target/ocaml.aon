@@ -1,0 +1,60 @@
+
+main: kit: target: ocaml: {
+
+  title: OCaml
+  ext: ml
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct is vendored under utility/ (voxgig_struct.ml + vregex.ml) — the
+  # runtime is dependency-free: it compiles with the stock ocamlc, no opam
+  # packages, no dune. So there are no manifest dependencies.
+  deps: {}
+}
+
+
+main: kit: feature: &: target: ocaml: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: opam registry (declared, publish pending — git-tag only).
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: ocaml: publish: {
+  registry: {
+    name: 'opam'
+    url: 'https://opam.ocaml.org'
+    vault: { alias: 'opam', env: 'OPAM_PUBLISH_TOKEN' }
+  }
+}
+
+
+# Feature source is NOT trimmed to the model's selection here: every
+# feature lives inside a single generated module (sdk_features.ml), not in
+# per-feature source files, so there is nothing per-feature to leave out.
+# Trimming waits on that module becoming model-driven.
+main: kit: target: ocaml: feature: {
+  trim: false
+}

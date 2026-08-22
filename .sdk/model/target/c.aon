@@ -1,0 +1,65 @@
+
+main: kit: target: c: {
+
+  title: C
+  ext: c
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct is vendored under utility/struct — no external dep. The whole
+  # pipeline is synchronous; the transport uses libcurl when available at
+  # build time (weak, optional) else returns a transport error.
+  deps: {
+  }
+}
+
+
+main: kit: feature: &: target: c: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: C has no central registry — publishing IS the git tag.
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: c: publish: {
+  registry: {
+    name: 'none'
+    url: ''
+    vault: { alias: 'none', env: 'NONE' }
+  }
+}
+
+
+# Feature source may be trimmed to the model's selection. Two templates need
+# the COMPLETE set, so both are dropped alongside the features they exercise
+# whenever the set is trimmed:
+#   tests/feature_test.c      — calls every feature_*_new()
+#   tests/sdk_pipeline_test.c — drives the retry feature by NAME through the
+#                               options map, so it fails at RUNTIME rather
+#                               than at link time when retry is absent
+main: kit: target: c: feature: {
+  trim: true
+  fullset: ['tests/feature_test.c', 'tests/sdk_pipeline_test.c']
+}

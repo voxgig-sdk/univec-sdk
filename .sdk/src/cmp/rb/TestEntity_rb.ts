@@ -1,0 +1,572 @@
+
+import {
+  flatten,
+  items,
+  join,
+} from '@voxgig/struct'
+
+import {
+  KIT,
+  Model,
+  ModelEntity,
+  ModelEntityFlow,
+  ModelEntityFlowStep,
+  getModelPath,
+  nom,
+} from '@voxgig/apidef'
+
+
+import {
+  Content,
+  File,
+  cmp,
+  each,
+  buildIdNames,
+  getMatchEntries,
+  isAuthActive,
+  entityDataIdField, envName, envToken
+} from '@voxgig/sdkgen'
+
+
+// See TestEntity_ts.ts for the GenCtx/OpGen contract.
+type GenCtx = {
+  model: Model
+  entity: ModelEntity
+  flow: ModelEntityFlow
+  PROJUPPER: string
+}
+
+type OpGen = (ctx: GenCtx, step: ModelEntityFlowStep, index: number) => void
+
+
+const TestEntity = cmp(function TestEntity(props: any) {
+  const ctx$ = props.ctx$
+  const model: Model = ctx$.model
+
+  const target = props.target
+  const entity: ModelEntity = props.entity
+
+  // The stream test streams the "list" op and asserts a 3-item collection, so
+  // it only applies to entities that declare a list op. Others (e.g. Batch =
+  // create/load) have no list endpoint — make_point errors and the stream
+  // yields nothing — so skip the stream test for them.
+  const hasList = !!(entity.op && (entity.op as any)?.list)
+
+  const basicflow: ModelEntityFlow | undefined =
+    getModelPath(model, `main.${KIT}.flow.Basic${nom(entity, 'Name')}Flow`)
+  if (null == basicflow || true !== basicflow.active) {
+    return
+  }
+
+  const PROJUPPER = envName(model)
+
+  const authActive = isAuthActive(model)
+  const apikeyEnvEntry = authActive
+    ? `\n    "${PROJUPPER}_APIKEY" => "NONE",`
+    : ''
+  const apikeyLiveField = authActive
+    ? `\n        "apikey" => env["${PROJUPPER}_APIKEY"],`
+    : ''
+
+  const idnames = buildIdNames(entity, basicflow)
+  const idnamesStr = idnames.map(n => `"${n}"`).join(', ')
+
+  const allSteps = Object.values(basicflow.step) as any[]
+  const updateStep = allSteps.find((s: any) => s.op === 'update')
+  const updateData = updateStep?.data
+    ? Object.entries(updateStep.data).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    : []
+  const aliases = updateData.map(([k, v]: any) => [k, v])
+
+  const genCtx: GenCtx = { model, entity, flow: basicflow, PROJUPPER }
+
+  File({ name: entity.name + '_entity_test.' + target.ext }, () => {
+
+    Content(`# ${entity.Name} entity test
+
+require "minitest/autorun"
+require "json"
+require_relative "../${model.const.Name}_sdk"
+require_relative "runner"
+
+class ${entity.Name}EntityTest < Minitest::Test
+  def test_create_instance
+    testsdk = ${model.const.Name}SDK.test(nil, nil)
+    ent = testsdk.${entity.Name}(nil)
+    assert !ent.nil?
+  end
+${hasList ? `
+  # Feature #4: the entity stream(action, ...) method runs the op pipeline and
+  # returns an Enumerator over result items. With the streaming feature active
+  # it yields the feature's incremental output; otherwise it falls back to the
+  # materialised list so stream always yields.
+  def test_stream
+    seed = {
+      "entity" => {
+        "${entity.name}" => {
+          "s1" => { "id" => "s1" },
+          "s2" => { "id" => "s2" },
+          "s3" => { "id" => "s3" },
+        },
+      },
+    }
+
+    # Fallback: streaming inactive -> yields the materialised list items.
+    base = ${model.const.Name}SDK.test(seed, nil)
+    seen = base.${entity.Name}(nil).stream("list", nil, nil).to_a
+    assert_equal 3, seen.length
+
+    # Inbound: streaming active -> yields each item from the feature.
+    cfg = ${model.const.Name}Config.shared_config
+    if cfg["feature"].is_a?(Hash) && cfg["feature"].key?("streaming")
+      sdk = ${model.const.Name}SDK.test(seed, { "feature" => { "streaming" => { "active" => true } } })
+      got = []
+      sdk.${entity.Name}(nil).stream("list", nil, nil).each do |item|
+        if item.is_a?(Array)
+          got.concat(item)
+        else
+          got << item
+        end
+      end
+      assert_equal 3, got.length
+    end
+  end
+` : ''}
+  def test_basic_flow
+    setup = ${entity.name}_basic_setup(nil)
+    # Per-op sdk-test-control.json skip.
+    _live = setup[:live] || false
+    [${(Array.from(new Set((allSteps as any[]).map((s: any) => s.op).filter(Boolean)))).map(o => `"${o}"`).join(', ')}].each do |_op|
+      _should_skip, _reason = Runner.is_control_skipped("entityOp", "${entity.name}." + _op, _live ? "live" : "unit")
+      if _should_skip
+        skip(_reason || "skipped via sdk-test-control.json")
+        return
+      end
+    end
+    # The basic flow consumes synthetic IDs from the fixture. In live mode
+    # without an *_ENTID env override, those IDs hit the live API and 4xx.
+    if setup[:synthetic_only]
+      skip "live entity test uses synthetic IDs from fixture — set ${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID JSON to run live"
+      return
+    end
+    client = setup[:client]
+
+`)
+
+    // Check if the flow has a create step
+    const flowHasCreate = allSteps.some((s: any) => s.op === 'create')
+    if (!flowHasCreate) {
+      Content(`    # Bootstrap entity data from existing test data.
+    ${entity.name}_ref01_data_raw = Vs.items(Helpers.to_map(
+      Vs.getpath(setup[:data], "existing.${entity.name}")))
+    ${entity.name}_ref01_data = nil
+    if ${entity.name}_ref01_data_raw.length > 0
+      ${entity.name}_ref01_data = Helpers.to_map(${entity.name}_ref01_data_raw[0][1])
+    end
+
+`)
+    }
+
+    // Model-driven step iteration
+    each(basicflow.step, (step: any, index: any) => {
+      // Never emit a REMOVE (or its removed-item verify LIST) without a
+      // preceding CREATE: a coherent CRUD flow only removes what it created,
+      // so a create-less remove would mutate pre-existing (live) data.
+      if (!flowHasCreate) {
+        if ('remove' === step.op) { return }
+        if ('list' === step.op &&
+          (step.valid || []).some((v: any) => 'ItemNotExists' === v.apply)) { return }
+      }
+      const opgen: OpGen = GENERATE_OP[step.op]
+      if (opgen) {
+        opgen(genCtx, step, index)
+        Content('\n')
+      }
+    })
+
+    Content(`  end
+end
+
+`)
+
+    // Generate setup function
+    Content(`def ${entity.name}_basic_setup(extra)
+  Runner.load_env_local
+
+  entity_data_file = File.join(__dir__, "..", "..", ".sdk", "test", "entity", "${entity.name}", "${entity.Name}TestData.json")
+  entity_data_source = File.read(entity_data_file)
+  entity_data = JSON.parse(entity_data_source)
+
+  options = {}
+  options["entity"] = entity_data["existing"]
+
+  client = ${model.const.Name}SDK.test(options, extra)
+
+`)
+
+    // Generate idmap via Vs.transform
+    Content(`  # Generate idmap via transform.
+  idmap = Vs.transform(
+    [${idnamesStr}],
+    {
+      "\`$PACK\`" => ["", {
+        "\`$KEY\`" => "\`$COPY\`",
+        "\`$VAL\`" => ["\`$FORMAT\`", "upper", "\`$COPY\`"],
+      }],
+    }
+  )
+
+`)
+
+    Content(`  # Detect ENTID env override before envOverride consumes it. When live
+  # mode is on without a real override, the basic test runs against synthetic
+  # IDs from the fixture and 4xx's. Surface this so the test can skip.
+  entid_env_raw = ENV["${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID"]
+  idmap_overridden = !entid_env_raw.nil? && entid_env_raw.strip.start_with?("{")
+
+  env = Runner.env_override({
+    "${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID" => idmap,
+    "${PROJUPPER}_TEST_LIVE" => "FALSE",
+    "${PROJUPPER}_TEST_EXPLAIN" => "FALSE",${apikeyEnvEntry}
+  })
+
+  idmap_resolved = Helpers.to_map(
+    env["${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID"])
+  if idmap_resolved.nil?
+    idmap_resolved = Helpers.to_map(idmap)
+  end
+`)
+
+    // Add aliases
+    for (const [key, val] of aliases) {
+      Content(`  if idmap_resolved["${key}"].nil?
+    idmap_resolved["${key}"] = idmap_resolved["${val}"]
+  end
+`)
+    }
+
+    Content(`
+  if env["${PROJUPPER}_TEST_LIVE"] == "TRUE"
+    merged_opts = Vs.merge([
+      {${apikeyLiveField}
+      },
+      extra || {},
+    ])
+    client = ${model.const.Name}SDK.new(Helpers.to_map(merged_opts))
+  end
+
+  live = env["${PROJUPPER}_TEST_LIVE"] == "TRUE"
+  {
+    client: client,
+    data: entity_data,
+    idmap: idmap_resolved,
+    env: env,
+    explain: env["${PROJUPPER}_TEST_EXPLAIN"] == "TRUE",
+    live: live,
+    synthetic_only: live && !idmap_overridden,
+    now: (Time.now.to_f * 1000).to_i,
+  }
+end
+`)
+  })
+})
+
+
+const generateCreate: OpGen = (ctx, step, index) => {
+  const { entity, flow } = ctx
+  const ref = step.input.ref ?? entity.name + '_ref01'
+  const entvar = step.input.entvar ?? ref + '_ent'
+  const datavar = step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? ''))
+
+  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const needsEnt = !priorSteps.some((s: any) =>
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+
+  const hasDatvar = priorSteps.some((s: any) => {
+    if ('create' === s.op) {
+      const priorRef = s.input.ref ?? entity.name + '_ref01'
+      const priorDatvar = s.input.datavar ?? (priorRef + '_data' + (s.input.suffix ?? ''))
+      return priorDatvar === datavar
+    }
+    return false
+  })
+
+  Content(`    # CREATE
+`)
+  if (needsEnt) {
+    Content(`    ${entvar} = client.${entity.Name}(nil)
+`)
+  }
+
+  if (hasDatvar) {
+    Content(`    ${datavar} = Helpers.to_map(Vs.getprop(
+      Vs.getpath(setup[:data], "new.${entity.name}"), "${ref}"))
+`)
+  } else {
+    Content(`    ${datavar} = Helpers.to_map(Vs.getprop(
+      Vs.getpath(setup[:data], "new.${entity.name}"), "${ref}"))
+`)
+  }
+
+  const matchEntries = getMatchEntries(step)
+  for (const [key, val] of matchEntries) {
+    Content(`    ${datavar}["${key}"] = setup[:idmap]["${val}"]
+`)
+  }
+
+  Content(`
+    ${datavar}_result = ${entvar}.create(${datavar}, nil)
+    ${datavar} = Helpers.to_map(${datavar}_result.respond_to?(:data_get) ? ${datavar}_result.data_get : ${datavar}_result)
+    assert !${datavar}.nil?
+`)
+  if (null != ctx.entity.id) {
+    Content(`    assert !${datavar}["id"].nil?
+`)
+  }
+}
+
+
+const generateList: OpGen = (ctx, step, index) => {
+  const { entity, flow } = ctx
+  const hasDataId = null != entityDataIdField(entity)
+  const ref = step.input.ref ?? entity.name + '_ref01'
+  const entvar = step.input.entvar ?? ref + '_ent'
+  const matchvar = step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? ''))
+  const listvar = step.input.listvar ?? (ref + '_list' + (step.input.suffix ?? ''))
+
+  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const needsEnt = !priorSteps.some((s: any) =>
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+
+  Content(`    # LIST
+`)
+  if (needsEnt) {
+    Content(`    ${entvar} = client.${entity.Name}(nil)
+`)
+  }
+
+  const matchEntries = getMatchEntries(step)
+  if (matchEntries.length === 0) {
+    Content(`    ${matchvar} = {}
+`)
+  } else {
+    Content(`    ${matchvar} = {
+`)
+    for (const [key, val] of matchEntries) {
+      Content(`      "${key}" => setup[:idmap]["${val}"],
+`)
+    }
+    Content(`    }
+`)
+  }
+
+  Content(`
+    ${listvar}_result = ${entvar}.list(${matchvar}, nil)
+    assert ${listvar}_result.is_a?(Array)
+`)
+
+  // Handle validators
+  const allSteps = Object.values(flow.step) as any[]
+  if (step.valid) {
+    for (const validator of step.valid) {
+      const validRef = validator.def?.ref
+      const hasRefData = validRef && allSteps.some((s: any) => 'create' === s.op &&
+        ((s.input.ref ?? entity.name + '_ref01') === validRef))
+
+      if ('ItemExists' === validator.apply && hasRefData && hasDataId) {
+        const refDataVar = validRef + '_data'
+        Content(`
+    found_item = Vs.select(
+      Runner.entity_list_to_data(${listvar}_result),
+      { "id" => ${refDataVar}["id"] })
+    assert !Vs.isempty(found_item)
+`)
+      } else if ('ItemNotExists' === validator.apply && hasRefData && hasDataId) {
+        const refDataVar = validRef + '_data'
+        Content(`
+    not_found_item = Vs.select(
+      Runner.entity_list_to_data(${listvar}_result),
+      { "id" => ${refDataVar}["id"] })
+    assert Vs.isempty(not_found_item)
+`)
+      }
+    }
+  }
+}
+
+
+const generateUpdate: OpGen = (ctx, step, index) => {
+  const { entity, flow } = ctx
+  const ref = step.input.ref ?? entity.name + '_ref01'
+  const entvar = step.input.entvar ?? ref + '_ent'
+  const datavar = step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? ''))
+  const resdatavar = step.input.resdatavar ?? (ref + '_resdata' + (step.input.suffix ?? ''))
+  const markdefvar = step.input.markdefvar ?? (ref + '_markdef' + (step.input.suffix ?? ''))
+  const srcdatavar = step.input.srcdatavar ?? (ref + '_data' + (step.input.suffix ?? ''))
+
+  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const needsEnt = !priorSteps.some((s: any) =>
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+
+  const hasEntIdU = null != entity.id
+
+  Content(`    # UPDATE
+`)
+  if (needsEnt) {
+    Content(`    ${entvar} = client.${entity.Name}(nil)
+`)
+  }
+  Content(`    ${datavar}_up = {
+`)
+  if (hasEntIdU) {
+    Content(`      "id" => ${srcdatavar}["id"],
+`)
+  }
+
+  if (step.data) {
+    const dataEntries = Object.entries(step.data).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    for (const [key] of dataEntries) {
+      Content(`      "${key}" => setup[:idmap]["${key}"],
+`)
+    }
+  }
+
+  Content(`    }
+`)
+
+  if (step.spec) {
+    for (const spec of step.spec) {
+      if ('TextFieldMark' === spec.apply && null != step.input.textfield) {
+        const fieldname = step.input.textfield
+        const fieldvalue = spec.def?.mark ?? `Mark01-${ref}`
+        Content(`
+    ${markdefvar}_name = "${fieldname}"
+    ${markdefvar}_value = "${fieldvalue}_#{setup[:now]}"
+    ${datavar}_up[${markdefvar}_name] = ${markdefvar}_value
+`)
+      }
+    }
+  }
+
+  Content(`
+    ${resdatavar}_result = ${entvar}.update(${datavar}_up, nil)
+    ${resdatavar} = Helpers.to_map(${resdatavar}_result.respond_to?(:data_get) ? ${resdatavar}_result.data_get : ${resdatavar}_result)
+    assert !${resdatavar}.nil?
+`)
+  if (hasEntIdU) {
+    Content(`    assert_equal ${resdatavar}["id"], ${datavar}_up["id"]
+`)
+  }
+
+  if (step.spec) {
+    for (const spec of step.spec) {
+      if ('TextFieldMark' === spec.apply && null != step.input.textfield) {
+        Content(`    assert_equal ${resdatavar}[${markdefvar}_name], ${markdefvar}_value
+`)
+      }
+    }
+  }
+}
+
+
+const generateLoad: OpGen = (ctx, step, index) => {
+  const { entity, flow } = ctx
+  const ref = step.input.ref ?? entity.name + '_ref01'
+  const entvar = step.input.entvar ?? ref + '_ent'
+  const matchvar = step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? ''))
+  const datavar = step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? ''))
+  const srcdatavar = step.input.srcdatavar ?? (ref + '_data' + (step.input.suffix ?? ''))
+
+  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const hasEntVar = priorSteps.some((s: any) =>
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+
+  const flowHasCreate = Object.values(flow.step).some((s: any) => (s as any).op === 'create')
+  const preambleRef = entity.name + '_ref01'
+  const hasSrcData = (!flowHasCreate && srcdatavar === (preambleRef + '_data')) ||
+    priorSteps.some((s: any) => {
+      if ('create' === s.op) {
+        const priorRef = s.input.ref ?? entity.name + '_ref01'
+        const priorDatvar = s.input.datavar ?? (priorRef + '_data' + (s.input.suffix ?? ''))
+        return priorDatvar === srcdatavar
+      }
+      return false
+    })
+
+  const hasEntId = null != entity.id
+
+  Content(`    # LOAD
+`)
+  if (!hasEntVar) {
+    Content(`    ${entvar} = client.${entity.Name}(nil)
+`)
+  }
+  if (!hasSrcData && hasEntId) {
+    Content(`    ${srcdatavar}_raw = Vs.items(Helpers.to_map(
+      Vs.getpath(setup[:data], "existing.${entity.name}")))
+    ${srcdatavar} = nil
+    if ${srcdatavar}_raw.length > 0
+      ${srcdatavar} = Helpers.to_map(${srcdatavar}_raw[0][1])
+    end
+`)
+  }
+  if (hasEntId) {
+    Content(`    ${matchvar} = {
+      "id" => ${srcdatavar}["id"],
+    }
+    ${datavar}_loaded = ${entvar}.load(${matchvar}, nil)
+    ${datavar}_load_result = Helpers.to_map(${datavar}_loaded.respond_to?(:data_get) ? ${datavar}_loaded.data_get : ${datavar}_loaded)
+    assert !${datavar}_load_result.nil?
+    assert_equal ${datavar}_load_result["id"], ${srcdatavar}["id"]
+`)
+  }
+  else {
+    Content(`    ${matchvar} = {}
+    ${datavar}_loaded = ${entvar}.load(${matchvar}, nil)
+    assert !${datavar}_loaded.nil?
+`)
+  }
+}
+
+
+const generateRemove: OpGen = (ctx, step, index) => {
+  const { entity, flow } = ctx
+  if (null == entityDataIdField(entity)) {
+    return
+  }
+  const ref = step.input.ref ?? entity.name + '_ref01'
+  const entvar = step.input.entvar ?? ref + '_ent'
+  const matchvar = step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? ''))
+  const srcdatavar = step.input.srcdatavar ?? (ref + '_data')
+
+  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const needsEnt = !priorSteps.some((s: any) =>
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+
+  Content(`    # REMOVE
+`)
+  if (needsEnt) {
+    Content(`    ${entvar} = client.${entity.Name}(nil)
+`)
+  }
+  // Always match the prior-created entity by id to avoid mock-order flakes.
+  Content(`    ${matchvar} = {
+      "id" => ${srcdatavar}["id"],
+    }
+    ${entvar}.remove(${matchvar}, nil)
+`)
+}
+
+
+const GENERATE_OP: Record<string, OpGen> = {
+  create: generateCreate,
+  list: generateList,
+  update: generateUpdate,
+  load: generateLoad,
+  remove: generateRemove,
+}
+
+
+export {
+  TestEntity
+}

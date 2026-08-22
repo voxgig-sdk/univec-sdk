@@ -1,0 +1,59 @@
+main: kit: target: csharp: {
+
+  title: "C#"
+  ext: cs
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct utility is vendored under tm/csharp/utility/struct - no manifest dep needed.
+  # The runtime uses only the .NET 8 BCL (System.Net.Http + System.Text.Json).
+  deps: {}
+}
+
+
+main: kit: feature: &: target: csharp: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: NuGet registry (declared, publish pending — git-tag only).
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: csharp: publish: {
+  registry: {
+    name: 'nuget'
+    url: 'https://www.nuget.org'
+    vault: { alias: 'nuget', env: 'NUGET_API_KEY' }
+  }
+}
+
+
+# Feature source may be trimmed to the model's selection. The one template
+# needing the COMPLETE set is the cross-feature test suite, which
+# constructs every *Feature class — so it is dropped alongside the
+# features it exercises whenever the set is trimmed.
+main: kit: target: csharp: feature: {
+  trim: true
+  fullset: ['test/FeatureTest.cs']
+}

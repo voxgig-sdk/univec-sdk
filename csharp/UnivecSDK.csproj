@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <AssemblyName>UnivecSDK</AssemblyName>
+    <RootNamespace>UnivecSdk</RootNamespace>
+    <!-- Loose-object-model port: suppress repetitive nullability noise. -->
+    <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;CS1591</NoWarn>
+
+    <!-- NuGet package metadata (publication pending; see Makefile). -->
+    <Version>0.1.1</Version>
+    <PackageId>Univec.Sdk</PackageId>
+    <Authors>Voxgig</Authors>
+    <Description>Unofficial generated csharp SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/voxgig-sdk/univec-sdk</RepositoryUrl>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="test/**" />
+  </ItemGroup>
+</Project>

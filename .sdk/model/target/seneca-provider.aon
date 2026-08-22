@@ -1,0 +1,121 @@
+# Seneca provider target — a Seneca plugin that exposes this API's entities
+# as Seneca entities (`provider/<name>/<entity>`), layered on the sibling
+# `ts` SDK. It is not a language SDK in its own right, so every standard
+# generation phase is switched off below and Main_seneca-provider emits the
+# whole package, exactly as go-cli / go-mcp / py-data do.
+#
+# Requires the `ts` target in the same SDK project (Main throws when it is
+# absent): the plugin imports the published TypeScript SDK.
+#
+# UNLIKE the other consumer targets, this one generates into ITS OWN REPO.
+# A Seneca provider is an independently released npm package under the
+# @seneca scope, with its own LICENSE, CI workflow and release cadence, and
+# it depends on the SDK as an ordinary published dependency rather than by
+# path. Point it at that repo from the PROJECT model:
+#
+#   main: kit: target: 'seneca-provider': output: path: '../../seneca/seneca-acme-provider'
+#
+# Relative to the SDK repo root. Left unset here on purpose — every project's
+# provider repo is somewhere different, and a concrete value here would
+# CONFLICT with the project's rather than yield to it (see the publication
+# note below). Unset means the ordinary in-tree `<sdk-repo>/seneca-provider/`,
+# which is a usable default for a first look at the output.
+
+main: kit: target: 'seneca-provider': {
+
+  title: 'Seneca Provider'
+  ext: ts
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  # Per-generation-phase activation. Mirrors py-data: every standard phase is
+  # off and Main emits the package. README, docs and tests ARE generated — by
+  # Main, not by the standard cmps, which assume an SDK-shaped package and
+  # would emit wrong content here.
+  phase: {
+    entity:     { active: false }
+    feature:    { active: false }
+    readme:     { active: false }
+    agentguide: { active: false }
+    test:       { active: false }
+  }
+
+  # `kind` is a COMMA-SEPARATED LIST of manifest sections, not a single one.
+  # collectDeps deduplicates by package name and this map is keyed by name, so
+  # a package belonging in two sections cannot be declared twice — it says so
+  # here instead. See `seneca` below for the case that forced it.
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # The Seneca plugin contract. `@seneca/provider` supplies entityBuilder and
+  # the keymap message this plugin's `prepare` posts; the rest are the host
+  # framework a plugin runs inside and so are PEER deps — a plugin that
+  # bundled its own seneca would run against a different instance than the
+  # application it is loaded into.
+  #
+  # The ts SDK dependency is emitted by Main from the model's published
+  # package name, so it is not declared here.
+  deps: {
+    '@seneca/maintain':  { active: true, version: '^0.1.0', kind: prod }
+
+    '@seneca/env':       { active: true, version: '>=0.4',  kind: peer }
+    '@seneca/provider':  { active: true, version: '>=4',    kind: peer }
+
+    # PEER *and* DEV. Peer for the reason above — the plugin must attach to
+    # the host application's seneca instance. Dev because the generated test
+    # suite does `require('seneca')` itself, so a clean `npm install && npm
+    # test` in a fresh checkout has to produce one. Relying on npm's automatic
+    # peer installation instead is what dropping this from the manifest
+    # amounted to, and that is npm-version- and client-specific: pnpm and
+    # `--legacy-peer-deps` both leave the suite with no seneca to require.
+    'seneca':            { active: true, version: '>=3||>=4.0.0-rc2', kind: 'peer,dev' }
+
+    'seneca-entity':     { active: true, version: '>=26',   kind: peer }
+    'seneca-promisify':  { active: true, version: '>=3',    kind: peer }
+
+    '@seneca/doc':       { active: true, version: '^8.0.0', kind: dev }
+    '@types/node':       { active: true, version: '^24.0.0', kind: dev }
+    'seneca-msg-test':   { active: true, version: '^4.1.0', kind: dev }
+    'typescript':        { active: true, version: '^5.4.5', kind: dev }
+  }
+}
+
+
+# Feature-deps map slot — every target carries this so the same feature can
+# specify per-target dep variants.
+main: kit: feature: &: target: 'seneca-provider': deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: npm registry, under the @seneca scope rather than the SDK's
+# own. The package name is NOT derived from the SDK slug the way a language
+# target's is — a provider is `@seneca/<name>-provider` — so Main sets it
+# from the model and a project can pin it like any other.
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: 'seneca-provider': publish: {
+  registry: {
+    name: 'npm'
+    url: 'https://registry.npmjs.org'
+    vault: { recipe: 'npm', alias: 'npm' }
+  }
+}

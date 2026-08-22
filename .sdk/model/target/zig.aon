@@ -1,0 +1,62 @@
+
+main: kit: target: zig: {
+
+  title: Zig
+  ext: zig
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  # The vendored voxgig struct port is in-tree (utility/voxgigstruct) — Zig
+  # has no package registry to depend on, so there are no external deps.
+  deps: &: {
+    kind: *'prod' | string
+  }
+}
+
+
+main: kit: feature: &: target: zig: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: Zig has no central registry — publishing IS the git tag.
+# The `registry: { state:'pending', name:'none' }` placeholder (same as c/cpp)
+# routes deploy-zig to the root tag-push recipe. WITHOUT it, Deploy.ts falls
+# through to `make -C zig publish` — but zig's Makefile has no `publish` target,
+# so the deploy fails. Mirror c.aon exactly.
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: zig: publish: {
+  registry: {
+    name: 'none'
+    url: ''
+    vault: { alias: 'none', env: 'NONE' }
+  }
+}
+
+
+# Feature source is NOT trimmed to the model's selection here: root.zig
+# re-exports every feature type with @import("feature/<name>.zig"), and
+# build.zig names test/feature_test.zig explicitly, so a trimmed tree
+# fails to build. Trimming stays off until root.zig's feature exports are
+# driven from the model.
+main: kit: target: zig: feature: {
+  trim: false
+}

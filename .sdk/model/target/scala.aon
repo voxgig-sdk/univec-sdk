@@ -1,0 +1,61 @@
+main: kit: target: scala: {
+
+  title: Scala
+  ext: scala
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct is inlined under utility/struct — no external runtime dep.
+  # JSON parsing is the zero-dep utility/Json.java; HTTP transport is
+  # java.net.http.HttpClient (JDK built-in). The corpus runner and pipeline
+  # tests are plain scala-cli mains (no test-framework dependency).
+  deps: {}
+}
+
+
+main: kit: feature: &: target: scala: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: tag-only for now (tag scala/vX.Y.Z) — Maven Central
+# publication via the Sonatype Central Portal is declared but pending.
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: scala: publish: {
+  registry: {
+    name: 'maven-central'
+    url: 'https://central.sonatype.com'
+    vault: { recipe: 'maven', alias: 'central' }
+  }
+}
+
+
+# Feature source is NOT trimmed to the model's selection here: the cross-
+# feature tests live inside sdktest/SdkTestMain.scala, the single test
+# entry point, so they cannot be dropped without losing every other test
+# too. Trimming stays off until that suite is split per feature.
+main: kit: target: scala: feature: {
+  trim: false
+}

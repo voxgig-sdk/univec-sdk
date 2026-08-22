@@ -1,0 +1,225 @@
+
+import { cmp, each, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, matchArg, idLiteral } from '@voxgig/sdkgen'
+
+import {
+  KIT,
+  getModelPath,
+  nom,
+} from '@voxgig/apidef'
+
+import { dartPackageName } from './Package_dart'
+
+
+// A `list()` on a NESTED entity needs its parent path params. The
+// quickstart used to emit `client.Moon().list()` for an entity at
+// `/planet/{planet_id}/moon`, which 404s against a live server from a
+// half-built URL — indistinguishable from "no such record". The model
+// already marks those params `reqd: true`; matchArg renders exactly them.
+function listMatchArg(ent: any): string {
+  const idF = entityIdField(ent)
+  return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))
+}
+
+
+const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
+  const { target, ctx$: { model } } = props
+
+  const entity = getModelPath(model, `main.${KIT}.entity`)
+  const pkg = dartPackageName(model)
+
+  const exampleEntity = Object.values(entity).find((e: any) => e.active !== false) as any
+
+  // Find a nested entity if available: one with a parent chain
+  // (relations.ancestors), an active load op, and a required non-id load
+  // param to demonstrate (the parent key, e.g. page_id).
+  const nestedEntity = Object.values(entity).find((e: any) =>
+    e.active !== false &&
+    e.relations && e.relations.ancestors && 0 < e.relations.ancestors.length &&
+    entityOps(e).includes('load') &&
+    opRequestShape(e, 'load').items.some((it: any) =>
+      !it.optional && it.name !== entityIdField(e))
+  ) as any
+
+  const authActive = isAuthActive(model)
+  const importIO = authActive ? `import 'dart:io';\n` : ''
+  const ctor = authActive
+    ? `${model.const.Name}SDK({\n  'apikey': Platform.environment['${envName(model)}_APIKEY'],\n})`
+    : `${model.const.Name}SDK()`
+
+  Content(`### 1. Create a client
+
+\`\`\`dart
+${importIO}import 'package:${pkg}/${model.const.Name}SDK.dart';
+
+final client = ${ctor};
+\`\`\`
+
+`)
+
+  if (exampleEntity) {
+    const eName = nom(exampleEntity, 'Name')
+    const article = /^[aeiou]/i.test(eName) ? 'an' : 'a'
+    const eVar = exampleVarName(eName.toLowerCase(), 'dart')
+    const opnames = entityOps(exampleEntity)
+    // Model-driven id keys: `idF` is the entity's id-like MATCH field name, or
+    // null when it has none. `dataIdF` is the id on the RETURNED record's data
+    // type — an entity can key its match on an id it does not carry as data.
+    const idF = entityIdField(exampleEntity)
+    const dataIdF = entityDataIdField(exampleEntity)
+
+    // A type-correct, executable Dart literal for a param.
+    const dartLit = (type: any, placeholder: string = 'example'): string => {
+      const k = canonKey(type)
+      if ('INTEGER' === k || 'NUMBER' === k) return '1'
+      if ('BOOLEAN' === k) return 'true'
+      if ('ARRAY' === k) return '<dynamic>[]'
+      if ('OBJECT' === k) return '<String, dynamic>{}'
+      return `'${placeholder}'`
+    }
+
+    if (opnames.includes('list')) {
+      Content(`### 2. List ${eName.toLowerCase()} records
+
+\`list()\` returns a \`List\` of entity instances and throws on error — iterate
+it and read each record's data via \`.data()\`.
+
+\`\`\`dart
+try {
+  final ${eVar}s = await client.${eName}().list(${listMatchArg(exampleEntity)});
+  for (final item in ${eVar}s) {
+    print(item.data());
+  }
+} catch (err) {
+  print('list failed: $err');
+}
+\`\`\`
+
+`)
+    }
+
+    if (nestedEntity) {
+      const neName = nom(nestedEntity, 'Name')
+      const neArticle = /^[aeiou]/i.test(neName) ? 'an' : 'a'
+      const neVar = exampleVarName(neName.toLowerCase(), 'dart')
+
+      // Model-driven match: every REQUIRED load-match key. Parent keys (e.g.
+      // page_id) first, the entity's own id last.
+      const neIdF = entityIdField(nestedEntity)
+      const neRequired = opRequestShape(nestedEntity, 'load').items
+        .filter((it: any) => !it.optional)
+        .sort((a: any, b: any) =>
+          (a.name === neIdF ? 1 : 0) - (b.name === neIdF ? 1 : 0))
+      const parentItem = neRequired.find((it: any) => it.name !== neIdF) as any
+      const parentParam = parentItem && parentItem.name
+      const parentName = parentParam ? parentParam.replace(/_id$/, '') : 'its parent'
+      const neMatch = neRequired.map((it: any) =>
+        `'${it.name}': ${dartLit(it.type,
+          it.name === neIdF ? 'example_id' : 'example_' + it.name)}`)
+
+      Content(`### 3. Load ${neArticle} ${neName.toLowerCase()}
+
+${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
+\`load()\` returns the ENTITY — call data() for the record — and throws on error.
+
+\`\`\`dart
+try {
+  final ${neVar} = await client.${neName}().load({${neMatch.join(', ')}});
+  print(${neVar});
+} catch (err) {
+  print('load failed: $err');
+}
+\`\`\`
+
+`)
+    }
+    else if (opnames.includes('load')) {
+      // Every REQUIRED load-match key (id first, then parent path params).
+      const loadRequired = opRequestShape(exampleEntity, 'load').items
+        .filter((it: any) => !it.optional || it.name === idF)
+        .sort((a: any, b: any) =>
+          (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
+      const loadArg = 0 < loadRequired.length
+        ? `{${loadRequired.map((it: any) =>
+          `'${it.name}': ${dartLit(it.type,
+            it.name === idF ? 'example_id' : 'example_' + it.name)}`).join(', ')}}`
+        : ''
+
+      Content(`### 3. Load ${article} ${eName.toLowerCase()}
+
+\`load()\` returns the ENTITY — call data() for the record — and throws on error.
+
+\`\`\`dart
+try {
+  final ${eVar} = await client.${eName}().load(${loadArg});
+  print(${eVar});
+} catch (err) {
+  print('load failed: $err');
+}
+\`\`\`
+
+`)
+    }
+
+    // Model-driven example fields for create/update bodies.
+    const examplePairs = (opname: string): string[] => {
+      const items = opRequestShape(exampleEntity, opname).items
+        .filter((it: any) => (it.name !== idF && it.name !== 'id') ||
+          ('create' === opname && !it.optional))
+      const required = items.filter((it: any) => !it.optional)
+      const optional = items.filter((it: any) => it.optional)
+      const chosen = 'create' === opname
+        ? (required.length ? required : items.slice(0, 2))
+        : required.concat(optional).slice(0, Math.max(2, required.length))
+      return chosen.map((it: any) => `'${it.name}': ${dartLit(it.type, 'example_' + it.name)}`)
+    }
+
+    const idParamType = (opname: string): any => {
+      const it = opRequestShape(exampleEntity, opname).items.find((x: any) => x.name === idF)
+      return it && it.type
+    }
+    const idValueFor = (opname: string): string => (null != dataIdF && opnames.includes('create'))
+      ? `created.data()['${dataIdF}']`
+      : dartLit(idParamType(opname), 'example_id')
+
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+      Content(`### 4. Create, update, and remove
+
+\`\`\`dart
+`)
+      if (opnames.includes('create')) {
+        Content(`// Create — returns the ENTITY (call data() for the record)
+final created = await client.${eName}().create({${examplePairs('create').join(', ')}});
+
+`)
+      }
+      if (opnames.includes('update')) {
+        const updatePairs = (idF ? [`'${idF}': ${idValueFor('update')}`] : []).concat(examplePairs('update'))
+        const fromCreated = null != dataIdF && opnames.includes('create')
+        Content(`// Update${fromCreated ? " — the created record's id is a plain map key" : ''}
+await client.${eName}().update({${updatePairs.join(', ')}});
+
+`)
+      }
+      if (opnames.includes('remove')) {
+        const removePairs = opRequestShape(exampleEntity, 'remove').items
+          .filter((it: any) => !it.optional || it.name === idF)
+          .sort((a: any, b: any) =>
+            (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
+          .map((it: any) => it.name === idF
+            ? `'${it.name}': ${idValueFor('remove')}`
+            : `'${it.name}': ${dartLit(it.type, 'example_' + it.name)}`)
+        Content(`// Remove
+await client.${eName}().remove(${removePairs.length ? `{${removePairs.join(', ')}}` : ''});
+`)
+      }
+      Content(`\`\`\`
+
+`)
+    }
+  }
+})
+
+
+export {
+  ReadmeQuick
+}

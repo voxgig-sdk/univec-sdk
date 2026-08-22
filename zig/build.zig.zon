@@ -1,0 +1,11 @@
+.{
+    .name = "univec_sdk",
+    .version = "0.1.1",
+    .dependencies = .{},
+    .paths = .{
+        "src",
+        "test",
+        "build.zig",
+        "build.zig.zon",
+    },
+}

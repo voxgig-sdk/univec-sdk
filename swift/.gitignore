@@ -1,0 +1,14 @@
+# Build output
+.build/
+*.o
+*.swiftmodule
+
+# SwiftPM
+Package.resolved
+
+# IDE / OS
+.swiftpm/
+.idea/
+.vscode/
+*.xcodeproj
+.DS_Store

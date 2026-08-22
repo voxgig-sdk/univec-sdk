@@ -1,0 +1,62 @@
+
+main: kit: target: rust: {
+
+  title: Rust
+  ext: rs
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct is vendored under utility/voxgigstruct — no external dep.
+  # ureq is the blocking HTTP transport (the whole pipeline is synchronous).
+  deps: {
+    'ureq': { active: true, version: '2', kind: prod }
+  }
+}
+
+
+main: kit: feature: &: target: rust: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: crates.io registry (declared, publish pending — git-tag only).
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own overlay
+# (`model/project.aon`), which create-sdkgen creates once and never
+# overwrites — NOT `model/sdk.aon`, which it rewrites on every scaffold.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aon)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: rust: publish: {
+  registry: {
+    name: 'crates.io'
+    url: 'https://crates.io'
+    vault: { alias: 'cratesio', env: 'CARGO_REGISTRY_TOKEN' }
+  }
+}
+
+
+# Feature source may be trimmed to the model's selection. The one template
+# needing the COMPLETE set is the cross-feature test suite, which `use`s
+# every feature module — so it is dropped alongside the features it
+# exercises whenever the set is trimmed.
+main: kit: target: rust: feature: {
+  trim: true
+  fullset: ['tests/feature_test.rs']
+}

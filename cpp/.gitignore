@@ -1,0 +1,9 @@
+# Build output
+test/*.out
+*.o
+*.out
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

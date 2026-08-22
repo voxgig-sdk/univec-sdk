@@ -1,0 +1,13 @@
+# scala-cli build output
+.scala-build/
+.bsp/
+out/
+
+# Compiled class files
+*.class
+
+# IDE / OS
+.idea/
+.vscode/
+.metals/
+.DS_Store

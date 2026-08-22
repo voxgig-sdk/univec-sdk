@@ -16,7 +16,7 @@ import { TEST_JSON_FILE } from './index'
 // indistinguishable from a fixture that passes.
 //
 // Deferral is therefore DATA (`basic.pending`), not a comment: comments do not
-// survive compilation to test.json, so a marker written only in the .aontu
+// survive compilation to test.json, so a marker written only in the .aon
 // source cannot be checked by the thing that consumes it. Being data, these
 // invariants hold for every port, not just this one.
 describe('Corpus', () => {
@@ -44,7 +44,7 @@ describe('Corpus', () => {
     })
     equal(undeclared.join(','), '',
       'these sections compile to ZERO cases and carry no `basic: pending` ' +
-      'reason — add cases, or state the blocker in .sdk/test/primary/<name>.aontu')
+      'reason — add cases, or state the blocker in .sdk/test/primary/<name>.aon')
   })
 
 

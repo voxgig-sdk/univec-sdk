@@ -1,0 +1,23 @@
+# Gradle build output
+.gradle/
+build/
+
+# Compiled class files
+*.class
+
+# Package files
+*.jar
+*.war
+
+# Kotlin
+.kotlin/
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
