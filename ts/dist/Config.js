@@ -12,8 +12,17 @@ class Config {
         // TODO: errors etc
         return fi;
     }
+    // False for a feature added at runtime via options.extend (station's
+    // adopt path) - the constructor uses this to skip makeFeature for names
+    // no generated class backs.
+    hasFeature(fn) {
+        return null != FEATURE_CLASS[fn];
+    }
     main = {
         name: 'Univec',
+        slug: "univec",
+        version: "0.0.1",
+        target: "ts",
     };
     feature = {
         test: {
@@ -23,7 +32,7 @@ class Config {
         },
     };
     options = {
-        base: 'https://api.univec.ai',
+        base: "https://api.univec.ai",
         auth: {
             prefix: 'Bearer',
         },
@@ -41,53 +50,34 @@ class Config {
         "convert": {
             "fields": [
                 {
-                    "active": true,
                     "name": "bridge_model",
                     "req": true,
-                    "type": "`$STRING`",
-                    "index$": 0
+                    "short": "Embed model used to vectorise the text before translation.",
+                    "type": "`$STRING`"
                 },
                 {
-                    "active": true,
-                    "name": "data",
+                    "name": "embeddings",
                     "req": true,
-                    "type": "`$OBJECT`",
-                    "index$": 1
+                    "short": "Translated vectors, in the target model's dimension.",
+                    "type": "`$ARRAY`"
                 },
                 {
-                    "active": true,
-                    "name": "embedding",
-                    "req": true,
-                    "type": "`$ARRAY`",
-                    "index$": 2
-                },
-                {
-                    "active": true,
                     "name": "source_model",
                     "req": true,
-                    "type": "`$STRING`",
-                    "index$": 3
+                    "short": "Model space the supplied vectors are currently in.",
+                    "type": "`$STRING`"
                 },
                 {
-                    "active": true,
-                    "name": "success",
-                    "req": true,
-                    "type": "`$BOOLEAN`",
-                    "index$": 4
-                },
-                {
-                    "active": true,
                     "name": "target_model",
                     "req": true,
-                    "type": "`$STRING`",
-                    "index$": 5
+                    "short": "Model space to translate into.",
+                    "type": "`$STRING`"
                 },
                 {
-                    "active": true,
-                    "name": "text",
+                    "name": "texts",
                     "req": true,
-                    "type": "`$ARRAY`",
-                    "index$": 6
+                    "short": "Texts to embed and translate.",
+                    "type": "`$ARRAY`"
                 }
             ],
             "name": "convert",
@@ -97,8 +87,8 @@ class Config {
                     "name": "create",
                     "points": [
                         {
-                            "active": true,
                             "args": {},
+                            "kind": "http",
                             "method": "POST",
                             "orig": "/v1/convert",
                             "parts": [
@@ -108,13 +98,12 @@ class Config {
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
-                                "res": "`body`"
-                            },
-                            "index$": 0
+                                "res": "`body.data`"
+                            }
                         },
                         {
-                            "active": true,
                             "args": {},
+                            "kind": "http",
                             "method": "POST",
                             "orig": "/v1/embed-bridge",
                             "parts": [
@@ -124,13 +113,12 @@ class Config {
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
-                                "res": "`body`"
-                            },
-                            "index$": 1
+                                "res": "`body.data`"
+                            }
                         },
                         {
-                            "active": true,
                             "args": {},
+                            "kind": "http",
                             "method": "POST",
                             "orig": "/v1/ephemeral/convert",
                             "parts": [
@@ -141,13 +129,12 @@ class Config {
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
-                                "res": "`body`"
-                            },
-                            "index$": 2
+                                "res": "`body.data`"
+                            }
                         },
                         {
-                            "active": true,
                             "args": {},
+                            "kind": "http",
                             "method": "POST",
                             "orig": "/v1/ephemeral/embed-bridge",
                             "parts": [
@@ -158,12 +145,10 @@ class Config {
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
-                                "res": "`body`"
-                            },
-                            "index$": 3
+                                "res": "`body.data`"
+                            }
                         }
-                    ],
-                    "key$": "create"
+                    ]
                 }
             },
             "relations": {
@@ -173,32 +158,22 @@ class Config {
         "embed": {
             "fields": [
                 {
-                    "active": true,
-                    "name": "data",
+                    "name": "embeddings",
                     "req": true,
-                    "type": "`$OBJECT`",
-                    "index$": 0
+                    "short": "One vector per input text, in input order.",
+                    "type": "`$ARRAY`"
                 },
                 {
-                    "active": true,
                     "name": "model",
                     "req": true,
-                    "type": "`$STRING`",
-                    "index$": 1
+                    "short": "Model that produced the vectors.",
+                    "type": "`$STRING`"
                 },
                 {
-                    "active": true,
-                    "name": "success",
+                    "name": "texts",
                     "req": true,
-                    "type": "`$BOOLEAN`",
-                    "index$": 2
-                },
-                {
-                    "active": true,
-                    "name": "text",
-                    "req": true,
-                    "type": "`$ARRAY`",
-                    "index$": 3
+                    "short": "Texts to embed.",
+                    "type": "`$ARRAY`"
                 }
             ],
             "name": "embed",
@@ -208,8 +183,8 @@ class Config {
                     "name": "create",
                     "points": [
                         {
-                            "active": true,
                             "args": {},
+                            "kind": "http",
                             "method": "POST",
                             "orig": "/v1/embed",
                             "parts": [
@@ -219,13 +194,12 @@ class Config {
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
-                                "res": "`body`"
-                            },
-                            "index$": 0
+                                "res": "`body.data`"
+                            }
                         },
                         {
-                            "active": true,
                             "args": {},
+                            "kind": "http",
                             "method": "POST",
                             "orig": "/v1/ephemeral/embed",
                             "parts": [
@@ -236,12 +210,10 @@ class Config {
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
-                                "res": "`body`"
-                            },
-                            "index$": 1
+                                "res": "`body.data`"
+                            }
                         }
-                    ],
-                    "key$": "create"
+                    ]
                 }
             },
             "relations": {
@@ -251,18 +223,28 @@ class Config {
         "ephemeral_key": {
             "fields": [
                 {
-                    "active": true,
-                    "name": "data",
+                    "name": "dailyLimit",
                     "req": true,
-                    "type": "`$OBJECT`",
-                    "index$": 0
+                    "short": "Calls permitted per day.",
+                    "type": "`$INTEGER`"
                 },
                 {
-                    "active": true,
-                    "name": "success",
+                    "name": "dailyUsed",
                     "req": true,
-                    "type": "`$BOOLEAN`",
-                    "index$": 1
+                    "short": "Calls already used today.",
+                    "type": "`$INTEGER`"
+                },
+                {
+                    "name": "key",
+                    "req": true,
+                    "short": "The ephemeral API key, prefixed `eph_`.",
+                    "type": "`$STRING`"
+                },
+                {
+                    "name": "resetsAt",
+                    "req": true,
+                    "short": "When the daily allowance resets.",
+                    "type": "`$STRING`"
                 }
             ],
             "name": "ephemeral_key",
@@ -272,8 +254,8 @@ class Config {
                     "name": "create",
                     "points": [
                         {
-                            "active": true,
                             "args": {},
+                            "kind": "http",
                             "method": "POST",
                             "orig": "/v1/ephemeral/key",
                             "parts": [
@@ -284,12 +266,10 @@ class Config {
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
-                                "res": "`body`"
-                            },
-                            "index$": 0
+                                "res": "`body.data`"
+                            }
                         }
-                    ],
-                    "key$": "create"
+                    ]
                 }
             },
             "relations": {
@@ -299,74 +279,58 @@ class Config {
         "model": {
             "fields": [
                 {
-                    "active": true,
                     "name": "eval",
-                    "req": false,
-                    "type": "`$OBJECT`",
-                    "index$": 0
+                    "short": "Retrieval-fidelity metrics for a convert model.",
+                    "type": "`$OBJECT`"
                 },
                 {
-                    "active": true,
-                    "name": "execution_provider",
-                    "req": false,
-                    "type": "`$STRING`",
-                    "index$": 1
+                    "name": "executionProvider",
+                    "short": "Hardware backend, e.g.",
+                    "type": "`$STRING`"
                 },
                 {
-                    "active": true,
-                    "name": "model_card",
-                    "req": false,
-                    "type": "`$OBJECT`",
-                    "index$": 2
+                    "name": "modelCard",
+                    "short": "Convert models only: training provenance and architecture detail.",
+                    "type": "`$OBJECT`"
                 },
                 {
-                    "active": true,
-                    "name": "model_type",
+                    "name": "modelType",
                     "req": true,
-                    "type": "`$STRING`",
-                    "index$": 3
+                    "short": "`embed` for text-to-vector models, `convert` for space-translation models.",
+                    "type": "`$STRING`"
                 },
                 {
-                    "active": true,
                     "name": "name",
                     "req": true,
-                    "type": "`$STRING`",
-                    "index$": 4
+                    "short": "Model identifier used in requests.",
+                    "type": "`$STRING`"
                 },
                 {
-                    "active": true,
-                    "name": "sequence_len",
-                    "req": false,
-                    "type": "`$INTEGER`",
-                    "index$": 5
+                    "name": "sequenceLen",
+                    "short": "Embed models only: maximum input sequence length.",
+                    "type": "`$INTEGER`"
                 },
                 {
-                    "active": true,
-                    "name": "source_dim",
-                    "req": false,
-                    "type": "`$INTEGER`",
-                    "index$": 6
+                    "name": "sourceDim",
+                    "short": "Convert models only: source vector dimension.",
+                    "type": "`$INTEGER`"
                 },
                 {
-                    "active": true,
-                    "name": "source_model",
-                    "req": false,
-                    "type": "`$STRING`",
-                    "index$": 7
+                    "name": "sourceModel",
+                    "short": "Convert models only: the source model space.",
+                    "type": "`$STRING`"
                 },
                 {
-                    "active": true,
-                    "name": "target_dim",
+                    "name": "targetDim",
                     "req": true,
-                    "type": "`$INTEGER`",
-                    "index$": 8
+                    "short": "Dimension of the produced vectors.",
+                    "type": "`$INTEGER`"
                 },
                 {
-                    "active": true,
-                    "name": "target_model",
+                    "name": "targetModel",
                     "req": true,
-                    "type": "`$STRING`",
-                    "index$": 9
+                    "short": "The model space produced.",
+                    "type": "`$STRING`"
                 }
             ],
             "name": "model",
@@ -376,8 +340,8 @@ class Config {
                     "name": "list",
                     "points": [
                         {
-                            "active": true,
                             "args": {},
+                            "kind": "http",
                             "method": "GET",
                             "orig": "/v1/models",
                             "parts": [
@@ -387,12 +351,10 @@ class Config {
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
-                                "res": "`body`"
-                            },
-                            "index$": 0
+                                "res": "`body.data`"
+                            }
                         }
-                    ],
-                    "key$": "list"
+                    ]
                 }
             },
             "relations": {

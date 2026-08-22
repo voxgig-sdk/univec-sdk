@@ -11,6 +11,9 @@ func MakeConfig() map[string]any {
 	return map[string]any{
 		"main": map[string]any{
 			"name": "Univec",
+			"slug": "univec",
+			"version": "0.0.1",
+			"target": "go",
 		},
 		"feature": map[string]any{
 			"test": map[string]any{
@@ -40,26 +43,31 @@ func MakeConfig() map[string]any {
 					map[string]any{
 						"name": "bridge_model",
 						"req": true,
+						"short": "Embed model used to vectorise the text before translation.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "embeddings",
 						"req": true,
+						"short": "Translated vectors, in the target model's dimension.",
 						"type": "`$ARRAY`",
 					},
 					map[string]any{
 						"name": "source_model",
 						"req": true,
+						"short": "Model space the supplied vectors are currently in.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "target_model",
 						"req": true,
+						"short": "Model space to translate into.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "texts",
 						"req": true,
+						"short": "Texts to embed and translate.",
 						"type": "`$ARRAY`",
 					},
 				},
@@ -143,16 +151,19 @@ func MakeConfig() map[string]any {
 					map[string]any{
 						"name": "embeddings",
 						"req": true,
+						"short": "One vector per input text, in input order.",
 						"type": "`$ARRAY`",
 					},
 					map[string]any{
 						"name": "model",
 						"req": true,
+						"short": "Model that produced the vectors.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "texts",
 						"req": true,
+						"short": "Texts to embed.",
 						"type": "`$ARRAY`",
 					},
 				},
@@ -205,21 +216,25 @@ func MakeConfig() map[string]any {
 					map[string]any{
 						"name": "dailyLimit",
 						"req": true,
+						"short": "Calls permitted per day.",
 						"type": "`$INTEGER`",
 					},
 					map[string]any{
 						"name": "dailyUsed",
 						"req": true,
+						"short": "Calls already used today.",
 						"type": "`$INTEGER`",
 					},
 					map[string]any{
 						"name": "key",
 						"req": true,
+						"short": "The ephemeral API key, prefixed `eph_`.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "resetsAt",
 						"req": true,
+						"short": "When the daily allowance resets.",
 						"type": "`$STRING`",
 					},
 				},
@@ -256,46 +271,56 @@ func MakeConfig() map[string]any {
 				"fields": []any{
 					map[string]any{
 						"name": "eval",
+						"short": "Retrieval-fidelity metrics for a convert model.",
 						"type": "`$OBJECT`",
 					},
 					map[string]any{
 						"name": "executionProvider",
+						"short": "Hardware backend, e.g.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "modelCard",
+						"short": "Convert models only: training provenance and architecture detail.",
 						"type": "`$OBJECT`",
 					},
 					map[string]any{
 						"name": "modelType",
 						"req": true,
+						"short": "`embed` for text-to-vector models, `convert` for space-translation models.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "name",
 						"req": true,
+						"short": "Model identifier used in requests.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "sequenceLen",
+						"short": "Embed models only: maximum input sequence length.",
 						"type": "`$INTEGER`",
 					},
 					map[string]any{
 						"name": "sourceDim",
+						"short": "Convert models only: source vector dimension.",
 						"type": "`$INTEGER`",
 					},
 					map[string]any{
 						"name": "sourceModel",
+						"short": "Convert models only: the source model space.",
 						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "targetDim",
 						"req": true,
+						"short": "Dimension of the produced vectors.",
 						"type": "`$INTEGER`",
 					},
 					map[string]any{
 						"name": "targetModel",
 						"req": true,
+						"short": "The model space produced.",
 						"type": "`$STRING`",
 					},
 				},

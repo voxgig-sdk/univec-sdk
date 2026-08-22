@@ -5,6 +5,6 @@ import type { Convert, ConvertCreateData } from '../UnivecTypes';
 declare class ConvertEntity extends UnivecEntityBase<Convert> {
     constructor(client: UnivecSDK, entopts: any);
     make(this: ConvertEntity): ConvertEntity;
-    create(this: any, reqdata?: ConvertCreateData, ctrl?: Control): Promise<Convert>;
+    create(this: any, reqdata?: ConvertCreateData, ctrl?: Control): Promise<ConvertEntity>;
 }
 export { ConvertEntity };

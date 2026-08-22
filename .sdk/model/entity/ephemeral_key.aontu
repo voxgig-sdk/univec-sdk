@@ -8,21 +8,25 @@ main: kit: entity: ephemeral_key: {
     {
       name: "dailyLimit"
       req: true
+      short: "Calls permitted per day."
       type: "`$INTEGER`"
     }
     {
       name: "dailyUsed"
       req: true
+      short: "Calls already used today."
       type: "`$INTEGER`"
     }
     {
       name: "key"
       req: true
+      short: "The ephemeral API key, prefixed `eph_`."
       type: "`$STRING`"
     }
     {
       name: "resetsAt"
       req: true
+      short: "When the daily allowance resets."
       type: "`$STRING`"
     }
   ]

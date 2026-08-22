@@ -13,6 +13,7 @@ import { makeResponse } from './MakeResponseUtility';
 import { makeResult } from './MakeResultUtility';
 import { makePoint } from './MakePointUtility';
 import { makeSpec } from './MakeSpecUtility';
+import { graphqlBody, graphqlErrors } from './GraphqlUtility';
 import { makeUrl } from './MakeUrlUtility';
 import { param } from './ParamUtility';
 import { prepareAuth } from './PrepareAuthUtility';
@@ -44,6 +45,9 @@ declare class Utility {
     makeResult: typeof makeResult;
     makePoint: typeof makePoint;
     makeSpec: typeof makeSpec;
+    graphqlBody: typeof graphqlBody;
+    graphqlErrors: typeof graphqlErrors;
+    GRAPHQL_CONTENT_TYPE: string;
     makeUrl: typeof makeUrl;
     param: typeof param;
     prepareAuth: typeof prepareAuth;

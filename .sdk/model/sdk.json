@@ -20,9 +20,11 @@
         ],
         "headers": {
           "content-type": "application/json"
-        }
+        },
+        "repr": "auto"
       },
       "contributor": {},
+      "docs": {},
       "entity": {
         "convert": {
           "active": true,
@@ -34,30 +36,35 @@
               "active": true,
               "name": "bridge_model",
               "req": true,
+              "short": "Embed model used to vectorise the text before translation.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "embeddings",
               "req": true,
+              "short": "Translated vectors, in the target model's dimension.",
               "type": "`$ARRAY`"
             },
             {
               "active": true,
               "name": "source_model",
               "req": true,
+              "short": "Model space the supplied vectors are currently in.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "target_model",
               "req": true,
+              "short": "Model space to translate into.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "texts",
               "req": true,
+              "short": "Texts to embed and translate.",
               "type": "`$ARRAY`"
             }
           ],
@@ -150,18 +157,21 @@
               "active": true,
               "name": "embeddings",
               "req": true,
+              "short": "One vector per input text, in input order.",
               "type": "`$ARRAY`"
             },
             {
               "active": true,
               "name": "model",
               "req": true,
+              "short": "Model that produced the vectors.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "texts",
               "req": true,
+              "short": "Texts to embed.",
               "type": "`$ARRAY`"
             }
           ],
@@ -221,24 +231,28 @@
               "active": true,
               "name": "dailyLimit",
               "req": true,
+              "short": "Calls permitted per day.",
               "type": "`$INTEGER`"
             },
             {
               "active": true,
               "name": "dailyUsed",
               "req": true,
+              "short": "Calls already used today.",
               "type": "`$INTEGER`"
             },
             {
               "active": true,
               "name": "key",
               "req": true,
+              "short": "The ephemeral API key, prefixed `eph_`.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "resetsAt",
               "req": true,
+              "short": "When the daily allowance resets.",
               "type": "`$STRING`"
             }
           ],
@@ -282,60 +296,70 @@
               "active": true,
               "name": "eval",
               "req": false,
+              "short": "Retrieval-fidelity metrics for a convert model.",
               "type": "`$OBJECT`"
             },
             {
               "active": true,
               "name": "executionProvider",
               "req": false,
+              "short": "Hardware backend, e.g.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "modelCard",
               "req": false,
+              "short": "Convert models only: training provenance and architecture detail.",
               "type": "`$OBJECT`"
             },
             {
               "active": true,
               "name": "modelType",
               "req": true,
+              "short": "`embed` for text-to-vector models, `convert` for space-translation models.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "name",
               "req": true,
+              "short": "Model identifier used in requests.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "sequenceLen",
               "req": false,
+              "short": "Embed models only: maximum input sequence length.",
               "type": "`$INTEGER`"
             },
             {
               "active": true,
               "name": "sourceDim",
               "req": false,
+              "short": "Convert models only: source vector dimension.",
               "type": "`$INTEGER`"
             },
             {
               "active": true,
               "name": "sourceModel",
               "req": false,
+              "short": "Convert models only: the source model space.",
               "type": "`$STRING`"
             },
             {
               "active": true,
               "name": "targetDim",
               "req": true,
+              "short": "Dimension of the produced vectors.",
               "type": "`$INTEGER`"
             },
             {
               "active": true,
               "name": "targetModel",
               "req": true,
+              "short": "The model space produced.",
               "type": "`$STRING`"
             }
           ],
@@ -372,6 +396,7 @@
       "feature": {
         "test": {
           "active": true,
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "config": {
             "options": {
               "active": false
@@ -432,6 +457,8 @@
             }
           },
           "name": "test",
+          "origname": "",
+          "package": "@voxgig/sdkgen",
           "target": {
             "go": {
               "deps": {}
@@ -589,6 +616,7 @@
             "name": "",
             "url": ""
           },
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "comment": {
             "line": "//"
           },
@@ -607,12 +635,14 @@
             "path": ""
           },
           "name": "go",
+          "origname": "",
           "output": {
             "adopt": false,
             "path": "",
             "repo": "",
             "sdkrel": ""
           },
+          "package": "@voxgig/sdkgen",
           "publish": {
             "registry": {
               "active": false,
@@ -646,6 +676,7 @@
             "name": "",
             "url": ""
           },
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "comment": {
             "line": "//"
           },
@@ -662,12 +693,14 @@
             "path": ""
           },
           "name": "go-cli",
+          "origname": "",
           "output": {
             "adopt": false,
             "path": "",
             "repo": "",
             "sdkrel": ""
           },
+          "package": "@voxgig/sdkgen",
           "phase": {
             "agentguide": {
               "active": false
@@ -717,6 +750,7 @@
             "name": "",
             "url": ""
           },
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "comment": {
             "line": "//"
           },
@@ -733,12 +767,14 @@
             "path": ""
           },
           "name": "go-mcp",
+          "origname": "",
           "output": {
             "adopt": false,
             "path": "",
             "repo": "",
             "sdkrel": ""
           },
+          "package": "@voxgig/sdkgen",
           "phase": {
             "agentguide": {
               "active": false
@@ -788,6 +824,7 @@
             "name": "",
             "url": ""
           },
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "comment": {
             "line": "//"
           },
@@ -810,12 +847,14 @@
             "path": ""
           },
           "name": "js",
+          "origname": "",
           "output": {
             "adopt": false,
             "path": "",
             "repo": "",
             "sdkrel": ""
           },
+          "package": "@voxgig/sdkgen",
           "publish": {
             "registry": {
               "active": false,
@@ -848,6 +887,7 @@
             "name": "",
             "url": ""
           },
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "comment": {
             "line": "--"
           },
@@ -870,12 +910,14 @@
             "path": ""
           },
           "name": "lua",
+          "origname": "",
           "output": {
             "adopt": false,
             "path": "",
             "repo": "",
             "sdkrel": ""
           },
+          "package": "@voxgig/sdkgen",
           "publish": {
             "registry": {
               "active": false,
@@ -909,6 +951,7 @@
             "name": "",
             "url": ""
           },
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "comment": {
             "line": "//"
           },
@@ -925,12 +968,14 @@
             "path": ""
           },
           "name": "php",
+          "origname": "",
           "output": {
             "adopt": false,
             "path": "",
             "repo": "",
             "sdkrel": ""
           },
+          "package": "@voxgig/sdkgen",
           "publish": {
             "registry": {
               "active": false,
@@ -964,6 +1009,7 @@
             "name": "",
             "url": ""
           },
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
           "comment": {
             "line": "#"
           },
@@ -986,12 +1032,14 @@
             "path": ""
           },
           "name": "py",
+          "origname": "",
           "output": {
             "adopt": false,
             "path": "",
             "repo": "",
             "sdkrel": ""
           },
+          "package": "@voxgig/sdkgen",
           "publish": {
             "registry": {
               "active": false,
@@ -1058,12 +1106,14 @@
             "path": ""
           },
           "name": "ts",
+          "origname": "",
           "output": {
             "adopt": false,
             "path": "",
             "repo": "",
             "sdkrel": ""
           },
+          "package": "@voxgig/sdkgen",
           "publish": {
             "registry": {
               "active": false,

@@ -6,7 +6,7 @@ The Golang SDK for the Univec API — an entity-oriented client using standard G
 
 It exposes the API as capitalised, semantic **Entities** — e.g. `client.Convert(nil)` — each with the same small set of operations (`List`, `Create`) instead of raw URL paths and query strings. You call meaning, not endpoints, which keeps the cognitive load low.
 
-> Other languages, the CLI, and MCP server live alongside this one — see
+> Also generated from this model: `go-cli`, `go-mcp`, `js`, `lua`, `php`, `py`, `ts` — see
 > the [top-level README](../README.md).
 
 
@@ -268,11 +268,11 @@ Only `Direct()` returns a response envelope — a `map[string]any` with
 
 | Field | Description |
 | --- | --- |
-| `"bridge_model"` |  |
-| `"embeddings"` |  |
-| `"source_model"` |  |
-| `"target_model"` |  |
-| `"texts"` |  |
+| `"bridge_model"` | Embed model used to vectorise the text before translation. |
+| `"embeddings"` | Translated vectors, in the target model's dimension. |
+| `"source_model"` | Model space the supplied vectors are currently in. |
+| `"target_model"` | Model space to translate into. |
+| `"texts"` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -282,9 +282,9 @@ API path: `/v1/convert`
 
 | Field | Description |
 | --- | --- |
-| `"embeddings"` |  |
-| `"model"` |  |
-| `"texts"` |  |
+| `"embeddings"` | One vector per input text, in input order. |
+| `"model"` | Model that produced the vectors. |
+| `"texts"` | Texts to embed. |
 
 Operations: Create.
 
@@ -294,10 +294,10 @@ API path: `/v1/embed`
 
 | Field | Description |
 | --- | --- |
-| `"dailyLimit"` |  |
-| `"dailyUsed"` |  |
-| `"key"` |  |
-| `"resetsAt"` |  |
+| `"dailyLimit"` | Calls permitted per day. |
+| `"dailyUsed"` | Calls already used today. |
+| `"key"` | The ephemeral API key, prefixed `eph_`. |
+| `"resetsAt"` | When the daily allowance resets. |
 
 Operations: Create.
 
@@ -307,16 +307,16 @@ API path: `/v1/ephemeral/key`
 
 | Field | Description |
 | --- | --- |
-| `"eval"` |  |
-| `"executionProvider"` |  |
-| `"modelCard"` |  |
-| `"modelType"` |  |
-| `"name"` |  |
-| `"sequenceLen"` |  |
-| `"sourceDim"` |  |
-| `"sourceModel"` |  |
-| `"targetDim"` |  |
-| `"targetModel"` |  |
+| `"eval"` | Retrieval-fidelity metrics for a convert model. |
+| `"executionProvider"` | Hardware backend, e.g. |
+| `"modelCard"` | Convert models only: training provenance and architecture detail. |
+| `"modelType"` | `embed` for text-to-vector models, `convert` for space-translation models. |
+| `"name"` | Model identifier used in requests. |
+| `"sequenceLen"` | Embed models only: maximum input sequence length. |
+| `"sourceDim"` | Convert models only: source vector dimension. |
+| `"sourceModel"` | Convert models only: the source model space. |
+| `"targetDim"` | Dimension of the produced vectors. |
+| `"targetModel"` | The model space produced. |
 
 Operations: List.
 
@@ -341,11 +341,11 @@ Create an instance: `convert := client.Convert(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `string` |  |
-| `embeddings` | `[]any` |  |
-| `source_model` | `string` |  |
-| `target_model` | `string` |  |
-| `texts` | `[]any` |  |
+| `bridge_model` | `string` | Embed model used to vectorise the text before translation. |
+| `embeddings` | `[]any` | Translated vectors, in the target model's dimension. |
+| `source_model` | `string` | Model space the supplied vectors are currently in. |
+| `target_model` | `string` | Model space to translate into. |
+| `texts` | `[]any` | Texts to embed and translate. |
 
 #### Example: Create
 
@@ -378,9 +378,9 @@ Create an instance: `embed := client.Embed(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `embeddings` | `[]any` |  |
-| `model` | `string` |  |
-| `texts` | `[]any` |  |
+| `embeddings` | `[]any` | One vector per input text, in input order. |
+| `model` | `string` | Model that produced the vectors. |
+| `texts` | `[]any` | Texts to embed. |
 
 #### Example: Create
 
@@ -411,10 +411,10 @@ Create an instance: `ephemeralKey := client.EphemeralKey(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `dailyLimit` | `int` |  |
-| `dailyUsed` | `int` |  |
-| `key` | `string` |  |
-| `resetsAt` | `string` |  |
+| `dailyLimit` | `int` | Calls permitted per day. |
+| `dailyUsed` | `int` | Calls already used today. |
+| `key` | `string` | The ephemeral API key, prefixed `eph_`. |
+| `resetsAt` | `string` | When the daily allowance resets. |
 
 #### Example: Create
 
@@ -446,16 +446,16 @@ Create an instance: `model := client.Model(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `eval` | `map[string]any` |  |
-| `executionProvider` | `string` |  |
-| `modelCard` | `map[string]any` |  |
-| `modelType` | `string` |  |
-| `name` | `string` |  |
-| `sequenceLen` | `int` |  |
-| `sourceDim` | `int` |  |
-| `sourceModel` | `string` |  |
-| `targetDim` | `int` |  |
-| `targetModel` | `string` |  |
+| `eval` | `map[string]any` | Retrieval-fidelity metrics for a convert model. |
+| `executionProvider` | `string` | Hardware backend, e.g. |
+| `modelCard` | `map[string]any` | Convert models only: training provenance and architecture detail. |
+| `modelType` | `string` | `embed` for text-to-vector models, `convert` for space-translation models. |
+| `name` | `string` | Model identifier used in requests. |
+| `sequenceLen` | `int` | Embed models only: maximum input sequence length. |
+| `sourceDim` | `int` | Convert models only: source vector dimension. |
+| `sourceModel` | `string` | Convert models only: the source model space. |
+| `targetDim` | `int` | Dimension of the produced vectors. |
+| `targetModel` | `string` | The model space produced. |
 
 #### Example: List
 

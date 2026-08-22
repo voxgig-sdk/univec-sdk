@@ -1,62 +1,60 @@
 export interface Convert {
     bridge_model: string;
-    data: Record<string, any>;
-    embedding: any[];
+    embeddings: any[];
     source_model: string;
-    success: boolean;
     target_model: string;
-    text: any[];
+    texts: any[];
 }
 export interface ConvertCreateData {
     bridge_model: string;
-    data: Record<string, any>;
-    embedding: any[];
+    embeddings: any[];
     source_model: string;
-    success: boolean;
     target_model: string;
-    text: any[];
+    texts: any[];
 }
 export interface Embed {
-    data: Record<string, any>;
+    embeddings: any[];
     model: string;
-    success: boolean;
-    text: any[];
+    texts: any[];
 }
 export interface EmbedCreateData {
-    data: Record<string, any>;
+    embeddings: any[];
     model: string;
-    success: boolean;
-    text: any[];
+    texts: any[];
 }
 export interface EphemeralKey {
-    data: Record<string, any>;
-    success: boolean;
+    dailyLimit: number;
+    dailyUsed: number;
+    key: string;
+    resetsAt: string;
 }
 export interface EphemeralKeyCreateData {
-    data: Record<string, any>;
-    success: boolean;
+    dailyLimit: number;
+    dailyUsed: number;
+    key: string;
+    resetsAt: string;
 }
 export interface Model {
     eval?: Record<string, any>;
-    execution_provider?: string;
-    model_card?: Record<string, any>;
-    model_type: string;
+    executionProvider?: string;
+    modelCard?: Record<string, any>;
+    modelType: string;
     name: string;
-    sequence_len?: number;
-    source_dim?: number;
-    source_model?: string;
-    target_dim: number;
-    target_model: string;
+    sequenceLen?: number;
+    sourceDim?: number;
+    sourceModel?: string;
+    targetDim: number;
+    targetModel: string;
 }
 export interface ModelListMatch {
     eval?: Record<string, any>;
-    execution_provider?: string;
-    model_card?: Record<string, any>;
-    model_type?: string;
+    executionProvider?: string;
+    modelCard?: Record<string, any>;
+    modelType?: string;
     name?: string;
-    sequence_len?: number;
-    source_dim?: number;
-    source_model?: string;
-    target_dim?: number;
-    target_model?: string;
+    sequenceLen?: number;
+    sourceDim?: number;
+    sourceModel?: string;
+    targetDim?: number;
+    targetModel?: string;
 }

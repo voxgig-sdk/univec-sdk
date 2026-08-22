@@ -5,6 +5,6 @@ import type { Model, ModelListMatch } from '../UnivecTypes';
 declare class ModelEntity extends UnivecEntityBase<Model> {
     constructor(client: UnivecSDK, entopts: any);
     make(this: ModelEntity): ModelEntity;
-    list(this: any, reqmatch?: ModelListMatch, ctrl?: Control): Promise<Model[]>;
+    list(this: any, reqmatch?: ModelListMatch, ctrl?: Control): Promise<ModelEntity[]>;
 }
 export { ModelEntity };

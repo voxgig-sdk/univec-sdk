@@ -8,16 +8,19 @@ main: kit: entity: embed: {
     {
       name: "embeddings"
       req: true
+      short: "One vector per input text, in input order."
       type: "`$ARRAY`"
     }
     {
       name: "model"
       req: true
+      short: "Model that produced the vectors."
       type: "`$STRING`"
     }
     {
       name: "texts"
       req: true
+      short: "Texts to embed."
       type: "`$ARRAY`"
     }
   ]

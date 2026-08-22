@@ -16,6 +16,7 @@ const MakeResponseUtility_1 = require("./MakeResponseUtility");
 const MakeResultUtility_1 = require("./MakeResultUtility");
 const MakePointUtility_1 = require("./MakePointUtility");
 const MakeSpecUtility_1 = require("./MakeSpecUtility");
+const GraphqlUtility_1 = require("./GraphqlUtility");
 const MakeUrlUtility_1 = require("./MakeUrlUtility");
 const ParamUtility_1 = require("./ParamUtility");
 const PrepareAuthUtility_1 = require("./PrepareAuthUtility");
@@ -47,6 +48,9 @@ class Utility {
     makeResult = MakeResultUtility_1.makeResult;
     makePoint = MakePointUtility_1.makePoint;
     makeSpec = MakeSpecUtility_1.makeSpec;
+    graphqlBody = GraphqlUtility_1.graphqlBody;
+    graphqlErrors = GraphqlUtility_1.graphqlErrors;
+    GRAPHQL_CONTENT_TYPE = GraphqlUtility_1.GRAPHQL_CONTENT_TYPE;
     makeUrl = MakeUrlUtility_1.makeUrl;
     param = ParamUtility_1.param;
     prepareAuth = PrepareAuthUtility_1.prepareAuth;

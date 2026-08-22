@@ -4,12 +4,18 @@ import {
   File,
   cmp,
   collectDeps,
+  each,
   pkgDescription,
   keywords,
   repoInfo, packageName,
   packageVersion,
 } from '@voxgig/sdkgen'
 
+
+import {
+  KIT,
+  getModelPath,
+} from '@voxgig/apidef'
 
 import type {
   Model,
@@ -27,7 +33,7 @@ const Package = cmp(async function Package(props: any) {
   // (`${model.name}_sdk`) used by `require` is unchanged.
   const ns = model.origin || 'voxgig-sdk'
   const pkgBase = ns.endsWith('-sdk') ? model.name : `${model.name}-sdk`
-  const rockName = packageName(model, 'lua')
+  const rockName = packageName(model, target.name)
   const { repoUrl, issuesUrl } = repoInfo(model)
   const labels = keywords(model).map((k) => `"${k}"`).join(', ')
 
@@ -46,7 +52,7 @@ source = {
   dir = "${model.name}-sdk/lua"
 }
 description = {
-  summary = "${pkgDescription(model, 'lua')}",
+  summary = "${pkgDescription(model, target.name)}",
   homepage = "${repoUrl}",
   issues_url = "${issuesUrl}",
   license = "MIT",
@@ -66,6 +72,23 @@ dependencies = {
 `)
     }
 
+    // Feature modules must be listed too, or an install-from-rock ships a
+    // features.lua whose requires cannot resolve. Emitted from the model
+    // (each = sorted order, byte-stable), plus the base feature every
+    // factory falls back to. The station feature additionally carries the
+    // VENDORED voxgig_station library beside its adapter (no voxgig-station
+    // rock exists to depend on - station design 9.2's registry-less tier).
+    const feature = getModelPath(model, `main.${KIT}.feature`)
+    let featureModules = `    ["feature.base_feature"] = "feature/base_feature.lua",\n`
+    each(feature, (f: any) => {
+      featureModules +=
+        `    ["feature.${f.name}_feature"] = "feature/${f.name}_feature.lua",\n`
+      if ('station' === f.name) {
+        featureModules +=
+          `    ["feature.station.voxgig_station"] = "feature/station/voxgig_station.lua",\n`
+      }
+    })
+
     Content(`}
 build = {
   type = "builtin",
@@ -74,7 +97,7 @@ build = {
     ["config"] = "config.lua",
     ["config_shared"] = "config_shared.lua",
     ["features"] = "features.lua",
-  }
+${featureModules}  }
 }
 `)
   })

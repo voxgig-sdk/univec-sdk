@@ -33,6 +33,20 @@ declare class UnivecSDK {
         headers?: undefined;
         data?: undefined;
     }>;
+    _rawRequest(fetchargs?: any): Promise<Error | {
+        ok: boolean;
+        status: number;
+        headers: any;
+        data: any;
+        err?: undefined;
+    } | {
+        ok: boolean;
+        err: any;
+        status?: undefined;
+        headers?: undefined;
+        data?: undefined;
+    }>;
+    graphql(query: string, variables?: any, ctrl?: any): Promise<any>;
     Convert(entopts?: Record<string, any>): ConvertEntity;
     Embed(entopts?: Record<string, any>): EmbedEntity;
     EphemeralKey(entopts?: Record<string, any>): EphemeralKeyEntity;

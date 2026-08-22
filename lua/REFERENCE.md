@@ -103,11 +103,11 @@ local convert = client:Convert(nil)
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `bridge_model` | `string` | Yes |  |
-| `embeddings` | `table` | Yes |  |
-| `source_model` | `string` | Yes |  |
-| `target_model` | `string` | Yes |  |
-| `texts` | `table` | Yes |  |
+| `bridge_model` | `string` | Yes | Embed model used to vectorise the text before translation. |
+| `embeddings` | `table` | Yes | Translated vectors, in the target model's dimension. |
+| `source_model` | `string` | Yes | Model space the supplied vectors are currently in. |
+| `target_model` | `string` | Yes | Model space to translate into. |
+| `texts` | `table` | Yes | Texts to embed and translate. |
 
 ### Operations
 
@@ -165,9 +165,9 @@ local embed = client:Embed(nil)
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `embeddings` | `table` | Yes |  |
-| `model` | `string` | Yes |  |
-| `texts` | `table` | Yes |  |
+| `embeddings` | `table` | Yes | One vector per input text, in input order. |
+| `model` | `string` | Yes | Model that produced the vectors. |
+| `texts` | `table` | Yes | Texts to embed. |
 
 ### Operations
 
@@ -223,10 +223,10 @@ local ephemeral_key = client:EphemeralKey(nil)
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `dailyLimit` | `number` | Yes |  |
-| `dailyUsed` | `number` | Yes |  |
-| `key` | `string` | Yes |  |
-| `resetsAt` | `string` | Yes |  |
+| `dailyLimit` | `number` | Yes | Calls permitted per day. |
+| `dailyUsed` | `number` | Yes | Calls already used today. |
+| `key` | `string` | Yes | The ephemeral API key, prefixed `eph_`. |
+| `resetsAt` | `string` | Yes | When the daily allowance resets. |
 
 ### Operations
 
@@ -283,16 +283,16 @@ local model = client:Model(nil)
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `eval` | `table` | No |  |
-| `executionProvider` | `string` | No |  |
-| `modelCard` | `table` | No |  |
-| `modelType` | `string` | Yes |  |
-| `name` | `string` | Yes |  |
-| `sequenceLen` | `number` | No |  |
-| `sourceDim` | `number` | No |  |
-| `sourceModel` | `string` | No |  |
-| `targetDim` | `number` | Yes |  |
-| `targetModel` | `string` | Yes |  |
+| `eval` | `table` | No | Retrieval-fidelity metrics for a convert model. |
+| `executionProvider` | `string` | No | Hardware backend, e.g. |
+| `modelCard` | `table` | No | Convert models only: training provenance and architecture detail. |
+| `modelType` | `string` | Yes | `embed` for text-to-vector models, `convert` for space-translation models. |
+| `name` | `string` | Yes | Model identifier used in requests. |
+| `sequenceLen` | `number` | No | Embed models only: maximum input sequence length. |
+| `sourceDim` | `number` | No | Convert models only: source vector dimension. |
+| `sourceModel` | `string` | No | Convert models only: the source model space. |
+| `targetDim` | `number` | Yes | Dimension of the produced vectors. |
+| `targetModel` | `string` | Yes | The model space produced. |
 
 ### Operations
 

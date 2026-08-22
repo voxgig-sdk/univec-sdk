@@ -1,8 +1,12 @@
 import { BaseFeature } from './feature/base/BaseFeature';
 declare class Config {
     makeFeature(this: any, fn: string): BaseFeature;
+    hasFeature(this: any, fn: string): boolean;
     main: {
         name: string;
+        slug: string;
+        version: string;
+        target: string;
     };
     feature: {
         test: {
@@ -29,11 +33,10 @@ declare class Config {
     entity: {
         convert: {
             fields: {
-                active: boolean;
                 name: string;
                 req: boolean;
+                short: string;
                 type: string;
-                index$: number;
             }[];
             name: string;
             op: {
@@ -41,8 +44,8 @@ declare class Config {
                     input: string;
                     name: string;
                     points: {
-                        active: boolean;
                         args: {};
+                        kind: string;
                         method: string;
                         orig: string;
                         parts: string[];
@@ -51,9 +54,7 @@ declare class Config {
                             req: string;
                             res: string;
                         };
-                        index$: number;
                     }[];
-                    key$: string;
                 };
             };
             relations: {
@@ -62,11 +63,10 @@ declare class Config {
         };
         embed: {
             fields: {
-                active: boolean;
                 name: string;
                 req: boolean;
+                short: string;
                 type: string;
-                index$: number;
             }[];
             name: string;
             op: {
@@ -74,8 +74,8 @@ declare class Config {
                     input: string;
                     name: string;
                     points: {
-                        active: boolean;
                         args: {};
+                        kind: string;
                         method: string;
                         orig: string;
                         parts: string[];
@@ -84,9 +84,7 @@ declare class Config {
                             req: string;
                             res: string;
                         };
-                        index$: number;
                     }[];
-                    key$: string;
                 };
             };
             relations: {
@@ -95,11 +93,10 @@ declare class Config {
         };
         ephemeral_key: {
             fields: {
-                active: boolean;
                 name: string;
                 req: boolean;
+                short: string;
                 type: string;
-                index$: number;
             }[];
             name: string;
             op: {
@@ -107,8 +104,8 @@ declare class Config {
                     input: string;
                     name: string;
                     points: {
-                        active: boolean;
                         args: {};
+                        kind: string;
                         method: string;
                         orig: string;
                         parts: string[];
@@ -117,9 +114,7 @@ declare class Config {
                             req: string;
                             res: string;
                         };
-                        index$: number;
                     }[];
-                    key$: string;
                 };
             };
             relations: {
@@ -127,21 +122,25 @@ declare class Config {
             };
         };
         model: {
-            fields: {
-                active: boolean;
+            fields: ({
+                name: string;
+                short: string;
+                type: string;
+                req?: undefined;
+            } | {
                 name: string;
                 req: boolean;
+                short: string;
                 type: string;
-                index$: number;
-            }[];
+            })[];
             name: string;
             op: {
                 list: {
                     input: string;
                     name: string;
                     points: {
-                        active: boolean;
                         args: {};
+                        kind: string;
                         method: string;
                         orig: string;
                         parts: string[];
@@ -150,9 +149,7 @@ declare class Config {
                             req: string;
                             res: string;
                         };
-                        index$: number;
                     }[];
-                    key$: string;
                 };
             };
             relations: {

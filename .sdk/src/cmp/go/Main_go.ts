@@ -37,10 +37,10 @@ const Main = cmp(async function Main(props: any) {
 
   // Go module path == the repo path on GitHub (org from model.origin),
   // e.g. github.com/voxgig-sdk/<slug>-sdk. Used in go.mod and every import.
-  const gomodule = goModule(model, 'go')
+  const gomodule = goModule(model, target.name)
   // The root package name must be a plain Go identifier (can't be a path),
   // so it stays a concatenated-lowercase form (e.g. voxgigdogsdk).
-  const gopackage = goPackageIdent(model, 'go')
+  const gopackage = goPackageIdent(model, target.name)
 
   Package({ target })
 

@@ -33,6 +33,9 @@ class UnivecConfig
         return [
             "main" => [
                 "name" => "Univec",
+                "slug" => "univec",
+                "version" => "0.0.1",
+                "target" => "php",
             ],
             "feature" => [
                 "test" => [
@@ -62,26 +65,31 @@ class UnivecConfig
             [
               'name' => 'bridge_model',
               'req' => true,
+              'short' => 'Embed model used to vectorise the text before translation.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'embeddings',
               'req' => true,
+              'short' => 'Translated vectors, in the target model\'s dimension.',
               'type' => '`$ARRAY`',
             ],
             [
               'name' => 'source_model',
               'req' => true,
+              'short' => 'Model space the supplied vectors are currently in.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'target_model',
               'req' => true,
+              'short' => 'Model space to translate into.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'texts',
               'req' => true,
+              'short' => 'Texts to embed and translate.',
               'type' => '`$ARRAY`',
             ],
           ],
@@ -165,16 +173,19 @@ class UnivecConfig
             [
               'name' => 'embeddings',
               'req' => true,
+              'short' => 'One vector per input text, in input order.',
               'type' => '`$ARRAY`',
             ],
             [
               'name' => 'model',
               'req' => true,
+              'short' => 'Model that produced the vectors.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'texts',
               'req' => true,
+              'short' => 'Texts to embed.',
               'type' => '`$ARRAY`',
             ],
           ],
@@ -227,21 +238,25 @@ class UnivecConfig
             [
               'name' => 'dailyLimit',
               'req' => true,
+              'short' => 'Calls permitted per day.',
               'type' => '`$INTEGER`',
             ],
             [
               'name' => 'dailyUsed',
               'req' => true,
+              'short' => 'Calls already used today.',
               'type' => '`$INTEGER`',
             ],
             [
               'name' => 'key',
               'req' => true,
+              'short' => 'The ephemeral API key, prefixed `eph_`.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'resetsAt',
               'req' => true,
+              'short' => 'When the daily allowance resets.',
               'type' => '`$STRING`',
             ],
           ],
@@ -278,46 +293,56 @@ class UnivecConfig
           'fields' => [
             [
               'name' => 'eval',
+              'short' => 'Retrieval-fidelity metrics for a convert model.',
               'type' => '`$OBJECT`',
             ],
             [
               'name' => 'executionProvider',
+              'short' => 'Hardware backend, e.g.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'modelCard',
+              'short' => 'Convert models only: training provenance and architecture detail.',
               'type' => '`$OBJECT`',
             ],
             [
               'name' => 'modelType',
               'req' => true,
+              'short' => '`embed` for text-to-vector models, `convert` for space-translation models.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'name',
               'req' => true,
+              'short' => 'Model identifier used in requests.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'sequenceLen',
+              'short' => 'Embed models only: maximum input sequence length.',
               'type' => '`$INTEGER`',
             ],
             [
               'name' => 'sourceDim',
+              'short' => 'Convert models only: source vector dimension.',
               'type' => '`$INTEGER`',
             ],
             [
               'name' => 'sourceModel',
+              'short' => 'Convert models only: the source model space.',
               'type' => '`$STRING`',
             ],
             [
               'name' => 'targetDim',
               'req' => true,
+              'short' => 'Dimension of the produced vectors.',
               'type' => '`$INTEGER`',
             ],
             [
               'name' => 'targetModel',
               'req' => true,
+              'short' => 'The model space produced.',
               'type' => '`$STRING`',
             ],
           ],

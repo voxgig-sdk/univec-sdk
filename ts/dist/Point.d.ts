@@ -2,6 +2,8 @@ declare class Point {
     args: {
         params: any[];
     };
+    kind: string;
+    graphql?: any;
     rename: {
         params: Record<string, string>;
     };

@@ -28,6 +28,9 @@ def make_config():
     return {
         "main": {
             "name": "Univec",
+            "slug": "univec",
+            "version": "0.0.1",
+            "target": "py",
         },
         "feature": {
             "test": {
@@ -57,26 +60,31 @@ def make_config():
           {
             "name": "bridge_model",
             "req": True,
+            "short": "Embed model used to vectorise the text before translation.",
             "type": "`$STRING`",
           },
           {
             "name": "embeddings",
             "req": True,
+            "short": "Translated vectors, in the target model's dimension.",
             "type": "`$ARRAY`",
           },
           {
             "name": "source_model",
             "req": True,
+            "short": "Model space the supplied vectors are currently in.",
             "type": "`$STRING`",
           },
           {
             "name": "target_model",
             "req": True,
+            "short": "Model space to translate into.",
             "type": "`$STRING`",
           },
           {
             "name": "texts",
             "req": True,
+            "short": "Texts to embed and translate.",
             "type": "`$ARRAY`",
           },
         ],
@@ -160,16 +168,19 @@ def make_config():
           {
             "name": "embeddings",
             "req": True,
+            "short": "One vector per input text, in input order.",
             "type": "`$ARRAY`",
           },
           {
             "name": "model",
             "req": True,
+            "short": "Model that produced the vectors.",
             "type": "`$STRING`",
           },
           {
             "name": "texts",
             "req": True,
+            "short": "Texts to embed.",
             "type": "`$ARRAY`",
           },
         ],
@@ -222,21 +233,25 @@ def make_config():
           {
             "name": "dailyLimit",
             "req": True,
+            "short": "Calls permitted per day.",
             "type": "`$INTEGER`",
           },
           {
             "name": "dailyUsed",
             "req": True,
+            "short": "Calls already used today.",
             "type": "`$INTEGER`",
           },
           {
             "name": "key",
             "req": True,
+            "short": "The ephemeral API key, prefixed `eph_`.",
             "type": "`$STRING`",
           },
           {
             "name": "resetsAt",
             "req": True,
+            "short": "When the daily allowance resets.",
             "type": "`$STRING`",
           },
         ],
@@ -273,46 +288,56 @@ def make_config():
         "fields": [
           {
             "name": "eval",
+            "short": "Retrieval-fidelity metrics for a convert model.",
             "type": "`$OBJECT`",
           },
           {
             "name": "executionProvider",
+            "short": "Hardware backend, e.g.",
             "type": "`$STRING`",
           },
           {
             "name": "modelCard",
+            "short": "Convert models only: training provenance and architecture detail.",
             "type": "`$OBJECT`",
           },
           {
             "name": "modelType",
             "req": True,
+            "short": "`embed` for text-to-vector models, `convert` for space-translation models.",
             "type": "`$STRING`",
           },
           {
             "name": "name",
             "req": True,
+            "short": "Model identifier used in requests.",
             "type": "`$STRING`",
           },
           {
             "name": "sequenceLen",
+            "short": "Embed models only: maximum input sequence length.",
             "type": "`$INTEGER`",
           },
           {
             "name": "sourceDim",
+            "short": "Convert models only: source vector dimension.",
             "type": "`$INTEGER`",
           },
           {
             "name": "sourceModel",
+            "short": "Convert models only: the source model space.",
             "type": "`$STRING`",
           },
           {
             "name": "targetDim",
             "req": True,
+            "short": "Dimension of the produced vectors.",
             "type": "`$INTEGER`",
           },
           {
             "name": "targetModel",
             "req": True,
+            "short": "The model space produced.",
             "type": "`$STRING`",
           },
         ],

@@ -127,7 +127,28 @@ function clean(o: any, dropDefaults?: boolean): any {
 }
 
 
+
+// A Lua LONG-BRACKET string holding `s` verbatim.
+//
+// Lua's quoted strings process escapes, so the JSON's own `\n` and `\uXXXX`
+// would be consumed by the Lua lexer before the JSON decoder ever saw them -
+// turning an escaped newline into a real one inside a JSON string (invalid
+// JSON), and failing outright on `\uXXXX`, which Lua 5.1/5.2 do not accept at
+// all. A long bracket processes nothing, so the JSON text survives byte for
+// byte. The level is raised until its terminator does not occur in the text.
+function luaLongString(s: string): string {
+  let level = 0
+  while (s.includes(']' + '='.repeat(level) + ']')) {
+    level++
+  }
+  const eq = '='.repeat(level)
+  // A long bracket swallows an immediately following newline, so start the
+  // content on the same line as the opener.
+  return '[' + eq + '[' + s + ']' + eq + ']'
+}
+
 export {
+  luaLongString,
   clean,
   formatLuaTable,
   formatLuaValue,

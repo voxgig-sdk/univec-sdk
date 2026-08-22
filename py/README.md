@@ -246,11 +246,11 @@ On error, `ok` is `False` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` |  |
-| `embeddings` |  |
-| `source_model` |  |
-| `target_model` |  |
-| `texts` |  |
+| `bridge_model` | Embed model used to vectorise the text before translation. |
+| `embeddings` | Translated vectors, in the target model's dimension. |
+| `source_model` | Model space the supplied vectors are currently in. |
+| `target_model` | Model space to translate into. |
+| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -260,9 +260,9 @@ API path: `/v1/convert`
 
 | Field | Description |
 | --- | --- |
-| `embeddings` |  |
-| `model` |  |
-| `texts` |  |
+| `embeddings` | One vector per input text, in input order. |
+| `model` | Model that produced the vectors. |
+| `texts` | Texts to embed. |
 
 Operations: Create.
 
@@ -272,10 +272,10 @@ API path: `/v1/embed`
 
 | Field | Description |
 | --- | --- |
-| `dailyLimit` |  |
-| `dailyUsed` |  |
-| `key` |  |
-| `resetsAt` |  |
+| `dailyLimit` | Calls permitted per day. |
+| `dailyUsed` | Calls already used today. |
+| `key` | The ephemeral API key, prefixed `eph_`. |
+| `resetsAt` | When the daily allowance resets. |
 
 Operations: Create.
 
@@ -285,16 +285,16 @@ API path: `/v1/ephemeral/key`
 
 | Field | Description |
 | --- | --- |
-| `eval` |  |
-| `executionProvider` |  |
-| `modelCard` |  |
-| `modelType` |  |
-| `name` |  |
-| `sequenceLen` |  |
-| `sourceDim` |  |
-| `sourceModel` |  |
-| `targetDim` |  |
-| `targetModel` |  |
+| `eval` | Retrieval-fidelity metrics for a convert model. |
+| `executionProvider` | Hardware backend, e.g. |
+| `modelCard` | Convert models only: training provenance and architecture detail. |
+| `modelType` | `embed` for text-to-vector models, `convert` for space-translation models. |
+| `name` | Model identifier used in requests. |
+| `sequenceLen` | Embed models only: maximum input sequence length. |
+| `sourceDim` | Convert models only: source vector dimension. |
+| `sourceModel` | Convert models only: the source model space. |
+| `targetDim` | Dimension of the produced vectors. |
+| `targetModel` | The model space produced. |
 
 Operations: List.
 
@@ -319,11 +319,11 @@ Create an instance: `convert = client.Convert()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `str` |  |
-| `embeddings` | `list` |  |
-| `source_model` | `str` |  |
-| `target_model` | `str` |  |
-| `texts` | `list` |  |
+| `bridge_model` | `str` | Embed model used to vectorise the text before translation. |
+| `embeddings` | `list` | Translated vectors, in the target model's dimension. |
+| `source_model` | `str` | Model space the supplied vectors are currently in. |
+| `target_model` | `str` | Model space to translate into. |
+| `texts` | `list` | Texts to embed and translate. |
 
 #### Example: Create
 
@@ -352,9 +352,9 @@ Create an instance: `embed = client.Embed()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `embeddings` | `list` |  |
-| `model` | `str` |  |
-| `texts` | `list` |  |
+| `embeddings` | `list` | One vector per input text, in input order. |
+| `model` | `str` | Model that produced the vectors. |
+| `texts` | `list` | Texts to embed. |
 
 #### Example: Create
 
@@ -381,10 +381,10 @@ Create an instance: `ephemeral_key = client.EphemeralKey()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `dailyLimit` | `int` |  |
-| `dailyUsed` | `int` |  |
-| `key` | `str` |  |
-| `resetsAt` | `str` |  |
+| `dailyLimit` | `int` | Calls permitted per day. |
+| `dailyUsed` | `int` | Calls already used today. |
+| `key` | `str` | The ephemeral API key, prefixed `eph_`. |
+| `resetsAt` | `str` | When the daily allowance resets. |
 
 #### Example: Create
 
@@ -412,16 +412,16 @@ Create an instance: `model = client.Model()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `eval` | `dict` |  |
-| `executionProvider` | `str` |  |
-| `modelCard` | `dict` |  |
-| `modelType` | `str` |  |
-| `name` | `str` |  |
-| `sequenceLen` | `int` |  |
-| `sourceDim` | `int` |  |
-| `sourceModel` | `str` |  |
-| `targetDim` | `int` |  |
-| `targetModel` | `str` |  |
+| `eval` | `dict` | Retrieval-fidelity metrics for a convert model. |
+| `executionProvider` | `str` | Hardware backend, e.g. |
+| `modelCard` | `dict` | Convert models only: training provenance and architecture detail. |
+| `modelType` | `str` | `embed` for text-to-vector models, `convert` for space-translation models. |
+| `name` | `str` | Model identifier used in requests. |
+| `sequenceLen` | `int` | Embed models only: maximum input sequence length. |
+| `sourceDim` | `int` | Convert models only: source vector dimension. |
+| `sourceModel` | `str` | Convert models only: the source model space. |
+| `targetDim` | `int` | Dimension of the produced vectors. |
+| `targetModel` | `str` | The model space produced. |
 
 #### Example: List
 

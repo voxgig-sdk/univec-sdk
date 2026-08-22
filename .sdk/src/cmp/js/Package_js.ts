@@ -63,7 +63,7 @@ const Package = cmp(async function Package(props: any) {
   const pkg = {
     // The ts target publishes the canonical scoped npm name; the js target
     // appends `-js` so the two never collide on npm.
-    name: packageName(model, 'js'),
+    name: packageName(model, target.name),
     version: packageVersion(model, target.name),
     description: pkgDescription(model, target.name),
     keywords: keywords(model),

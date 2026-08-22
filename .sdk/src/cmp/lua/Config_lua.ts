@@ -8,8 +8,11 @@ import {
   Fragment,
   Line,
   cmp,
+  configDefinition,
+  configReprSetting,
   each,
   isAuthActive,
+  isConfigData,
   resolveAuthPrefix,
   serverVariables,
 } from '@voxgig/sdkgen'
@@ -26,6 +29,7 @@ import {
 import {
   clean,
   formatLuaTable,
+  luaLongString,
 } from './utility_lua'
 
 
@@ -61,17 +65,69 @@ const Config = cmp(async function Config(props: any) {
       },\n`
     : ''
 
+  // The same config as an OBJECT, built by the shared helper so this target's
+  // literal and the data that replaces it above the threshold are the same
+  // config by construction. The JSON is what the threshold is measured on -
+  // emitted source size varies by language, the model does not. Passing the
+  // target name opts this target into the main slug/version/target identity
+  // fields (station descriptor v1 reads all three) - the literal branch
+  // below emits them too, so the two representations cannot diverge.
+  const { def: configDef, json: configJson } = configDefinition(model, target.name)
+  const asData = isConfigData(configJson, configReprSetting(model))
+
   File({ name: 'config.' + target.ext }, () => {
 
     Content(`-- ${model.const.Name} SDK configuration
 
--- Build a fresh, fully materialised config table. Every call rebuilds the
+`)
+
+    // ABOVE THE THRESHOLD: emit the model as DATA.
+    //
+    // A table constructor makes the Lua parser emit a SETTABLE per entry and
+    // the VM run them all on every load; a long-bracket string is one token,
+    // and dkjson's decoder builds the table from it.
+    //
+    // dkjson is already a runtime dependency - `utility/fetcher.lua` decodes
+    // every HTTP response with it - so this adds nothing to the SDK.
+    //
+    // Null handling agrees between the branches by construction: dkjson maps
+    // JSON null to nil, and assigning nil to a table key removes it, which is
+    // exactly what the literal branch does when `formatLuaTable` emits `nil`.
+    if (asData) {
+      Content(`local json = require("dkjson")
+
+
+-- THE API MODEL, EMBEDDED AS DATA (sdkgen rung L1).
+--
+-- Emitted only above a size threshold, or when \`main.kit.config.repr\` pins
+-- it: for a small model the table literal is smaller and far easier to read
+-- when debugging.
+local CONFIG_DATA = ${luaLongString(configJson)}
+
+
+-- Parse a fresh, fully materialised config table. Every call re-parses, so
+-- prefer require("config_shared") unless you need a private copy you intend
+-- to mutate.
+local function make_config()
+  return json.decode(CONFIG_DATA)
+end
+`)
+    }
+    else {
+
+    // Identity values from configDefinition's def, not re-derived here, so
+    // the literal rep and the data rep cannot disagree (the ts #MainMeta
+    // discipline).
+    Content(`-- Build a fresh, fully materialised config table. Every call rebuilds the
 -- whole structure, so prefer require("config_shared") unless you need a
 -- private copy you intend to mutate.
 local function make_config()
   return {
     main = {
       name = "${model.const.Name}",
+      slug = ${JSON.stringify(configDef.main.slug)},
+      version = ${JSON.stringify(configDef.main.version)},
+      target = ${JSON.stringify(configDef.main.target)},
     },
     feature = {
 `)
@@ -105,7 +161,10 @@ ${serverBlock}${authBlock}      headers = ${formatLuaTable(headers, 3)},
       }, true), a), {}), 2)},
   }
 end
+`)
+    }
 
+    Content(`
 
 local function make_feature(name)
   local features = require("features")

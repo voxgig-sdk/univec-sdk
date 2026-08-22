@@ -32,6 +32,9 @@ function makeError(ctx, err) {
     }
     err.result = (0, CleanUtility_1.clean)(ctx, result);
     err.spec = (0, CleanUtility_1.clean)(ctx, spec);
+    // Promote the HTTP status to the top level, so a consumer can branch on
+    // `err.status` / `err.notFound` instead of reaching into `err.result`.
+    err.status = null == result.status ? -1 : result.status;
     ctx.ctrl.err = err;
     // Fire PreUnexpected so observability features (metrics, telemetry, audit,
     // debug) close/record error paths that never reach PreDone (e.g. a PrePoint

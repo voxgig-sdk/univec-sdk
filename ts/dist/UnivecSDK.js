@@ -45,17 +45,24 @@ class UnivecSDK {
         // the `test` feature installs the base mock transport and the transport
         // features (retry/cache/netsim/proxy/ratelimit) wrap whatever is current,
         // so `test` must be added before them to sit at the base of the chain.
+        const extend = this._options.extend || [];
         const featureorder = getpath(this._options, '__derived__.featureorder') || [];
         for (const fname of featureorder) {
             const fopts = this._options.feature[fname] || {};
             if (fopts.active) {
+                // An active name with no generated class is legal when an
+                // extend-supplied instance carries that name (station's adopt
+                // path): the instance is added below, positioned by its own
+                // __after__ entry, so skip it here rather than fail construction.
+                if (!this._rootctx.config.hasFeature(fname) &&
+                    extend.some((f) => fname === f.name)) {
+                    continue;
+                }
                 featureAdd(this._rootctx, this._rootctx.config.makeFeature(fname));
             }
         }
-        if (null != this._options.extend) {
-            for (let f of this._options.extend) {
-                featureAdd(this._rootctx, f);
-            }
+        for (let f of extend) {
+            featureAdd(this._rootctx, f);
         }
         for (let f of this._features) {
             featureInit(this._rootctx, f);
@@ -108,7 +115,24 @@ class UnivecSDK {
         }
         return makeFetchDef(ctx);
     }
+    // Raw endpoint access is operator-controllable, like every entity op.
+    // Blocking it means denying BOTH the 'direct' and 'graphql' tokens, since
+    // either one reaches the same endpoint.
     async direct(fetchargs) {
+        if (!this._options.allow.op.includes('direct')) {
+            return {
+                ok: false,
+                err: new Error('UnivecSDK: direct: operation not allowed by' +
+                    ' SDK option allow.op value: "' + this._options.allow.op + '"'),
+            };
+        }
+        return this._rawRequest(fetchargs);
+    }
+    // Ungated request path shared by direct() and graphql(), each of which
+    // checks its own allow.op token first. Private, rather than a flag on
+    // fetchargs: a caller-supplied marker would let anyone opt straight back
+    // out of the gate by passing it.
+    async _rawRequest(fetchargs) {
         const utility = this._utility;
         const fetcher = utility.fetcher;
         const makeContext = utility.makeContext;
@@ -158,6 +182,51 @@ class UnivecSDK {
         catch (err) {
             return { ok: false, err };
         }
+    }
+    // Raw GraphQL access: the pressure valve that makes the generated
+    // surface's deliberate omissions (per-call selection sets, typed filter
+    // builders, batching, subscriptions) livable — the whole schema stays
+    // reachable.
+    //
+    // Thin wrapper over the same prepare/fetch path `direct` uses, with the
+    // one thing raw `direct` cannot do for GraphQL: a GraphQL failure rides
+    // HTTP 200 as a top-level `errors` array, so status alone would report a
+    // failed query as ok.
+    //
+    // NOTE: like `direct`, this bypasses the feature pipeline — no retry,
+    // ratelimit or paging features apply.
+    async graphql(query, variables, ctrl) {
+        const options = this._options;
+        if (!options.allow.op.includes('graphql')) {
+            return {
+                ok: false,
+                err: new Error('UnivecSDK: graphql: operation not allowed by' +
+                    ' SDK option allow.op value: "' + options.allow.op + '"'),
+            };
+        }
+        const res = await this._rawRequest({
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: { query, variables: variables || {} },
+            ctrl,
+        });
+        if (res instanceof Error) {
+            return res;
+        }
+        // Errors are read BEFORE any status check: a GraphQL parse or validation
+        // failure comes back as HTTP 400 carrying the standard { errors: [...] }
+        // body, and the raw path represents a non-2xx as { ok: false } with no
+        // err — so returning early on status would discard the server's own
+        // diagnostics, which are the only useful part of that response.
+        const errors = null == res.data ? undefined : res.data.errors;
+        if (null != errors && Array.isArray(errors) && 0 < errors.length) {
+            const first = errors[0] || {};
+            const err = new Error('UnivecSDK: graphql: ' +
+                (first.message || 'graphql error'));
+            err.graphql = errors;
+            return { ok: false, status: res.status, headers: res.headers, err, data: res.data };
+        }
+        return res;
     }
     // Entity access: `client.Convert().list()` / `client.Convert().load({ id })`.
     // The argument is the entity OPTIONS object (passed to the entity

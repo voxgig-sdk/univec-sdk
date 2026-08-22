@@ -18,6 +18,10 @@ class UnivecEntityBase {
     _data;
     _match;
     _entctx;
+    // Set once a successful `remove` resolves on this instance. The entity
+    // KEEPS the data it held — a caller can still read what was deleted — but
+    // it is no longer a live record.
+    _deleted;
     constructor(client, entopts) {
         entopts = entopts || {};
         entopts.active = false !== entopts.active;
@@ -26,6 +30,7 @@ class UnivecEntityBase {
         this._utility = client.utility();
         this._data = {};
         this._match = {};
+        this._deleted = false;
         const makeContext = this._utility.makeContext;
         this._entctx = makeContext({
             entity: this,
@@ -33,6 +38,15 @@ class UnivecEntityBase {
         }, client._rootctx);
         const featureHook = this._utility.featureHook;
         featureHook(this._entctx, 'PostConstructEntity');
+    }
+    // True once `remove` has succeeded on this instance. `remove` resolves to
+    // the entity like every other operation, so this is how a caller tells a
+    // removed record from a live one.
+    markDeleted() {
+        this._deleted = true;
+    }
+    deleted() {
+        return true === this._deleted;
     }
     entopts() {
         return this._utility.struct.merge([{}, this._entopts]);
@@ -168,7 +182,12 @@ class UnivecEntityBase {
     }
     toJSON() {
         const struct = this._utility.struct;
-        return struct.merge([{}, struct.getdef(this._data, {}), { entity$: this.Name }]);
+        // The marker is NAMESPACED. It used to be `entity$` — a short, generic
+        // name, and the `$`-suffix convention is not unique to sdkgen. Seneca uses
+        // `entity$` on its own entities to hold the canon, so an SDK record fed
+        // into `entize` silently overwrote it and produced entities claiming a
+        // canon that does not exist: no error, just wrong entities.
+        return struct.merge([{}, struct.getdef(this._data, {}), { 'voxgig$entity': this.Name }]);
     }
     toString() {
         return this.Name + ' ' + this._utility.struct.jsonify(this._data);

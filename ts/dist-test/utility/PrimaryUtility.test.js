@@ -21,7 +21,7 @@ const index_1 = require("./index");
     // (.sdk/test/primary/<name>.aontu carries a PENDING header). Everything
     // else MUST contribute cases.
     const PENDING = new Set([
-        'fetcher', 'makeFetchDef', 'makePoint', 'makeResult',
+        'fetcher', 'makeFetchDef', 'makeResult',
         'featureAdd', 'featureHook', 'featureInit',
     ]);
     // Run one corpus section, failing loudly when it would run ZERO cases.
@@ -211,21 +211,15 @@ const index_1 = require("./index");
             return utility.makeError(...args);
         });
     });
-    (0, node_test_1.test)('makePoint-single', () => {
-        const ctx = makeCtx();
-        const point = {
-            parts: ['items', '{id}'],
-            args: { params: [] },
-            params: [],
-            alias: {},
-            select: {},
-            active: true,
-            transform: { req: undefined, res: undefined },
-        };
-        ctx.op.points = [point];
-        const result = utility.makePoint(ctx);
-        (0, node_assert_1.ok)(!(result instanceof Error));
-        (0, node_assert_1.equal)(ctx.point, point);
+    // Was one hand-written case (the single-point path) covering one of this
+    // utility's seven branches, which is how the corpus fixture came to be
+    // marked deferred as "needs a real client". It does not: Context rebuilds
+    // `op` from opname + entity + config, and `options` can be supplied
+    // literally, so allow.op, the empty-points error, exist-selection,
+    // $action selection and the invalid-$action error are all expressible.
+    // Driven from the corpus now, so every port asserts the same branches.
+    (0, node_test_1.test)('makePoint-basic', async () => {
+        await runsection('makePoint', utility.makePoint);
     });
     (0, node_test_1.test)('makeFetchDef', () => {
         const ctx = makeFullCtx();

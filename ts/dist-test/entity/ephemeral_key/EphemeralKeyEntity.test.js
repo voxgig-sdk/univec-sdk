@@ -74,7 +74,7 @@ const utility_1 = require("../../utility");
         // CREATE
         const ephemeral_key_ref01_ent = client.EphemeralKey();
         let ephemeral_key_ref01_data = setup.data.new.ephemeral_key['ephemeral_key_ref01'];
-        ephemeral_key_ref01_data = await ephemeral_key_ref01_ent.create(ephemeral_key_ref01_data);
+        ephemeral_key_ref01_data = (await ephemeral_key_ref01_ent.create(ephemeral_key_ref01_data)).data();
         (0, node_assert_1.default)(null != ephemeral_key_ref01_data);
     });
 });

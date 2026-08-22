@@ -5,6 +5,8 @@ main: kit: target: js: {
   ext: js
   comment: line: "//"
   module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
 
   deps: &: {
     # TODO: fix aontu disjunctions!

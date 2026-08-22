@@ -74,7 +74,7 @@ const utility_1 = require("../../utility");
         // CREATE
         const convert_ref01_ent = client.Convert();
         let convert_ref01_data = setup.data.new.convert['convert_ref01'];
-        convert_ref01_data = await convert_ref01_ent.create(convert_ref01_data);
+        convert_ref01_data = (await convert_ref01_ent.create(convert_ref01_data)).data();
         (0, node_assert_1.default)(null != convert_ref01_data);
     });
 });

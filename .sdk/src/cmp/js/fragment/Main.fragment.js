@@ -50,18 +50,26 @@ class ProjectNameSDK {
     // the `test` feature installs the base mock transport and the transport
     // features (retry/cache/netsim/proxy/ratelimit) wrap whatever is current,
     // so `test` must be added before them to sit at the base of the chain.
+    const extend = this._options.extend || []
+
     const featureorder = getpath(this._options, '__derived__.featureorder') || []
     for (const fname of featureorder) {
       const fopts = this._options.feature[fname] || {}
       if (fopts.active) {
+        // An active name with no generated class is legal when an
+        // extend-supplied instance carries that name (station's adopt
+        // path): the instance is added below, positioned by its own
+        // __after__ entry, so skip it here rather than fail construction.
+        if (!this._rootctx.config.hasFeature(fname) &&
+          extend.some((f) => fname === f.name)) {
+          continue
+        }
         featureAdd(this._rootctx, this._rootctx.config.makeFeature(fname))
       }
     }
 
-    if (null != this._options.extend) {
-      for (let f of this._options.extend) {
-        featureAdd(this._rootctx, f)
-      }
+    for (let f of extend) {
+      featureAdd(this._rootctx, f)
     }
 
     for (let f of this._features) {
@@ -185,7 +193,27 @@ class ProjectNameSDK {
       }
 
       const status = fetched.status
-      const json = 'function' === typeof fetched.json ? await fetched.json() : fetched.json
+
+      // No body responses (204 No Content, 304 Not Modified) and explicit
+      // zero content-length must skip JSON parsing — fetched.json() would
+      // throw `Unexpected end of JSON input` on an empty body.
+      const headers = fetched.headers
+      const contentLength = headers && 'function' === typeof headers.get
+        ? headers.get('content-length')
+        : (headers || {})['content-length']
+      const noBody = 204 === status || 304 === status || '0' === String(contentLength)
+
+      let json = undefined
+      if (!noBody) {
+        try {
+          json = 'function' === typeof fetched.json ? await fetched.json() : fetched.json
+        }
+        catch (parseErr) {
+          // Body wasn't valid JSON — surface the raw response rather than
+          // throwing. data stays undefined; callers can inspect status/headers.
+          json = undefined
+        }
+      }
 
       return {
         ok: status >= 200 && status < 300,

@@ -12,7 +12,10 @@ declare class UnivecEntityBase<D = any> {
     _data: Partial<D>;
     _match: Partial<D>;
     _entctx: Context;
+    _deleted: boolean;
     constructor(client: UnivecSDK, entopts: any);
+    markDeleted(this: any): void;
+    deleted(this: any): boolean;
     entopts(): any;
     client(): UnivecSDK;
     data(this: any, data?: Partial<D>): D;
