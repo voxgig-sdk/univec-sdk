@@ -38,12 +38,40 @@ class TestFeature extends BaseFeature {
 
     final self = this;
 
-    dynamic respond(int status, [dynamic data, dynamic res]) {
+    // THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+    // `transform.res: `body.item`` describes an API that answers
+    // {"item": {...}}, and the response transform unwraps that key on the way
+    // back. Returning the bare payload means the transform unwraps a property
+    // that is not there and the caller gets nothing. Mirrors the go/ts/lua/php
+    // mocks.
+    dynamic envelope(dynamic fctx, dynamic data) {
+      if (null == data || null == fctx || null == fctx.point) {
+        return data;
+      }
+      // dart wraps the point in a Point OBJECT (Context._aspoint), so its
+      // fields are typed properties, not map keys — vs.getprop on it returns
+      // null and the envelope silently never applies.
+      final tm = fctx.point.transform;
+      final spec = vs.getprop(tm, 'res');
+      if (spec is! String) {
+        return data;
+      }
+      // Exactly `body.<key>`; a deeper path is not an envelope this mock can
+      // synthesise, so it is left alone rather than guessed at.
+      final m = RegExp(r'^`body\.([^`.]+)`$').firstMatch(spec);
+      if (null == m) {
+        return data;
+      }
+      return <String, dynamic>{m.group(1)!: data};
+    }
+
+    dynamic respond(dynamic fctx, int status, [dynamic data, dynamic res]) {
+      final payload = envelope(fctx, data);
       final out = vs.merge([
         <String, dynamic>{
           'status': status,
           'statusText': 'OK',
-          'json': () => data,
+          'json': () => payload,
           'body': 'not-used',
         },
         vs.getdef(res, {}),
@@ -66,30 +94,30 @@ class TestFeature extends BaseFeature {
         final found = vs.select(entmap, args);
         final ent = vs.getelem(found, 0);
         if (null == ent) {
-          return respond(404, null, {'statusText': S_NOT_FOUND});
+          return respond(fctx, 404, null, {'statusText': S_NOT_FOUND});
         } else {
           vs.delprop(ent, r'$KEY');
           final out = vs.clone(ent);
-          return respond(200, out);
+          return respond(fctx, 200, out);
         }
       } else if ('list' == op.name) {
         final args = self.buildArgs(fctx, op, fctx.reqmatch);
         final found = vs.select(entmap, args);
         if (null == found) {
-          return respond(404, null, {'statusText': S_NOT_FOUND});
+          return respond(fctx, 404, null, {'statusText': S_NOT_FOUND});
         } else {
           for (final ent in found) {
             vs.delprop(ent, r'$KEY');
           }
           final out = vs.clone(found);
-          return respond(200, out);
+          return respond(fctx, 200, out);
         }
       } else if ('update' == op.name) {
         final args = self.buildArgs(fctx, op, fctx.reqdata);
         final found = vs.select(entmap, args);
         final ent = vs.getelem(found, 0);
         if (null == ent) {
-          return respond(404, null, {'statusText': S_NOT_FOUND});
+          return respond(fctx, 404, null, {'statusText': S_NOT_FOUND});
         } else {
           // Dart's single null stands in for the donor's undefined: merge
           // must not overwrite stored values with absent ones.
@@ -104,7 +132,7 @@ class TestFeature extends BaseFeature {
           vs.merge([ent, upddata]);
           vs.delprop(ent, r'$KEY');
           final out = vs.clone(ent);
-          return respond(200, out);
+          return respond(fctx, 200, out);
         }
       } else if ('remove' == op.name) {
         final args = self.buildArgs(fctx, op, fctx.reqmatch);
@@ -115,7 +143,7 @@ class TestFeature extends BaseFeature {
         if (null != ent) {
           vs.delprop(entmap, vs.getprop(ent, 'id'));
         }
-        return respond(200);
+        return respond(fctx, 200);
       } else if ('create' == op.name) {
         self.buildArgs(fctx, op, fctx.reqdata);
         dynamic id = param(fctx, 'id');
@@ -130,7 +158,7 @@ class TestFeature extends BaseFeature {
         vs.setprop(entmap, id, ent);
         vs.delprop(ent, r'$KEY');
         final out = vs.clone(ent);
-        return respond(200, out);
+        return respond(fctx, 200, out);
       }
 
       return null;

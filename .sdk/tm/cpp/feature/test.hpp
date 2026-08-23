@@ -57,11 +57,34 @@ public:
   }
 
 private:
-  Value respond(int status, const Value& data, const Value& extra) {
+  // THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+  // `transform.res: `body.item`` describes an API that answers {"item": {...}}
+  // and the response transform unwraps that key on the way back. Returning the
+  // bare payload means the transform unwraps a property that is not there and
+  // the caller gets nothing. Mirrors the go/ts/lua/php mocks.
+  Value envelope(CtxPtr ctx, const Value& data) {
+    if (is_nullish(data) || !ctx) return data;
+    Value tm = getp(ctx->point, "transform");
+    Value restf = getp(tm, "res");
+    if (!restf.is_string()) return data;
+    std::string spec = restf.as_string();
+    // Exactly `body.<key>`; a deeper path is not an envelope this mock can
+    // synthesise, so it is left alone rather than guessed at.
+    if (spec.size() < 8) return data;
+    if (0 != spec.compare(0, 6, "`body.")) return data;
+    if ('`' != spec[spec.size() - 1]) return data;
+    std::string inner = spec.substr(6, spec.size() - 7);
+    if (inner.empty() || std::string::npos != inner.find('.')) return data;
+    Value wrapped = vmap();
+    map_put(wrapped, inner, data);
+    return wrapped;
+  }
+
+  Value respond(CtxPtr ctx, int status, const Value& data, const Value& extra) {
     Value out = vmap();
     map_put(out, "status", Value(status));
     map_put(out, "statusText", Value("OK"));
-    map_put(out, "json", json_thunk(data));
+    map_put(out, "json", json_thunk(envelope(ctx, data)));
     map_put(out, "body", Value("not-used"));
     if (extra.is_map()) {
       for (const auto& kv : *extra.as_map()) map_put(out, kv.first, kv.second);
@@ -100,10 +123,10 @@ private:
       Value args = buildArgs(ctx, op, resolveMatch(ctx, ctx->reqmatch));
       std::vector<Value> found = Struct::select(entmap, args);
       Value ent = found.empty() ? Value::undef() : found[0];
-      if (is_nullish(ent)) return respond(404, Value(nullptr), extra1("statusText", Value("Not found")));
+      if (is_nullish(ent)) return respond(ctx, 404, Value(nullptr), extra1("statusText", Value("Not found")));
       Struct::delprop(ent, Value("$KEY"));
       Value out = Struct::clone(ent);
-      return respond(200, out, Value::undef());
+      return respond(ctx, 200, out, Value::undef());
     } else if (op->name == "list") {
       Value args = buildArgs(ctx, op, ctx->reqmatch);
       std::vector<Value> found = Struct::select(entmap, args);
@@ -113,7 +136,7 @@ private:
         outlist.as_list()->push_back(item);
       }
       Value out = Struct::clone(outlist);
-      return respond(200, out, Value::undef());
+      return respond(ctx, 200, out, Value::undef());
     } else if (op->name == "update") {
       Value updateMatch = vmap();
       if (ctx->reqdata.is_map()) {
@@ -141,13 +164,13 @@ private:
           if (kv.second.is_map()) { ent = kv.second; break; }
         }
       }
-      if (is_nullish(ent)) return respond(404, Value(nullptr), extra1("statusText", Value("Not found")));
+      if (is_nullish(ent)) return respond(ctx, 404, Value(nullptr), extra1("statusText", Value("Not found")));
       if (ent.is_map() && ctx->reqdata.is_map()) {
         for (const auto& kv : *ctx->reqdata.as_map()) map_put(ent, kv.first, kv.second);
       }
       Struct::delprop(ent, Value("$KEY"));
       Value out = Struct::clone(ent);
-      return respond(200, out, Value::undef());
+      return respond(ctx, 200, out, Value::undef());
     } else if (op->name == "remove") {
       Value args = buildArgs(ctx, op, resolveMatch(ctx, ctx->reqmatch));
       std::vector<Value> found = Struct::select(entmap, args);
@@ -156,7 +179,7 @@ private:
         Value id = getp(ent, "id", Value(nullptr));
         Struct::delprop(entmap, id);
       }
-      return respond(200, Value(nullptr), Value::undef());
+      return respond(ctx, 200, Value(nullptr), Value::undef());
     } else if (op->name == "create") {
       buildArgs(ctx, op, ctx->reqdata);
       Value id = ctx->utility->param(ctx, Value("id"));
@@ -177,12 +200,12 @@ private:
         if (id.is_string()) map_put(entmap, id.as_string(), ent);
         Struct::delprop(ent, Value("$KEY"));
         Value out = Struct::clone(ent);
-        return respond(200, out, Value::undef());
+        return respond(ctx, 200, out, Value::undef());
       }
-      return respond(200, ent, Value::undef());
+      return respond(ctx, 200, ent, Value::undef());
     }
 
-    return respond(404, Value(nullptr), extra1("statusText", Value("Unknown operation")));
+    return respond(ctx, 404, Value(nullptr), extra1("statusText", Value("Unknown operation")));
   }
 
   // ---- net simulation over the mock -----------------------------------

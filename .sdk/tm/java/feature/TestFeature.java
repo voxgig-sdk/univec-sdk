@@ -90,11 +90,45 @@ public class TestFeature extends BaseFeature {
     }
   }
 
-  private Map<String, Object> respond(int status, Object data, Map<String, Object> extra) {
+  // THE MOCK HAS TO AGREE WITH THE MODEL.
+  //
+  // A point carrying `transform.res: `body.item`` describes an API that
+  // answers {"item": {...}}, and the response transform unwraps that key on
+  // the way back. Handing back the bare payload means the transform unwraps a
+  // property that is not there and the caller gets nothing — a mock that only
+  // ever simulates APIs whose responses happen to be unwrapped.
+  //
+  // Mirrors the go/ts/lua/php mocks, which already wrap.
+  private Object envelope(Context ctx, Object data) {
+    if (null == data || null == ctx || null == ctx.point) {
+      return data;
+    }
+    Object tm = Struct.getprop(ctx.point, "transform");
+    Object restf = Struct.getprop(tm, "res");
+    if (!(restf instanceof String)) {
+      return data;
+    }
+    String spec = (String) restf;
+    // Exactly `body.<key>`; a deeper path is not an envelope this mock can
+    // synthesise, so it is left alone rather than guessed at.
+    if (!spec.startsWith("`body.") || !spec.endsWith("`") || spec.length() < 8) {
+      return data;
+    }
+    String inner = spec.substring(6, spec.length() - 1);
+    if (inner.isEmpty() || inner.contains(".")) {
+      return data;
+    }
+    Map<String, Object> wrapped = new LinkedHashMap<>();
+    wrapped.put(inner, data);
+    return wrapped;
+  }
+
+  private Map<String, Object> respond(Context ctx, int status, Object data, Map<String, Object> extra) {
+    Object payload = envelope(ctx, data);
     Map<String, Object> out = new LinkedHashMap<>();
     out.put("status", status);
     out.put("statusText", "OK");
-    out.put("json", (Supplier<Object>) () -> data);
+    out.put("json", (Supplier<Object>) () -> payload);
     out.put("body", "not-used");
     if (extra != null) {
       out.putAll(extra);
@@ -142,23 +176,23 @@ public class TestFeature extends BaseFeature {
       List<Object> found = Struct.select(entmap, args);
       Object ent = Struct.getelem(found, 0);
       if (ent == null) {
-        return respond(404, null, extra("statusText", "Not found"));
+        return respond(ctx, 404, null, extra("statusText", "Not found"));
       }
       Struct.delprop(ent, "$KEY");
       Object out = Struct.clone(ent);
-      return respond(200, out, null);
+      return respond(ctx, 200, out, null);
     }
     else if ("list".equals(op.name)) {
       Object args = buildArgs(ctx, op, ctx.reqmatch);
       List<Object> found = Struct.select(entmap, args);
       if (found == null) {
-        return respond(404, null, extra("statusText", "Not found"));
+        return respond(ctx, 404, null, extra("statusText", "Not found"));
       }
       for (Object item : found) {
         Struct.delprop(item, "$KEY");
       }
       Object out = Struct.clone(found);
-      return respond(200, out, null);
+      return respond(ctx, 200, out, null);
     }
     else if ("update".equals(op.name)) {
       // Match the existing entity by id only (or its alias). Reqdata
@@ -198,14 +232,14 @@ public class TestFeature extends BaseFeature {
         }
       }
       if (ent == null) {
-        return respond(404, null, extra("statusText", "Not found"));
+        return respond(ctx, 404, null, extra("statusText", "Not found"));
       }
       if (ent instanceof Map && ctx.reqdata != null) {
         ((Map<String, Object>) ent).putAll(ctx.reqdata);
       }
       Struct.delprop(ent, "$KEY");
       Object out = Struct.clone(ent);
-      return respond(200, out, null);
+      return respond(ctx, 200, out, null);
     }
     else if ("remove".equals(op.name)) {
       Object args = buildArgs(ctx, op, resolveMatch(ctx, ctx.reqmatch));
@@ -217,7 +251,7 @@ public class TestFeature extends BaseFeature {
         Object id = Struct.getprop(ent, "id", null);
         Struct.delprop(entmap, id);
       }
-      return respond(200, null, null);
+      return respond(ctx, 200, null, null);
     }
     else if ("create".equals(op.name)) {
       buildArgs(ctx, op, ctx.reqdata);
@@ -238,12 +272,12 @@ public class TestFeature extends BaseFeature {
         }
         Struct.delprop(entm, "$KEY");
         Object out = Struct.clone(entm);
-        return respond(200, out, null);
+        return respond(ctx, 200, out, null);
       }
-      return respond(200, ent, null);
+      return respond(ctx, 200, ent, null);
     }
 
-    return respond(404, null, extra("statusText", "Unknown operation"));
+    return respond(ctx, 404, null, extra("statusText", "Unknown operation"));
   }
 
   // makeNetsim wraps a transport with simulated network conditions: latency

@@ -47,12 +47,39 @@ defmodule Univec.Feature.Test do
     nil
   end
 
-  defp respond(status, data, extra \\ nil) do
+  # THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+  # `transform.res: `body.item`` describes an API that answers {"item": {...}}
+  # and the response transform unwraps that key on the way back. Returning the
+  # bare payload means the transform unwraps a property that is not there and
+  # the caller gets nothing. Mirrors the go/ts/lua/php mocks.
+  defp envelope(fctx, data) do
+    spec = S.getprop(S.getprop(S.getprop(fctx, "point"), "transform"), "res")
+
+    # Exactly `body.<key>`; a deeper path is not an envelope this mock can
+    # synthesise, so it is left alone rather than guessed at.
+    case {data, spec} do
+      {nil, _} ->
+        data
+
+      {_, s} when is_binary(s) ->
+        case Regex.run(~r/^`body\.([^`.]+)`$/, s) do
+          [_, inner] -> S.jm([inner, data])
+          _ -> data
+        end
+
+      _ ->
+        data
+    end
+  end
+
+  defp respond(fctx, status, data, extra \\ nil) do
+    payload = envelope(fctx, data)
+
     out =
       S.jm([
         "status", status,
         "statusText", "OK",
-        "json", fn -> data end,
+        "json", fn -> payload end,
         "body", "not-used"
       ])
 
@@ -87,10 +114,10 @@ defmodule Univec.Feature.Test do
         ent = S.getelem(found, 0)
 
         if ent == nil do
-          respond(404, nil, S.jm(["statusText", "Not found"]))
+          respond(fctx, 404, nil, S.jm(["statusText", "Not found"]))
         else
           S.delprop(ent, "$KEY")
-          respond(200, S.clone(ent))
+          respond(fctx, 200, S.clone(ent))
         end
 
       "list" ->
@@ -98,13 +125,13 @@ defmodule Univec.Feature.Test do
         found = S.select(entmap, args)
 
         if found == nil do
-          respond(404, nil, S.jm(["statusText", "Not found"]))
+          respond(fctx, 404, nil, S.jm(["statusText", "Not found"]))
         else
           if S.islist(found) and S.size(found) > 0 do
             Enum.each(0..(S.size(found) - 1), fn i -> S.delprop(S.getelem(found, i), "$KEY") end)
           end
 
-          respond(200, S.clone(found))
+          respond(fctx, 200, S.clone(found))
         end
 
       "update" ->
@@ -143,14 +170,14 @@ defmodule Univec.Feature.Test do
           end
 
         if ent == nil do
-          respond(404, nil, S.jm(["statusText", "Not found"]))
+          respond(fctx, 404, nil, S.jm(["statusText", "Not found"]))
         else
           if S.ismap(ent) and reqdata != nil do
             Enum.each(H.entries(reqdata), fn {k, v} -> S.setprop(ent, k, v) end)
           end
 
           S.delprop(ent, "$KEY")
-          respond(200, S.clone(ent))
+          respond(fctx, 200, S.clone(ent))
         end
 
       "remove" ->
@@ -163,7 +190,7 @@ defmodule Univec.Feature.Test do
           S.delprop(entmap, eid)
         end
 
-        respond(200, nil)
+        respond(fctx, 200, nil)
 
       "create" ->
         build_args(f, fctx, op, S.getprop(fctx, "reqdata"))
@@ -175,13 +202,13 @@ defmodule Univec.Feature.Test do
           S.setprop(ent, "id", eid)
           if is_binary(eid), do: S.setprop(entmap, eid, ent)
           S.delprop(ent, "$KEY")
-          respond(200, S.clone(ent))
+          respond(fctx, 200, S.clone(ent))
         else
-          respond(200, ent)
+          respond(fctx, 200, ent)
         end
 
       _ ->
-        respond(404, nil, S.jm(["statusText", "Unknown operation"]))
+        respond(fctx, 404, nil, S.jm(["statusText", "Unknown operation"]))
     end
   end
 
@@ -258,7 +285,7 @@ defmodule Univec.Feature.Test do
           netsleep.(pick_latency(net))
           status = H.or_(S.getprop(net, "failStatus"), 503)
 
-          respond(status, nil,
+          respond(fctx, status, nil,
             S.jm(["statusText", "Simulated Failure", "headers", S.jm([])]))
 
         true ->

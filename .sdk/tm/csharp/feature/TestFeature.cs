@@ -45,14 +45,40 @@ public class TestFeature : BaseFeature
 
         FetcherFunc testFetcher = (ctx2, _fullurl, _fetchdef) =>
         {
-            static Dictionary<string, object?> Respond(int status, object? data,
+            // THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+            // `transform.res: `body.item`` describes an API that answers
+            // {"item": {...}}, and the response transform unwraps that key on
+            // the way back. Returning the bare payload means the transform
+            // unwraps a property that is not there and the caller gets
+            // nothing. Mirrors the go/ts/lua/php mocks.
+            //
+            // NOT `static`: it closes over ctx2 to read the point, which is
+            // how go's mock does it too.
+            object? Envelope(object? data)
+            {
+                if (data == null || ctx2.Point == null) { return data; }
+                var tm = StructUtils.GetProp(ctx2.Point, "transform");
+                if (StructUtils.GetProp(tm, "res") is not string spec) { return data; }
+                // Exactly `body.<key>`; a deeper path is not an envelope this
+                // mock can synthesise, so it is left alone.
+                if (!spec.StartsWith("`body.") || !spec.EndsWith("`") || spec.Length < 8)
+                {
+                    return data;
+                }
+                var inner = spec.Substring(6, spec.Length - 7);
+                if (inner.Length == 0 || inner.Contains('.')) { return data; }
+                return new Dictionary<string, object?> { [inner] = data };
+            }
+
+            Dictionary<string, object?> Respond(int status, object? data,
                 Dictionary<string, object?>? extra)
             {
+                var payload = Envelope(data);
                 var res = new Dictionary<string, object?>
                 {
                     ["status"] = status,
                     ["statusText"] = "OK",
-                    ["json"] = (Func<object?>)(() => data),
+                    ["json"] = (Func<object?>)(() => payload),
                     ["body"] = "not-used",
                 };
                 if (extra != null)

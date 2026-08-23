@@ -54,11 +54,29 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
     }
   }
 
-  private fun respond(status: Int, data: Any?, extra: MutableMap<String, Any?>?): MutableMap<String, Any?> {
+  // THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+  // `transform.res: `body.item`` describes an API that answers {"item": {...}}
+  // and the response transform unwraps that key on the way back. Returning the
+  // bare payload means the transform unwraps a property that is not there and
+  // the caller gets nothing. Mirrors the go/ts/lua/php mocks.
+  private fun envelope(ctx: Context?, data: Any?): Any? {
+    if (null == data || null == ctx) return data
+    val tm = Struct.getprop(ctx.point, "transform")
+    val restf = Struct.getprop(tm, "res") as? String ?: return data
+    // Exactly `body.<key>`; a deeper path is not an envelope this mock can
+    // synthesise, so it is left alone rather than guessed at.
+    if (!restf.startsWith("`body.") || !restf.endsWith("`") || restf.length < 8) return data
+    val inner = restf.substring(6, restf.length - 1)
+    if (inner.isEmpty() || inner.contains(".")) return data
+    return linkedMapOf<String, Any?>(inner to data)
+  }
+
+  private fun respond(ctx: Context?, status: Int, data: Any?, extra: MutableMap<String, Any?>?): MutableMap<String, Any?> {
+    val payload = envelope(ctx, data)
     val out = linkedMapOf<String, Any?>()
     out["status"] = status
     out["statusText"] = "OK"
-    out["json"] = Supplier<Any?> { data }
+    out["json"] = Supplier<Any?> { payload }
     out["body"] = "not-used"
     if (extra != null) {
       out.putAll(extra)
@@ -102,11 +120,11 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
         val found = Struct.select(entmap, args)
         val ent = Struct.getelem(found, 0, null)
         if (ent == null) {
-          return respond(404, null, extra("statusText", "Not found"))
+          return respond(ctx, 404, null, extra("statusText", "Not found"))
         }
         Struct.delprop(ent, "\$KEY")
         val out = Struct.clone(ent)
-        return respond(200, out, null)
+        return respond(ctx, 200, out, null)
       }
       "list" -> {
         val args = buildArgs(ctx, op, ctx.reqmatch)
@@ -115,7 +133,7 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
           Struct.delprop(item, "\$KEY")
         }
         val out = Struct.clone(found)
-        return respond(200, out, null)
+        return respond(ctx, 200, out, null)
       }
       "update" -> {
         // Match the existing entity by id only (or its alias).
@@ -148,14 +166,14 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
           }
         }
         if (ent == null) {
-          return respond(404, null, extra("statusText", "Not found"))
+          return respond(ctx, 404, null, extra("statusText", "Not found"))
         }
         if (ent is MutableMap<*, *>) {
           (ent as MutableMap<String, Any?>).putAll(reqdata)
         }
         Struct.delprop(ent, "\$KEY")
         val out = Struct.clone(ent)
-        return respond(200, out, null)
+        return respond(ctx, 200, out, null)
       }
       "remove" -> {
         val args = buildArgs(ctx, op, resolveMatch(ctx, ctx.reqmatch))
@@ -166,7 +184,7 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
           val id = Struct.getprop(ent, "id", null)
           Struct.delprop(entmap, id)
         }
-        return respond(200, null, null)
+        return respond(ctx, 200, null, null)
       }
       "create" -> {
         buildArgs(ctx, op, ctx.reqdata)
@@ -189,13 +207,13 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
           }
           Struct.delprop(entm, "\$KEY")
           val out = Struct.clone(entm)
-          return respond(200, out, null)
+          return respond(ctx, 200, out, null)
         }
-        return respond(200, ent, null)
+        return respond(ctx, 200, ent, null)
       }
     }
 
-    return respond(404, null, extra("statusText", "Unknown operation"))
+    return respond(ctx, 404, null, extra("statusText", "Unknown operation"))
   }
 
   // makeNetsim wraps a transport with simulated network conditions.

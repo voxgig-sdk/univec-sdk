@@ -104,9 +104,27 @@
                                  val))
                (let [test-fetcher
                      (fn [fctx _fullurl _fetchdef]
-                       (let [respond (fn [status data extra]
-                                       (let [out (vs/jm "status" status "statusText" "OK"
-                                                        "json" (fn [] data) "body" "not-used")]
+                       ;; THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+                       ;; `transform.res: `body.item`` describes an API that answers
+                       ;; {"item": {...}}, and the response transform unwraps that key
+                       ;; on the way back. Returning the bare payload means the
+                       ;; transform unwraps a property that is not there and the caller
+                       ;; gets nothing. Mirrors the go/ts/lua/php mocks. `fctx` is in
+                       ;; scope here, so the point is the one being served.
+                       (let [envelope (fn [data]
+                                        (let [tm (vs/getprop (core/oget fctx :point) "transform")
+                                              spec (vs/getprop tm "res")]
+                                          ;; Exactly `body.<key>`; a deeper path is not an
+                                          ;; envelope this mock can synthesise.
+                                          (if (and (some? data) (string? spec))
+                                            (if-let [m (re-matches #"`body\.([^`.]+)`" spec)]
+                                              (vs/jm (second m) data)
+                                              data)
+                                            data)))
+                             respond (fn [status data extra]
+                                       (let [payload (envelope data)
+                                             out (vs/jm "status" status "statusText" "OK"
+                                                        "json" (fn [] payload) "body" "not-used")]
                                          (when extra (doseq [item (or (vs/items extra) [])]
                                                        (.put ^java.util.Map out (vs/getprop item 0) (vs/getprop item 1))))
                                          [out nil]))

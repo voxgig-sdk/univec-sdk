@@ -51,12 +51,34 @@ sub init {
 
   my $test_self = $self;
 
+  # THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+  # `transform.res: `body.item`` describes an API that answers {"item": {...}}
+  # and the response transform unwraps that key on the way back. Returning the
+  # bare payload means the transform unwraps a property that is not there and
+  # the caller gets nothing. Mirrors the go/ts/lua/php mocks.
+  #
+  # Takes the PER-REQUEST context: the point is resolved per call, so the
+  # init-time $ctx this closure would otherwise capture is the wrong one.
+  my $envelope = sub {
+    my ($fctx, $data) = @_;
+    return $data unless defined $data;
+    return $data unless defined $fctx && defined $fctx->{point};
+    my $tm = UnivecHelpers::gp($fctx->{point}, 'transform');
+    my $spec = UnivecHelpers::gp($tm, 'res');
+    return $data unless defined $spec && !ref($spec);
+    # Exactly `body.<key>`; a deeper path is not an envelope this mock can
+    # synthesise, so it is left alone rather than guessed at.
+    return $data unless $spec =~ /^`body\.([^`.]+)`$/;
+    return { $1 => $data };
+  };
+
   my $respond = sub {
-    my ($status, $data, $extra) = @_;
+    my ($fctx, $status, $data, $extra) = @_;
+    my $payload = $envelope->($fctx, $data);
     my $out = {
       'status' => $status,
       'statusText' => 'OK',
-      'json' => sub { $data },
+      'json' => sub { $payload },
       'body' => 'not-used',
     };
     if (Voxgig::Struct::ismap($extra)) {
@@ -92,22 +114,22 @@ sub init {
       my $args = $test_self->build_args($fctx, $op, $resolve_match->($fctx->{reqmatch}));
       my $found = Voxgig::Struct::select($entmap, $args);
       my $ent = UnivecHelpers::ge($found, 0);
-      return $respond->(404, undef, { 'statusText' => 'Not found' })
+      return $respond->($fctx, 404, undef, { 'statusText' => 'Not found' })
         unless UnivecHelpers::rb_truthy($ent);
       Voxgig::Struct::delprop($ent, '$KEY');
       my $out = Voxgig::Struct::clone($ent);
-      return $respond->(200, $out, undef);
+      return $respond->($fctx, 200, $out, undef);
     }
     elsif ('list' eq $op->{name}) {
       my $args = $test_self->build_args($fctx, $op, $fctx->{reqmatch});
       my $found = Voxgig::Struct::select($entmap, $args);
-      return $respond->(404, undef, { 'statusText' => 'Not found' })
+      return $respond->($fctx, 404, undef, { 'statusText' => 'Not found' })
         unless defined $found && !Voxgig::Struct::is_none($found);
       if (Voxgig::Struct::islist($found)) {
         Voxgig::Struct::delprop($_, '$KEY') for @$found;
       }
       my $out = Voxgig::Struct::clone($found);
-      return $respond->(200, $out, undef);
+      return $respond->($fctx, 200, $out, undef);
     }
     elsif ('update' eq $op->{name}) {
       # Match the existing entity by id only (or its alias). reqdata also
@@ -138,14 +160,14 @@ sub init {
           }
         }
       }
-      return $respond->(404, undef, { 'statusText' => 'Not found' })
+      return $respond->($fctx, 404, undef, { 'statusText' => 'Not found' })
         unless UnivecHelpers::rb_truthy($ent);
       if (Voxgig::Struct::ismap($ent) && $fctx->{reqdata}) {
         $ent->{$_} = $fctx->{reqdata}{$_} for keys %{ $fctx->{reqdata} };
       }
       Voxgig::Struct::delprop($ent, '$KEY');
       my $out = Voxgig::Struct::clone($ent);
-      return $respond->(200, $out, undef);
+      return $respond->($fctx, 200, $out, undef);
     }
     elsif ('remove' eq $op->{name}) {
       my $args = $test_self->build_args($fctx, $op, $resolve_match->($fctx->{reqmatch}));
@@ -157,7 +179,7 @@ sub init {
         my $id = UnivecHelpers::gp($ent, 'id');
         Voxgig::Struct::delprop($entmap, $id);
       }
-      return $respond->(200, undef, undef);
+      return $respond->($fctx, 200, undef, undef);
     }
     elsif ('create' eq $op->{name}) {
       $test_self->build_args($fctx, $op, $fctx->{reqdata});
@@ -172,12 +194,12 @@ sub init {
         $entmap->{"$id"} = $ent if defined $id && !ref $id;
         Voxgig::Struct::delprop($ent, '$KEY');
         my $out = Voxgig::Struct::clone($ent);
-        return $respond->(200, $out, undef);
+        return $respond->($fctx, 200, $out, undef);
       }
-      return $respond->(200, $ent, undef);
+      return $respond->($fctx, 200, $ent, undef);
     }
     else {
-      return $respond->(404, undef, { 'statusText' => 'Unknown operation' });
+      return $respond->($fctx, 404, undef, { 'statusText' => 'Unknown operation' });
     }
   };
 

@@ -205,6 +205,23 @@ def liveFetcher : SdkFeature.Fetcher := fun _ctx url fetchdef => do
                       ("body", json), ("headers", ← emptyMap)]
   pure (resp, none)
 
+/-- THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+    `transform.res: `body.item`` describes an API that answers {"item": {...}}
+    and the response transform unwraps that key on the way back. Returning the
+    bare payload means the transform unwraps a property that is not there and
+    the caller gets nothing. Mirrors the go/ts/lua/php mocks. -/
+def mockEnvelope (ctx : Value) (data : Value) : SIO Value := do
+  if isNv data then pure data else do
+    let tm ← gp (← gp ctx "point") "transform"
+    let spec := asStr (← gp tm "res")
+    -- Exactly `body.<key>`; a deeper path is not an envelope this mock can
+    -- synthesise, so it is left alone rather than guessed at.
+    if spec.startsWith "`body." && spec.endsWith "`" && spec.length > 7 then
+      let inner := ((spec.drop 6).dropRight 1).toString
+      if inner.isEmpty || inner.contains '.' then pure data
+      else newMap #[(inner, data)]
+    else pure data
+
 /-- The base transport in test mode: answer from the seeded store. -/
 def testFetcher : SdkFeature.Fetcher := fun ctx _url _fetchdef => do
   let client ← gp ctx "client"
@@ -213,8 +230,9 @@ def testFetcher : SdkFeature.Fetcher := fun ctx _url _fetchdef => do
   let matchV ← gp ctx "reqmatch"
   let dataV ← gp ctx "reqdata"
   let out ← mockOp client entityName opName matchV dataV
+  let payload ← mockEnvelope ctx out
   let resp ← newMap #[("status", .num 200.0), ("statusText", .str "OK"),
-                      ("body", out), ("headers", ← emptyMap)]
+                      ("body", payload), ("headers", ← emptyMap)]
   pure (resp, none)
 
 /-- Merge config.feature and options.feature into the client's feature options. -/

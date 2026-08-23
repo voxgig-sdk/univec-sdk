@@ -40,8 +40,31 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
     else ctx.utility.fetcher = makeNetsim(net, testFetcher)
   }
 
-  private def respond(status: Int, data: Object, extra: JMap[String, Object]): JMap[String, Object] = {
-    val js: Supplier[Object] = () => data
+  // THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+  // `transform.res: `body.item`` describes an API that answers {"item": {...}}
+  // and the response transform unwraps that key on the way back. Returning the
+  // bare payload means the transform unwraps a property that is not there and
+  // the caller gets nothing. Mirrors the go/ts/lua/php mocks.
+  private def envelope(ctx: Context, data: Object): Object = {
+    if (data == null || ctx == null || ctx.point == null) return data
+    val tm = Struct.getprop(ctx.point, "transform")
+    Struct.getprop(tm, "res") match {
+      case spec: String =>
+        // Exactly `body.<key>`; a deeper path is not an envelope this mock
+        // can synthesise, so it is left alone rather than guessed at.
+        if (!spec.startsWith("`body.") || !spec.endsWith("`") || spec.length < 8) return data
+        val inner = spec.substring(6, spec.length - 1)
+        if (inner.isEmpty || inner.contains(".")) return data
+        val wrapped = new java.util.LinkedHashMap[String, Object]()
+        wrapped.put(inner, data)
+        wrapped
+      case _ => data
+    }
+  }
+
+  private def respond(ctx: Context, status: Int, data: Object, extra: JMap[String, Object]): JMap[String, Object] = {
+    val payload = envelope(ctx, data)
+    val js: Supplier[Object] = () => payload
     val out = new LinkedHashMap[String, Object]()
     out.put("status", java.lang.Integer.valueOf(status))
     out.put("statusText", "OK")
@@ -85,18 +108,18 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
       val args = buildArgs(ctx, op, resolveMatch(ctx, ctx.reqmatch))
       val found = Struct.select(entmap, args)
       val ent = Struct.getelem(found, java.lang.Integer.valueOf(0))
-      if (ent == null) return respond(404, null, extra("statusText", "Not found"))
+      if (ent == null) return respond(ctx, 404, null, extra("statusText", "Not found"))
       Struct.delprop(ent, "$KEY")
       val out = Struct.clone(ent)
-      respond(200, out, null)
+      respond(ctx, 200, out, null)
     } else if ("list" == op.name) {
       val args = buildArgs(ctx, op, ctx.reqmatch)
       val found = Struct.select(entmap, args)
-      if (found == null) return respond(404, null, extra("statusText", "Not found"))
+      if (found == null) return respond(ctx, 404, null, extra("statusText", "Not found"))
       val it = found.iterator()
       while (it.hasNext) Struct.delprop(it.next(), "$KEY")
       val out = Struct.clone(found)
-      respond(200, out, null)
+      respond(ctx, 200, out, null)
     } else if ("update" == op.name) {
       var updateMatch = new LinkedHashMap[String, Object]()
       if (ctx.reqdata != null) {
@@ -119,11 +142,11 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
           vit.next() match { case e: JMap[_, _] => ent = e; brk = true; case _ => }
         }
       }
-      if (ent == null) return respond(404, null, extra("statusText", "Not found"))
+      if (ent == null) return respond(ctx, 404, null, extra("statusText", "Not found"))
       ent match { case m: JMap[_, _] if ctx.reqdata != null => m.asInstanceOf[JMap[String, Object]].putAll(ctx.reqdata); case _ => }
       Struct.delprop(ent, "$KEY")
       val out = Struct.clone(ent)
-      respond(200, out, null)
+      respond(ctx, 200, out, null)
     } else if ("remove" == op.name) {
       val args = buildArgs(ctx, op, resolveMatch(ctx, ctx.reqmatch))
       val found = Struct.select(entmap, args)
@@ -134,7 +157,7 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
           Struct.delprop(entmap, id)
         case _ =>
       }
-      respond(200, null, null)
+      respond(ctx, 200, null, null)
     } else if ("create" == op.name) {
       buildArgs(ctx, op, ctx.reqdata)
       var id = ctx.utility.param(ctx, "id")
@@ -153,11 +176,11 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
           id match { case s: String => entmap.put(s, entm); case _ => }
           Struct.delprop(entm, "$KEY")
           val out = Struct.clone(entm)
-          respond(200, out, null)
-        case _ => respond(200, ent, null)
+          respond(ctx, 200, out, null)
+        case _ => respond(ctx, 200, ent, null)
       }
     } else {
-      respond(404, null, extra("statusText", "Unknown operation"))
+      respond(ctx, 404, null, extra("statusText", "Unknown operation"))
     }
   }
 

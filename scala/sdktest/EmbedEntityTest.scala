@@ -5,7 +5,7 @@
 
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
 
-import voxgig.univecsdk.core.{Helpers, UnivecSDK}
+import voxgig.univecsdk.core.{Helpers, SdkEntity, UnivecSDK}
 import voxgig.univecsdk.utility.struct.Struct
 
 object EmbedEntityTest {

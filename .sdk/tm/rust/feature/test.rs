@@ -33,11 +33,40 @@ impl TestFeature {
     }
 }
 
-fn respond(status: i64, data: Value, extra: Vec<(&str, Value)>) -> Value {
+// THE MOCK HAS TO AGREE WITH THE MODEL.
+//
+// A point carrying `transform.res: `body.item`` describes an API that answers
+// {"item": {...}}, and the response transform unwraps that key on the way
+// back. Handing back the bare payload means the transform unwraps a property
+// that is not there, and the caller gets nothing — a mock that only ever
+// simulates APIs whose responses happen to be unwrapped.
+//
+// univec's list op declares `body.data`, so every list returned zero items
+// while the fixture plainly held two. Mirrors the go/ts/lua/php mocks, which
+// already wrap; rust, c and zig were the three that did not.
+fn envelope(ctx: &Rc<Context>, data: Value) -> Value {
+    if data.is_noval() || data.is_null() {
+        return data;
+    }
+    let restf = crate::core::helpers::getpath(&["transform", "res"], &ctx.point.borrow());
+    if let Value::Str(spec) = restf {
+        // Exactly `body.<key>` — a deeper path is not an envelope this mock
+        // can synthesise, so it is left alone rather than guessed at.
+        if let Some(inner) = spec.strip_prefix("`body.").and_then(|r| r.strip_suffix('`')) {
+            if !inner.is_empty() && !inner.contains('.') {
+                return jo(vec![(inner, data)]);
+            }
+        }
+    }
+    data
+}
+
+fn respond(ctx: &Rc<Context>, status: i64, data: Value, extra: Vec<(&str, Value)>) -> Value {
+    let payload = envelope(ctx, data);
     let out = jo(vec![
         ("status", Value::Num(status as f64)),
         ("statusText", Value::str("OK")),
-        ("json", json_thunk(data)),
+        ("json", json_thunk(payload)),
         ("body", Value::str("not-used")),
     ]);
     for (k, v) in extra {
@@ -150,22 +179,20 @@ fn test_fetch(
             let found = vs::select(&entmap, &args);
             let ent = vs::get_elem(&found, &Value::Num(0.0), Value::Noval);
             if ent.is_noval() || ent.is_null() {
-                return Ok(respond(
-                    404,
+                return Ok(respond(ctx, 404,
                     Value::Noval,
                     vec![("statusText", Value::str("Not found"))],
                 ));
             }
             vs::del_prop(ent.clone(), &Value::str("$KEY"));
-            Ok(respond(200, vs::clone(&ent), vec![]))
+            Ok(respond(ctx, 200, vs::clone(&ent), vec![]))
         }
 
         "list" => {
             let args = build_args(ctx, &ctx.reqmatch.borrow().clone());
             let found = vs::select(&entmap, &args);
             if found.is_noval() || found.is_null() {
-                return Ok(respond(
-                    404,
+                return Ok(respond(ctx, 404,
                     Value::Noval,
                     vec![("statusText", Value::str("Not found"))],
                 ));
@@ -175,7 +202,7 @@ fn test_fetch(
                     vs::del_prop(item.clone(), &Value::str("$KEY"));
                 }
             }
-            Ok(respond(200, vs::clone(&found), vec![]))
+            Ok(respond(ctx, 200, vs::clone(&found), vec![]))
         }
 
         "update" => {
@@ -214,8 +241,7 @@ fn test_fetch(
                 }
             }
             if ent.is_noval() || ent.is_null() {
-                return Ok(respond(
-                    404,
+                return Ok(respond(ctx, 404,
                     Value::Noval,
                     vec![("statusText", Value::str("Not found"))],
                 ));
@@ -228,7 +254,7 @@ fn test_fetch(
                 }
             }
             vs::del_prop(ent.clone(), &Value::str("$KEY"));
-            Ok(respond(200, vs::clone(&ent), vec![]))
+            Ok(respond(ctx, 200, vs::clone(&ent), vec![]))
         }
 
         "remove" => {
@@ -242,7 +268,7 @@ fn test_fetch(
                 let id = getp(&ent, "id");
                 vs::del_prop(entmap, &id);
             }
-            Ok(respond(200, Value::Noval, vec![]))
+            Ok(respond(ctx, 200, Value::Noval, vec![]))
         }
 
         "create" => {
@@ -265,13 +291,12 @@ fn test_fetch(
                     setp(&entmap, id_str, ent.clone());
                 }
                 vs::del_prop(ent.clone(), &Value::str("$KEY"));
-                return Ok(respond(200, vs::clone(&ent), vec![]));
+                return Ok(respond(ctx, 200, vs::clone(&ent), vec![]));
             }
-            Ok(respond(200, ent, vec![]))
+            Ok(respond(ctx, 200, ent, vec![]))
         }
 
-        _ => Ok(respond(
-            404,
+        _ => Ok(respond(ctx, 404,
             Value::Noval,
             vec![("statusText", Value::str("Unknown operation"))],
         )),

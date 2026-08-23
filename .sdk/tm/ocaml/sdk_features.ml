@@ -980,8 +980,27 @@ let netsim_feature () : feature =
 let test_feature () : feature =
   let f = { f_name = "test"; f_version = "0.0.1"; f_active = true; f_options = Noval;
             f_init = (fun _ _ -> ()); f_hook = (fun _ _ -> ()) } in
-  let respond status data extra =
-    let out = jo [("status", vint_of status); ("statusText", Str "OK"); ("json", json_thunk data); ("body", Str "not-used")] in
+  (* THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+     `transform.res: `body.item`` describes an API that answers {"item": {...}}
+     and the response transform unwraps that key on the way back. Returning the
+     bare payload means the transform unwraps a property that is not there and
+     the caller gets nothing. Mirrors the go/ts/lua/php mocks. *)
+  let envelope ctx data =
+    if is_nullish data then data
+    else
+      match getp (getp ctx.c_point "transform") "res" with
+      | Str spec ->
+        let n = String.length spec in
+        (* Exactly `body.<key>`; a deeper path is not an envelope this mock
+           can synthesise, so it is left alone rather than guessed at. *)
+        if n > 7 && String.sub spec 0 6 = "`body." && spec.[n - 1] = '`' then
+          let inner = String.sub spec 6 (n - 7) in
+          if String.length inner = 0 || String.contains inner '.' then data
+          else jo [(inner, data)]
+        else data
+      | _ -> data in
+  let respond ctx status data extra =
+    let out = jo [("status", vint_of status); ("statusText", Str "OK"); ("json", json_thunk (envelope ctx data)); ("body", Str "not-used")] in
     (match extra with Some (Map _ as e) -> List.iter (fun k -> setp out k (getp e k)) (keysof e) | _ -> ());
     (out, None) in
   let build_args ctx (op : operation) args =
@@ -1027,15 +1046,15 @@ let test_feature () : feature =
        | "load" ->
          let args = build_args fctx op (resolve_match fctx fctx.c_reqmatch) in
          let ent = getelem (select entmap args) (Num 0.0) in
-         if is_nullish ent then respond 404 Noval (Some (jo [("statusText", Str "Not found")]))
-         else (ignore (delprop ent (Str "$KEY")); respond 200 (clone ent) None)
+         if is_nullish ent then respond fctx 404 Noval (Some (jo [("statusText", Str "Not found")]))
+         else (ignore (delprop ent (Str "$KEY")); respond fctx 200 (clone ent) None)
        | "list" ->
          let args = build_args fctx op fctx.c_reqmatch in
          let found = select entmap args in
-         if is_nullish found then respond 404 Noval (Some (jo [("statusText", Str "Not found")]))
+         if is_nullish found then respond fctx 404 Noval (Some (jo [("statusText", Str "Not found")]))
          else begin
            (match found with List r -> List.iter (fun item -> ignore (delprop item (Str "$KEY"))) !r | _ -> ());
-           respond 200 (clone found) None
+           respond fctx 200 (clone found) None
          end
        | "update" ->
          let update_match = empty_map () in
@@ -1046,17 +1065,17 @@ let test_feature () : feature =
          (if is_nullish !ent then match entmap with
            | Map m -> (try (match List.find (fun (_, v) -> match v with Map _ -> true | _ -> false) m.entries with (_, v) -> ent := v) with Not_found -> ())
            | _ -> ());
-         if is_nullish !ent then respond 404 Noval (Some (jo [("statusText", Str "Not found")]))
+         if is_nullish !ent then respond fctx 404 Noval (Some (jo [("statusText", Str "Not found")]))
          else begin
            (match !ent with Map _ -> (match fctx.c_reqdata with Map _ -> List.iter (fun k -> setp !ent k (getp fctx.c_reqdata k)) (keysof fctx.c_reqdata) | _ -> ()) | _ -> ());
            ignore (delprop !ent (Str "$KEY"));
-           respond 200 (clone !ent) None
+           respond fctx 200 (clone !ent) None
          end
        | "remove" ->
          let args = build_args fctx op (resolve_match fctx fctx.c_reqmatch) in
          let ent = getelem (select entmap args) (Num 0.0) in
          (match ent with Map _ -> ignore (delprop entmap (getp ent "id")) | _ -> ());
-         respond 200 Noval None
+         respond fctx 200 Noval None
        | "create" ->
          ignore (build_args fctx op fctx.c_reqdata);
          let eid = let v = (cu fctx).u_param fctx (Str "id") in if is_nullish v then Str (random_id16 ()) else v in
@@ -1066,9 +1085,9 @@ let test_feature () : feature =
             setp ent "id" eid;
             (match eid with Str s -> setp entmap s ent | _ -> ());
             ignore (delprop ent (Str "$KEY"));
-            respond 200 (clone ent) None
-          | _ -> respond 200 ent None)
-       | _ -> respond 404 Noval (Some (jo [("statusText", Str "Unknown operation")]))) in
+            respond fctx 200 (clone ent) None
+          | _ -> respond fctx 200 ent None)
+       | _ -> respond fctx 404 Noval (Some (jo [("statusText", Str "Unknown operation")]))) in
   let make_netsim net inner =
     let netcalls = ref 0 in
     let pick_latency () =

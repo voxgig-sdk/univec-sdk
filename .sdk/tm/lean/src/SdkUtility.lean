@@ -595,8 +595,6 @@ def makeResult (ctx : Value) : SIO Value := do
   sp ctx "result" res
   pure res
 
-/-- Select the endpoint for this operation: the single point, else the first
-    whose `select.exist` keys are all present and whose `$action` agrees. -/
 /-- How many path segments a point has, and whether its path ends in a
     parameter. A record route ends in the record's identifier (/boards/{id});
     a cross-reference that also returns the entity ends in the relationship's
@@ -611,6 +609,8 @@ def pointShape (pt : Value) : SIO (Nat × Bool) := do
     else pure (items.size, (vs items[items.size - 1]!).startsWith "{")
   | _ => pure (0, false)
 
+/-- Select the endpoint for this operation: the single point, else the first
+    whose `select.exist` keys are all present and whose `$action` agrees. -/
 def makePoint (ctx : Value) : SIO Value := do
   let op ← gp ctx "op"
   let matchV ← gp ctx "reqmatch"

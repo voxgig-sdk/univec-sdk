@@ -10,10 +10,48 @@
 #include <stdlib.h>
 #include <string.h>
 
+// THE MOCK HAS TO AGREE WITH THE MODEL.
+//
+// A point carrying `transform.res: `body.item`` describes an API that answers
+// {"item": {...}}, and the response transform unwraps that key on the way
+// back. Handing back the bare payload means the transform unwraps a property
+// that is not there and the caller gets nothing — a mock that only ever
+// simulates APIs whose responses happen to be unwrapped.
+//
+// univec's list op declares `body.data`, so every list returned zero items
+// while the fixture plainly held two. Mirrors the go/ts/lua/php mocks, which
+// already wrap; rust, c and zig were the three that did not.
+static voxgig_value* envelope(Context* ctx, voxgig_value* data) {
+  if (v_is_noval(data) || v_is_null(data)) {
+    return data;
+  }
+  voxgig_value* tm = getp(ctx->point, "transform");
+  const char* spec = get_str(tm, "res");
+  if (NULL == spec) {
+    return data;
+  }
+  // Exactly `body.<key>`; a deeper path is not an envelope this mock can
+  // synthesise, so it is left alone rather than guessed at.
+  size_t n = strlen(spec);
+  if (n < 8 || 0 != strncmp(spec, "`body.", 6) || '`' != spec[n - 1]) {
+    return data;
+  }
+  size_t inner_len = n - 7;
+  if (0 == inner_len || NULL != memchr(spec + 6, '.', inner_len)) {
+    return data;
+  }
+  char* inner = (char*)malloc(inner_len + 1);
+  memcpy(inner, spec + 6, inner_len);
+  inner[inner_len] = '\0';
+  voxgig_value* out = cmap(1, inner, data);
+  free(inner);
+  return out;
+}
+
 // respond builds a transport-shaped response the result pipeline understands.
-static voxgig_value* respond(int64_t status, voxgig_value* data) {
+static voxgig_value* respond(Context* ctx, int64_t status, voxgig_value* data) {
   return cmap(4, "status", v_num((double)status), "statusText", v_str("OK"), "json",
-              json_thunk(data), "body", v_str("not-used"));
+              json_thunk(envelope(ctx, data)), "body", v_str("not-used"));
 }
 
 // For single-entity ops (load, remove) with an empty explicit match, fall
@@ -109,19 +147,19 @@ static voxgig_value* test_fetch(voxgig_value* entity, Context* ctx, const char* 
     voxgig_value* found = voxgig_select(entmap, args);
     voxgig_value* ent = voxgig_getelem(found, v_int(0), NULL);
     if (v_is_noval(ent) || v_is_null(ent)) {
-      voxgig_value* r = respond(404, v_undef());
+      voxgig_value* r = respond(ctx, 404, v_undef());
       setp(r, "statusText", v_str("Not found"));
       return r;
     }
     voxgig_delprop(ent, v_str("$KEY"));
-    return respond(200, voxgig_clone(ent));
+    return respond(ctx, 200, voxgig_clone(ent));
   }
 
   if (strcmp(opname, "list") == 0) {
     voxgig_value* args = build_args(ctx, ctx->reqmatch);
     voxgig_value* found = voxgig_select(entmap, args);
     if (v_is_noval(found) || v_is_null(found)) {
-      voxgig_value* r = respond(404, v_undef());
+      voxgig_value* r = respond(ctx, 404, v_undef());
       setp(r, "statusText", v_str("Not found"));
       return r;
     }
@@ -131,7 +169,7 @@ static voxgig_value* test_fetch(voxgig_value* entity, Context* ctx, const char* 
         voxgig_delprop(l->items[i], v_str("$KEY"));
       }
     }
-    return respond(200, voxgig_clone(found));
+    return respond(ctx, 200, voxgig_clone(found));
   }
 
   if (strcmp(opname, "update") == 0) {
@@ -168,7 +206,7 @@ static voxgig_value* test_fetch(voxgig_value* entity, Context* ctx, const char* 
       }
     }
     if (v_is_noval(ent) || v_is_null(ent)) {
-      voxgig_value* r = respond(404, v_undef());
+      voxgig_value* r = respond(ctx, 404, v_undef());
       setp(r, "statusText", v_str("Not found"));
       return r;
     }
@@ -179,7 +217,7 @@ static voxgig_value* test_fetch(voxgig_value* entity, Context* ctx, const char* 
       }
     }
     voxgig_delprop(ent, v_str("$KEY"));
-    return respond(200, voxgig_clone(ent));
+    return respond(ctx, 200, voxgig_clone(ent));
   }
 
   if (strcmp(opname, "remove") == 0) {
@@ -192,7 +230,7 @@ static voxgig_value* test_fetch(voxgig_value* entity, Context* ctx, const char* 
       voxgig_value* id = getp(ent, "id");
       voxgig_delprop(entmap, id);
     }
-    return respond(200, v_undef());
+    return respond(ctx, 200, v_undef());
   }
 
   if (strcmp(opname, "create") == 0) {
@@ -216,12 +254,12 @@ static voxgig_value* test_fetch(voxgig_value* entity, Context* ctx, const char* 
         setp(entmap, voxgig_as_string(id), ent);
       }
       voxgig_delprop(ent, v_str("$KEY"));
-      return respond(200, voxgig_clone(ent));
+      return respond(ctx, 200, voxgig_clone(ent));
     }
-    return respond(200, ent);
+    return respond(ctx, 200, ent);
   }
 
-  voxgig_value* r = respond(404, v_undef());
+  voxgig_value* r = respond(ctx, 404, v_undef());
   setp(r, "statusText", v_str("Unknown operation"));
   return r;
 }

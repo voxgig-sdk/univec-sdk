@@ -5,11 +5,32 @@
 
 import Foundation
 
-private func testRespond(_ status: Int, _ data: Value, _ extra: VMap?) -> Value {
+// THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
+// `transform.res: `body.item`` describes an API that answers {"item": {...}},
+// and the response transform unwraps that key on the way back. Returning the
+// bare payload means the transform unwraps a property that is not there and
+// the caller gets nothing. Mirrors the go/ts/lua/php mocks.
+private func testEnvelope(_ ctx: Context, _ data: Value) -> Value {
+  if case .noval = data { return data }
+  if case .null = data { return data }
+  guard let point = ctx.point else { return data }
+  guard case .map(let tm)? = point.entries["transform"] else { return data }
+  guard case .string(let spec)? = tm.entries["res"] else { return data }
+  // Exactly `body.<key>`; a deeper path is not an envelope this mock can
+  // synthesise, so it is left alone rather than guessed at.
+  guard spec.hasPrefix("`body."), spec.hasSuffix("`"), spec.count >= 8 else { return data }
+  let inner = String(spec.dropFirst(6).dropLast(1))
+  guard !inner.isEmpty, !inner.contains(".") else { return data }
+  let wrapped = VMap()
+  wrapped.entries[inner] = data
+  return .map(wrapped)
+}
+
+private func testRespond(_ ctx: Context, _ status: Int, _ data: Value, _ extra: VMap?) -> Value {
   let res = VMap()
   res.entries["status"] = .int(Int64(status))
   res.entries["statusText"] = .string("OK")
-  let captured = data
+  let captured = testEnvelope(ctx, data)
   res.entries["json"] = .nat({ () -> Value in captured } as NativeCall0)
   res.entries["body"] = .string("not-used")
   if let extra = extra {
@@ -151,22 +172,22 @@ public final class TestFeature: BaseFeature {
         if isNil(ent) {
           let extra = VMap()
           extra.entries["statusText"] = .string("Not found")
-          return testRespond(404, .noval, extra)
+          return testRespond(ctx2, 404, .noval, extra)
         }
         delprop(ent, .string("$KEY"))
-        return testRespond(200, clone(ent), nil)
+        return testRespond(ctx2, 200, clone(ent), nil)
       } else if op.name == "list" {
         let args = testBuildArgs(ctx2, op, ctx2.reqmatch)
         let found = select(.map(entmap), args)
         if isNil(found) {
           let extra = VMap()
           extra.entries["statusText"] = .string("Not found")
-          return testRespond(404, .noval, extra)
+          return testRespond(ctx2, 404, .noval, extra)
         }
         if let fl = found.asList {
           for item in fl.items { delprop(item, .string("$KEY")) }
         }
-        return testRespond(200, clone(found), nil)
+        return testRespond(ctx2, 200, clone(found), nil)
       } else if op.name == "update" {
         var updateMatch = VMap()
         if let idv = ctx2.reqdata.entries["id"] {
@@ -188,13 +209,13 @@ public final class TestFeature: BaseFeature {
         if isNil(ent) {
           let extra = VMap()
           extra.entries["statusText"] = .string("Not found")
-          return testRespond(404, .noval, extra)
+          return testRespond(ctx2, 404, .noval, extra)
         }
         if let entm = ent.asMap {
           for (k, v) in ctx2.reqdata.entries { entm.entries[k] = v }
         }
         delprop(ent, .string("$KEY"))
-        return testRespond(200, clone(ent), nil)
+        return testRespond(ctx2, 200, clone(ent), nil)
       } else if op.name == "remove" {
         let args = testBuildArgs(ctx2, op, testResolveMatch(ctx2, ctx2.reqmatch))
         let found = select(.map(entmap), args)
@@ -203,7 +224,7 @@ public final class TestFeature: BaseFeature {
           let id = gp(entm2, "id")
           delprop(.map(entmap), id)
         }
-        return testRespond(200, .noval, nil)
+        return testRespond(ctx2, 200, .noval, nil)
       } else if op.name == "create" {
         _ = testBuildArgs(ctx2, op, ctx2.reqdata)
         var id = ctx2.utility!.param(ctx2, .string("id"))
@@ -218,14 +239,14 @@ public final class TestFeature: BaseFeature {
           entm.entries["id"] = id
           if let idStr = id.asString { entmap.entries[idStr] = .map(entm) }
           delprop(.map(entm), .string("$KEY"))
-          return testRespond(200, clone(.map(entm)), nil)
+          return testRespond(ctx2, 200, clone(.map(entm)), nil)
         }
-        return testRespond(200, ent, nil)
+        return testRespond(ctx2, 200, ent, nil)
       }
 
       let extra = VMap()
       extra.entries["statusText"] = .string("Unknown operation")
-      return testRespond(404, .noval, extra)
+      return testRespond(ctx2, 404, .noval, extra)
     }
 
     // Optional network behaviour simulation over the mock transport.

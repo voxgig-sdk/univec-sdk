@@ -10,6 +10,16 @@ CXXFLAGS ?= -std=c++17 -O0 -g -Wall -Wextra -Wno-unused-parameter -pthread
 TEST_SRCS := $(wildcard test/*.cpp)
 TEST_BINS := $(TEST_SRCS:.cpp=.out)
 
+# REBUILD WHEN A HEADER CHANGES. The runtime is header-only, so a test binary
+# depends on far more than its own .cpp — but the pattern rule below names
+# only that .cpp, so make happily reused a stale .out after every change to
+# core/, feature/, entity/ or utility/. A real fix to the mock transport read
+# as "still failing" through several rebuilds because the binary under test
+# predated it. Listing the headers is cheap and makes `make test` mean what it
+# says.
+SDK_HDRS := $(wildcard core/*.hpp entity/*.hpp feature/*.hpp \
+                       utility/*.hpp utility/*/*.hpp *.hpp)
+
 .PHONY: test build clean
 
 build: $(TEST_BINS)
@@ -23,7 +33,7 @@ test: build
 	if [ $$fail -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi; \
 	echo "ALL TESTS PASSED"
 
-test/%.out: test/%.cpp
+test/%.out: test/%.cpp $(SDK_HDRS)
 	$(CXX) $(CXXFLAGS) $< -o $@
 
 clean:

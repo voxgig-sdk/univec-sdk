@@ -118,7 +118,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
 import java.util.function.{BiFunction, Supplier}
 
-import ${scalapackage}.core.{Helpers, ${SDK}}
+import ${scalapackage}.core.{Helpers, SdkEntity, ${SDK}}
 
 object ${EntityName}DirectTest {
 

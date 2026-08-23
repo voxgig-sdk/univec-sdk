@@ -6,7 +6,7 @@
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
 import java.util.function.{BiFunction, Supplier}
 
-import voxgig.univecsdk.core.{Helpers, UnivecSDK}
+import voxgig.univecsdk.core.{Helpers, SdkEntity, UnivecSDK}
 
 object ModelDirectTest {
 

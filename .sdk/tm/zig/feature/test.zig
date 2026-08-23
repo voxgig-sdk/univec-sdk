@@ -93,11 +93,38 @@ fn fixIds(_: Allocator, key: ?[]const u8, val: Value, _: Value, path: []const []
     return val;
 }
 
-fn respond(status: i64, data: Value, extra: []const h.Pair) Value {
+// THE MOCK HAS TO AGREE WITH THE MODEL.
+//
+// A point carrying `transform.res: `body.item`` describes an API that answers
+// {"item": {...}}, and the response transform unwraps that key on the way
+// back. Handing back the bare payload means the transform unwraps a property
+// that is not there and the caller gets nothing — a mock that only ever
+// simulates APIs whose responses happen to be unwrapped.
+//
+// univec's list op declares `body.data`, so every list returned zero items
+// while the fixture plainly held two. Mirrors the go/ts/lua/php mocks, which
+// already wrap; rust, c and zig were the three that did not.
+fn envelope(ctx: *Context, data: Value) Value {
+    if (data == .undef or data == .null) return data;
+    const restf = h.getpath(&.{ "transform", "res" }, ctx.point);
+    if (restf != .string) return data;
+    const spec = restf.string;
+    // Exactly `body.<key>`; a deeper path is not an envelope this mock can
+    // synthesise, so it is left alone rather than guessed at.
+    if (spec.len < 8) return data;
+    if (!std.mem.startsWith(u8, spec, "`body.")) return data;
+    if (!std.mem.endsWith(u8, spec, "`")) return data;
+    const inner = spec[6 .. spec.len - 1];
+    if (inner.len == 0) return data;
+    if (std.mem.indexOfScalar(u8, inner, '.') != null) return data;
+    return h.jo(&.{.{ inner, data }});
+}
+
+fn respond(ctx: *Context, status: i64, data: Value, extra: []const h.Pair) Value {
     const out = h.jo(&.{
         .{ "status", h.vnum(status) },
         .{ "statusText", h.vstr("OK") },
-        .{ "json", h.json_thunk(data) },
+        .{ "json", h.json_thunk(envelope(ctx, data)) },
         .{ "body", h.vstr("not-used") },
     });
     for (extra) |kv| h.setp(out, kv[0], kv[1]);
@@ -182,20 +209,20 @@ fn test_fetch(entity: Value, ctx: *Context, _: []const u8, _: Value) err.E!Value
         const found = vs.select(h.A(), entmap, args) catch h.olist();
         const ent = h.get_elem(found, h.vnum(0), h.vnull());
         if (h.is_noval(ent)) {
-            return respond(404, h.vnull(), &.{.{ "statusText", h.vstr("Not found") }});
+            return respond(ctx, 404, h.vnull(), &.{.{ "statusText", h.vstr("Not found") }});
         }
         h.del_prop(ent, h.vstr("$KEY"));
-        return respond(200, h.clone(ent), &.{});
+        return respond(ctx, 200, h.clone(ent), &.{});
     } else if (std.mem.eql(u8, op.name, "list")) {
         const args = build_args(ctx, ctx.reqmatch);
         const found = vs.select(h.A(), entmap, args) catch h.olist();
         if (h.is_noval(found)) {
-            return respond(404, h.vnull(), &.{.{ "statusText", h.vstr("Not found") }});
+            return respond(ctx, 404, h.vnull(), &.{.{ "statusText", h.vstr("Not found") }});
         }
         if (found == .array) {
             for (found.array.data.items) |item| h.del_prop(item, h.vstr("$KEY"));
         }
-        return respond(200, h.clone(found), &.{});
+        return respond(ctx, 200, h.clone(found), &.{});
     } else if (std.mem.eql(u8, op.name, "update")) {
         const reqdata = ctx.reqdata;
         var update_match = h.omap();
@@ -221,14 +248,14 @@ fn test_fetch(entity: Value, ctx: *Context, _: []const u8, _: Value) err.E!Value
             }
         }
         if (h.is_noval(ent)) {
-            return respond(404, h.vnull(), &.{.{ "statusText", h.vstr("Not found") }});
+            return respond(ctx, 404, h.vnull(), &.{.{ "statusText", h.vstr("Not found") }});
         }
         if (ent == .object and reqdata == .object) {
             var it = reqdata.object.iterator();
             while (it.next()) |kv| h.setp(ent, kv.key_ptr.*, kv.value_ptr.*);
         }
         h.del_prop(ent, h.vstr("$KEY"));
-        return respond(200, h.clone(ent), &.{});
+        return respond(ctx, 200, h.clone(ent), &.{});
     } else if (std.mem.eql(u8, op.name, "remove")) {
         const m = resolve_match(ctx, ctx.reqmatch);
         const args = build_args(ctx, m);
@@ -238,7 +265,7 @@ fn test_fetch(entity: Value, ctx: *Context, _: []const u8, _: Value) err.E!Value
             const id = h.getp(ent, "id");
             h.del_prop(entmap, id);
         }
-        return respond(200, h.vnull(), &.{});
+        return respond(ctx, 200, h.vnull(), &.{});
     } else if (std.mem.eql(u8, op.name, "create")) {
         _ = build_args(ctx, ctx.reqdata);
         var id = ctx.util().param(ctx, h.vstr("id"));
@@ -255,12 +282,12 @@ fn test_fetch(entity: Value, ctx: *Context, _: []const u8, _: Value) err.E!Value
             h.setp(ent, "id", id);
             if (id == .string) h.setp(entmap, id.string, ent);
             h.del_prop(ent, h.vstr("$KEY"));
-            return respond(200, h.clone(ent), &.{});
+            return respond(ctx, 200, h.clone(ent), &.{});
         }
-        return respond(200, ent, &.{});
+        return respond(ctx, 200, ent, &.{});
     }
 
-    return respond(404, h.vnull(), &.{.{ "statusText", h.vstr("Unknown operation") }});
+    return respond(ctx, 404, h.vnull(), &.{.{ "statusText", h.vstr("Unknown operation") }});
 }
 
 // make_netsim (test-local): counter-driven latency / first-N failures /

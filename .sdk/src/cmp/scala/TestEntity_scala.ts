@@ -90,7 +90,7 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
 
-import ${scalapackage}.core.{Helpers, ${SDK}}
+import ${scalapackage}.core.{Helpers, SdkEntity, ${SDK}}
 import ${scalapackage}.utility.struct.Struct
 
 object ${EntityName}EntityTest {
