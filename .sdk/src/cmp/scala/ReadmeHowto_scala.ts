@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -11,7 +11,7 @@ import { scalaVarName } from './utility_scala'
 
 // A type-correct Scala literal for a field's canonical type.
 function scalaLit(type: any): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k) return '1L'
   if ('NUMBER' === k) return '1.0'
   if ('BOOLEAN' === k) return 'true'

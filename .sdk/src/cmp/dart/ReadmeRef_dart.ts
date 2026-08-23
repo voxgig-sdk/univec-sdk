@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, canonKey, File, isAuthActive, entityIdField, opRequestShape, safeVarName, exampleVarName, matchArg, idLiteral } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape, safeVarName, exampleVarName, matchArg, idLiteral } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -14,7 +14,7 @@ import { dartPackageName } from './Package_dart'
 // A type-correct Dart literal for a field's canonical type. Strings render
 // the quoted placeholder (single-quoted, matching the generated Dart style).
 function dartLit(type: any, placeholder: string = 'example'): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return 'true'
   if ('ARRAY' === k) return '<dynamic>[]'

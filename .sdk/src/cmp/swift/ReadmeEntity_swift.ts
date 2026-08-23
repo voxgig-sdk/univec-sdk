@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, canonKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -13,7 +13,7 @@ import { swiftVarName } from './utility_swift'
 
 // A type-correct Swift `Value` literal for a field's canonical type.
 function swiftLit(type: any, placeholder: string = 'example'): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k) return '.int(1)'
   if ('NUMBER' === k) return '.double(1.0)'
   if ('BOOLEAN' === k) return '.bool(true)'

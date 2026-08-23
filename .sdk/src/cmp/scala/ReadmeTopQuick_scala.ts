@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -14,7 +14,7 @@ import { scalaVarName, scalaPackage } from './utility_scala'
 // render a typed literal; strings render the quoted placeholder. The SDK's
 // loose object model means all values live in java.util.Map[String, Object].
 function scalaLit(type: any, placeholder: string = 'example'): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k) return '1L'
   if ('NUMBER' === k) return '1.0'
   if ('BOOLEAN' === k) return 'true'

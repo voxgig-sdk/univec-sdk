@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonKey, File, isAuthActive, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -9,7 +9,7 @@ import {
 
 // A type-correct, executable Perl literal for a field's canonical type.
 function perlLit(type: any, placeholder: string = 'example'): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return '1'
   if ('ARRAY' === k) return '[]'

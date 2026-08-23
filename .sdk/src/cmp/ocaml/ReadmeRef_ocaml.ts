@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonKey, File, isAuthActive, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -11,7 +11,7 @@ import { ocamlVarName } from './utility_ocaml'
 
 // A type-correct OCaml `value` literal. Strings render the quoted placeholder.
 function ocamlLit(type: any, placeholder: string = 'example'): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k || 'NUMBER' === k) return '(Num 1.)'
   if ('BOOLEAN' === k) return '(Bool true)'
   if ('ARRAY' === k) return '(empty_list ())'

@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, matchArg, idLiteral } from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, matchArg, idLiteral } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -69,7 +69,7 @@ final client = ${ctor};
 
     // A type-correct, executable Dart literal for a param.
     const dartLit = (type: any, placeholder: string = 'example'): string => {
-      const k = canonKey(type)
+      const k = canonScalarKey(type)
       if ('INTEGER' === k || 'NUMBER' === k) return '1'
       if ('BOOLEAN' === k) return 'true'
       if ('ARRAY' === k) return '<dynamic>[]'

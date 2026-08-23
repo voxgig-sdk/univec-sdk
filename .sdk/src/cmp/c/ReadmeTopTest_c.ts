@@ -1,5 +1,5 @@
 
-import { cmp, Content, canonKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -13,7 +13,7 @@ import { cIdent, cVarName } from './utility_c'
 // A type-correct C expression constructing a voxgig struct Value for a field's
 // canonical type.
 function cLit(type: any): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k || 'NUMBER' === k) return 'v_num(1)'
   if ('BOOLEAN' === k) return 'v_bool(true)'
   if ('ARRAY' === k) return 'v_list()'

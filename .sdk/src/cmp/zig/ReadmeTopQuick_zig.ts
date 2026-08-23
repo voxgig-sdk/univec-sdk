@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -14,7 +14,7 @@ import { zigVarName } from './utility_zig'
 // param. Strings render the quoted placeholder; numeric/boolean/array/object
 // render a typed literal.
 function zigLit(type: any, placeholder: string = 'example'): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k || 'NUMBER' === k) return 'h.vnum(1)'
   if ('BOOLEAN' === k) return 'h.vbool(true)'
   if ('ARRAY' === k) return 'h.olist()'

@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -36,7 +36,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
 
   // A type-correct C expression constructing a voxgig struct Value.
   const cLit = (type: any, placeholder: string = 'example'): string => {
-    const k = canonKey(type)
+    const k = canonScalarKey(type)
     if ('INTEGER' === k || 'NUMBER' === k) return 'v_num(1)'
     if ('BOOLEAN' === k) return 'v_bool(true)'
     if ('ARRAY' === k) return 'v_list()'

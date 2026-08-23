@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -55,7 +55,7 @@ let client = ${ctor}
 
     // A type-correct OCaml `value` literal for a param.
     const ocamlLit = (type: any, placeholder: string = 'example'): string => {
-      const k = canonKey(type)
+      const k = canonScalarKey(type)
       if ('INTEGER' === k || 'NUMBER' === k) return '(Num 1.)'
       if ('BOOLEAN' === k) return '(Bool true)'
       if ('ARRAY' === k) return '(empty_list ())'

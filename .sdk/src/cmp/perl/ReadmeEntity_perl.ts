@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -11,7 +11,7 @@ import {
 // create example is EXECUTED by the doc test, so a placeholder must be a real
 // value. Strings render the quoted placeholder.
 function perlLit(type: any, placeholder: string = 'example'): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return '1'
   if ('ARRAY' === k) return '[]'

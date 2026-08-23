@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityOps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -35,7 +35,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   // A type-correct Java literal for a param — the loose object model means
   // all values live in a Map<String, Object>.
   const javaLit = (type: any, placeholder: string = 'example'): string => {
-    const k = canonKey(type)
+    const k = canonScalarKey(type)
     if ('INTEGER' === k) return '1L'
     if ('NUMBER' === k) return '1.0'
     if ('BOOLEAN' === k) return 'true'

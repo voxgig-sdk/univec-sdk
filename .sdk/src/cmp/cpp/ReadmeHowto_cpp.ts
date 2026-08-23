@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -11,7 +11,7 @@ import { cppVarName } from './utility_cpp'
 
 // A type-correct C++ literal for a field's canonical type.
 function cppLit(type: any): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value(1)'
   if ('BOOLEAN' === k) return 'Value(true)'
   if ('ARRAY' === k) return 'vlist()'

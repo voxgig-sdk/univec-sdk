@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -31,7 +31,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
 
   // A type-correct Clojure literal for a param.
   const cljLit = (type: any, placeholder: string = 'example'): string => {
-    const k = canonKey(type)
+    const k = canonScalarKey(type)
     if ('INTEGER' === k || 'NUMBER' === k) return '1'
     if ('BOOLEAN' === k) return 'true'
     if ('ARRAY' === k) return '(vs/jt)'

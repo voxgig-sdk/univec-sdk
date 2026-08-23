@@ -8,6 +8,7 @@ import {
 
 import {
   canonKey,
+  canonScalarKey,
   canonToType,
 } from '@voxgig/sdkgen'
 
@@ -26,7 +27,7 @@ function elixirType(sentinel: unknown): string {
 // canonical type. Strings render the quoted placeholder; numeric/boolean/
 // collection types render a real literal so example blocks parse and run.
 function elixirLit(sentinel: unknown, placeholder: string = 'example'): string {
-  switch (canonKey(sentinel)) {
+  switch (canonScalarKey(sentinel)) {
     case 'INTEGER':
     case 'NUMBER': return '1'
     case 'BOOLEAN': return 'true'

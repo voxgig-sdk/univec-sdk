@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityOps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -36,7 +36,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   // A type-correct Swift `Value` literal for a param — the loose object model
   // means all values live in a `VMap` of `Value`.
   const swiftLit = (type: any, placeholder: string = 'example'): string => {
-    const k = canonKey(type)
+    const k = canonScalarKey(type)
     if ('INTEGER' === k) return '.int(1)'
     if ('NUMBER' === k) return '.double(1.0)'
     if ('BOOLEAN' === k) return '.bool(true)'

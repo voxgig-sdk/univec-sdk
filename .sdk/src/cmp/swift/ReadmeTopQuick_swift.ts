@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -14,7 +14,7 @@ import { swiftVarName } from './utility_swift'
 // object params render a typed literal; strings render the quoted placeholder.
 // The SDK's loose object model means every value is a `Value` inside a `VMap`.
 function swiftLit(type: any, placeholder: string = 'example'): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k) return '.int(1)'
   if ('NUMBER' === k) return '.double(1.0)'
   if ('BOOLEAN' === k) return '.bool(true)'

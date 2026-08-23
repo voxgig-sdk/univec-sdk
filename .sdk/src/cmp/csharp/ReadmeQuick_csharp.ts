@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityOps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -56,7 +56,7 @@ var client = ${ctor};
 
     // A type-correct C# literal for a param.
     const csLit = (type: any, placeholder: string = 'example'): string => {
-      const k = canonKey(type)
+      const k = canonScalarKey(type)
       if ('INTEGER' === k) return '1L'
       if ('NUMBER' === k) return '1.0'
       if ('BOOLEAN' === k) return 'true'

@@ -5,6 +5,7 @@ import * as Path from 'node:path'
 import {
   camelify,
   canonKey,
+  canonScalarKey,
   each,
   exampleVarName,
   names,
@@ -55,7 +56,12 @@ function paramCanonType(entity: any, op: any, paramName: string): unknown {
 // the empty `map[string]any{}`, everything else (STRING, unknown, missing)
 // as the quoted `placeholder`.
 function exampleValue(entity: any, op: any, paramName: string, placeholder: string): string {
-  const key = canonKey(paramCanonType(entity, op, paramName))
+  // canonScalarKey, not canonKey: a nullable field's sentinel is the union
+  // ['`$ONE`', ['`$NUMBER`','`$NULL`']], which canonKey stringifies into
+  // nothing recognizable — so a `number | null` id fell through to the
+  // quoted placeholder and the example failed to compile against the type
+  // generated from that very sentinel.
+  const key = canonScalarKey(paramCanonType(entity, op, paramName))
   if ('INTEGER' === key || 'NUMBER' === key) {
     return '1'
   }
@@ -67,6 +73,9 @@ function exampleValue(entity: any, op: any, paramName: string, placeholder: stri
   }
   if ('OBJECT' === key) {
     return 'map[string]any{}'
+  }
+  if ('NULL' === key) {
+    return 'nil'
   }
   return `"${placeholder}"`
 }

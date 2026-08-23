@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -56,7 +56,7 @@ ${ctor}
   // A type-correct C++ literal for a param: numeric/boolean/array/object
   // params render a typed sdk::Value; strings render the quoted placeholder.
   const cppLit = (type: any, placeholder: string = 'example'): string => {
-    const k = canonKey(type)
+    const k = canonScalarKey(type)
     if ('INTEGER' === k || 'NUMBER' === k) return 'Value(1)'
     if ('BOOLEAN' === k) return 'Value(true)'
     if ('ARRAY' === k) return 'vlist()'

@@ -1,5 +1,5 @@
 
-import { cmp, Content, canonKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -12,7 +12,7 @@ import { csVarName } from './utility_csharp'
 
 // A type-correct C# literal for a field's canonical type.
 function csLit(type: any): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k) return '1L'
   if ('NUMBER' === k) return '1.0'
   if ('BOOLEAN' === k) return 'true'

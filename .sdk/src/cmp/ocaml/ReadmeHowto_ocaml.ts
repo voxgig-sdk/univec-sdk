@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -11,7 +11,7 @@ import { ocamlVarName } from './utility_ocaml'
 
 // A type-correct OCaml `value` literal for a field's canonical type.
 function ocamlLit(type: any): string {
-  const k = canonKey(type)
+  const k = canonScalarKey(type)
   if ('INTEGER' === k || 'NUMBER' === k) return '(Num 1.)'
   if ('BOOLEAN' === k) return '(Bool true)'
   if ('ARRAY' === k) return '(empty_list ())'
