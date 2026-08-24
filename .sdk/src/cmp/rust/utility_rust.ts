@@ -18,6 +18,32 @@ const RUST_RESERVED = new Set<string>([
 ])
 
 
+// Method names on a generated struct that must never be an entity accessor.
+//
+// An entity called `clone` generated `pub fn clone(&self, Value)` on the SDK
+// struct, which SHADOWS Clone::clone — so every `sdk.clone()` the generated
+// code makes elsewhere resolved to the entity accessor and the crate failed
+// with "this method takes 1 argument but 0 arguments were supplied", 16 times
+// over, pointing at the call sites and never at the entity that caused it.
+// `new` would collide with the struct's own constructor the same way.
+//
+// These are not Rust keywords, so RUST_RESERVED does not catch them; they are
+// inherent or std-trait methods the generated code actually calls.
+const RUST_METHOD_RESERVED = new Set<string>([
+  'clone', 'new', 'default', 'drop', 'from', 'into', 'to_string',
+  'as_ref', 'as_mut', 'borrow', 'borrow_mut', 'deref', 'deref_mut',
+  'eq', 'ne', 'cmp', 'partial_cmp', 'hash', 'fmt', 'next', 'iter',
+])
+
+
+// A snake_case rust METHOD name for a model name — rustVarName, plus a guard
+// against shadowing a method the generated code calls on the same struct.
+function rustMethodName(name: string): string {
+  const ident = rustVarName(name)
+  return RUST_METHOD_RESERVED.has(ident) ? ident + '_' : ident
+}
+
+
 // A collision-free snake_case rust identifier for a model name.
 function rustVarName(name: string): string {
   let snake = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
@@ -170,6 +196,7 @@ function rustRawString(s: string): string {
 }
 
 export {
+  rustMethodName,
   rustRawString,
   clean,
   crateIdent,

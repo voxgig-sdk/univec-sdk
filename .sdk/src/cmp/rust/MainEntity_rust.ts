@@ -7,7 +7,7 @@ import {
   getModelPath
 } from '@voxgig/apidef'
 
-import { rustVarName } from './utility_rust'
+import { rustVarName, rustMethodName } from './utility_rust'
 
 
 // Entity accessor method on the SDK client, injected at the Main fragment
@@ -19,7 +19,7 @@ const MainEntity = cmp(async function MainEntity(props: any) {
 
   const entityColl = entityCollection(model)
   const cls = entityClassName(entity, entityColl)
-  const method = rustVarName(entity.name)
+  const method = rustMethodName(entity.name)
   const mod = rustVarName(entity.name)
 
   Content(`
