@@ -1,6 +1,15 @@
 {
+  "NAME": "UNIVEC",
+  "Name": "Univec",
   "def": "univec-openapi.json",
   "main": {
+    "api": {
+      "entity": {},
+      "guide": {}
+    },
+    "custom": {
+      "plurals": {}
+    },
     "def": {
       "desc": ""
     },
@@ -2260,5 +2269,8 @@
     }
   },
   "name": "univec",
+  "name-": "univec",
+  "name_": "univec",
+  "name__orig": "univec",
   "origin": "voxgig-sdk"
 }
