@@ -6,7 +6,7 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { rustVarName } from './utility_rust'
+import { rustVarName, rustMethodName } from './utility_rust'
 
 
 // Type names come from the shared canonToType 'rust' column (single source of truth).
@@ -56,7 +56,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
     const fields = entity.fields || []
     const idF = entityIdField(entity)
     const eVar = rustVarName(entity.name)
-    const method = rustVarName(entity.name)
+    const method = rustMethodName(entity.name)
 
     Content(`
 ### ${entity.Name}

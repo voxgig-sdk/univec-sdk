@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { crateIdent, rustVarName } from './utility_rust'
+import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
 
 
 // A type-correct rust expression constructing a voxgig struct Value for a
@@ -40,7 +40,7 @@ let client = test_sdk(Value::Noval, Value::Noval);
 
   if (exampleEntity && primaryOp) {
     const eName = nom(exampleEntity, 'Name')
-    const method = rustVarName(exampleEntity.name)
+    const method = rustMethodName(exampleEntity.name)
     const idF = entityIdField(exampleEntity)
     const isMatchOp = 'load' === primaryOp || 'remove' === primaryOp
     let arg = 'Value::Noval'

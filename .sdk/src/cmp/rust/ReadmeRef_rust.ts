@@ -6,7 +6,7 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { crateIdent, rustVarName } from './utility_rust'
+import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
 
 
 // Type names come from the shared canonToType 'rust' column (single source of truth).
@@ -120,7 +120,7 @@ let client = test_sdk(Value::Noval, Value::Noval);
 
     // Entity factory methods
     publishedEntities.map((ent: any) => {
-      Content(`#### \`${rustVarName(ent.name)}(entopts: Value) -> Rc<${ent.Name}Entity>\`
+      Content(`#### \`${rustMethodName(ent.name)}(entopts: Value) -> Rc<${ent.Name}Entity>\`
 
 Create a new \`${ent.Name}Entity\` instance. Pass \`Value::Noval\` for no
 initial options.
@@ -168,7 +168,7 @@ Prepare a fetch definition without sending. Returns the fetchdef on \`Ok\`.
       const fields = ent.fields || []
       const idF = entityIdField(ent)
       const eVar = rustVarName(ent.name)
-      const method = rustVarName(ent.name)
+      const method = rustMethodName(ent.name)
 
       Content(`
 ---

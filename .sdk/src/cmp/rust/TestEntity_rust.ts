@@ -21,7 +21,7 @@ import {
 } from '@voxgig/sdkgen'
 
 
-import { rustVarName } from './utility_rust'
+import { rustVarName, rustMethodName } from './utility_rust'
 
 
 // Rust's GenCtx mirrors the shared shape (see TestEntity_ts.ts) plus the
@@ -100,7 +100,7 @@ const TestEntity = cmp(function TestEntity(props: any) {
     }
 `
 
-  const method = rustVarName(entity.name)
+  const method = rustMethodName(entity.name)
   const evar = rustVarName(entity.name)
 
   File({ name: entity.name + '_entity_test.' + target.ext }, () => {
@@ -330,7 +330,7 @@ const generateCreate: OpGen = (ctx, step, index) => {
   Content(`    // CREATE
 `)
   if (needsEnt) {
-    Content(`    let ${entvar} = client.${rustVarName(entity.name)}(Value::Noval);
+    Content(`    let ${entvar} = client.${rustMethodName(entity.name)}(Value::Noval);
 `)
   }
 
@@ -381,7 +381,7 @@ const generateList: OpGen = (ctx, step, index) => {
   Content(`    // LIST
 `)
   if (needsEnt) {
-    Content(`    let ${entvar} = client.${rustVarName(entity.name)}(Value::Noval);
+    Content(`    let ${entvar} = client.${rustMethodName(entity.name)}(Value::Noval);
 `)
   }
 
@@ -464,7 +464,7 @@ const generateUpdate: OpGen = (ctx, step, index) => {
   Content(`    // UPDATE
 `)
   if (needsEnt) {
-    Content(`    let ${entvar} = client.${rustVarName(entity.name)}(Value::Noval);
+    Content(`    let ${entvar} = client.${rustMethodName(entity.name)}(Value::Noval);
 `)
   }
   Content(`    let ${datavar}_up = Value::empty_map();
@@ -568,7 +568,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
   Content(`    // LOAD
 `)
   if (!hasEntVar) {
-    Content(`    let ${entvar} = client.${rustVarName(entity.name)}(Value::Noval);
+    Content(`    let ${entvar} = client.${rustMethodName(entity.name)}(Value::Noval);
 `)
   }
   if (!hasSrcData && hasEntId) {
@@ -626,7 +626,7 @@ const generateRemove: OpGen = (ctx, step, index) => {
   Content(`    // REMOVE
 `)
   if (needsEnt) {
-    Content(`    let ${entvar} = client.${rustVarName(entity.name)}(Value::Noval);
+    Content(`    let ${entvar} = client.${rustMethodName(entity.name)}(Value::Noval);
 `)
   }
   // Always match the prior-created entity by id to avoid mock-order flakes.

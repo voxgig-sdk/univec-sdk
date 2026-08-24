@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { crateIdent, rustVarName } from './utility_rust'
+import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
 
 
 // A type-correct rust expression constructing a voxgig struct Value.
@@ -31,7 +31,7 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   const { entity: exampleEntity, primaryOp } = pickExampleEntity(entity)
   const eName = exampleEntity ? nom(exampleEntity, 'Name') : 'Entity'
   const eVar = exampleEntity ? rustVarName(exampleEntity.name) : 'entity'
-  const method = exampleEntity ? rustVarName(exampleEntity.name) : 'entity'
+  const method = exampleEntity ? rustMethodName(exampleEntity.name) : 'entity'
   const idF = exampleEntity ? entityIdField(exampleEntity) : null
   const isMatchOp = 'load' === primaryOp || 'remove' === primaryOp
   let testArg = 'Value::Noval'

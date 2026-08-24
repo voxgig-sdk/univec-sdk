@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { crateIdent, rustVarName } from './utility_rust'
+import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -58,7 +58,7 @@ let client = ${ctor};
     const eName = nom(exampleEntity, 'Name')
     const article = /^[aeiou]/i.test(eName) ? 'an' : 'a'
     const eVar = rustVarName(exampleEntity.name)
-    const method = rustVarName(exampleEntity.name)
+    const method = rustMethodName(exampleEntity.name)
     const opnames = entityOps(exampleEntity)
     // Model-driven id key: `idF` is the entity's id-like MATCH field name, or
     // null. `dataIdF` is the id on the RETURNED record's data type.
@@ -91,7 +91,7 @@ match client.${method}(Value::Noval).list(Value::Noval, Value::Noval) {
       const neName = nom(nestedEntity, 'Name')
       const neArticle = /^[aeiou]/i.test(neName) ? 'an' : 'a'
       const neVar = rustVarName(nestedEntity.name)
-      const neMethod = rustVarName(nestedEntity.name)
+      const neMethod = rustMethodName(nestedEntity.name)
 
       const neIdF = entityIdField(nestedEntity)
       const neRequired = opRequestShape(nestedEntity, 'load').items

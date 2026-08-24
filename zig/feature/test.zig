@@ -105,7 +105,7 @@ fn fixIds(_: Allocator, key: ?[]const u8, val: Value, _: Value, path: []const []
 // while the fixture plainly held two. Mirrors the go/ts/lua/php mocks, which
 // already wrap; rust, c and zig were the three that did not.
 fn envelope(ctx: *Context, data: Value) Value {
-    if (data == .undef or data == .null) return data;
+    if (data == .null) return data;
     const restf = h.getpath(&.{ "transform", "res" }, ctx.point);
     if (restf != .string) return data;
     const spec = restf.string;

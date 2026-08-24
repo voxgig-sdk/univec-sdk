@@ -6,7 +6,7 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { crateIdent, rustVarName } from './utility_rust'
+import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
 
 
 const ReadmeModel = cmp(function ReadmeModel(props: any) {
@@ -77,7 +77,7 @@ Creates a test-mode client with mock transport. Both arguments may be
 
   each(entityList, (ent: any) => {
     const article = /^[aeiou]/i.test(ent.Name) ? 'an' : 'a'
-    Content(`| \`${rustVarName(ent.name)}\` | \`(entopts: Value) -> Rc<${ent.Name}Entity>\` | Create ${article} ${ent.Name} entity instance. |
+    Content(`| \`${rustMethodName(ent.name)}\` | \`(entopts: Value) -> Rc<${ent.Name}Entity>\` | Create ${article} ${ent.Name} entity instance. |
 `)
   })
 

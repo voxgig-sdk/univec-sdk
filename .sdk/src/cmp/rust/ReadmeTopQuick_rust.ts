@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { crateIdent, rustVarName } from './utility_rust'
+import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
 
 
 // A type-correct rust expression constructing a voxgig struct Value for a
@@ -46,7 +46,7 @@ let client = ${ctor};
   if (exampleEntity) {
     const eName = nom(exampleEntity, 'Name')
     const eVar = rustVarName(exampleEntity.name)
-    const method = rustVarName(exampleEntity.name)
+    const method = rustMethodName(exampleEntity.name)
     const opnames = Object.keys(exampleEntity.op || {})
     // Model-driven id key: null when the entity has no id-like field, in which
     // case the load example takes no match argument.

@@ -6,7 +6,7 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { rustVarName } from './utility_rust'
+import { rustVarName, rustMethodName } from './utility_rust'
 
 
 const ReadmeIntro = cmp(function ReadmeIntro(props: any) {
@@ -30,7 +30,7 @@ The ${target.title} SDK for the ${model.Name} API — an entity-oriented client 
   const exampleEntity = Object.values(entity || {})
     .find((e: any) => e.active !== false) as any
   const example = exampleEntity
-    ? `for example \`client.${rustVarName(exampleEntity.name)}(Value::Noval)\` — each`
+    ? `for example \`client.${rustMethodName(exampleEntity.name)}(Value::Noval)\` — each`
     : 'each'
 
   // Model-driven op list — only the operations the active entities actually
