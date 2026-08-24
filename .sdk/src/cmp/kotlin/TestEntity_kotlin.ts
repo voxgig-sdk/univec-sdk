@@ -114,7 +114,7 @@ class ${entity.Name}EntityTest {
     val setup = ${accessor}BasicSetup(null)
     // Per-op sdk-test-control.json skip.
     val mode = if (setup.live) "live" else "unit"
-    for (op in arrayOf(${stepOps.map(o => `"${o}"`).join(', ')})) {
+    for (op in arrayOf<String>(${stepOps.map(o => `"${o}"`).join(', ')})) {
       val reason = RunnerSupport.skipReason("entityOp", "${entity.name}.\$op", mode)
       Assumptions.assumeTrue(
         reason == null,

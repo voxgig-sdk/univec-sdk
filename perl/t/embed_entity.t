@@ -21,7 +21,7 @@ BASIC_FLOW: {
   my $setup = embed_basic_setup(undef);
   my $_live = $setup->{live} ? 1 : 0;
   # Per-op sdk-test-control.json skip.
-  for my $_op ('create') {
+  for my $_op (('create')) {
     my ($_should_skip, $_reason) = UnivecTestRunner::is_control_skipped(
       'entityOp', "embed." . $_op, $_live ? 'live' : 'unit');
     if ($_should_skip) {

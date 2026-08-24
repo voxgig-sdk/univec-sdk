@@ -158,7 +158,7 @@ class ${entity.Name}DirectTest {
         : []
       const listSkipBlock = listLiveIdKeys.length > 0
         ? `    if (setup.live) {
-      for (liveKey in arrayOf(${listLiveIdKeys.map((k: string) => `"${k}"`).join(', ')})) {
+      for (liveKey in arrayOf<String>(${listLiveIdKeys.map((k: string) => `"${k}"`).join(', ')})) {
         Assumptions.assumeTrue(setup.idmap[liveKey] != null,
             "live test needs " + liveKey + " via *_ENTID env var (synthetic IDs only)")
       }
@@ -265,7 +265,7 @@ ${listSkipBlock}    val client = setup.client
       }
       const loadSkipBlock = loadLiveIdKeys.length > 0
         ? `    if (setup.live) {
-      for (liveKey in arrayOf(${loadLiveIdKeys.map(k => `"${k}"`).join(', ')})) {
+      for (liveKey in arrayOf<String>(${loadLiveIdKeys.map(k => `"${k}"`).join(', ')})) {
         Assumptions.assumeTrue(setup.idmap[liveKey] != null,
             "live test needs " + liveKey + " via *_ENTID env var (synthetic IDs only)")
       }

@@ -21,7 +21,7 @@ BASIC_FLOW: {
   my $setup = model_basic_setup(undef);
   my $_live = $setup->{live} ? 1 : 0;
   # Per-op sdk-test-control.json skip.
-  for my $_op ('list') {
+  for my $_op (('list')) {
     my ($_should_skip, $_reason) = UnivecTestRunner::is_control_skipped(
       'entityOp', "model." . $_op, $_live ? 'live' : 'unit');
     if ($_should_skip) {

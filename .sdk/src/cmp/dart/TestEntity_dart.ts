@@ -382,18 +382,21 @@ const generateList: OpGen = (ctx, step, index) => {
     const hasRefData = validRef && allSteps.some(s => 'create' === s.op &&
       ((s.input.ref ?? entity.name + '_ref01') === validRef))
 
-    // Entities in the list are entity instances; select over their data maps.
+    // listvar is ALREADY a list of data maps — the list call above maps
+    // .data() over the entity instances. Mapping .data() a second time here
+    // called it on a plain Map and every entity test died at runtime with
+    // "Class '_Map<String, dynamic>' has no instance method 'data'".
     if ('ItemExists' === validator.apply && hasRefData) {
       Content(`
       ok(!isempty(select(
-          (${listvar} as List).map((e) => e.data()).toList(),
+          ${listvar},
           {'id': ${validRef}_data['id']})));
 `)
     }
     else if ('ItemNotExists' === validator.apply && hasRefData) {
       Content(`
       ok(isempty(select(
-          (${listvar} as List).map((e) => e.data()).toList(),
+          ${listvar},
           {'id': ${validRef}_data['id']})));
 `)
     }

@@ -55,9 +55,21 @@ function normalizePathParams(
 
 
 // Render a JSON value as a Java literal for query examples.
+// A Java source literal for an example value from the model.
+//
+// An integer beyond Java's int range needs the L suffix: javac rejects a bare
+// 120615523104 outright ("integer number too large"), so one large id in a
+// spec's example makes the whole generated test package fail to compile.
+// A non-integral double is fine unsuffixed.
 function javaLiteral(v: any): string {
   if (null == v) return 'null'
-  if ('number' === typeof v || 'boolean' === typeof v) return String(v)
+  if ('boolean' === typeof v) return String(v)
+  if ('number' === typeof v) {
+    if (Number.isInteger(v) && (v > 2147483647 || v < -2147483648)) {
+      return String(v) + 'L'
+    }
+    return String(v)
+  }
   return JSON.stringify(String(v))
 }
 

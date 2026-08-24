@@ -22,13 +22,27 @@ function projectPath(suffix?: string): string {
 function swiftVarName(name: string): string {
   const pascal = camelify(name)
   const lower = pascal.charAt(0).toLowerCase() + pascal.slice(1)
-  return SWIFT_RESERVED.has(lower) ? lower + '_' : lower
+  if (SWIFT_RESERVED.has(lower)) {
+    return lower + '_'
+  }
+  return leadingDigitSafe(lower)
+}
+
+
+// No Swift identifier may begin with a digit, but a model field may: a
+// `3d_id` field camelifies to `3DId`, and `public var 3DId: String` does not
+// merely fail to bind — the compiler reads it as a malformed number and the
+// whole module dies on "'D' is not a valid digit in integer literal", naming
+// nothing that leads back to the field. Prefixed with an underscore, the same
+// convention cmp/c/utility_c.ts already applies.
+function leadingDigitSafe(ident: string): string {
+  return /^[0-9]/.test(ident) ? '_' + ident : ident
 }
 
 
 // A PascalCase Swift identifier for a snake_case model name.
 function swiftPascalName(name: string): string {
-  return camelify(name)
+  return leadingDigitSafe(camelify(name))
 }
 
 

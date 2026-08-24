@@ -20,7 +20,14 @@ const RUST_RESERVED = new Set<string>([
 
 // A collision-free snake_case rust identifier for a model name.
 function rustVarName(name: string): string {
-  const snake = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+  let snake = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
+  // No Rust identifier may begin with a digit. A `3d_id` field became
+  // `pub 3_d_id: String`, which does not compile ("expected identifier, found
+  // `3_d_id`") and took the whole crate with it. Prefixed with an underscore,
+  // the convention cmp/c/utility_c.ts already applies.
+  if (/^[0-9]/.test(snake)) {
+    snake = '_' + snake
+  }
   return RUST_RESERVED.has(snake) ? snake + '_' : snake
 }
 

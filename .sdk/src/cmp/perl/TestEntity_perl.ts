@@ -70,6 +70,11 @@ const TestEntity = cmp(function TestEntity(props: any) {
     : []
   const aliases = updateData.map(([k, v]: any) => [k, v])
 
+  // An entity whose basic flow has no steps yields an EMPTY list, and Perl's
+  // `for my $x () {` is a syntax error (unlike `for my $x (()) {`, which is a
+  // valid empty loop) — the whole test file then fails to compile. The loop
+  // below therefore wraps this in a second pair of parens, which is a no-op
+  // for a non-empty list because Perl flattens it.
   const opsList = Array.from(new Set(
     (allSteps as any[]).map((s: any) => s.op).filter(Boolean)))
     .map(o => `'${o}'`).join(', ')
@@ -101,7 +106,7 @@ BASIC_FLOW: {
   my $setup = ${entity.name}_basic_setup(undef);
   my $_live = $setup->{live} ? 1 : 0;
   # Per-op sdk-test-control.json skip.
-  for my $_op (${opsList}) {
+  for my $_op ((${opsList})) {
     my ($_should_skip, $_reason) = ${N}TestRunner::is_control_skipped(
       'entityOp', "${entity.name}." . $_op, $_live ? 'live' : 'unit');
     if ($_should_skip) {
