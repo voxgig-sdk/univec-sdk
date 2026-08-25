@@ -514,11 +514,21 @@ def _run_batch(items, label):
     env = dict(os.environ)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PYTHONPATH"] = _PY_ROOT + os.pathsep + env.get("PYTHONPATH", "")
-    proc = subprocess.run(
-        [sys.executable, "-c", driver],
-        cwd=_PY_ROOT, env=env, capture_output=True, text=True,
-    )
-    return (proc.stdout or "") + (proc.stderr or "")
+
+    # A FILE, not "python -c". The driver embeds every runnable snippet's
+    # source, and a large SDK documents hundreds of them: passing that on the
+    # command line exceeded ARG_MAX and the whole gate died with
+    # "OSError: [Errno 7] Argument list too long" — on gitlab and github, while
+    # every small repo passed. The batch has no size limit through a file.
+    with tempfile.TemporaryDirectory() as td:
+        driver_path = os.path.join(td, "readme_batch_driver.py")
+        with open(driver_path, "w", encoding="utf-8") as fh:
+            fh.write(driver)
+        proc = subprocess.run(
+            [sys.executable, driver_path],
+            cwd=_PY_ROOT, env=env, capture_output=True, text=True,
+        )
+        return (proc.stdout or "") + (proc.stderr or "")
 
 
 def _batch_segment(text, index):

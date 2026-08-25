@@ -519,6 +519,7 @@ Feature* feature_retry_new(void);
 Feature* feature_timeout_new(void);
 Feature* feature_ratelimit_new(void);
 Feature* feature_cache_new(void);
+Feature* feature_cost_new(void);
 Feature* feature_idempotency_new(void);
 Feature* feature_paging_new(void);
 Feature* feature_streaming_new(void);
