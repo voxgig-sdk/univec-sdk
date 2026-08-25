@@ -6,6 +6,7 @@ import {
   canonKey,
   canonScalarKey,
   each,
+  opParams,
 } from '@voxgig/sdkgen'
 
 import {
@@ -28,13 +29,25 @@ import {
 // does. Falls back to the entity field of the same name (used when the op
 // has no params). Returns undefined when neither is present.
 function paramCanonType(entity: any, op: any, paramName: string): unknown {
-  const points = op && op.points ? each(op.points) : []
-  for (const pt of points as any[]) {
-    const params = pt && pt.args && pt.args.params ? each(pt.args.params) : []
-    const found = (params as any[]).find((p: any) => p && p.name === paramName)
-    if (found) {
-      return found.type
-    }
+  // opParams, NOT a raw walk of op.points.
+  //
+  // opParams drops points flagged with select['$action'] and merges what is
+  // left; the typed-model generator reaches the op's params through it, so
+  // anything else is a DIFFERENT set of params wearing the same name.
+  //
+  // A raw walk returned the first match on ANY point, action points included.
+  // github's `action` entity has a field `owner` (`$OBJECT`, "A GitHub user")
+  // and seven create points whose path carries `{owner}` (a string) — so the
+  // type said Record<string, any> and the doc example said 'example_owner',
+  // and ts/README.md stopped compiling. Same for workflow_id: `number` in the
+  // type, quoted string in the example.
+  //
+  // Deriving from opParams is what actually makes good on the promise below —
+  // that the docs and the generated types cannot disagree.
+  const params = op ? each(opParams(op)) : []
+  const found = (params as any[]).find((p: any) => p && p.name === paramName)
+  if (found) {
+    return found.type
   }
   const field = (entity && entity.fields ? each(entity.fields) : [])
     .find((f: any) => f && f.name === paramName) as any
