@@ -1,6 +1,8 @@
 
 import * as Path from 'node:path'
 
+import { swiftTargetDir, swiftTestDir } from './utility_swift'
+
 import {
   cmp, each,
   File, Content, Copy, Folder, Fragment,
@@ -40,18 +42,51 @@ const Main = cmp(async function Main(props: any) {
 
   // Copy tm/swift files with replacements. `src/` holds only the per-feature
   // extension folders (not shipped into the SDK output).
+  // THE COPIED TREE HAS TO CARRY THE API NAME TOO.
+  //
+  // Copy substitutes file CONTENTS, never path components, so a blanket copy
+  // of tm/swift landed the runtime in a directory literally called
+  // ProjectNameSDK. Package.swift papered over it with an explicit `path:`,
+  // so it compiled and every swift suite passed — while every published SDK
+  // shipped `Sources/ProjectNameSDK/`, and SwiftPM's own convention
+  // (Sources/<target>) was broken in all of them.
+  //
+  // Copy's `to` prop names the destination, so the two placeholder subtrees
+  // are copied explicitly and the rest of tm/swift blanket-copied as before.
   Copy({
     from: 'tm/' + target.name,
-    exclude: [/src\//],
+    exclude: [/src\//, /Sources\//, /Tests\//],
     replace: {
       ...props.ctx$.stdrep,
       ProjectName: model.const.Name,
     }
   })
 
+  Folder({ name: 'Sources' }, () => {
+    Copy({
+      from: 'tm/' + target.name + '/Sources/ProjectNameSDK',
+      to: swiftTargetDir(model),
+      replace: {
+        ...props.ctx$.stdrep,
+        ProjectName: model.const.Name,
+      }
+    })
+  })
+
+  Folder({ name: 'Tests' }, () => {
+    Copy({
+      from: 'tm/' + target.name + '/Tests/ProjectNameSDKTests',
+      to: swiftTestDir(model),
+      replace: {
+        ...props.ctx$.stdrep,
+        ProjectName: model.const.Name,
+      }
+    })
+  })
+
   // Generated sources join the copied runtime under Sources/ProjectNameSDK.
   Folder({ name: 'Sources' }, () => {
-    Folder({ name: 'ProjectNameSDK' }, () => {
+    Folder({ name: swiftTargetDir(model) }, () => {
       Folder({ name: 'core' }, () => {
 
         // Main SDK client class, with entity accessors injected at the SLOT.

@@ -252,9 +252,13 @@
     "feature" (vs/jm
       "test" (vs/jm
         "options" (vs/jm
-          "active" false)))
+          "active" false)
+        "transport" "base"))
     "main" (vs/jm
-      "name" "Univec")
+      "name" "Univec"
+      "slug" "univec"
+      "target" "clojure"
+      "version" "0.1.1")
     "options" (vs/jm
       "auth" (vs/jm
         "prefix" "Bearer")

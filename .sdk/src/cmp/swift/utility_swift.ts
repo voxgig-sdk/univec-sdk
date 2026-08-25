@@ -132,10 +132,26 @@ function clean(o: any, dropDefaults?: boolean): any {
 }
 
 
+// SwiftPM's convention is Sources/<target>/ and Tests/<target>Tests/, and the
+// target is named <Name>Sdk in Package_swift. These name the two directories
+// so the copied runtime lands under the API's own name rather than under the
+// template's placeholder — see the note in Main_swift.
+function swiftTargetDir(model: any): string {
+  return model.const.Name + 'Sdk'
+}
+
+
+function swiftTestDir(model: any): string {
+  return swiftTargetDir(model) + 'Tests'
+}
+
+
 export {
   clean,
   projectPath,
   swiftPascalName,
+  swiftTargetDir,
+  swiftTestDir,
   swiftVarName,
   swiftString,
 }

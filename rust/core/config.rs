@@ -19,6 +19,7 @@ pub fn make_config() -> Value {
                 ("options".to_string(), Value::map_of([
                     ("active".to_string(), Value::Bool(false)),
                 ])),
+                ("transport".to_string(), Value::str("base")),
             ])),
         ])),
         ("options".to_string(), Value::map_of([

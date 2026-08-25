@@ -32,7 +32,7 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { swiftVarName } from './utility_swift'
+import { swiftVarName , swiftTargetDir, swiftTestDir } from './utility_swift'
 
 
 const LANG = 'swift'
@@ -89,7 +89,7 @@ const EntityTypes = cmp(function EntityTypes(props: any) {
   warnEntityTypeCollisions(entity, log, LANG)
 
   Folder({ name: 'Sources' }, () => {
-    Folder({ name: 'ProjectNameSDK' }, () => {
+    Folder({ name: swiftTargetDir(model) }, () => {
       Folder({ name: 'entity' }, () => {
 
         File({ name: model.const.Name + 'Types.' + target.ext }, () => {

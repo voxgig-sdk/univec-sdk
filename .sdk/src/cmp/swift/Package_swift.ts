@@ -1,4 +1,6 @@
 
+import { swiftTargetDir, swiftTestDir } from './utility_swift'
+
 import {
   Content,
   File,
@@ -14,10 +16,11 @@ import type {
 
 // Emits Package.swift (the SwiftPM manifest; the Swift twin of Package_go's
 // go.mod / Package_csharp's csproj). The library target compiles everything
-// under Sources/ProjectNameSDK (the copied runtime + generated sources); the
-// test target compiles Tests/ProjectNameSDKTests. Directory names are the
-// verbatim copied paths (Copy does not rewrite path components); the target
-// NAMES carry the API name.
+// under Sources/<Name>Sdk (the copied runtime + generated sources); the test
+// target compiles Tests/<Name>SdkTests. Both directories carry the API name:
+// Copy does not rewrite path components, so Main_swift copies the two
+// placeholder subtrees explicitly via Copy's `to` prop rather than letting a
+// blanket copy ship them as ProjectNameSDK.
 //
 // Dependencies: the runtime itself is dependency-free (Foundation + the
 // vendored struct), but declared target/feature deps flow into the manifest
@@ -91,11 +94,11 @@ let package = Package(
     targets: [
         .target(
             name: "${Name}Sdk",${targetdeps}
-            path: "Sources/ProjectNameSDK"),
+            path: "Sources/${swiftTargetDir(model)}"),
         .testTarget(
             name: "${Name}SdkTests",
             dependencies: ["${Name}Sdk"],
-            path: "Tests/ProjectNameSDKTests"),
+            path: "Tests/${swiftTestDir(model)}"),
     ]
 )
 `)

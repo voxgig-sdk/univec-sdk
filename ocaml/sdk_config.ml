@@ -11,11 +11,15 @@ open Sdk_features
 let make_config () : value =
   (jo [
     ("main", (jo [
-      ("name", (Str "Univec")) ]));
+      ("name", (Str "Univec"));
+      ("slug", (Str "univec"));
+      ("version", (Str "0.1.1"));
+      ("target", (Str "ocaml")) ]));
     ("feature", (jo [
       ("test", (jo [
         ("options", (jo [
-          ("active", (Bool false)) ])) ])) ]));
+          ("active", (Bool false)) ]));
+        ("transport", (Str "base")) ])) ]));
     ("options", (jo [
       ("base", (Str "https://api.univec.ai"));
       ("auth", (jo [

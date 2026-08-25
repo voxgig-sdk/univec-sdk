@@ -10,12 +10,16 @@ pub fn make_config() Value {
     return h.jo(&.{
         .{ "main", h.jo(&.{
             .{ "name", h.vstr("Univec") },
+            .{ "slug", h.vstr("univec") },
+            .{ "version", h.vstr("0.1.1") },
+            .{ "target", h.vstr("zig") },
         }) },
         .{ "feature", h.jo(&.{
             .{ "test", h.jo(&.{
                 .{ "options", h.jo(&.{
                     .{ "active", h.vbool(false) },
                 }) },
+                .{ "transport", h.vstr("base") },
             }) },
         }) },
         .{ "options", h.jo(&.{

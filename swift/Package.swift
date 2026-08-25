@@ -14,10 +14,10 @@ let package = Package(
     targets: [
         .target(
             name: "UnivecSdk",
-            path: "Sources/ProjectNameSDK"),
+            path: "Sources/UnivecSdk"),
         .testTarget(
             name: "UnivecSdkTests",
             dependencies: ["UnivecSdk"],
-            path: "Tests/ProjectNameSDKTests"),
+            path: "Tests/UnivecSdkTests"),
     ]
 )

@@ -36,6 +36,7 @@ class Config {
       'options': <String, dynamic>{
         'active': false,
       },
+      'transport': 'base',
     },
 
   };

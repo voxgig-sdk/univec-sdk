@@ -1,6 +1,8 @@
 
 import * as Path from 'node:path'
 
+import { swiftTargetDir, swiftTestDir } from './utility_swift'
+
 import {
   cmp, camelify, names,
   Content, File, Folder, Fragment,
@@ -33,7 +35,7 @@ const Entity = cmp(function Entity(props: any) {
 
   // Entity files join the copied runtime under Sources/ProjectNameSDK/entity.
   Folder({ name: 'Sources' }, () => {
-    Folder({ name: 'ProjectNameSDK' }, () => {
+    Folder({ name: swiftTargetDir(model) }, () => {
       Folder({ name: 'entity' }, () => {
 
         File({ name: cls + '.' + target.ext }, () => {

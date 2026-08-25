@@ -1,4 +1,6 @@
 
+import { swiftTargetDir, swiftTestDir } from './utility_swift'
+
 import { cmp, Content } from '@voxgig/sdkgen'
 
 
@@ -24,16 +26,16 @@ generated for editor documentation.
 \`\`\`
 swift/
 ├── Package.swift                     -- SwiftPM manifest (zero runtime deps)
-├── Sources/ProjectNameSDK/
+├── Sources/${swiftTargetDir(model)}/
 │   ├── core/                         -- Main client, config, entity base, error type
 │   ├── entity/                       -- Generated entity clients
 │   ├── feature/                      -- Built-in features (Base, Test, Log, ...)
 │   ├── utility/                      -- Utility functions
 │   └── Struct/                       -- Vendored Voxgig Struct port
-└── Tests/ProjectNameSDKTests/        -- Test suites (XCTest)
+└── Tests/${swiftTestDir(model)}/    -- Test suites (XCTest)
 \`\`\`
 
-The main client class (\`${SDK}\`, under \`Sources/ProjectNameSDK/core\`)
+The main client class (\`${SDK}\`, under \`Sources/${swiftTargetDir(model)}/core\`)
 exposes the entity accessors. Reference entity or utility types directly only
 when needed. The SDK is dependency-free: JSON parsing is the vendored
 \`Struct/JSON.swift\`, HTTP transport is Foundation's \`URLSession\`, and the

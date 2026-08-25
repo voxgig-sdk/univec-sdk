@@ -57,7 +57,8 @@ public final class Config {
     b.append("  \"test\": {");
     b.append("   \"options\": {");
     b.append("    \"active\": false");
-    b.append("   }");
+    b.append("   },");
+    b.append("   \"transport\": \"base\"");
     b.append("  }");
     b.append(" },");
     b.append(" \"options\": {");

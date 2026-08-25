@@ -24,6 +24,7 @@ public static class SdkConfig
                     {
                         ["active"] = false,
                     },
+                    ["transport"] = "base",
                 },
             },
             ["options"] = new Dictionary<string, object?>

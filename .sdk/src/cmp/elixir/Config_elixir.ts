@@ -174,7 +174,10 @@ defmodule ${Name}.Config do
 `)
 
       each(feature, (f: any) => {
-        Content(`        ${elixirString(f.name)} => ${formatElixir(f.config || {}, 4)},
+        // From configDefinition's def, not f.config, so the literal carries
+        // the feature's `transport` role (station design §8.4) beside its
+        // options and cannot drift from the data rep.
+        Content(`        ${elixirString(f.name)} => ${formatElixir(configDef.feature[f.name] || {}, 4)},
 `)
       })
 

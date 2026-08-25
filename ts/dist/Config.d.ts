@@ -13,6 +13,7 @@ declare class Config {
             options: {
                 active: boolean;
             };
+            transport: string;
         };
     };
     options: {

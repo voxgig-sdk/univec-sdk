@@ -26,7 +26,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
     "test": {
       "options": {
         "active": false
-      }
+      },
+      "transport": "base"
     }
   },
   "options": {

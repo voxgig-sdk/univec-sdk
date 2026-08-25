@@ -46,9 +46,19 @@ const Config = cmp(async function Config(props: any) {
   let baseUrl = ''
   try { baseUrl = getModelPath(model, `main.${KIT}.info.servers.0.url`) } catch (_e) { }
 
+  // Identity comes from configDefinition's def, not re-derived here, so
+  // this target cannot disagree with the shared emitter on main.slug /
+  // main.version / main.target (the three station descriptor fields,
+  // station design §4) — passing target.name is what opts this target in.
+  const { def: configDef } = configDefinition(model, target.name)
+
+  // The feature block comes from configDefinition's def, not from
+  // f.config, so it carries each feature's `transport` role (station
+  // design §8.4) beside its options and cannot drift from the shared
+  // emitter.
   const featureConfig: Record<string, any> = {}
   each(feature, (f: any) => {
-    featureConfig[f.name] = cleanModel(f.config || {})
+    featureConfig[f.name] = cleanModel(configDef.feature[f.name] || {})
   })
 
   const optionsEntity: Record<string, any> = {}
@@ -72,12 +82,6 @@ const Config = cmp(async function Config(props: any) {
       op: n.op,
       relations: n.relations,
     }, true), a), {})
-
-  // Identity comes from configDefinition's def, not re-derived here, so
-  // this target cannot disagree with the shared emitter on main.slug /
-  // main.version / main.target (the three station descriptor fields,
-  // station design §4) — passing target.name is what opts this target in.
-  const { def: configDef } = configDefinition(model, target.name)
 
   const config = {
     main: configDef.main,

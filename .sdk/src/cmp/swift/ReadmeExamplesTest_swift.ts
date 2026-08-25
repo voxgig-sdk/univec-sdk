@@ -64,7 +64,7 @@ final class ReadmeExamplesTest: XCTestCase {
   // The three documents to scan, resolved relative to this test file.
   private func docs() -> [Doc] {
     let here = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()   // ProjectNameSDKTests
+      .deletingLastPathComponent()   // the test target dir
       .deletingLastPathComponent()   // Tests
       .deletingLastPathComponent()   // swift (module dir)
     let project = here.deletingLastPathComponent()  // project (holds root README)

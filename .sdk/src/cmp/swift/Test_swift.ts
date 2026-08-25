@@ -3,6 +3,8 @@ import type {
   ModelEntity
 } from '@voxgig/apidef'
 
+import { swiftTargetDir, swiftTestDir } from './utility_swift'
+
 import { cmp, each, Folder, entityCollection } from '@voxgig/sdkgen'
 
 
@@ -20,7 +22,7 @@ const Test = cmp(function Test(props: any) {
   // templates in tm/swift/Tests. Only the API-specific entity/direct tests
   // are generated here.
   Folder({ name: 'Tests' }, () => {
-    Folder({ name: 'ProjectNameSDKTests' }, () => {
+    Folder({ name: swiftTestDir(model) }, () => {
       const entity = each(entityCollection(model))
         .filter((e: any) => false !== e.active)
 

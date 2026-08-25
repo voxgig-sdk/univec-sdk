@@ -46,9 +46,21 @@ const Config = cmp(async function Config(props: any) {
   let baseUrl = ''
   try { baseUrl = getModelPath(model, `main.${KIT}.info.servers.0.url`) } catch (_e) { }
 
+  // The same config as an OBJECT, built by the shared helper so this target's
+  // literal and the data that replaces it above the threshold are the same
+  // config by construction. The JSON is what the threshold is measured on -
+  // emitted source size varies by language, the model does not. Passing
+  // target.name opts this target into the main slug/version/target identity
+  // fields (read by station's descriptor - see configDefinition).
+  const { def: configDef, json: configJson } = configDefinition(model, target.name)
+  const asData = isConfigData(configJson, configReprSetting(model))
+
+  // The feature block comes from configDefinition's def, not from f.config,
+  // so the literal carries each feature's `transport` role (station design
+  // §8.4) beside its options and cannot drift from the data rep.
   const featureConfig: any = {}
   each(feature, (f: any) => {
-    featureConfig[f.name] = f.config || {}
+    featureConfig[f.name] = configDef.feature[f.name] || {}
   })
 
   const entityOptions: any = {}
@@ -72,15 +84,6 @@ const Config = cmp(async function Config(props: any) {
       op: n.op,
       relations: n.relations,
     }, true), a), {})
-
-  // The same config as an OBJECT, built by the shared helper so this target's
-  // literal and the data that replaces it above the threshold are the same
-  // config by construction. The JSON is what the threshold is measured on -
-  // emitted source size varies by language, the model does not. Passing
-  // target.name opts this target into the main slug/version/target identity
-  // fields (read by station's descriptor - see configDefinition).
-  const { def: configDef, json: configJson } = configDefinition(model, target.name)
-  const asData = isConfigData(configJson, configReprSetting(model))
 
   const config = {
     // main from configDefinition's def, not re-derived here, so the literal
