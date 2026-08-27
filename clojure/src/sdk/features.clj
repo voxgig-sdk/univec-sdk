@@ -620,6 +620,173 @@
     fa))
 
 ;; ---------------------------------------------------------------------------
+;; cost
+;; ---------------------------------------------------------------------------
+;; Prices every transport ATTEMPT and commits the spend once per OPERATION.
+;; Mirrors tm/ts/src/feature/cost/CostFeature.ts; the cases are
+;; .sdk/test/feature/cost.aon.
+;;
+;; ORDER MATTERS. Cost must sit INSIDE the cache, or a response served from
+;; cache is charged for money that was never spent. Activate in list form with
+;; cost first: [{name "cost"} {name "cache"}].
+
+(defn cost-feature []
+  (let [fa (new-feature "cost" false "0.0.1")
+        per-unit (fn [] (let [p (opt fa "perUnit")] (if (number? p) p 0)))
+        budget-limit (fn [] (let [b (opt fa "budget")] (if (number? b) b 0)))
+        record! (fn []
+                  (track-ensure! fa "_cost"
+                    (vs/jm "currency" (or (opt fa "currency") "USD")
+                           "total" (vs/jm "calls" 0 "attempts" 0 "amount" 0 "reported" 0 "estimated" 0)
+                           "ops" (vs/jm) "actors" (vs/jm)
+                           "budget" (vs/jm "limit" (budget-limit) "spent" 0
+                                           "remaining" (budget-limit) "exceeded" false)
+                           "last" nil)))
+        bump! (fn [m k by] (.put ^java.util.Map m k (+ (or (mget m k) 0) by)))
+        ;; Accumulated per context, committed once at PreDone: adding each
+        ;; attempt to the running total and subtracting it again when a body
+        ;; figure supersedes it loses precision to catastrophic cancellation.
+        pending (fn [ctx]
+                  (let [id (core/oget ctx :id)]
+                    (or (get (:pending @fa) id)
+                        (let [p (vs/jm "attempts" 0 "amount" 0 "reported" 0 "estimated" 0
+                                       "source" "none" "piped" false)]
+                          (swap! fa update :pending assoc id p) p))))
+        price-header (fn [res]
+                       (let [name (opt fa "header")]
+                         (when (and (string? name) (seq name))
+                           (let [v (header-of (vs/getprop res "headers") name)
+                                 n (to-num v)]
+                             (when (number? n) [(* n (per-unit)) "header"])))))
+        ;; Same lookup grammar as rbac's rules: '<entity>.<op>', then '<op>',
+        ;; then '*'.
+        price-rate (fn [ctx]
+                     (let [rates (let [r (opt fa "rates")] (if (vs/ismap r) r (vs/jm)))
+                           op (core/oget ctx :op)
+                           ent (or (when-let [e (core/oget ctx :entity)] (core/entity-get-name e))
+                                   (when op (core/op-entity op)) "")
+                           opname (if op (core/op-name op) "")
+                           pick (fn [k] (let [v (vs/getprop rates k)] (when (number? v) v)))]
+                       (when-let [n (or (pick (str ent "." opname)) (pick opname) (pick "*"))]
+                         [n "table"])))
+        price (fn [ctx res]
+                (or (price-header res)
+                    (price-rate ctx)
+                    (let [u (opt fa "unit")]
+                      (if (and (number? u) (not= 0 u)) [u "unit"] [0 "none"]))))
+        ;; A usage figure from the parsed result body, priced by perUnit. Read
+        ;; at commit, not at the transport seam, because the body is one-shot.
+        price-body (fn [ctx]
+                     (let [path (opt fa "path")]
+                       (when (and (string? path) (seq path))
+                         (when-let [result (core/oget ctx :result)]
+                           (let [body (core/oget result :body)]
+                             (when (vs/ismap body)
+                               (let [n (to-num (vs/getpath body path))]
+                                 (when (number? n) (* n (per-unit))))))))))
+        spend! (fn [rec amount reported estimated]
+                 (let [total (mget rec "total") budget (mget rec "budget")
+                       lim (or (mget budget "limit") 0)]
+                   (bump! total "amount" amount)
+                   (bump! total "reported" reported)
+                   (bump! total "estimated" estimated)
+                   (let [spent (or (mget total "amount") 0)]
+                     (.put ^java.util.Map budget "spent" spent)
+                     (.put ^java.util.Map budget "remaining"
+                           (if (> lim 0) (max 0 (- lim spent)) 0))
+                     (when (and (> lim 0) (>= spent lim))
+                       (.put ^java.util.Map budget "exceeded" true)))))
+        bump-bucket! (fn [bucket key amount]
+                       (let [b (let [x (vs/getprop bucket key)]
+                                 (if (vs/ismap x) x
+                                     (let [m (vs/jm "calls" 0 "amount" 0)]
+                                       (.put ^java.util.Map bucket key m) m)))]
+                         (bump! b "calls" 1)
+                         (bump! b "amount" amount)))
+        commit! (fn [ctx p entity opname]
+                  (let [rec (record!)
+                        body (price-body ctx)
+                        amount (if (some? body) body (or (mget p "amount") 0))
+                        reported (if (some? body) body (or (mget p "reported") 0))
+                        estimated (if (some? body) 0 (or (mget p "estimated") 0))
+                        source (if (some? body) "body" (mget p "source"))
+                        actor (or (core/oget (core/oget ctx :ctrl) :actor)
+                                  (opt fa "actor") "anonymous")]
+                    (spend! rec amount reported estimated)
+                    (bump! (mget rec "total") "calls" 1)
+                    (bump-bucket! (mget rec "ops") (str entity "." opname) amount)
+                    (bump-bucket! (mget rec "actors") (str actor) amount)
+                    (swap! fa update :seq (fnil inc 0))
+                    (.put ^java.util.Map rec "last"
+                          (vs/jm "seq" (:seq @fa) "entity" entity "op" opname "actor" (str actor)
+                                 "amount" amount "currency" (mget rec "currency")
+                                 "source" source "attempts" (mget p "attempts")))))
+        finish! (fn [ctx done]
+                  (when (active? fa)
+                    (let [id (core/oget ctx :id) p (get (:pending @fa) id)]
+                      (when (some? p)
+                        (swap! fa update :pending dissoc id)
+                        ;; A FAILED operation that made no attempt never reached
+                        ;; the network - the budget gate refused it - and must
+                        ;; not be counted. A SUCCEEDED one that made no attempt
+                        ;; was served from the cache: a real call that cost
+                        ;; nothing, which is the point of ordering cost inside
+                        ;; the cache.
+                        (when (or done (> (or (mget p "attempts") 0) 0))
+                          (let [op (core/oget ctx :op)
+                                entity (if (and op (seq (core/op-entity op))) (core/op-entity op) "_")
+                                opname (if (and op (seq (core/op-name op))) (core/op-name op) "_")]
+                            (commit! ctx p entity opname)))))))
+        charge (fn [ctx url fetchdef inner]
+                 ;; A rejecting transport still costs an attempt: without this a
+                 ;; run of connection-level failures under retry would be
+                 ;; charged nothing, and an onBudget "deny" ceiling could never
+                 ;; stop it.
+                 (let [[res err] (inner ctx url fetchdef)
+                       [amount source] (price ctx res)
+                       p (pending ctx)]
+                   (bump! p "attempts" 1)
+                   (bump! p "amount" amount)
+                   (bump! p (if (or (= source "header") (= source "body")) "reported" "estimated") amount)
+                   (.put ^java.util.Map p "source" source)
+                   (bump! (mget (record!) "total") "attempts" 1)
+                   ;; direct() and graphql() dispatch no pipeline hooks, so
+                   ;; their spend is committed here or never. `piped` is set by
+                   ;; PrePoint, so its absence is the signal.
+                   (when (not= true (mget p "piped"))
+                     (swap! fa update :pending dissoc (core/oget ctx :id))
+                     (commit! ctx p "_" "direct"))
+                   [res err]))]
+    (swap! fa assoc :pending {} :seq 0)
+    (swap! fa assoc
+           "init" (fn [ctx options]
+                    (swap! fa assoc :client (core/oget ctx :client)
+                           :options (if (vs/ismap options) options (vs/jm))
+                           :active (opts-active? options) :pending {} :seq 0)
+                    (when (active? fa)
+                      (record!)
+                      (wrap-fetcher! ctx (fn [fctx url fd inner] (charge fctx url fd inner)))))
+           "PrePoint"
+           (fn [ctx]
+             (when (active? fa)
+               ;; Mark the context as piped, so charge knows a PreDone follows.
+               (.put ^java.util.Map (pending ctx) "piped" true)
+               (let [lim (budget-limit)]
+                 (when (> lim 0)
+                   (let [rec (record!)
+                         spent (or (mget (mget rec "total") "amount") 0)]
+                     (when (>= spent lim)
+                       (.put ^java.util.Map (mget rec "budget") "exceeded" true)
+                       (when (= "deny" (opt fa "onBudget"))
+                         (let [err (core/ctx-error ctx "cost_budget"
+                                     (str "Cost budget of " lim " " (mget rec "currency")
+                                          " is spent (" spent " used)"))]
+                           (core/out-set! ctx "point" err)
+                           err))))))))
+           "PreDone" (fn [ctx] (finish! ctx true)))
+    fa))
+
+;; ---------------------------------------------------------------------------
 ;; streaming
 ;; ---------------------------------------------------------------------------
 
@@ -1108,4 +1275,5 @@
     "clienttrack" (clienttrack-feature)
     "rbac" (rbac-feature)
     "netsim" (netsim-feature)
+    "cost" (cost-feature)
     (base-feature)))

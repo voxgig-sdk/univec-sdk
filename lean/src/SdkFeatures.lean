@@ -479,6 +479,155 @@ def pagingFeature : SIO Feature := do
                  (newMap #[("pages", .num 0.0), ("items", .num 0.0)])
                bumpNum b "items" n.toFloat }
 
+-- ---------------------------------------------------------------------------
+-- cost
+-- ---------------------------------------------------------------------------
+-- Prices every transport ATTEMPT and commits the spend once per OPERATION.
+-- Mirrors tm/ts/src/feature/cost/CostFeature.ts.
+--
+-- ORDER MATTERS. Cost must sit INSIDE the cache, or a response served from
+-- cache is charged for money that was never spent.
+
+def costFeature : SIO Feature := do
+  let optsR ← IO.mkRef (← emptyMap)
+  -- Accumulated per call and committed once: adding each attempt to the
+  -- running total and subtracting it again loses precision.
+  let pendR ← IO.mkRef (← newMap #[("attempts", Value.num 0.0), ("amount", Value.num 0.0),
+                                   ("reported", Value.num 0.0), ("estimated", Value.num 0.0),
+                                   ("source", Value.str "none")])
+  let seqR ← IO.mkRef 0
+
+  let record : Value → SIO Value := fun ctx => do
+    let o ← optsR.get
+    let cur ← optStr o "currency" "USD"
+    let lim ← optNum o "budget" 0.0
+    let total ← newMap #[("calls", Value.num 0.0), ("attempts", Value.num 0.0),
+                         ("amount", Value.num 0.0), ("reported", Value.num 0.0),
+                         ("estimated", Value.num 0.0)]
+    let ops ← emptyMap
+    let actors ← emptyMap
+    let budget ← newMap #[("limit", Value.num lim), ("spent", Value.num 0.0),
+                          ("remaining", Value.num lim), ("exceeded", Value.bool false)]
+    trackCtx ctx "cost" (newMap #[("currency", Value.str cur), ("total", total),
+                                  ("ops", ops), ("actors", actors), ("budget", budget),
+                                  ("last", Value.noval)])
+
+  let resetPending : SIO Unit := do
+    let p ← newMap #[("attempts", Value.num 0.0), ("amount", Value.num 0.0),
+                     ("reported", Value.num 0.0), ("estimated", Value.num 0.0),
+                     ("source", Value.str "none")]
+    pendR.set p
+
+  -- Pricing precedence: a server-stated header beats the rate table, which
+  -- beats the flat unit.
+  let priceOf : Value → Value → SIO (Float × String) := fun ctx res => do
+    let o ← optsR.get
+    let perUnit ← optNum o "perUnit" 0.0
+    let hname ← optStr o "header" ""
+    let hv ← if hname == "" then pure Value.noval else headerCI (← gp res "headers") hname
+    let hn := numOf hv (-1.0)
+    if hname != "" && hn >= 0.0 then
+      pure (hn * perUnit, "header")
+    else do
+      let rates ← gp o "rates"
+      let opname ← SdkUtility.opnameOf ctx
+      let byOp := numOf (← gp rates opname) (-1.0)
+      let byAny := numOf (← gp rates "*") (-1.0)
+      if byOp >= 0.0 then pure (byOp, "table")
+      else if byAny >= 0.0 then pure (byAny, "table")
+      else do
+        let unit ← optNum o "unit" 0.0
+        if unit != 0.0 then pure (unit, "unit") else pure (0.0, "none")
+
+  let bucketOf : Value → String → SIO Value := fun bucket key => do
+    let b ← gp bucket key
+    match b with
+    | Value.map _ => pure b
+    | _ => do
+        let m ← newMap #[("calls", Value.num 0.0), ("amount", Value.num 0.0)]
+        sp bucket key m
+        pure m
+
+  let commit : Value → SIO Unit := fun ctx => do
+    let o ← optsR.get
+    let p ← pendR.get
+    let rec_ ← record ctx
+    let amount := numOf (← gp p "amount") 0.0
+    let total ← gp rec_ "total"
+    bumpNum total "amount" amount
+    bumpNum total "reported" (numOf (← gp p "reported") 0.0)
+    bumpNum total "estimated" (numOf (← gp p "estimated") 0.0)
+    bumpNum total "calls" 1.0
+
+    let budget ← gp rec_ "budget"
+    let lim := numOf (← gp budget "limit") 0.0
+    let spent := numOf (← gp total "amount") 0.0
+    sp budget "spent" (Value.num spent)
+    sp budget "remaining"
+      (Value.num (if lim > 0.0 then (if lim - spent > 0.0 then lim - spent else 0.0) else 0.0))
+    if lim > 0.0 && spent >= lim then sp budget "exceeded" (Value.bool true)
+
+    let opname ← SdkUtility.opnameOf ctx
+    let actorV ← gp (← gp ctx "ctrl") "actor"
+    let actorS := match actorV with | Value.str a => a | _ => ""
+    let actor ← if actorS != "" then pure actorS else optStr o "actor" "anonymous"
+
+    let opB ← bucketOf (← gp rec_ "ops") ("_." ++ opname)
+    bumpNum opB "calls" 1.0
+    bumpNum opB "amount" amount
+    let acB ← bucketOf (← gp rec_ "actors") actor
+    bumpNum acB "calls" 1.0
+    bumpNum acB "amount" amount
+
+    let n ← seqR.modifyGet fun n => (n + 1, n + 1)
+    let last ← newMap #[("seq", Value.num n.toFloat), ("op", Value.str opname),
+                        ("actor", Value.str actor), ("amount", Value.num amount),
+                        ("currency", ← gp rec_ "currency"), ("source", ← gp p "source"),
+                        ("attempts", ← gp p "attempts")]
+    sp rec_ "last" last
+    resetPending
+
+  pure { name := "cost"
+       , init := fun ctx opts => do
+           let om ← toOptsMap opts
+           optsR.set om
+           resetPending
+           if (← optActive opts) then do
+             let _ ← record ctx
+             let client ← clientOf ctx
+             let inner ← getFetcher client
+             setFetcher client fun c u f => do
+               -- The transport answers (response, error): a rejecting attempt
+               -- still costs, or a run of failures under retry would be free.
+               let (res, rerr) ← inner c u f
+               let (amount, source) ← priceOf c res
+               let p ← pendR.get
+               bumpNum p "attempts" 1.0
+               bumpNum p "amount" amount
+               bumpNum p (if source == "header" then "reported" else "estimated") amount
+               sp p "source" (Value.str source)
+               let rec_ ← record c
+               bumpNum (← gp rec_ "total") "attempts" 1.0
+               pure (res, rerr)
+       , hook := fun stage ctx => do
+           let o ← optsR.get
+           if stage == "PrePoint" then do
+             let lim ← optNum o "budget" 0.0
+             if lim > 0.0 then do
+               let rec_ ← record ctx
+               let spent := numOf (← gp (← gp rec_ "total") "amount") 0.0
+               if spent >= lim then do
+                 sp (← gp rec_ "budget") "exceeded" (Value.bool true)
+                 if (← optStr o "onBudget" "warn") == "deny" then do
+                   let e ← SdkUtility.mkErr "cost_budget"
+                     ("Cost budget of " ++ toString lim ++ " is spent")
+                   let out ← SdkUtility.gpMap ctx "out"
+                   sp out "point" e
+           else if stage == "PreDone" then do
+             -- A cache hit is a real call that cost nothing, so it commits
+             -- too: that is the point of ordering cost inside the cache.
+             commit ctx }
+
 def streamingFeature : SIO Feature := do
   let optsR ← IO.mkRef (← emptyMap)
   pure { name := "streaming"
@@ -591,12 +740,13 @@ def makeFeature (name : String) : SIO Feature :=
   | "streaming" => streamingFeature
   | "proxy" => proxyFeature
   | "netsim" => netsimFeature
+  | "cost" => costFeature
   | _ => baseFeature
 
 /-- The catalog order: transport wrappers compose in this order. -/
 def featureNames : Array String :=
   #["log", "rbac", "idempotency", "clienttrack", "paging", "streaming",
     "metrics", "telemetry", "debug", "audit",
-    "cache", "ratelimit", "timeout", "retry", "proxy", "netsim"]
+    "cost", "cache", "ratelimit", "timeout", "retry", "proxy", "netsim"]
 
 end SdkFeatures
