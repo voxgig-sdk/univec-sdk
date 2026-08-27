@@ -101,8 +101,24 @@ let make_feature (name : string) : feature =
 `)
     }
 
+    // ONLY THE FEATURES THIS PORT ACTUALLY IMPLEMENTS. tm/ocaml/sdk_features.ml
+    // defines a `<name>_feature` for seventeen of the eighteen; `cost` has no
+    // OCaml implementation. Emitting an arm for a name with no constructor is
+    // an "Unbound value cost_feature" at COMPILE time — the whole SDK fails to
+    // build, not just the feature. This only surfaced when an SDK first
+    // activated every feature; before that nothing referenced cost.
+    //
+    // A name with no arm falls through to `base_feature ()` below, which is
+    // the same inert result any unimplemented feature gives. Implementing
+    // cost for OCaml is what would make it real.
+    const OCAML_FEATURES = [
+      'audit', 'cache', 'clienttrack', 'debug', 'idempotency', 'log',
+      'metrics', 'netsim', 'paging', 'proxy', 'ratelimit', 'rbac',
+      'retry', 'streaming', 'telemetry', 'test', 'timeout',
+    ]
+
     each(feature, (f: any) => {
-      if (f.name !== 'base') {
+      if (f.name !== 'base' && OCAML_FEATURES.includes(f.name)) {
         Content(`  | "${ocamlString(f.name)}" -> ${f.name}_feature ()
 `)
       }

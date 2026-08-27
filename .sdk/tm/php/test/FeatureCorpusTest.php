@@ -145,6 +145,17 @@ class FeatureCorpusTest extends TestCase
                 }
             }
         }
+
+        // SAFE OPS FIRST — see the ts harness for the reasoning: the cache
+        // stores only successful GETs, so an SDK whose first usable op is a
+        // `create` (POST) can never satisfy "a hit served from cache costs
+        // nothing".
+        $safe = ['list' => 0, 'load' => 1];
+        usort($out, function ($a, $b) use ($safe) {
+            $ra = $safe[$a['op']] ?? 2;
+            $rb = $safe[$b['op']] ?? 2;
+            return $ra === $rb ? strcmp($a['key'], $b['key']) : $ra - $rb;
+        });
         return $out;
     }
 

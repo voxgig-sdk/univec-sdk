@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -184,6 +185,23 @@ func fcCandidates(client *sdk.UnivecSDK) []fcOp {
 			})
 		}
 	}
+
+	// SAFE OPS FIRST — see the ts harness for the reasoning: the cache stores
+	// only successful GETs, so an SDK whose first usable op is a `create`
+	// (POST) can never satisfy "a hit served from cache costs nothing".
+	safe := map[string]int{"list": 0, "load": 1}
+	rank := func(o fcOp) int {
+		if r, ok := safe[strings.ToLower(o.method)]; ok {
+			return r
+		}
+		return 2
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if rank(out[i]) != rank(out[j]) {
+			return rank(out[i]) < rank(out[j])
+		}
+		return out[i].key < out[j].key
+	})
 	return out
 }
 

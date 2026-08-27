@@ -129,6 +129,12 @@ def _candidates(client):
                     "accessor": accessor,
                     "op": opname,
                 })
+
+    # SAFE OPS FIRST - see the ts harness for the reasoning: the cache stores
+    # only successful GETs, so an SDK whose first usable op is a `create`
+    # (POST) can never satisfy "a hit served from cache costs nothing".
+    safe = {"list": 0, "load": 1}
+    out.sort(key=lambda o: (safe.get(o["op"], 2), o["key"]))
     return out
 
 

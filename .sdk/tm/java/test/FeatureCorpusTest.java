@@ -182,6 +182,14 @@ public class FeatureCorpusTest {
         out.add(new Op(e.getKey() + "." + opname, accessor, call));
       }
     }
+
+    // SAFE OPS FIRST — see the ts harness for the reasoning: the cache stores
+    // only successful GETs, so an SDK whose first usable op is a `create`
+    // (POST) can never satisfy "a hit served from cache costs nothing".
+    java.util.Map<String, Integer> safe = java.util.Map.of("list", 0, "load", 1);
+    out.sort(java.util.Comparator
+        .<Op>comparingInt(o -> safe.getOrDefault(o.key.substring(o.key.indexOf('.') + 1), 2))
+        .thenComparing(o -> o.key));
     return out;
   }
 

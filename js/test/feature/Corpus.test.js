@@ -109,7 +109,12 @@ function candidates(client) {
       out.push({ key: entity + '.' + op, accessor: accessor[entity], entity, op })
     }
   }
-  return out
+  // SAFE OPS FIRST — see the ts harness for the reasoning: the cache stores
+  // only successful GETs, so an SDK whose first usable op is a `create`
+  // (POST) can never satisfy "a hit served from cache costs nothing".
+  const SAFE = { list: 0, load: 1 }
+  return out.sort((a, b) =>
+    ((SAFE[a.op] ?? 2) - (SAFE[b.op] ?? 2)) || a.key.localeCompare(b.key))
 }
 
 

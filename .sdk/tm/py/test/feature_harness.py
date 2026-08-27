@@ -1,4 +1,4 @@
-# Univec SDK feature test harness
+# ProjectName SDK feature test harness
 #
 # Offline feature-test harness for the generated SDK.
 #
@@ -16,10 +16,10 @@ from urllib.parse import quote
 
 from projectname_sdk.config import shared_config
 from projectname_sdk.features import _make_feature
-from projectname_sdk.core.control import UnivecControl
-from projectname_sdk.core.error import UnivecError
-from projectname_sdk.core.result import UnivecResult
-from projectname_sdk.core.spec import UnivecSpec
+from projectname_sdk.core.control import ProjectNameControl
+from projectname_sdk.core.error import ProjectNameError
+from projectname_sdk.core.result import ProjectNameResult
+from projectname_sdk.core.spec import ProjectNameSpec
 
 
 # True when this SDK was generated with the named feature.
@@ -161,17 +161,23 @@ class _Ctx:
         self.client = client
         self.utility = utility
         self.out = {}
-        self.ctrl = ctrl if ctrl is not None else UnivecControl()
+        self.ctrl = ctrl if ctrl is not None else ProjectNameControl()
         self.meta = {}
         self.op = op
         self.entity = entity
+        # The pipeline always resolves a point before a feature sees the ctx,
+        # so features read ctx.point freely — paging checks `point.kind` for
+        # graphql. This stub had no such attribute, so every paging test died
+        # with AttributeError before reaching the transport. Those tests were
+        # SKIPPED until an SDK activated paging, which is why it went unseen.
+        self.point = {}
         self.spec = None
         self.response = None
         self.result = None
         self.shared = {}
 
     def make_error(self, code, msg):
-        return UnivecError(code, msg, self)
+        return ProjectNameError(code, msg, self)
 
 
 # Construct a fake client wired with the given features (in init order) and
@@ -221,7 +227,7 @@ class Harness:
                 method(ctx)
 
     def _populate_result(self, ctx, response, fetch_err):
-        result = UnivecResult({})
+        result = ProjectNameResult({})
         ctx.result = result
 
         if fetch_err is not None:
@@ -266,7 +272,7 @@ class Harness:
         ctx = _Ctx(self.client, self.utility,
                    op=_Op(opname, entity),
                    entity=_Entity(entity),
-                   ctrl=UnivecControl(ctrl or {}))
+                   ctrl=ProjectNameControl(ctrl or {}))
 
         self.feature_hook(ctx, "PostConstructEntity")
 
@@ -282,7 +288,7 @@ class Harness:
                 merged = dict(self.headers)
                 for key, val in (headers or {}).items():
                     merged[key] = val
-                spec = UnivecSpec({
+                spec = ProjectNameSpec({
                     "method": method,
                     "base": self.base,
                     "path": path if path is not None else "/" + entity,

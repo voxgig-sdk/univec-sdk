@@ -108,7 +108,12 @@ class FeatureCorpusTest < Minitest::Test
         out << { "key" => "#{entname}.#{opname}", "accessor" => accessor, "op" => opname }
       end
     end
-    out
+
+    # SAFE OPS FIRST - see the ts harness for the reasoning: the cache stores
+    # only successful GETs, so an SDK whose first usable op is a `create`
+    # (POST) can never satisfy "a hit served from cache costs nothing".
+    safe = { "list" => 0, "load" => 1 }
+    out.sort_by { |o| [safe.fetch(o["op"], 2), o["key"]] }
   end
 
   def invoke(client, op, ctrl)

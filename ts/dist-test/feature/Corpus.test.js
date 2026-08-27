@@ -97,7 +97,16 @@ function candidates(client) {
             out.push({ key: entity + '.' + op, accessor: accessor[entity], entity, op });
         }
     }
-    return out;
+    // SAFE OPS FIRST. The corpus calls #OP1 repeatedly and reasons about what
+    // the transport did in between — a cache hit, a retry, a rate-limit wait.
+    // `load`/`list` are the GET ops, and the cache stores only successful GETs,
+    // so an SDK whose first usable op is a `create` (POST) can never satisfy
+    // "a hit served from cache costs nothing": nothing is ever cached, the
+    // second call goes to the network, and cost correctly charges twice. That
+    // reads as a cost defect and is not one. Ordering here rather than
+    // filtering keeps every SDK runnable, including ones with no GET at all.
+    const SAFE = { list: 0, load: 1 };
+    return out.sort((a, b) => (SAFE[a.op] ?? 2) - (SAFE[b.op] ?? 2) || a.key.localeCompare(b.key));
 }
 // Pick operations the corpus can drive, by DRIVING them: an op is usable when
 // it completes against a plain 200 with no feature active. Declared ops are

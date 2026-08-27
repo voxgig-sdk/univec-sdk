@@ -144,7 +144,15 @@ sub candidates {
       };
     }
   }
-  return @out;
+
+  # SAFE OPS FIRST - see the ts harness for the reasoning: the cache stores
+  # only successful GETs, so an SDK whose first usable op is a `create`
+  # (POST) can never satisfy "a hit served from cache costs nothing".
+  my %safe = (list => 0, load => 1);
+  return sort {
+    ($safe{ $a->{op} } // 2) <=> ($safe{ $b->{op} } // 2)
+      || $a->{key} cmp $b->{key}
+  } @out;
 }
 
 

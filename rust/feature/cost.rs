@@ -41,7 +41,10 @@ pub struct CostBucket {
     pub amount: f64,
 }
 
-#[derive(Default)]
+// NOT `#[derive(Default)]`: the struct holds a `Value`, and `Value` has no
+// `Default` impl — deriving it does not compile. This file only ships when the
+// cost feature is active, so no SDK had ever built it. `Value::Noval` is the
+// absent value, which is what a fresh track should carry.
 pub struct CostTrack {
     // Aggregates (mirrors the ts client._cost record).
     pub currency: String,
@@ -58,6 +61,27 @@ pub struct CostTrack {
     pub exceeded: bool,
     pub last: Value,
     pub seq: i64,
+}
+
+impl Default for CostTrack {
+    fn default() -> Self {
+        CostTrack {
+            currency: String::new(),
+            calls: 0,
+            attempts: 0,
+            amount: 0.0,
+            reported: 0.0,
+            estimated: 0.0,
+            ops: HashMap::new(),
+            actors: HashMap::new(),
+            limit: 0.0,
+            spent: 0.0,
+            remaining: 0.0,
+            exceeded: false,
+            last: Value::Noval,
+            seq: 0,
+        }
+    }
 }
 
 pub struct CostFeature {
