@@ -1,0 +1,33 @@
+
+main: kit: feature: paging: {
+
+  name: key()
+  title: "Pagination signals for list operations"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+      pageParam: 'page'
+      limitParam: 'limit'
+      cursorParam: 'cursor'
+      startPage: 1
+
+      # GraphQL (relay) list ops paginate through operation variables
+      # rather than query parameters. These name the variables to bind;
+      # the cursor/hasMore response paths come from the model's per-op
+      # page descriptor.
+      afterVar: 'after'
+      firstVar: 'first'
+    }
+  }
+
+  hook: {
+    PreRequest: active: true
+    PreResult: active: true
+  }
+}

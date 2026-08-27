@@ -1,0 +1,28 @@
+
+main: kit: feature: debug: {
+
+  name: key()
+  title: "Request/response capture ring buffer for debugging"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+      # maximum retained entries
+      max: 100
+      # header names to mask in captured traces
+      redact: ['authorization', 'cookie', 'set-cookie', 'api-key', 'apikey', 'x-api-key', 'idempotency-key']
+    }
+  }
+
+  hook: {
+    PreRequest: active: true
+    PreResponse: active: true
+    PreDone: active: true
+    PreUnexpected: active: true
+  }
+}

@@ -1,0 +1,25 @@
+
+main: kit: feature: streaming: {
+
+  name: key()
+  title: "Incremental streaming of list results via async iteration"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+      # simulate paced delivery (ms between chunks) — mainly for tests
+      chunkDelay: 0
+      # group items into batches of this size (0 = one item per step)
+      chunkSize: 0
+    }
+  }
+
+  hook: {
+    PreResult: active: true
+  }
+}

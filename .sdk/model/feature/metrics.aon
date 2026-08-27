@@ -1,0 +1,23 @@
+
+main: kit: feature: metrics: {
+
+  name: key()
+  title: "Statistics capture: per-operation counters and latency"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+    }
+  }
+
+  hook: {
+    PrePoint: active: true
+    PreDone: active: true
+    PreUnexpected: active: true
+  }
+}

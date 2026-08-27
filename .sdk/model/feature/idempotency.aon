@@ -1,0 +1,24 @@
+
+main: kit: feature: idempotency: {
+
+  name: key()
+  title: "Idempotency keys for safe retries of mutating operations"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+      header: 'Idempotency-Key'
+      methods: ['POST', 'PUT', 'PATCH', 'DELETE']
+      ops: ['create', 'update', 'remove']
+    }
+  }
+
+  hook: {
+    PreRequest: active: true
+  }
+}

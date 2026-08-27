@@ -1,0 +1,24 @@
+
+main: kit: feature: telemetry: {
+
+  name: key()
+  title: "Distributed tracing spans with W3C trace-context propagation"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+    }
+  }
+
+  hook: {
+    PrePoint: active: true
+    PreRequest: active: true
+    PreDone: active: true
+    PreUnexpected: active: true
+  }
+}

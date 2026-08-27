@@ -1,0 +1,23 @@
+
+main: kit: feature: clienttrack: {
+
+  name: key()
+  title: "Client identity and per-request correlation headers"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+      clientVersion: '0.0.1'
+    }
+  }
+
+  hook: {
+    PostConstruct: active: true
+    PreRequest: active: true
+  }
+}

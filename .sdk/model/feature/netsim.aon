@@ -1,0 +1,39 @@
+
+main: kit: feature: netsim: {
+
+  name: key()
+  title: "Network behaviour simulation for offline testing (latency, failures, outages)"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'wrap'
+
+  config: {
+    # Test-support feature: enable per test via
+    # options.feature.netsim.active = true (kept off in normal use).
+    options: {
+      active: false
+      # fixed ms, or { min, max } for a uniform sample
+      latency: 0
+      # first N calls fail with `failStatus`
+      failTimes: 0
+      failStatus: 503
+      # every Nth call fails (0 = never)
+      failEvery: 0
+      # first N calls throw a connection error
+      errorTimes: 0
+      # first N calls return HTTP 429 with Retry-After
+      rateLimitTimes: 0
+      retryAfter: 0
+      # random failure probability 0..1 (uses `seed`)
+      failRate: 0
+      seed: 1
+      # hard outage: every call fails at the transport level
+      offline: false
+    }
+  }
+
+  # Netsim wraps the transport in init(); it dispatches no pipeline hooks.
+  hook: {}
+}

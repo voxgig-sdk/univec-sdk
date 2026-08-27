@@ -1,0 +1,41 @@
+
+main: kit: feature: log: {
+
+  name: key()
+  title: "Structured request and response logging"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+
+  config: {
+    options: active: true
+  }
+
+  hook: {
+    PostConstruct: active: true
+    PostConstructEntity: active: true
+    SetData: active: true
+    GetData: active: true
+    SetMatch: active: true
+    GetMatch: active: true
+
+    PrePoint: active: true
+    PreSpec: active: true
+    PreRequest: active: true
+    PreResponse: active: true
+    PreResult: active: true
+  }
+
+
+  deps: js: {
+    'pino': { active: true, version: '>=10', kind: peer }
+    'pino-pretty': { active: true, version: '>=13', kind: peer }
+  }
+
+  deps: ts: .js
+}
+
+

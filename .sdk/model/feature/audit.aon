@@ -1,0 +1,25 @@
+
+main: kit: feature: audit: {
+
+  name: key()
+  title: "Structured audit trail of operations"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+      actor: 'anonymous'
+      # maximum retained records
+      max: 1000
+    }
+  }
+
+  hook: {
+    PreDone: active: true
+    PreUnexpected: active: true
+  }
+}

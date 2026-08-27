@@ -1,0 +1,26 @@
+
+main: kit: feature: proxy: {
+
+  name: key()
+  title: "Outbound HTTP(S) proxy routing"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'wrap'
+
+  config: {
+    options: {
+      active: false
+      # proxy URL, e.g. 'http://proxy.internal:8080' ('' = use env when fromEnv)
+      url: ''
+      # read HTTPS_PROXY / HTTP_PROXY / NO_PROXY from the environment
+      fromEnv: false
+      # hosts that bypass the proxy (comma string or list)
+      noProxy: []
+    }
+  }
+
+  # Proxy wraps the transport in init(); it dispatches no pipeline hooks.
+  hook: {}
+}

@@ -1,0 +1,44 @@
+
+main: kit: feature: cost: {
+
+  name: key()
+  title: "Cost tracking and spend budget for API calls"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+
+  # Both seams. The wrap prices every HTTP ATTEMPT (a retry is charged
+  # again, as the upstream API charges it); the hooks gate on budget before
+  # anything is sent, and attribute the total to the operation afterwards.
+  transport: 'wrap'
+
+  config: {
+    options: {
+      active: false
+      currency: 'USD'
+      # flat cost per attempt, when no rate or reported figure applies
+      unit: 0
+      # cost per attempt keyed '<entity>.<op>', '<op>', or '*'
+      rates: {}
+      # response header carrying a reported usage figure (per attempt)
+      header: ''
+      # response body path carrying a reported usage figure (per operation),
+      # e.g. 'usage.total_tokens'
+      path: ''
+      # price per reported unit; multiplies a header or body figure
+      perUnit: 0
+      # spend ceiling, in `currency`. 0 = no budget
+      budget: 0
+      # once the budget is spent: 'warn' records it, 'deny' refuses the call
+      onBudget: 'warn'
+    }
+  }
+
+  hook: {
+    PrePoint: active: true
+    PreDone: active: true
+    # A failed operation still spent the money, so it is committed here too.
+    PreUnexpected: active: true
+  }
+}
