@@ -1019,7 +1019,14 @@ pub fn prepare_method_util(ctx: *Context) []const u8 {
     if (std.mem.eql(u8, opname, "list")) return "GET";
     if (std.mem.eql(u8, opname, "remove")) return "DELETE";
     if (std.mem.eql(u8, opname, "patch")) return "PATCH";
-    return "GET";
+
+    // NO CATCH-ALL GET. The ts reference returns methodMap[key], which is
+    // undefined for an op the map does not name, so the request is refused
+    // rather than issued. Returning "GET" here made every unrecognised op a
+    // GET — a mistyped or unsupported op quietly fetched — and the method
+    // feeds the allow.method gate, so it is not cosmetic. ocaml had the same
+    // fallback; the shared corpus caught both.
+    return "";
 }
 
 pub fn prepare_headers_util(ctx: *Context) Value {

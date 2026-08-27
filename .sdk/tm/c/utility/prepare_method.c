@@ -30,5 +30,7 @@ const char* prepare_method_util(Context* ctx) {
   if (strcmp(op, "list") == 0) return "GET";
   if (strcmp(op, "remove") == 0) return "DELETE";
   if (strcmp(op, "patch") == 0) return "PATCH";
-  return "GET";
+  /* No GET catch-all: an unrecognised op must fall through to the
+     allow.method gate, not be silently issued as a GET. */
+  return "";
 }

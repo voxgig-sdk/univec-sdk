@@ -199,13 +199,60 @@ object MakePoint {
 }
 
 object MakeOptions {
+
+  /**
+   * Replaces one utility member from `options.utility`, matching the ts
+   * reference: a key naming a real member REPLACES it, and any other key is
+   * attached as a custom extra. Returns false when the key names no member or
+   * the value is not that member's type, so the caller keeps it in `custom`.
+   *
+   * REFLECTION, NOT A KEYED SWITCH. The go and java ports list every member by
+   * hand and carry a "keep this in step with registerAll" warning, because a
+   * utility added to one list and not the other is overridable there and not
+   * here. The field set is readable off the class, so the list cannot drift.
+   *
+   * Scala `var` fields compile to a private field plus accessors, so the
+   * lookup is on the declared field and needs setAccessible. Function types
+   * erase on the JVM, so isInstance checks the FunctionN arity rather than the
+   * full signature - the same limit java's port documents.
+   *
+   * Only a PUBLIC name may replace a member: public utility names are
+   * camelCase and carry no underscore, so an underscore means the caller named
+   * something of their own rather than a member.
+   */
+  def overrideUtil(utility: Utility, key: String, value: Object): Boolean = {
+    if (null == key || key.isEmpty || key.contains("_") || "custom" == key) return false
+    if (null == value) return false
+
+    try {
+      val field = classOf[Utility].getDeclaredField(key)
+      if (!field.getType.isInstance(value)) return false
+      field.setAccessible(true)
+      field.set(utility, value)
+      true
+    }
+    catch {
+      case _: NoSuchFieldException => false
+    }
+  }
+
   def makeOptions(ctx: Context): JMap[String, Object] = {
     var options = ctx.options
     if (options == null) options = new LinkedHashMap[String, Object]()
 
-    // Merge custom utility overrides onto the utility object.
+    // Merge utility overrides from options onto the utility object.
+    //
+    // A key naming a real utility member REPLACES it; anything else is
+    // attached as a custom extra. Shelving everything in `custom` - a map
+    // nothing reads - made `utility -> Map("fetcher" -> ...)`, the documented
+    // transport seam, a silent no-op here while ts honoured it.
     val customUtils = Helpers.toMapAny(options.get("utility"))
-    if (customUtils != null && ctx.utility != null) ctx.utility.custom.putAll(customUtils)
+    if (customUtils != null && ctx.utility != null) {
+      customUtils.entrySet().forEach { e =>
+        if (!overrideUtil(ctx.utility, e.getKey, e.getValue))
+          ctx.utility.custom.put(e.getKey, e.getValue)
+      }
+    }
 
     var opts = Struct.clone(options).asInstanceOf[JMap[String, Object]]
 

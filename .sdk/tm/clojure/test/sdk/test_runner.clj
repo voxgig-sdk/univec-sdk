@@ -18,6 +18,8 @@
   (let [results (atom [])
         rec (fn [name ok? msg] (swap! results conj {:name name :ok ok? :msg msg}))]
     (primary/run rec)
+    ;; The shared corpus, driven through this SDK's utilities.
+    (primary/run-corpus rec)
     (pipeline/run rec)
     (feature/run rec)
     (netsim/run rec)

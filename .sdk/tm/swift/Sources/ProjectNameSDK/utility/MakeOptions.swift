@@ -57,12 +57,30 @@ private func buildOptSpec() -> Value {
 func makeOptionsUtil(_ ctx: Context) -> VMap {
   let options = ctx.options ?? VMap()
 
-  // Merge custom utility overrides onto the utility object. Read from the
-  // original options before clone for safety.
+  // Merge utility overrides from options onto the utility object. Read from
+  // the original options before clone for safety.
+  //
+  // `fetcher` REPLACES the member; every other key is attached as a custom
+  // extra. Shelving the fetcher too made `utility: ["fetcher": ...]`, the
+  // documented transport seam, a silent no-op here while ts honoured it - and
+  // it is the seam the shared feature corpus scripts.
+  //
+  // PARTIAL, DELIBERATELY. The other members are replaceable in principle -
+  // Value.native carries any Swift value - but each has a distinct closure
+  // type, so honouring them means one `as?` arm per member with the signature
+  // written exactly. `fetcher` is the documented seam and the one the corpus
+  // needs; the rest stay in `custom` until a swift toolchain can compile the
+  // arms rather than have them written blind. See AGENTS.md.
   if let customUtils = gp(options, "utility").asMap {
     if let utility = ctx.utility {
       for (k, v) in customUtils.entries {
-        utility.custom[k] = v.asNative ?? v
+        let native = v.asNative ?? v
+        if "fetcher" == k, let fn = native as? FetcherFunc {
+          utility.fetcher = fn
+        }
+        else {
+          utility.custom[k] = native
+        }
       }
     }
   }

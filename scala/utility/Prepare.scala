@@ -26,7 +26,9 @@ object PrepareMethod {
       case "list" => "GET"
       case "remove" => "DELETE"
       case "patch" => "PATCH"
-      case _ => "GET"
+      // No GET catch-all: an unrecognised op must fall through to the
+      // allow.method gate, not be silently issued as a GET.
+      case _ => ""
     }
   }
 }

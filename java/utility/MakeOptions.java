@@ -20,11 +20,20 @@ final class MakeOptions {
       options = new LinkedHashMap<>();
     }
 
-    // Merge custom utility overrides onto the utility object.
+    // Merge utility overrides from options onto the utility object.
     // Read from original options before clone for parity with the donors.
+    //
+    // A key naming a real utility member REPLACES it (Register.overrideUtil);
+    // anything else is attached as a custom extra. Shelving everything in
+    // `custom` - a map nothing reads - made `utility: {"fetcher": ...}`, the
+    // documented transport seam, a silent no-op here while ts honoured it.
     Map<String, Object> customUtils = Helpers.toMapAny(options.get("utility"));
     if (customUtils != null && ctx.utility != null) {
-      ctx.utility.custom.putAll(customUtils);
+      for (Map.Entry<String, Object> cu : customUtils.entrySet()) {
+        if (!Register.overrideUtil(ctx.utility, cu.getKey(), cu.getValue())) {
+          ctx.utility.custom.put(cu.getKey(), cu.getValue());
+        }
+      }
     }
 
     Map<String, Object> opts = (Map<String, Object>) Struct.clone(options);

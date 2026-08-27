@@ -68,7 +68,14 @@
 (defn- resolve-args [^Map entry subject]
   (cond
     (.containsKey entry "ctx") [(.get entry "ctx")]
-    (.containsKey entry "args") (vec (.get entry "args"))
+    (.containsKey entry "args")
+    (let [args (vec (.get entry "args"))]
+      ;; ts's resolveArgs writes the live first arg back as entry.ctx, so a
+      ;; `match: {ctx: ...}` resolves for args-style entries too. Without it
+      ;; every such assertion reads null and silently passes nothing.
+      (when (and (seq args) (s/ismap (first args)))
+        (.put entry "ctx" (first args)))
+      args)
     (.containsKey entry "in") [(s/clone (.get entry "in"))]
     :else []))
 
@@ -98,7 +105,11 @@
         (when (.containsKey entry "match")
           (do-match (.get entry "match")
                     (omap "in" (.get entry "in") "out" (.get entry "res")
-                          "ctx" (.get entry "ctx") "err" msg)))
+                          ;; The ts runner hands do-match the ERROR OBJECT, so a
+                          ;; corpus `match: {err: {message: ...}}` resolves. This
+                          ;; port passed the bare message string, where err.message
+                          ;; walks into a string and reads null.
+                          "ctx" (.get entry "ctx") "err" (omap "message" msg))))
         (throw (AssertionError. (str "ERROR MATCH: [" (s/stringify entry-err) "] <=> [" msg "]"))))
       (throw (if (instance? AssertionError err) err (AssertionError. (str err)))))))
 

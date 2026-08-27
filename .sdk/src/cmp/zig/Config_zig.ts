@@ -154,7 +154,7 @@ pub fn make_feature(name: []const u8) Feature {
     // `support`, a helper module). Any model feature not already built in is
     // appended so bespoke features still resolve.
     const builtinFeatures = [
-      'audit', 'cache', 'clienttrack', 'debug', 'idempotency', 'log',
+      'audit', 'cache', 'clienttrack', 'cost', 'debug', 'idempotency', 'log',
       'metrics', 'netsim', 'paging', 'proxy', 'ratelimit', 'rbac',
       'retry', 'streaming', 'telemetry', 'test', 'timeout',
     ]

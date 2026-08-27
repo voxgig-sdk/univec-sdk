@@ -8,6 +8,7 @@
 defmodule Univec.StructCorpus do
   alias Voxgig.Struct, as: S
   alias Voxgig.Struct.Error, as: SE
+  alias Univec.Utility, as: U
 
   @nullmark "__NULL__"
   @undefmark "__UNDEF__"
@@ -263,7 +264,23 @@ defmodule Univec.StructCorpus do
   defp resolve_args(entry) do
     cond do
       ehas(entry, "ctx") -> [eget(entry, "ctx")]
-      ehas(entry, "args") -> (a = eget(entry, "args")); if(S.islist(a), do: velems(a), else: [])
+      ehas(entry, "args") ->
+        a = eget(entry, "args")
+
+        if S.islist(a) do
+          args = velems(a)
+          # ts's resolveArgs writes the live first arg back as entry.ctx, so a
+          # `match: {ctx: ...}` resolves for args-style entries too. Without it
+          # every such assertion reads null and asserts nothing.
+          case args do
+            [first | _] -> if S.ismap(first), do: S.setprop(entry, "ctx", first)
+            _ -> :ok
+          end
+
+          args
+        else
+          []
+        end
       ehas(entry, "in") -> [S.clone(eget(entry, "in"))]
       true -> []
     end
@@ -301,7 +318,13 @@ defmodule Univec.StructCorpus do
         if ehas(entry, "match") do
           do_match(
             eget(entry, "match"),
-            S.jm(["in", eget(entry, "in"), "out", eget(entry, "res"), "ctx", eget(entry, "ctx"), "err", msg])
+            # ts hands do_match the ERROR OBJECT, so a corpus
+            # `match: {err: {message: ...}}` resolves; a bare string leaves
+            # err.message reading null.
+            S.jm([
+              "in", eget(entry, "in"), "out", eget(entry, "res"),
+              "ctx", eget(entry, "ctx"), "err", S.jm(["message", msg])
+            ])
           )
         end
 
@@ -671,6 +694,394 @@ defmodule Univec.StructCorpus do
     alltests = parse(raw)
     spec = S.getprop(alltests, "struct")
     run_all(spec)
+
+    {Process.get(:npass, 0), Process.get(:nfail, 0), Process.get(:failures, [])}
+  end
+
+  # --- PRIMARY corpus ------------------------------------------------------
+  #
+  # Drives .sdk/test/test.json -> "primary", the same language-neutral corpus
+  # the ts/js/lua/lean suites execute, through THIS SDK's request-shaping
+  # utilities. Before this, elixir mirrored the corpus by hand, so its cases
+  # could drift from the reference without anything noticing.
+  #
+  # The harness below is run_set's, with one difference: the subject receives
+  # the ENTRY rather than resolved args, because the args-style sections have
+  # to publish the context they build back onto the entry — a `match: ctx:`
+  # assertion reads it from there.
+
+  # A struct VALUE is itself a 2-tuple — {:vmap, id}, {:vlist, id}, {:vinj, id}
+  # — so a bare `{res, err}` clause destructures a perfectly good map into
+  # res=:vmap, err=<heap id>, and the run then fails with the heap id as its
+  # error message. Match the value shapes first.
+  defp pnorm({:vmap, _} = v), do: {v, nil}
+  defp pnorm({:vlist, _} = v), do: {v, nil}
+  defp pnorm({:vinj, _} = v), do: {v, nil}
+  defp pnorm({res, err}), do: {res, err}
+  defp pnorm(res), do: {res, nil}
+
+  # A ctx for a ctx-style entry: the corpus supplies it, the client supplies
+  # what makes it live (utility dispatch, options, config).
+  defp pctx(entry, util, opts, config) do
+    ctxmap = if ehas(entry, "ctx") and S.ismap(eget(entry, "ctx")), do: eget(entry, "ctx"), else: S.jm([])
+    ctx = pbuild(ctxmap, util, opts, config)
+    S.setprop(entry, "ctx", ctx)
+    ctx
+  end
+
+  # A LIVE context from a corpus map. The corpus carries spec/result/response
+  # as plain JSON; the utilities read and MUTATE them through Spec/Result/
+  # Response, so a bare map leaves them with nothing to work on — every
+  # `match: ctx.result.*` assertion then reads null, and prepare_* returns
+  # nothing. Mirrors make_ctx_from_map in the lua/js reference drivers.
+  defp pbuild(ctxmap, util, opts, config) do
+    ctx = Univec.Context.new(ctxmap, nil)
+    S.setprop(ctx, "utility", util)
+    S.setprop(ctx, "config", config)
+    # THE CLIENT IS OPT-IN. Some utilities read their defaults off it —
+    # prepare_headers reads opts_map(ctx.client) — but the client holds the
+    # root ctx, which holds the client, so anything that WALKS a ctx carrying
+    # one never terminates: makeContext returns a ctx, and make_error raises an
+    # error whose `ctx:` field is the ctx. Both hung the run until ExUnit
+    # killed it. Only the sections that need client defaults ask for it.
+    if Process.get(:pwantclient) == true and Process.get(:pclient) != nil,
+      do: S.setprop(ctx, "client", Process.get(:pclient))
+    if S.getprop(ctx, "options") == nil, do: S.setprop(ctx, "options", opts)
+
+    specmap = S.getprop(ctxmap, "spec")
+    if S.ismap(specmap), do: S.setprop(ctx, "spec", Univec.Spec.new(specmap))
+
+    resmap = S.getprop(ctxmap, "result")
+
+    if S.ismap(resmap) do
+      result = Univec.Result.new(resmap)
+      errmap = S.getprop(resmap, "err")
+
+      if S.ismap(errmap) do
+        msg = jss(S.getprop(errmap, "message"))
+        if is_binary(msg) and msg != "",
+          do: S.setprop(result, "err", Univec.Error.new("", msg, nil))
+      end
+
+      S.setprop(ctx, "result", result)
+    end
+
+    respmap = S.getprop(ctxmap, "response")
+
+    if S.ismap(respmap) do
+      response = Univec.Response.new(respmap)
+      body = S.getprop(respmap, "body")
+      if body != nil, do: S.setprop(response, "json_func", fn -> body end)
+
+      hdrs = S.getprop(respmap, "headers")
+
+      if S.ismap(hdrs) do
+        lower = S.jm([])
+        Enum.each(S.keysof(hdrs), fn k ->
+          S.setprop(lower, String.downcase(k), S.getprop(hdrs, k))
+        end)
+        S.setprop(response, "headers", lower)
+      end
+
+      S.setprop(ctx, "response", response)
+    end
+
+    ctx
+  end
+
+  # A ctx from a bare map (args-style sections), published back onto the entry.
+  defp pmapctx(entry, v, util, opts, config) do
+    ctx = pbuild(if(S.ismap(v), do: v, else: S.jm([])), util, opts, config)
+    S.setprop(entry, "ctx", ctx)
+    ctx
+  end
+
+  # A ctx that carries the client, for the sections whose utilities read their
+  # defaults off it. Scoped so nothing else inherits the cycle.
+  defp pctx_client(entry, util, opts, config) do
+    Process.put(:pwantclient, true)
+    ctx = pctx(entry, util, opts, config)
+    Process.put(:pwantclient, false)
+    ctx
+  end
+
+  defp parg(entry, i) do
+    a = eget(entry, "args")
+    if S.islist(a), do: Enum.at(velems(a), i), else: nil
+  end
+
+  defp run_primary_set(group, node, subject) do
+    if System.get_env("VOX_DBG"), do: IO.puts("SECTION #{group}")
+    fixed = fixj(S.clone(node), true)
+    testset = S.getprop(fixed, "set")
+
+    if S.islist(testset) do
+      Enum.each(velems(testset), fn entry ->
+        name = jss(eget(entry, "name"))
+
+        try do
+          if not ehas(entry, "out"), do: S.setprop(entry, "out", @nullmark)
+          {res0, err} = pnorm(subject.(entry))
+
+          if err != nil do
+            raise SE, message: perrmsg(err)
+          end
+
+          # The RESULT can carry them too — makeContext returns a context — and
+          # fixj walks it before anything else gets the chance to strip.
+          if S.ismap(res0) do
+            S.delprop(res0, "client")
+            S.delprop(res0, "utility")
+          end
+
+          res = fixj(res0, true)
+          S.setprop(entry, "res", res)
+
+          # STRIP THE LIVE REFERENCES BEFORE MATCHING. check_result matches
+          # against entry.ctx, and the ctx carries the client so utilities like
+          # prepare_headers can read their defaults off it. The client holds the
+          # root ctx, which holds the client — walking that is a cycle, and the
+          # run hangs until ExUnit kills it at 60s. The utilities have already
+          # run by here, so nothing needs them any more.
+          ectx = eget(entry, "ctx")
+
+          if S.ismap(ectx) do
+            S.delprop(ectx, "client")
+            S.delprop(ectx, "utility")
+          end
+
+          check_result(entry, resolve_args(entry), res)
+          record(group, name, true, "")
+        rescue
+          e ->
+            try do
+              handle_error(entry, e)
+              record(group, name, true, "")
+            rescue
+              e2 -> record(group, name, false, errmsg(e2))
+            end
+        end
+      end)
+    end
+  end
+
+  # The corpus speaks camelCase; snake_case languages do not. lua, py and
+  # elixir all store `status_text` internally while reading `statusText` off
+  # the wire, so a `match: ctx.result.statusText` assertion reads null unless
+  # the driver publishes a neutral-named view back. The lua reference driver
+  # does exactly this.
+  defp pneutral_result(result) do
+    if S.ismap(result) do
+      err = S.getprop(result, "err")
+
+      S.jm([
+        "ok", S.getprop(result, "ok"),
+        "status", S.getprop(result, "status"),
+        "statusText", S.getprop(result, "status_text"),
+        "headers", S.getprop(result, "headers"),
+        "body", S.getprop(result, "body"),
+        "err", if(err == nil, do: nil, else: S.jm(["message", perrmsg(err)]))
+      ])
+    end
+  end
+
+  # Publish the neutral view of ctx.result onto the entry's ctx, so
+  # `match: ctx.result.*` sees corpus-shaped data.
+  defp ppub(entry, ctx) do
+    ectx = eget(entry, "ctx")
+    result = if S.ismap(ctx), do: S.getprop(ctx, "result")
+    if S.ismap(ectx) and S.ismap(result) do
+      S.setprop(ectx, "result", pneutral_result(result))
+    end
+    :ok
+  end
+
+  defp perrmsg(err) do
+    cond do
+      is_binary(err) -> err
+      S.ismap(err) -> jss(S.getprop(err, "message")) || S.stringify(err)
+      true -> inspect(err)
+    end
+  end
+
+  defp psec(primary, name, sub \\ "basic"), do: S.getprop(S.getprop(primary, name), sub)
+
+  # A CLIENT built from a section's DEF.setup.a block.
+  #
+  # prepare_auth reads opts_map(ctx.client) — as the ts reference does, via
+  # client.options() — so a section's setup options have to reach it through a
+  # client, not through ctx.options. Passing them as options alone left the
+  # apikey unreachable and the authorization header never set.
+  defp pclient_for(primary, name) do
+    setup = S.getprop(S.getprop(S.getprop(S.getprop(primary, name), "DEF"), "setup"), "a")
+    if S.ismap(setup), do: Univec.test(nil, S.clone(setup)), else: Univec.test()
+  end
+
+  # Options built from a section's DEF.setup.a block, the way the reference
+  # harness does. Falls back to the client's options when a section has none.
+  defp psetup(primary, name, util, config) do
+    setup =
+      S.getprop(S.getprop(S.getprop(S.getprop(primary, name), "DEF"), "setup"), "a")
+
+    ctx = S.jm([])
+    S.setprop(ctx, "utility", util)
+    S.setprop(ctx, "config", config)
+    S.setprop(ctx, "options", if(S.ismap(setup), do: S.clone(setup), else: S.jm([])))
+    U.make_options(ctx)
+  end
+
+  def run_primary(testfile \\ nil) do
+    Process.put(:npass, 0)
+    Process.put(:nfail, 0)
+    Process.put(:failures, [])
+
+    testfile = testfile || Path.join(File.cwd!(), "../.sdk/test/test.json")
+    root = parse(File.read!(testfile))
+    primary = S.getprop(root, "primary")
+
+    client = Univec.test()
+    Process.put(:pclient, client)
+    Process.put(:pbaseclient, client)
+    rootctx = Univec.get_root_ctx(client)
+    util = S.getprop(rootctx, "utility")
+    config = S.getprop(rootctx, "config")
+    opts = S.getprop(rootctx, "options")
+
+    run_primary_set("done", psec(primary, "done"), fn e ->
+      U.done(pctx(e, util, opts, config))
+    end)
+
+    # makeContext takes a PLAIN map and returns a context; it needs no client
+    # and no utility dispatch. Handing it a live ctx made Context.new copy the
+    # client through, and fixj then walked client -> rootctx -> client.
+    run_primary_set("makeContext", psec(primary, "makeContext"), fn e ->
+      inv = eget(e, "in")
+      ctxmap = if S.ismap(inv), do: inv, else: S.jm([])
+      S.setprop(e, "ctx", ctxmap)
+      Univec.Context.new(ctxmap, nil)
+    end)
+
+    run_primary_set("makeError", psec(primary, "makeError"), fn e ->
+      ctx = pmapctx(e, parg(e, 0), util, opts, config)
+      {nil, U.make_error(ctx, parg(e, 1))}
+    end)
+
+    run_primary_set("makeOptions", psec(primary, "makeOptions"), fn e ->
+      inv = eget(e, "in")
+      ctx = pmapctx(e, S.jm([]), util, opts, config)
+      S.setprop(ctx, "config", S.getprop(inv, "config"))
+      S.setprop(ctx, "options", S.getprop(inv, "options"))
+      U.make_options(ctx)
+    end)
+
+    run_primary_set("makeRequest", psec(primary, "makeRequest"), fn e ->
+      U.make_request(pctx(e, util, opts, config))
+    end)
+
+    run_primary_set("makeResponse", psec(primary, "makeResponse"), fn e ->
+      ctx = pctx(e, util, opts, config)
+      out = U.make_response(ctx)
+      ppub(e, ctx)
+      out
+    end)
+
+    # makeSpec and prepareAuth are configured by their own DEF.setup.a block,
+    # not by the client's default options — the corpus supplies the base URL
+    # and the api key the cases assert on.
+    spec_opts = psetup(primary, "makeSpec", util, config)
+
+    run_primary_set("makeSpec", psec(primary, "makeSpec"), fn e ->
+      U.make_spec(pctx_client(e, util, spec_opts, config))
+    end)
+
+    run_primary_set("makeUrl", psec(primary, "makeUrl"), fn e ->
+      U.make_url(pctx(e, util, opts, config))
+    end)
+
+    run_primary_set("operator", psec(primary, "operator"), fn e ->
+      inv = eget(e, "in")
+      op = Univec.Operation.new(if(S.ismap(inv), do: inv, else: S.jm([])))
+      S.jm([
+        "entity", S.getprop(op, "entity"),
+        "input", S.getprop(op, "input"),
+        "name", S.getprop(op, "name"),
+        "points", S.getprop(op, "points")
+      ])
+    end)
+
+    run_primary_set("param", psec(primary, "param"), fn e ->
+      ctx = pmapctx(e, parg(e, 0), util, opts, config)
+      U.param(ctx, parg(e, 1))
+    end)
+
+    auth_opts = psetup(primary, "prepareAuth", util, config)
+    auth_client = pclient_for(primary, "prepareAuth")
+
+    run_primary_set("prepareAuth", psec(primary, "prepareAuth"), fn e ->
+      Process.put(:pclient, auth_client)
+      out = U.prepare_auth(pctx_client(e, util, auth_opts, config))
+      Process.put(:pclient, Process.get(:pbaseclient))
+      out
+    end)
+
+    run_primary_set("prepareBody", psec(primary, "prepareBody"), fn e ->
+      U.prepare_body(pctx(e, util, opts, config))
+    end)
+
+    run_primary_set("prepareHeaders", psec(primary, "prepareHeaders"), fn e ->
+      U.prepare_headers(pctx_client(e, util, opts, config))
+    end)
+
+    run_primary_set("prepareMethod", psec(primary, "prepareMethod"), fn e ->
+      U.prepare_method(pctx(e, util, opts, config))
+    end)
+
+    run_primary_set("prepareParams", psec(primary, "prepareParams"), fn e ->
+      U.prepare_params(pctx(e, util, opts, config))
+    end)
+
+    run_primary_set("preparePath", psec(primary, "preparePath"), fn e ->
+      U.prepare_path(pctx(e, util, opts, config))
+    end)
+
+    run_primary_set("prepareQuery", psec(primary, "prepareQuery"), fn e ->
+      U.prepare_query(pctx(e, util, opts, config))
+    end)
+
+    run_primary_set("resultBasic", psec(primary, "resultBasic"), fn e ->
+      ctx = pctx(e, util, opts, config)
+      out = U.result_basic(ctx)
+      ppub(e, ctx)
+      if S.ismap(out) and S.getprop(out, "status_text") != nil,
+        do: pneutral_result(out),
+        else: out
+    end)
+
+    run_primary_set("resultBody", psec(primary, "resultBody"), fn e ->
+      ctx = pctx(e, util, opts, config)
+      out = U.result_body(ctx)
+      ppub(e, ctx)
+      if S.ismap(out) and S.getprop(out, "status_text") != nil,
+        do: pneutral_result(out),
+        else: out
+    end)
+
+    run_primary_set("resultHeaders", psec(primary, "resultHeaders"), fn e ->
+      ctx = pctx(e, util, opts, config)
+      out = U.result_headers(ctx)
+      ppub(e, ctx)
+      if S.ismap(out) and S.getprop(out, "status_text") != nil,
+        do: pneutral_result(out),
+        else: out
+    end)
+
+    run_primary_set("transformRequest", psec(primary, "transformRequest"), fn e ->
+      U.transform_request(pctx(e, util, opts, config))
+    end)
+
+    run_primary_set("transformResponse", psec(primary, "transformResponse"), fn e ->
+      U.transform_response(pctx(e, util, opts, config))
+    end)
 
     {Process.get(:npass, 0), Process.get(:nfail, 0), Process.get(:failures, [])}
   end

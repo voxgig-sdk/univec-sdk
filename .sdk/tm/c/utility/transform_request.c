@@ -15,7 +15,8 @@ voxgig_value* transform_request_util(Context* ctx) {
   if (v_is_noval(reqform) || v_is_null(reqform)) return ctx->reqdata;
 
   voxgig_value* store = cmap(1, "reqdata", v_share(ctx->reqdata));
-  voxgig_value* out = voxgig_transform(store, reqform, NULL);
-  if (out && !v_is_noval(out)) return out;
-  return ctx->reqdata;
+  /* Return the transform result verbatim, as the ts reference does. Falling
+     back to ctx->reqdata meant a reqform naming a path that does not resolve
+     sent the WHOLE request data instead of nothing. */
+  return voxgig_transform(store, reqform, NULL);
 }

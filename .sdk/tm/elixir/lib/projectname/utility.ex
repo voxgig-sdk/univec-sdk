@@ -193,17 +193,53 @@ defmodule Univec.Utility do
 
   # ---- make_options --------------------------------------------------------
 
+  # Public camelCase option key -> snake_case utility member name, or nil
+  # when the key is not a public name (see make_options_impl).
+  defp util_member(key) when is_binary(key) do
+    if String.contains?(key, "_") do
+      nil
+    else
+      String.replace(key, ~r/([A-Z])/, "_\\1") |> String.downcase()
+    end
+  end
+
+  defp util_member(_key), do: nil
+
   def make_options_impl(ctx) do
     options = H.or_(S.getprop(ctx, "options"), S.jm([]))
 
     custom_utils = S.getprop(options, "utility")
 
+    # Utility overrides from options.
+    #
+    # A key naming a real utility member REPLACES it; anything else is
+    # attached as a custom extra. Shelving everything in `custom` - a map
+    # nothing reads - made `utility: %{"fetcher" => ...}`, the documented
+    # transport seam, a silent no-op here while ts honoured it.
+    #
+    # Only a PUBLIC name may replace. Option keys are camelCase, as ts spells
+    # them, and members here are snake_case; public names carry no underscore,
+    # so an underscore means the caller named something of their own -
+    # possibly the internal spelling of a real member. `make_error` must stay
+    # an extension, or a non-callable would break the error path on the next
+    # request.
     if S.ismap(custom_utils) do
       utility = S.getprop(ctx, "utility")
 
       if utility != nil do
         custom = S.getprop(utility, "custom")
-        Enum.each(S.keysof(custom_utils), fn k -> S.setprop(custom, k, S.getprop(custom_utils, k)) end)
+
+        Enum.each(S.keysof(custom_utils), fn k ->
+          val = S.getprop(custom_utils, k)
+          member = util_member(k)
+
+          if member != nil and member != "custom" and
+               S.getprop(utility, member) != nil do
+            S.setprop(utility, member, val)
+          else
+            S.setprop(custom, k, val)
+          end
+        end)
       end
     end
 
@@ -863,6 +899,16 @@ defmodule Univec.Utility do
       cond do
         match?(%Univec.Error{}, err) -> err.msg
         is_exception(err) -> Exception.message(err)
+        # S.ismap, not is_map: a struct value is a {:vmap, id} TUPLE, so
+        # is_map/1 is false for every heap map and this branch could never
+        # fire for one. And the neutral contract spells it "message" — "msg"
+        # is this port's own internal name. Between them, an error map reached
+        # the stringify fallback and the SDK reported
+        # "foo: {message:zed}" where every other target reports "foo: zed".
+        S.ismap(err) ->
+          m = S.getprop(err, "message") || S.getprop(err, "msg")
+          if is_binary(m) and m != "", do: m, else: "unknown error"
+
         is_map(err) and not is_struct(err) and S.getprop(err, "msg") != nil -> S.getprop(err, "msg")
         is_binary(err) -> err
         true -> S.stringify(err)
@@ -1066,7 +1112,9 @@ defmodule Univec.Utility do
     # Only fall back to the op-name convention when the point has no method.
     case S.getprop(S.getprop(ctx, "point"), "method") do
       m when is_binary(m) and m != "" -> String.upcase(m)
-      _ -> Map.get(@method_map, opname, "GET")
+      # No GET catch-all: an unrecognised op must fall through to the
+      # allow.method gate, not be silently issued as a GET.
+      _ -> Map.get(@method_map, opname)
     end
   end
 

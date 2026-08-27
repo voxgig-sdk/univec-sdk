@@ -34,11 +34,16 @@ SDK_TEST = $(RUNTIME) sdk_config.ml $(ENTITIES) sdk_client.ml sdk_error.ml \
   $(ENTITY_TESTS) $(DOC_TESTS) test/t_main.ml
 
 CORPUS_SRC = utility/vregex.ml utility/voxgig_struct.ml sdk_json.ml \
-  test/struct_corpus.ml
+  test/corpus_runner.ml test/struct_corpus.ml
 
-.PHONY: test test-sdk test-corpus build lint clean
+# The primary-utility corpus needs the whole SDK, because it drives the SDK's
+# own request-shaping utilities — not just the struct library.
+PRIMARY_SRC = $(RUNTIME) sdk_config.ml $(ENTITIES) sdk_client.ml sdk_error.ml \
+  test/corpus_runner.ml test/primary_utility_test.ml
 
-test: test-sdk test-corpus
+.PHONY: test test-sdk test-corpus test-primary build lint clean
+
+test: test-sdk test-corpus test-primary
 
 test-sdk: run_sdk_test
 	./run_sdk_test
@@ -50,7 +55,13 @@ run_sdk_test: $(SDK_TEST)
 	$(OCAMLC) $(INC) $(SDK_TEST) -o run_sdk_test
 
 run_struct_corpus: $(CORPUS_SRC)
-	$(OCAMLC) -I utility $(CORPUS_SRC) -o run_struct_corpus
+	$(OCAMLC) -I utility -I test $(CORPUS_SRC) -o run_struct_corpus
+
+test-primary: run_primary_corpus
+	./run_primary_corpus $(CORPUS)
+
+run_primary_corpus: $(PRIMARY_SRC)
+	$(OCAMLC) $(INC) $(PRIMARY_SRC) -o run_primary_corpus
 
 # Type-check the SDK library (a clean compile means it is sound).
 build: lint

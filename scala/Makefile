@@ -12,6 +12,7 @@ test:
 	scala-cli run . --main-class SdkTestMain
 	scala-cli run . --main-class SdkEntityTestMain
 	scala-cli run . --main-class Runner -- ../.sdk/test/test.json
+	scala-cli run . --main-class PrimaryCorpusMain -- ../.sdk/test/test.json
 
 corpus:
 	scala-cli run . --main-class Runner -- ../.sdk/test/test.json

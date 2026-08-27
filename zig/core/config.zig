@@ -382,6 +382,7 @@ pub fn make_feature(name: []const u8) Feature {
     if (std.mem.eql(u8, name, "audit")) return @import("../feature/audit.zig").AuditFeature.make();
     if (std.mem.eql(u8, name, "cache")) return @import("../feature/cache.zig").CacheFeature.make();
     if (std.mem.eql(u8, name, "clienttrack")) return @import("../feature/clienttrack.zig").ClienttrackFeature.make();
+    if (std.mem.eql(u8, name, "cost")) return @import("../feature/cost.zig").CostFeature.make();
     if (std.mem.eql(u8, name, "debug")) return @import("../feature/debug.zig").DebugFeature.make();
     if (std.mem.eql(u8, name, "idempotency")) return @import("../feature/idempotency.zig").IdempotencyFeature.make();
     if (std.mem.eql(u8, name, "log")) return @import("../feature/log.zig").LogFeature.make();

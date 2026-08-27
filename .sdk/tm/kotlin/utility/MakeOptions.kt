@@ -2,6 +2,7 @@ package KOTLINPACKAGE.utility
 
 import KOTLINPACKAGE.core.Context
 import KOTLINPACKAGE.core.Helpers
+import KOTLINPACKAGE.core.Utility
 import KOTLINPACKAGE.utility.struct.Struct
 
 @Suppress("UNCHECKED_CAST")
@@ -11,11 +12,20 @@ fun makeOptions(ctx: Context): MutableMap<String, Any?> {
     options = linkedMapOf()
   }
 
-  // Merge custom utility overrides onto the utility object.
+  // Merge utility overrides from options onto the utility object.
   // Read from original options before clone for parity with the donors.
+  //
+  // A key naming a real utility member REPLACES it; anything else is attached
+  // as a custom extra. Shelving everything in `custom` - a map nothing reads -
+  // made `utility = mapOf("fetcher" to ...)`, the documented transport seam, a
+  // silent no-op here while ts honoured it.
   val customUtils = Helpers.toMapAny(options["utility"])
   if (customUtils != null && ctx.utility != null) {
-    ctx.utility!!.custom.putAll(customUtils)
+    for ((key, value) in customUtils) {
+      if (!overrideUtil(ctx.utility!!, key, value)) {
+        ctx.utility!!.custom[key] = value
+      }
+    }
   }
 
   var opts = Struct.clone(options) as MutableMap<String, Any?>
@@ -164,4 +174,48 @@ fun makeOptions(ctx: Context): MutableMap<String, Any?> {
   opts["__derived__"] = derived
 
   return opts
+}
+
+
+/**
+ * Replaces one utility member from `options.utility`, matching the ts
+ * reference: a key naming a real member REPLACES it, and any other key is
+ * attached as a custom extra. Returns false when the key names no member or
+ * the value is not that member's type, so the caller keeps it in `custom`.
+ *
+ * REFLECTION, NOT A KEYED SWITCH. The go and java ports list every member by
+ * hand and carry a "keep this in step with registerAll" warning, because a
+ * utility added to one list and not the other is overridable there and not
+ * here. The field set is readable off the class, so the list cannot drift.
+ *
+ * Kotlin function types erase to FunctionN, so `isInstance` checks arity and
+ * not the full signature - the same limit java's port documents. A wrongly
+ * shaped value of the right arity is accepted, exactly as the dynamic donors
+ * accept whatever they are given.
+ *
+ * Only a PUBLIC name may replace a member: public utility names are camelCase
+ * and carry no underscore, so an underscore means the caller named something
+ * of their own rather than a member.
+ */
+internal fun overrideUtil(utility: Utility, key: String, value: Any?): Boolean {
+  if (key.isEmpty() || key.contains('_') || "custom" == key) {
+    return false
+  }
+  if (null == value) {
+    return false
+  }
+
+  val field = try {
+    Utility::class.java.getDeclaredField(key)
+  } catch (e: NoSuchFieldException) {
+    return false
+  }
+
+  if (!field.type.isInstance(value)) {
+    return false
+  }
+
+  field.isAccessible = true
+  field.set(utility, value)
+  return true
 }

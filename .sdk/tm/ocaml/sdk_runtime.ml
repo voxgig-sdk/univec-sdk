@@ -345,7 +345,14 @@ let prepare_method_util (ctx : ctx) : string =
   | _ ->
     match ctx.c_op.op_name with
     | "create" -> "POST" | "update" -> "PUT" | "load" -> "GET"
-    | "list" -> "GET" | "remove" -> "DELETE" | "patch" -> "PATCH" | _ -> "GET"
+    | "list" -> "GET" | "remove" -> "DELETE" | "patch" -> "PATCH"
+    (* NO CATCH-ALL GET. The ts reference returns methodMap[key], which is
+     * undefined for an op the map does not name — the request is then rejected
+     * rather than silently issued. A `| _ -> "GET"` here turned every
+     * unrecognised op into a GET, which is both a divergence from the corpus
+     * (which expects no method for opname "bad") and the more dangerous of the
+     * two behaviours: a mistyped or unsupported op quietly fetched. *)
+    | _ -> ""
 
 let prepare_headers_util (ctx : ctx) : value =
   let options = client_options_map (cc ctx) in
