@@ -21,10 +21,14 @@ dynamic makeOptions(dynamic ctx) {
   final optspec = {
     'apikey': '',
     'base': 'http://localhost:8000',
+    'secret': '',
     'prefix': '',
     'suffix': '',
+    // `basic` and `secret`: HTTP Basic Auth needs a second credential and a
+    // flag to say the pair is Basic rather than a single bearer token.
     'auth': {
       'prefix': '',
+      'basic': false,
     },
     'headers': {
       '`\$CHILD`': '`\$STRING`',

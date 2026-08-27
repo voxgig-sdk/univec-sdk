@@ -23,9 +23,10 @@ use PHPUnit\Framework\TestCase;
 
 class FeatureCorpusTest extends TestCase
 {
-    // Features with a corpus section. A name here with no section is a skip,
-    // not a failure: an SDK generated without the feature has nothing to run.
-    private const FEATURE_CORPUS_NAMES = ['cost'];
+    // Features with a corpus section are read from the corpus itself (see
+    // testFeatureCorpus), so a project-authored section - a custom feature
+    // added under .sdk/test/feature/ - runs without editing this file. An
+    // SDK generated without a listed feature still skips, not fails.
 
     // The standard operation names, in the order the runner prefers them.
     private const FEATURE_CORPUS_OPS = ['load', 'list', 'create', 'update', 'remove'];
@@ -300,7 +301,9 @@ class FeatureCorpusTest extends TestCase
                 . 'the corpus (create-sdkgen .sdk/test/feature/) to run these cases');
         }
 
-        foreach (self::FEATURE_CORPUS_NAMES as $name) {
+        $names = array_keys(self::corpus()['feature'] ?? []);
+        sort($names);
+        foreach ($names as $name) {
             $section = self::corpus()['feature'][$name] ?? null;
             if (null === $section) {
                 continue;

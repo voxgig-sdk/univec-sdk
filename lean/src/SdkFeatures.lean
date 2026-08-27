@@ -531,9 +531,15 @@ def costFeature : SIO Feature := do
     else do
       let rates ← gp o "rates"
       let opname ← SdkUtility.opnameOf ctx
+      -- The documented grammar is '<entity>.<op>', then '<op>', then '*'.
+      -- Checking only the bare name charged `{'widget.load': 0.25, '*': 0.01}`
+      -- a widget load at 0.01, unlike every other port.
+      let ent ← gpS (← gp ctx "op") "entity"
+      let byEntOp := numOf (← gp rates (ent ++ "." ++ opname)) (-1.0)
       let byOp := numOf (← gp rates opname) (-1.0)
       let byAny := numOf (← gp rates "*") (-1.0)
-      if byOp >= 0.0 then pure (byOp, "table")
+      if byEntOp >= 0.0 then pure (byEntOp, "table")
+      else if byOp >= 0.0 then pure (byOp, "table")
       else if byAny >= 0.0 then pure (byAny, "table")
       else do
         let unit ← optNum o "unit" 0.0
@@ -552,11 +558,31 @@ def costFeature : SIO Feature := do
     let o ← optsR.get
     let p ← pendR.get
     let rec_ ← record ctx
-    let amount := numOf (← gp p "amount") 0.0
+
+    -- A body usage figure prices the WHOLE call, so it replaces the
+    -- per-attempt estimate rather than adding to it - and, being
+    -- server-stated, the whole amount counts as reported. Read here, not at
+    -- the transport seam, because the body is one-shot.
+    let path ← optStr o "path" ""
+    let perUnit ← optNum o "perUnit" 0.0
+    let bodyAmt ← if path == "" then pure (-1.0) else do
+      let body ← gp (← gp ctx "result") "body"
+      pure (numOf (← getpath body (Value.str path)) (-1.0))
+
+    -- Bind the pending figures first: `←` cannot be nested inside an
+    -- if-then-else that is not itself a `do` block.
+    let pendAmount := numOf (← gp p "amount") 0.0
+    let pendReported := numOf (← gp p "reported") 0.0
+    let pendEstimated := numOf (← gp p "estimated") 0.0
+    let amount := if bodyAmt >= 0.0 then bodyAmt * perUnit else pendAmount
+    let reported := if bodyAmt >= 0.0 then amount else pendReported
+    let estimated := if bodyAmt >= 0.0 then 0.0 else pendEstimated
+    if bodyAmt >= 0.0 then sp p "source" (Value.str "body")
+
     let total ← gp rec_ "total"
     bumpNum total "amount" amount
-    bumpNum total "reported" (numOf (← gp p "reported") 0.0)
-    bumpNum total "estimated" (numOf (← gp p "estimated") 0.0)
+    bumpNum total "reported" reported
+    bumpNum total "estimated" estimated
     bumpNum total "calls" 1.0
 
     let budget ← gp rec_ "budget"
@@ -626,7 +652,16 @@ def costFeature : SIO Feature := do
            else if stage == "PreDone" then do
              -- A cache hit is a real call that cost nothing, so it commits
              -- too: that is the point of ordering cost inside the cache.
-             commit ctx }
+             commit ctx
+           else if stage == "PreUnexpected" then do
+             -- A failed operation never reaches PreDone, so without this its
+             -- attempts are priced and then discarded: repeated connection
+             -- failures would slip past an onBudget "deny" ceiling, and the
+             -- shared pending value would survive to be attributed to the
+             -- next successful call. A call that made NO attempt was refused
+             -- before the network and must not be counted.
+             let p ← pendR.get
+             if numOf (← gp p "attempts") 0.0 > 0.0 then commit ctx else resetPending }
 
 def streamingFeature : SIO Feature := do
   let optsR ← IO.mkRef (← emptyMap)

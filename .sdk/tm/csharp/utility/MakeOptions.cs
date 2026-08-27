@@ -150,12 +150,17 @@ public static partial class SdkUtility
         var optspec = new Dictionary<string, object?>
         {
             ["apikey"] = "",
+            ["secret"] = "",
             ["base"] = "http://localhost:8000",
             ["prefix"] = "",
             ["suffix"] = "",
+            // `basic` and `secret`: HTTP Basic Auth needs a second credential
+            // and a flag to say the pair is Basic rather than a single bearer
+            // token.
             ["auth"] = new Dictionary<string, object?>
             {
                 ["prefix"] = "",
+                ["basic"] = false,
             },
             ["headers"] = new Dictionary<string, object?>
             {

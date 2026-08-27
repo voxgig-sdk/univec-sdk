@@ -21,9 +21,20 @@ const node_assert_1 = require("node:assert");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const index_1 = require("../utility/index");
-// Features with a corpus section. A name here with no section is a skip, not
-// a failure: an SDK generated without the feature has nothing to run.
-const FEATURES = ['cost'];
+// Features with a corpus section — read from the corpus itself, so a
+// project-authored section (a custom feature added under
+// .sdk/test/feature/) runs without editing this file. Read eagerly: the
+// node test runner collects the per-feature tests at describe time,
+// before any `before` hook fires. An SDK generated without a listed
+// feature still skips, not fails.
+const FEATURES = Object.keys((() => {
+    try {
+        return JSON.parse((0, node_fs_1.readFileSync)((0, node_path_1.join)(__dirname, '..', index_1.TEST_JSON_FILE), 'utf8')).feature || {};
+    }
+    catch (e) {
+        return {};
+    }
+})()).sort();
 // A scripted transport built from a case's `res` list. Responses are consumed
 // in order and the last one repeats, so a case that does not care how many
 // attempts happen need only declare one.

@@ -18,6 +18,14 @@ function recordingServer(reply) {
     };
     return { server, calls };
 }
+// A subtest that drives a second feature (netsim as the simulated network)
+// can only run when this SDK was generated with it: the harness skips
+// absent features, which would leave the scenario unsimulated and the
+// assertions meaningless. Same convention as the other targets.
+function skipWithout(name) {
+    return (0, harness_1.hasFeature)(name) ? false
+        : ('this SDK was generated without the ' + name + ' feature');
+}
 (0, node_test_1.describe)('feature', () => {
     (0, node_test_1.test)('at least the test feature is present', () => {
         (0, node_assert_1.strictEqual)((0, harness_1.hasFeature)('test'), true);
@@ -79,7 +87,7 @@ function recordingServer(reply) {
     // --- retry ----------------------------------------------------------------
     if ((0, harness_1.hasFeature)('retry'))
         (0, node_test_1.describe)('retry', () => {
-            (0, node_test_1.test)('retries transient failures then succeeds', async () => {
+            (0, node_test_1.test)('retries transient failures then succeeds', { skip: skipWithout('netsim') }, async () => {
                 const clock = (0, harness_1.makeClock)();
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { failTimes: 2, failStatus: 503 } },
@@ -88,7 +96,7 @@ function recordingServer(reply) {
                 (0, node_assert_1.strictEqual)((await h.op({ op: 'load' })).ok, true);
                 (0, node_assert_1.strictEqual)(h.client._retry.attempts, 2);
             });
-            (0, node_test_1.test)('gives up after the budget', async () => {
+            (0, node_test_1.test)('gives up after the budget', { skip: skipWithout('netsim') }, async () => {
                 const clock = (0, harness_1.makeClock)();
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { failTimes: 9, failStatus: 500 } },
@@ -111,7 +119,7 @@ function recordingServer(reply) {
                 (0, node_assert_1.strictEqual)(res.ok, false);
                 (0, node_assert_1.strictEqual)(n, 3);
             });
-            (0, node_test_1.test)('honours a server Retry-After', async () => {
+            (0, node_test_1.test)('honours a server Retry-After', { skip: skipWithout('netsim') }, async () => {
                 const clock = (0, harness_1.makeClock)();
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { rateLimitTimes: 1, retryAfter: 2 } },
@@ -120,7 +128,7 @@ function recordingServer(reply) {
                 (0, node_assert_1.strictEqual)((await h.op({ op: 'load' })).ok, true);
                 (0, node_assert_1.strictEqual)(clock.time, 2000);
             });
-            (0, node_test_1.test)('default jitter path still succeeds', async () => {
+            (0, node_test_1.test)('default jitter path still succeeds', { skip: skipWithout('netsim') }, async () => {
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { failTimes: 1 } },
                         { name: 'retry', options: { retries: 2, minDelay: 0 } },
@@ -131,7 +139,7 @@ function recordingServer(reply) {
     // --- timeout --------------------------------------------------------------
     if ((0, harness_1.hasFeature)('timeout'))
         (0, node_test_1.describe)('timeout', () => {
-            (0, node_test_1.test)('a slow request times out', async () => {
+            (0, node_test_1.test)('a slow request times out', { skip: skipWithout('netsim') }, async () => {
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { latency: 80 } },
                         { name: 'timeout', options: { ms: 10 } },
@@ -273,7 +281,7 @@ function recordingServer(reply) {
     // --- metrics --------------------------------------------------------------
     if ((0, harness_1.hasFeature)('metrics'))
         (0, node_test_1.describe)('metrics', () => {
-            (0, node_test_1.test)('counts ok and err per op', async () => {
+            (0, node_test_1.test)('counts ok and err per op', { skip: skipWithout('netsim') }, async () => {
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { failTimes: 1, failStatus: 500 } },
                         { name: 'metrics', options: {} },
@@ -303,7 +311,7 @@ function recordingServer(reply) {
                 (0, node_assert_1.strictEqual)(sent['X-Trace-Id'], h.client._telemetry.spans[0].traceId);
                 (0, node_assert_1.ok)(/^00-.+-.+-01$/.test(sent['traceparent']));
             });
-            (0, node_test_1.test)('records a failed span on error', async () => {
+            (0, node_test_1.test)('records a failed span on error', { skip: skipWithout('netsim') }, async () => {
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { failTimes: 1, failStatus: 500 } },
                         { name: 'telemetry', options: {} },
@@ -325,7 +333,7 @@ function recordingServer(reply) {
                 (0, node_assert_1.strictEqual)(seen.length, 2);
                 (0, node_assert_1.strictEqual)(seen[0].headers.authorization, '<redacted>');
             });
-            (0, node_test_1.test)('captures failures', async () => {
+            (0, node_test_1.test)('captures failures', { skip: skipWithout('netsim') }, async () => {
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { failTimes: 1, failStatus: 500 } },
                         { name: 'debug', options: {} },
@@ -337,7 +345,7 @@ function recordingServer(reply) {
     // --- audit ----------------------------------------------------------------
     if ((0, harness_1.hasFeature)('audit'))
         (0, node_test_1.describe)('audit', () => {
-            (0, node_test_1.test)('one record per op with sink + actor', async () => {
+            (0, node_test_1.test)('one record per op with sink + actor', { skip: skipWithout('netsim') }, async () => {
                 const sink = [];
                 const h = (0, harness_1.makeClient)({ features: [
                         { name: 'netsim', options: { failTimes: 1, failStatus: 500 } },

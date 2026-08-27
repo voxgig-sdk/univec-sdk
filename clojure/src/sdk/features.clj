@@ -783,7 +783,14 @@
                                           " is spent (" spent " used)"))]
                            (core/out-set! ctx "point" err)
                            err))))))))
-           "PreDone" (fn [ctx] (finish! ctx true)))
+           "PreDone" (fn [ctx] (finish! ctx true))
+           ;; A failed operation never reaches PreDone - make-error dispatches
+           ;; PreUnexpected instead - so without this its attempts are priced
+           ;; and then discarded: repeated connection failures would slip past
+           ;; an onBudget "deny" ceiling and leak the pending entry. `false`
+           ;; keeps a call that made NO attempt (refused at the budget gate)
+           ;; from being counted.
+           "PreUnexpected" (fn [ctx] (finish! ctx false)))
     fa))
 
 ;; ---------------------------------------------------------------------------

@@ -141,6 +141,11 @@ function generateDirectLoad(model: Model, entity: ModelEntity) {
     return
   }
 
+  if ('graphql' === (loadPoint as any).kind) {
+    generateDirectGraphqlJs('load', entity, loadPoint)
+    return
+  }
+
   const loadParams = loadPoint.args?.params || []
   const loadPath = normalizePathParams(loadPoint.parts || [], loadParams, loadPoint.rename?.param)
 
@@ -238,6 +243,11 @@ function generateDirectList(model: Model, entity: ModelEntity) {
     return
   }
 
+  if ('graphql' === (listPoint as any).kind) {
+    generateDirectGraphqlJs('list', entity, listPoint)
+    return
+  }
+
   const listParams = listPoint.args?.params || []
   const listPath = normalizePathParams(listPoint.parts || [], listParams, listPoint.rename?.param)
 
@@ -292,6 +302,58 @@ ${paramsBlock}
       assert(calls.length === 1)
       assert(calls[0].init.method === 'GET')
 ${paramAsserts}    }
+  })
+`)
+}
+
+
+// GraphQL-backed op needs POST+body, not a REST-shaped GET+params direct()
+// call — reuse apidef's own point.graphql.doc via the SDK's graphql() hatch.
+// Mirrors TestDirect_ts.ts's generateDirectGraphql.
+function generateDirectGraphqlJs(
+  opname: 'load' | 'list',
+  entity: ModelEntity,
+  point: any,
+) {
+  const doc: string = point.graphql.doc
+  const vars: any[] = point.graphql.vars || []
+
+  const mockVarLines = vars.map((v: any, i: number) =>
+    `      variables[${JSON.stringify(v.name)}] = 'direct0${i + 1}'`).join('\n')
+
+  const liveVarLines = vars.map((v: any) => {
+    const from = v.from || v.name
+    const key = ('id' === from ? entity.name : from.replace(/_id$/, '')) + '01'
+    return `      variables[${JSON.stringify(v.name)}] = setup.idmap['${key}']`
+  }).join('\n')
+
+  // Asserted against the OUTGOING request body, not the mocked response —
+  // response-shape correctness is the entity-level tests' job.
+  const varAsserts = vars.map((_v: any, i: number) =>
+    '      assert(calls[0].init.body.includes(\'direct0' + (i + 1) + '\'))\n').join('')
+
+  Content(`
+  test('direct-${opname}-${entity.name}', async () => {
+    const setup = directSetup()
+    const { client, calls } = setup
+
+    const variables = {}
+    if (setup.live) {
+${liveVarLines || '      // no variables'}
+    } else {
+${mockVarLines || '      // no variables'}
+    }
+
+    const result = await client.graphql(${JSON.stringify(doc)}, variables)
+
+    assert(result.ok === true)
+    assert(result.status === 200)
+    assert(null != result.data)
+
+    if (!setup.live) {
+      assert(calls.length === 1)
+      assert(calls[0].init.method === 'POST')
+${varAsserts}    }
   })
 `)
 }

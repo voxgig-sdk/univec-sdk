@@ -937,10 +937,13 @@ let fetcher_util (ctx : ctx) (fullurl : string) (fetchdef : value) : (value * sd
 let opt_spec_value () : value =
   jo [
     ("apikey", Str "");
+    ("secret", Str "");
     ("base", Str "http://localhost:8000");
     ("prefix", Str "");
     ("suffix", Str "");
-    ("auth", jo [("prefix", Str "")]);
+    (* `basic` and `secret`: HTTP Basic Auth needs a second credential and a
+       flag to say the pair is Basic rather than a single bearer token. *)
+    ("auth", jo [("prefix", Str ""); ("basic", Bool false)]);
     ("headers", jo [("`$CHILD`", Str "`$STRING`")]);
     ("allow", jo [("method", Str "GET,PUT,POST,PATCH,DELETE,OPTIONS");
                   ("op", Str "create,update,load,list,remove,command,direct,graphql")]);

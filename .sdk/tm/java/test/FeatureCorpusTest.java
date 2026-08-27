@@ -43,9 +43,10 @@ import JAVAPACKAGE.core.Utility;
 @SuppressWarnings({"unchecked"})
 public class FeatureCorpusTest {
 
-  // Features with a corpus section. A name here with no section is a skip,
-  // not a failure: an SDK generated without the feature has nothing to run.
-  private static final List<String> FEATURE_CORPUS_NAMES = List.of("cost");
+  // Features with a corpus section are read from the corpus itself (see
+  // featureCorpus), so a project-authored section - a custom feature added
+  // under .sdk/test/feature/ - runs without editing this file. An SDK
+  // generated without a listed feature still skips, not fails.
 
   // The standard operation names, in the order the runner prefers them.
   private static final List<String> FEATURE_CORPUS_OPS =
@@ -377,7 +378,7 @@ public class FeatureCorpusTest {
         "this project's test.json has no `feature` section - recompile the "
             + "corpus (create-sdkgen .sdk/test/feature/) to run these cases");
 
-    for (String name : FEATURE_CORPUS_NAMES) {
+    for (String name : new TreeMap<>(features).keySet()) {
       Object sectionRaw = features.get(name);
       if (!(sectionRaw instanceof Map)) {
         continue;

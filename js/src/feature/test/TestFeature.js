@@ -274,10 +274,17 @@ class TestFeature extends BaseFeature {
       }
     }
 
-    const reqd = transform(
+    // Path AND query: a path-only read misses a query-addressed record
+    // (e.g. GET /result?trace_id=), which has no path param at all.
+    const reqdParams = transform(
       select(getpath(point, ['args', 'params']), { reqd: true }),
       ['`$EACH`', '', '`$KEY.name`']
     )
+    const reqdQuery = transform(
+      select(getpath(point, ['args', 'query']), { reqd: true }),
+      ['`$EACH`', '', '`$KEY.name`']
+    )
+    const reqd = [...(reqdParams || []), ...(reqdQuery || [])]
 
     const qand = []
     const q = { '`$AND`': qand }

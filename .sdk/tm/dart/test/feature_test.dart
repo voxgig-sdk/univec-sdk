@@ -134,6 +134,12 @@ void tests() {
     if (hasFeature('retry')) {
       describe('retry', () {
         test('retries transient failures then succeeds', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final clock = makeClock();
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'failTimes': 2, 'failStatus': 503}},
@@ -152,6 +158,12 @@ void tests() {
         });
 
         test('gives up after the budget', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final clock = makeClock();
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'failTimes': 9, 'failStatus': 500}},
@@ -203,6 +215,12 @@ void tests() {
         });
 
         test('honours a server Retry-After', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final clock = makeClock();
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'rateLimitTimes': 1, 'retryAfter': 2}},
@@ -222,6 +240,12 @@ void tests() {
         });
 
         test('default jitter path still succeeds', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'failTimes': 1}},
             {'name': 'retry', 'options': {'retries': 2, 'minDelay': 0}},
@@ -235,6 +259,12 @@ void tests() {
     if (hasFeature('timeout')) {
       describe('timeout', () {
         test('a slow request times out', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'latency': 80}},
             {'name': 'timeout', 'options': {'ms': 10}},
@@ -470,6 +500,12 @@ void tests() {
     if (hasFeature('metrics')) {
       describe('metrics', () {
         test('counts ok and err per op', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'failTimes': 1, 'failStatus': 500}},
             {'name': 'metrics', 'options': {}},
@@ -509,6 +545,12 @@ void tests() {
         });
 
         test('records a failed span on error', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'failTimes': 1, 'failStatus': 500}},
             {'name': 'telemetry', 'options': {}},
@@ -542,6 +584,12 @@ void tests() {
         });
 
         test('captures failures', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'failTimes': 1, 'failStatus': 500}},
             {'name': 'debug', 'options': {}},
@@ -556,6 +604,12 @@ void tests() {
     if (hasFeature('audit')) {
       describe('audit', () {
         test('one record per op with sink + actor', (t) async {
+          // Drives netsim as the simulated network: runnable only when this
+          // SDK was generated with it (the harness skips absent features).
+          if (!hasFeature('netsim')) {
+            t.skip('this SDK was generated without the netsim feature');
+            return;
+          }
           final sink = [];
           final h = makeClient(features: [
             {'name': 'netsim', 'options': {'failTimes': 1, 'failStatus': 500}},

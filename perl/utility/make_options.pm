@@ -108,9 +108,12 @@ $REGISTRY{make_options} = sub {
   my $optspec = {
     'apikey' => '',
     'base' => 'http://localhost:8000',
+    'secret' => '',
     'prefix' => '',
     'suffix' => '',
-    'auth' => { 'prefix' => '' },
+    # `basic` and `secret`: HTTP Basic Auth needs a second credential and a
+    # flag to say the pair is Basic rather than a single bearer token.
+    'auth' => { 'prefix' => '', 'basic' => $JF },
     'headers' => { '`$CHILD`' => '`$STRING`' },
     'allow' => {
       'method' => 'GET,PUT,POST,PATCH,DELETE,OPTIONS',

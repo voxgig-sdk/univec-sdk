@@ -167,10 +167,9 @@ above:
 | [`test`](#test) | In-memory mock transport for testing without a live server |
 | [`timeout`](#timeout) | Per-request timeout with transport abort |
 
-> **Order matters for `cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `timeout`.** These wrap the
-> transport, so each one wraps whatever is already installed: the order you
-> activate them in IS the nesting order. Activating them as an ordered list
-> rather than a map is what fixes that order.
+> **`cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `timeout` wrap the transport**, so each one wraps
+> whatever is already installed. This SDK composes them in a fixed catalog
+> order, not the order you activate them in, and takes `feature` as a map.
 
 ### audit
 

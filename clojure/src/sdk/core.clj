@@ -1012,8 +1012,12 @@
           config (or (oget ctx :config) (vs/jm))
           cfgopts (let [c (vs/getprop config "options")] (if (vs/ismap c) c (vs/jm)))
           optspec (vs/jm
-                   "apikey" "" "base" "http://localhost:8000" "prefix" "" "suffix" ""
-                   "auth" (vs/jm "prefix" "")
+                   "apikey" "" "secret" "" "base" "http://localhost:8000" "prefix" "" "suffix" ""
+                   ;; `basic` and `secret`: HTTP Basic Auth needs a second
+                   ;; credential and a flag to say the pair is Basic rather
+                   ;; than a single bearer token. Absent from the shape, a
+                   ;; client passing them is refused with "Unexpected keys".
+                   "auth" (vs/jm "prefix" "" "basic" false)
                    "headers" (vs/jm "`$CHILD`" "`$STRING`")
                    "allow" (vs/jm "method" "GET,PUT,POST,PATCH,DELETE,OPTIONS"
                                   "op" "create,update,load,list,remove,command,direct,graphql")

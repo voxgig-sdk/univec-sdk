@@ -813,6 +813,11 @@ let cost_feature () : feature =
             end
           end
         | "PreDone" -> finish ctx true
+        (* A failed operation never reaches PreDone - make_error dispatches
+           PreUnexpected - so its attempts would be priced and discarded, and
+           repeated failures could slip past an onBudget "deny" ceiling.
+           `false` keeps a call that made NO attempt from being counted. *)
+        | "PreUnexpected" -> finish ctx false
         | _ -> ());
   f
 

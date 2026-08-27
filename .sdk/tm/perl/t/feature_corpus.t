@@ -29,9 +29,10 @@ unless (defined $TEST_JSON && -e $TEST_JSON) {
   plan skip_all => 'test.json corpus not found';
 }
 
-# Features with a corpus section. A name here with no section is a skip, not
-# a failure: an SDK generated without the feature has nothing to run.
-my @FEATURE_CORPUS_NAMES = ('cost');
+# Features with a corpus section are read from the corpus itself (see the
+# loop below), so a project-authored section - a custom feature added under
+# .sdk/test/feature/ - runs without editing this file. An SDK generated
+# without a listed feature still skips, not fails.
 
 # The standard operation names, in the order the runner prefers them.
 my @FEATURE_CORPUS_OPS = qw(load list create update remove);
@@ -282,7 +283,7 @@ ok(scalar(@ops) > 0,
   exit 0;
 };
 
-for my $name (@FEATURE_CORPUS_NAMES) {
+for my $name (sort keys %{ $CORPUS->{feature} || {} }) {
   my $section = ($CORPUS->{feature} || {})->{$name};
   next unless defined $section;
 

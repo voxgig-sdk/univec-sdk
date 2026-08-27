@@ -285,10 +285,13 @@ defmodule Univec.Utility do
     optspec =
       H.deep(%{
         "apikey" => "",
+        "secret" => "",
         "base" => "http://localhost:8000",
         "prefix" => "",
         "suffix" => "",
-        "auth" => %{"prefix" => ""},
+        # `basic` and `secret`: HTTP Basic Auth needs a second credential and
+        # a flag to say the pair is Basic rather than a single bearer token.
+        "auth" => %{"prefix" => "", "basic" => false},
         "headers" => %{"`$CHILD`" => "`$STRING`"},
         "allow" => %{
           "method" => "GET,PUT,POST,PATCH,DELETE,OPTIONS",
