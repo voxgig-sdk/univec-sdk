@@ -30,7 +30,6 @@
 #   rb       rubygems (publish pending: deploy publishes the git tag only) https://rubygems.org
 #   rust     crates.io (publish pending: deploy publishes the git tag only) https://crates.io
 #   scala    maven-central (publish pending: deploy publishes the git tag only) https://central.sonatype.com
-#   seneca-provider npm (publish pending: deploy publishes the git tag only) https://registry.npmjs.org
 #   swift    swiftpm (publish pending: deploy publishes the git tag only) https://swift.org/package-manager
 #   ts       npm (publish pending: deploy publishes the git tag only) https://registry.npmjs.org
 #   zig      none (publish pending: deploy publishes the git tag only)
@@ -71,7 +70,7 @@ SWIFTPM_ALIAS ?= swiftpm
 VERSION := $(shell node -p "require('./ts/package.json').version" 2>/dev/null || echo 0.0.0)
 BORU_DRY_RUN_FILLER := BORU-DRY-RUN-FILLER-NOT-A-REAL-SECRET
 
-TARGETS := c clojure cpp csharp dart elixir go go-cli go-mcp java js kotlin lean lua ocaml perl php py py-data rb rust scala seneca-provider swift ts zig
+TARGETS := c clojure cpp csharp dart elixir go go-cli go-mcp java js kotlin lean lua ocaml perl php py py-data rb rust scala swift ts zig
 
 .PHONY: deploy deploy-dry \
   $(addprefix deploy-,$(TARGETS)) $(addprefix deploy-dry-,$(TARGETS)) \
@@ -103,7 +102,6 @@ deploy:
 	@echo "  deploy-rb       rubygems publish pending (deploy = git tag only)"
 	@echo "  deploy-rust     crates.io publish pending (deploy = git tag only)"
 	@echo "  deploy-scala    maven-central publish pending (deploy = git tag only)"
-	@echo "  deploy-seneca-provider npm publish pending (deploy = git tag only)"
 	@echo "  deploy-swift    swiftpm publish pending (deploy = git tag only)"
 	@echo "  deploy-ts       npm publish pending (deploy = git tag only)"
 	@echo "  deploy-zig      none publish pending (deploy = git tag only)"
@@ -558,27 +556,6 @@ tag-push-scala:
 	hdr="AUTHORIZATION: basic $$(printf 'x-access-token:%s' "$$token" | base64 | tr -d '\n')"; \
 	git -c http.extraheader="$$hdr" push "$$url" "$$tag"; \
 	echo "pushed $$tag (maven-central publication pending — tag-only deploy)"
-
-deploy-seneca-provider:
-	@echo "deploy-seneca-provider: npm publication is pending — publishing the git tag only."
-	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-seneca-provider
-
-deploy-dry-seneca-provider:
-	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-seneca-provider
-
-tag-push-seneca-provider:
-	@set -e; tag="seneca-provider/v$(VERSION)"; \
-	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
-	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
-	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
-	if [ -z "$$token" ]; then echo "tag-push-seneca-provider: no GITHUB_TOKEN in env — run via make deploy-seneca-provider (boru vault exec)"; exit 1; fi; \
-	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
-	  echo "tag $$tag already exists — pushing existing tag"; \
-	else git tag -a "$$tag" -m "Release $$tag"; fi; \
-	url=$$(git remote get-url origin | sed -E 's#^git@github.com:#https://github.com/#'); \
-	hdr="AUTHORIZATION: basic $$(printf 'x-access-token:%s' "$$token" | base64 | tr -d '\n')"; \
-	git -c http.extraheader="$$hdr" push "$$url" "$$tag"; \
-	echo "pushed $$tag (npm publication pending — tag-only deploy)"
 
 deploy-swift:
 	@echo "deploy-swift: swiftpm publication is pending — publishing the git tag only."

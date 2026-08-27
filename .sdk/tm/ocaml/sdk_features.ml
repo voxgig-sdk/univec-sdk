@@ -1,4 +1,4 @@
-(* ProjectName SDK features + API-agnostic client helpers.
+(* Univec SDK features + API-agnostic client helpers.
  *
  * The 18 pipeline features (base/test/log + the 15 enterprise features) and
  * the transport they wrap, plus make_client_base / direct / prepare / test.
@@ -825,7 +825,7 @@ let clienttrack_feature () : feature =
   let session = ref "" and requests = ref 0 in
   let f = { f_name = "clienttrack"; f_version = "0.0.1"; f_active = true; f_options = Noval;
             f_init = (fun _ _ -> ()); f_hook = (fun _ _ -> ()) } in
-  let name () = (opt_str !options "clientName" ~default:"ProjectName-SDK") ^ "/" ^ (opt_str !options "clientVersion" ~default:"0.0.1") in
+  let name () = (opt_str !options "clientName" ~default:"Univec-SDK") ^ "/" ^ (opt_str !options "clientVersion" ~default:"0.0.1") in
   let gen_id kind =
     match getp !options "idgen" with
     | Func _ as fn -> vstr_of (call_vfn fn (Str kind))
@@ -1420,7 +1420,7 @@ let op_denied (client : sdk_client) (op : string) : value =
   let allow = match getpath_s client.cl_options "allow.op" with
     | Str s -> s | _ -> "" in
   jo [("ok", Bool false);
-      ("err", Str ("ProjectNameSDK: " ^ op ^ ": operation not allowed by" ^
+      ("err", Str ("UnivecSDK: " ^ op ^ ": operation not allowed by" ^
                    " SDK option allow.op value: \"" ^ allow ^ "\""))]
 
 (* Ungated request path shared by direct and graphql, each of which checks its
@@ -1498,7 +1498,7 @@ let graphql (client : sdk_client) (query : string) (variables : value)
        let msg = get_str_d first "message" "" in
        let msg = if msg = "" then "graphql error" else msg in
        setp res "ok" (Bool false);
-       setp res "err" (Str ("ProjectNameSDK: graphql: " ^ msg));
+       setp res "err" (Str ("UnivecSDK: graphql: " ^ msg));
        setp res "graphql" (lst errors));
 
     res

@@ -12,7 +12,7 @@ There are companion guides deeper in the tree: one per language
 
 ## Project map
 
-**Targets** (26):
+**Targets** (25):
 
 | Target | Directory | Build guide |
 | --- | --- | --- |
@@ -38,7 +38,6 @@ There are companion guides deeper in the tree: one per language
 | `rb` | `rb/` | [`rb/AGENTS.md`](./rb/AGENTS.md) |
 | `rust` | `rust/` | [`rust/AGENTS.md`](./rust/AGENTS.md) |
 | `scala` | `scala/` | [`scala/AGENTS.md`](./scala/AGENTS.md) |
-| `seneca-provider` | `seneca-provider/` | [`seneca-provider/AGENTS.md`](./seneca-provider/AGENTS.md) |
 | `swift` | `swift/` | [`swift/AGENTS.md`](./swift/AGENTS.md) |
 | `ts` | `ts/` | [`ts/AGENTS.md`](./ts/AGENTS.md) |
 | `zig` | `zig/` | [`zig/AGENTS.md`](./zig/AGENTS.md) |

@@ -1,4 +1,4 @@
-# ProjectName SDK feature test harness
+# Univec SDK feature test harness
 #
 # Offline feature-test harness for the generated SDK.
 #
@@ -16,10 +16,10 @@ from urllib.parse import quote
 
 from projectname_sdk.config import shared_config
 from projectname_sdk.features import _make_feature
-from projectname_sdk.core.control import ProjectNameControl
-from projectname_sdk.core.error import ProjectNameError
-from projectname_sdk.core.result import ProjectNameResult
-from projectname_sdk.core.spec import ProjectNameSpec
+from projectname_sdk.core.control import UnivecControl
+from projectname_sdk.core.error import UnivecError
+from projectname_sdk.core.result import UnivecResult
+from projectname_sdk.core.spec import UnivecSpec
 
 
 # True when this SDK was generated with the named feature.
@@ -161,7 +161,7 @@ class _Ctx:
         self.client = client
         self.utility = utility
         self.out = {}
-        self.ctrl = ctrl if ctrl is not None else ProjectNameControl()
+        self.ctrl = ctrl if ctrl is not None else UnivecControl()
         self.meta = {}
         self.op = op
         self.entity = entity
@@ -177,7 +177,7 @@ class _Ctx:
         self.shared = {}
 
     def make_error(self, code, msg):
-        return ProjectNameError(code, msg, self)
+        return UnivecError(code, msg, self)
 
 
 # Construct a fake client wired with the given features (in init order) and
@@ -227,7 +227,7 @@ class Harness:
                 method(ctx)
 
     def _populate_result(self, ctx, response, fetch_err):
-        result = ProjectNameResult({})
+        result = UnivecResult({})
         ctx.result = result
 
         if fetch_err is not None:
@@ -272,7 +272,7 @@ class Harness:
         ctx = _Ctx(self.client, self.utility,
                    op=_Op(opname, entity),
                    entity=_Entity(entity),
-                   ctrl=ProjectNameControl(ctrl or {}))
+                   ctrl=UnivecControl(ctrl or {}))
 
         self.feature_hook(ctx, "PostConstructEntity")
 
@@ -288,7 +288,7 @@ class Harness:
                 merged = dict(self.headers)
                 for key, val in (headers or {}).items():
                     merged[key] = val
-                spec = ProjectNameSpec({
+                spec = UnivecSpec({
                     "method": method,
                     "base": self.base,
                     "path": path if path is not None else "/" + entity,
