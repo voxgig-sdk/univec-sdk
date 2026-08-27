@@ -16,11 +16,191 @@ func MakeConfig() map[string]any {
 			"target": "go",
 		},
 		"feature": map[string]any{
+			"audit": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"actor": "anonymous",
+					"max": 1000,
+				},
+				"transport": "none",
+			},
+			"cache": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"max": 256,
+					"methods": []any{
+						"GET",
+					},
+					"ttl": 5000,
+				},
+				"transport": "wrap",
+			},
+			"clienttrack": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"clientVersion": "0.0.1",
+				},
+				"transport": "none",
+			},
+			"cost": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"budget": 0,
+					"currency": "USD",
+					"header": "",
+					"onBudget": "warn",
+					"path": "",
+					"perUnit": 0,
+					"rates": map[string]any{},
+					"unit": 0,
+				},
+				"transport": "wrap",
+			},
+			"debug": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"max": 100,
+					"redact": []any{
+						"authorization",
+						"cookie",
+						"set-cookie",
+						"api-key",
+						"apikey",
+						"x-api-key",
+						"idempotency-key",
+					},
+				},
+				"transport": "none",
+			},
+			"idempotency": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"header": "Idempotency-Key",
+					"methods": []any{
+						"POST",
+						"PUT",
+						"PATCH",
+						"DELETE",
+					},
+					"ops": []any{
+						"create",
+						"update",
+						"remove",
+					},
+				},
+				"transport": "none",
+			},
+			"log": map[string]any{
+				"options": map[string]any{
+					"active": true,
+				},
+				"transport": "none",
+			},
+			"metrics": map[string]any{
+				"options": map[string]any{
+					"active": false,
+				},
+				"transport": "none",
+			},
+			"netsim": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"errorTimes": 0,
+					"failEvery": 0,
+					"failRate": 0,
+					"failStatus": 503,
+					"failTimes": 0,
+					"latency": 0,
+					"offline": false,
+					"rateLimitTimes": 0,
+					"retryAfter": 0,
+					"seed": 1,
+				},
+				"transport": "wrap",
+			},
+			"paging": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"afterVar": "after",
+					"cursorParam": "cursor",
+					"firstVar": "first",
+					"limitParam": "limit",
+					"pageParam": "page",
+					"startPage": 1,
+				},
+				"transport": "none",
+			},
+			"proxy": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"fromEnv": false,
+					"noProxy": []any{},
+					"url": "",
+				},
+				"transport": "wrap",
+			},
+			"ratelimit": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"burst": 5,
+					"rate": 5,
+				},
+				"transport": "wrap",
+			},
+			"rbac": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"deny": false,
+					"permissions": []any{},
+					"rules": map[string]any{},
+				},
+				"transport": "none",
+			},
+			"retry": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"factor": 2,
+					"maxDelay": 2000,
+					"minDelay": 50,
+					"retries": 2,
+					"statuses": []any{
+						408,
+						425,
+						429,
+						500,
+						502,
+						503,
+						504,
+					},
+				},
+				"transport": "wrap",
+			},
+			"streaming": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"chunkDelay": 0,
+					"chunkSize": 0,
+				},
+				"transport": "none",
+			},
+			"telemetry": map[string]any{
+				"options": map[string]any{
+					"active": false,
+				},
+				"transport": "none",
+			},
 			"test": map[string]any{
 				"options": map[string]any{
 					"active": false,
 				},
 				"transport": "base",
+			},
+			"timeout": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"ms": 30000,
+				},
+				"transport": "wrap",
 			},
 		},
 		"options": map[string]any{
@@ -377,9 +557,77 @@ func SharedConfig() map[string]any {
 
 func makeFeature(name string) Feature {
 	switch name {
+	case "audit":
+		if NewAuditFeatureFunc != nil {
+			return NewAuditFeatureFunc()
+		}
+	case "cache":
+		if NewCacheFeatureFunc != nil {
+			return NewCacheFeatureFunc()
+		}
+	case "clienttrack":
+		if NewClienttrackFeatureFunc != nil {
+			return NewClienttrackFeatureFunc()
+		}
+	case "cost":
+		if NewCostFeatureFunc != nil {
+			return NewCostFeatureFunc()
+		}
+	case "debug":
+		if NewDebugFeatureFunc != nil {
+			return NewDebugFeatureFunc()
+		}
+	case "idempotency":
+		if NewIdempotencyFeatureFunc != nil {
+			return NewIdempotencyFeatureFunc()
+		}
+	case "log":
+		if NewLogFeatureFunc != nil {
+			return NewLogFeatureFunc()
+		}
+	case "metrics":
+		if NewMetricsFeatureFunc != nil {
+			return NewMetricsFeatureFunc()
+		}
+	case "netsim":
+		if NewNetsimFeatureFunc != nil {
+			return NewNetsimFeatureFunc()
+		}
+	case "paging":
+		if NewPagingFeatureFunc != nil {
+			return NewPagingFeatureFunc()
+		}
+	case "proxy":
+		if NewProxyFeatureFunc != nil {
+			return NewProxyFeatureFunc()
+		}
+	case "ratelimit":
+		if NewRatelimitFeatureFunc != nil {
+			return NewRatelimitFeatureFunc()
+		}
+	case "rbac":
+		if NewRbacFeatureFunc != nil {
+			return NewRbacFeatureFunc()
+		}
+	case "retry":
+		if NewRetryFeatureFunc != nil {
+			return NewRetryFeatureFunc()
+		}
+	case "streaming":
+		if NewStreamingFeatureFunc != nil {
+			return NewStreamingFeatureFunc()
+		}
+	case "telemetry":
+		if NewTelemetryFeatureFunc != nil {
+			return NewTelemetryFeatureFunc()
+		}
 	case "test":
 		if NewTestFeatureFunc != nil {
 			return NewTestFeatureFunc()
+		}
+	case "timeout":
+		if NewTimeoutFeatureFunc != nil {
+			return NewTimeoutFeatureFunc()
 		}
 	default:
 		if NewBaseFeatureFunc != nil {

@@ -1,11 +1,45 @@
 
 const { BaseFeature } = require('./feature/base/BaseFeature')
+const { AuditFeature } = require('./feature/audit/AuditFeature')
+const { CacheFeature } = require('./feature/cache/CacheFeature')
+const { ClienttrackFeature } = require('./feature/clienttrack/ClienttrackFeature')
+const { CostFeature } = require('./feature/cost/CostFeature')
+const { DebugFeature } = require('./feature/debug/DebugFeature')
+const { IdempotencyFeature } = require('./feature/idempotency/IdempotencyFeature')
+const { LogFeature } = require('./feature/log/LogFeature')
+const { MetricsFeature } = require('./feature/metrics/MetricsFeature')
+const { NetsimFeature } = require('./feature/netsim/NetsimFeature')
+const { PagingFeature } = require('./feature/paging/PagingFeature')
+const { ProxyFeature } = require('./feature/proxy/ProxyFeature')
+const { RatelimitFeature } = require('./feature/ratelimit/RatelimitFeature')
+const { RbacFeature } = require('./feature/rbac/RbacFeature')
+const { RetryFeature } = require('./feature/retry/RetryFeature')
+const { StreamingFeature } = require('./feature/streaming/StreamingFeature')
+const { TelemetryFeature } = require('./feature/telemetry/TelemetryFeature')
 const { TestFeature } = require('./feature/test/TestFeature')
+const { TimeoutFeature } = require('./feature/timeout/TimeoutFeature')
 
 
 
 const FEATURE_CLASS = {
-   test: TestFeature,
+   audit: AuditFeature,
+ cache: CacheFeature,
+ clienttrack: ClienttrackFeature,
+ cost: CostFeature,
+ debug: DebugFeature,
+ idempotency: IdempotencyFeature,
+ log: LogFeature,
+ metrics: MetricsFeature,
+ netsim: NetsimFeature,
+ paging: PagingFeature,
+ proxy: ProxyFeature,
+ ratelimit: RatelimitFeature,
+ rbac: RbacFeature,
+ retry: RetryFeature,
+ streaming: StreamingFeature,
+ telemetry: TelemetryFeature,
+ test: TestFeature,
+ timeout: TimeoutFeature,
 
 }
 
@@ -37,11 +71,191 @@ class Config {
 
 
   feature = {
-     test:     {
+     audit:     {
+      "options": {
+        "active": false,
+        "actor": "anonymous",
+        "max": 1000
+      },
+      "transport": "none"
+    },
+ cache:     {
+      "options": {
+        "active": false,
+        "max": 256,
+        "methods": [
+          "GET"
+        ],
+        "ttl": 5000
+      },
+      "transport": "wrap"
+    },
+ clienttrack:     {
+      "options": {
+        "active": false,
+        "clientVersion": "0.0.1"
+      },
+      "transport": "none"
+    },
+ cost:     {
+      "options": {
+        "active": false,
+        "budget": 0,
+        "currency": "USD",
+        "header": "",
+        "onBudget": "warn",
+        "path": "",
+        "perUnit": 0,
+        "rates": {},
+        "unit": 0
+      },
+      "transport": "wrap"
+    },
+ debug:     {
+      "options": {
+        "active": false,
+        "max": 100,
+        "redact": [
+          "authorization",
+          "cookie",
+          "set-cookie",
+          "api-key",
+          "apikey",
+          "x-api-key",
+          "idempotency-key"
+        ]
+      },
+      "transport": "none"
+    },
+ idempotency:     {
+      "options": {
+        "active": false,
+        "header": "Idempotency-Key",
+        "methods": [
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ],
+        "ops": [
+          "create",
+          "update",
+          "remove"
+        ]
+      },
+      "transport": "none"
+    },
+ log:     {
+      "options": {
+        "active": true
+      },
+      "transport": "none"
+    },
+ metrics:     {
+      "options": {
+        "active": false
+      },
+      "transport": "none"
+    },
+ netsim:     {
+      "options": {
+        "active": false,
+        "errorTimes": 0,
+        "failEvery": 0,
+        "failRate": 0,
+        "failStatus": 503,
+        "failTimes": 0,
+        "latency": 0,
+        "offline": false,
+        "rateLimitTimes": 0,
+        "retryAfter": 0,
+        "seed": 1
+      },
+      "transport": "wrap"
+    },
+ paging:     {
+      "options": {
+        "active": false,
+        "afterVar": "after",
+        "cursorParam": "cursor",
+        "firstVar": "first",
+        "limitParam": "limit",
+        "pageParam": "page",
+        "startPage": 1
+      },
+      "transport": "none"
+    },
+ proxy:     {
+      "options": {
+        "active": false,
+        "fromEnv": false,
+        "noProxy": [],
+        "url": ""
+      },
+      "transport": "wrap"
+    },
+ ratelimit:     {
+      "options": {
+        "active": false,
+        "burst": 5,
+        "rate": 5
+      },
+      "transport": "wrap"
+    },
+ rbac:     {
+      "options": {
+        "active": false,
+        "deny": false,
+        "permissions": [],
+        "rules": {}
+      },
+      "transport": "none"
+    },
+ retry:     {
+      "options": {
+        "active": false,
+        "factor": 2,
+        "maxDelay": 2000,
+        "minDelay": 50,
+        "retries": 2,
+        "statuses": [
+          408,
+          425,
+          429,
+          500,
+          502,
+          503,
+          504
+        ]
+      },
+      "transport": "wrap"
+    },
+ streaming:     {
+      "options": {
+        "active": false,
+        "chunkDelay": 0,
+        "chunkSize": 0
+      },
+      "transport": "none"
+    },
+ telemetry:     {
+      "options": {
+        "active": false
+      },
+      "transport": "none"
+    },
+ test:     {
       "options": {
         "active": false
       },
       "transport": "base"
+    },
+ timeout:     {
+      "options": {
+        "active": false,
+        "ms": 30000
+      },
+      "transport": "wrap"
     },
 
   }

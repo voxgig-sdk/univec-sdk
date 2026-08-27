@@ -311,7 +311,24 @@ Return the entity name.
 
 | Feature | Version | Description |
 | --- | --- | --- |
+| `audit` | 0.0.1 | Structured audit trail of operations |
+| `cache` | 0.0.1 | Response caching for safe read requests |
+| `clienttrack` | 0.0.1 | Client identity and per-request correlation headers |
+| `cost` | 0.0.1 | Cost tracking and spend budget for API calls |
+| `debug` | 0.0.1 | Request/response capture ring buffer for debugging |
+| `idempotency` | 0.0.1 | Idempotency keys for safe retries of mutating operations |
+| `log` | 0.0.1 | Structured request and response logging |
+| `metrics` | 0.0.1 | Statistics capture: per-operation counters and latency |
+| `netsim` | 0.0.1 | Network behaviour simulation for offline testing (latency, failures, outages) |
+| `paging` | 0.0.1 | Pagination signals for list operations |
+| `proxy` | 0.0.1 | Outbound HTTP(S) proxy routing |
+| `ratelimit` | 0.0.1 | Client-side rate limiting via a token bucket |
+| `rbac` | 0.0.1 | Client-side role/permission enforcement |
+| `retry` | 0.0.1 | Automatic retry of transient failures with exponential backoff |
+| `streaming` | 0.0.1 | Incremental streaming of list results via async iteration |
+| `telemetry` | 0.0.1 | Distributed tracing spans with W3C trace-context propagation |
 | `test` | 0.0.1 | In-memory mock transport for testing without a live server |
+| `timeout` | 0.0.1 | Per-request timeout with transport abort |
 
 
 Features are activated via the `feature` option:
@@ -321,7 +338,24 @@ var client = new UnivecSDK(new Dictionary<string, object?>
 {
     ["feature"] = new Dictionary<string, object?>
     {
+        ["audit"] = new Dictionary<string, object?> { ["active"] = true },
+        ["cache"] = new Dictionary<string, object?> { ["active"] = true },
+        ["clienttrack"] = new Dictionary<string, object?> { ["active"] = true },
+        ["cost"] = new Dictionary<string, object?> { ["active"] = true },
+        ["debug"] = new Dictionary<string, object?> { ["active"] = true },
+        ["idempotency"] = new Dictionary<string, object?> { ["active"] = true },
+        ["log"] = new Dictionary<string, object?> { ["active"] = true },
+        ["metrics"] = new Dictionary<string, object?> { ["active"] = true },
+        ["netsim"] = new Dictionary<string, object?> { ["active"] = true },
+        ["paging"] = new Dictionary<string, object?> { ["active"] = true },
+        ["proxy"] = new Dictionary<string, object?> { ["active"] = true },
+        ["ratelimit"] = new Dictionary<string, object?> { ["active"] = true },
+        ["rbac"] = new Dictionary<string, object?> { ["active"] = true },
+        ["retry"] = new Dictionary<string, object?> { ["active"] = true },
+        ["streaming"] = new Dictionary<string, object?> { ["active"] = true },
+        ["telemetry"] = new Dictionary<string, object?> { ["active"] = true },
         ["test"] = new Dictionary<string, object?> { ["active"] = true },
+        ["timeout"] = new Dictionary<string, object?> { ["active"] = true },
     },
 });
 ```

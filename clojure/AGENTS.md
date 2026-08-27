@@ -42,7 +42,24 @@ the runtime under `.sdk/tm/clojure/feature/` and regenerate.
 
 | Feature | Runtime file | Active hooks |
 | --- | --- | --- |
+| **audit** — Structured audit trail of operations | `feature/audit_feature.clj` | `PreDone`, `PreUnexpected` |
+| **cache** — Response caching for safe read requests | `feature/cache_feature.clj` | — |
+| **clienttrack** — Client identity and per-request correlation headers | `feature/clienttrack_feature.clj` | `PostConstruct`, `PreRequest` |
+| **cost** — Cost tracking and spend budget for API calls | `feature/cost_feature.clj` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **debug** — Request/response capture ring buffer for debugging | `feature/debug_feature.clj` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
+| **idempotency** — Idempotency keys for safe retries of mutating operations | `feature/idempotency_feature.clj` | `PreRequest` |
+| **log** — Structured request and response logging | `feature/log_feature.clj` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **metrics** — Statistics capture: per-operation counters and latency | `feature/metrics_feature.clj` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **netsim** — Network behaviour simulation for offline testing (latency, failures, outages) | `feature/netsim_feature.clj` | — |
+| **paging** — Pagination signals for list operations | `feature/paging_feature.clj` | `PreRequest`, `PreResult` |
+| **proxy** — Outbound HTTP(S) proxy routing | `feature/proxy_feature.clj` | — |
+| **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.clj` | — |
+| **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.clj` | `PrePoint` |
+| **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.clj` | — |
+| **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.clj` | `PreResult` |
+| **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.clj` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
 | **test** — In-memory mock transport for testing without a live server | `feature/test_feature.clj` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **timeout** — Per-request timeout with transport abort | `feature/timeout_feature.clj` | — |
 
 ---
 

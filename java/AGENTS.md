@@ -42,7 +42,24 @@ the runtime under `.sdk/tm/java/feature/` and regenerate.
 
 | Feature | Runtime file | Active hooks |
 | --- | --- | --- |
+| **audit** — Structured audit trail of operations | `feature/audit_feature.java` | `PreDone`, `PreUnexpected` |
+| **cache** — Response caching for safe read requests | `feature/cache_feature.java` | — |
+| **clienttrack** — Client identity and per-request correlation headers | `feature/clienttrack_feature.java` | `PostConstruct`, `PreRequest` |
+| **cost** — Cost tracking and spend budget for API calls | `feature/cost_feature.java` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **debug** — Request/response capture ring buffer for debugging | `feature/debug_feature.java` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
+| **idempotency** — Idempotency keys for safe retries of mutating operations | `feature/idempotency_feature.java` | `PreRequest` |
+| **log** — Structured request and response logging | `feature/log_feature.java` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **metrics** — Statistics capture: per-operation counters and latency | `feature/metrics_feature.java` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **netsim** — Network behaviour simulation for offline testing (latency, failures, outages) | `feature/netsim_feature.java` | — |
+| **paging** — Pagination signals for list operations | `feature/paging_feature.java` | `PreRequest`, `PreResult` |
+| **proxy** — Outbound HTTP(S) proxy routing | `feature/proxy_feature.java` | — |
+| **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.java` | — |
+| **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.java` | `PrePoint` |
+| **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.java` | — |
+| **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.java` | `PreResult` |
+| **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.java` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
 | **test** — In-memory mock transport for testing without a live server | `feature/test_feature.java` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **timeout** — Per-request timeout with transport abort | `feature/timeout_feature.java` | — |
 
 ---
 
