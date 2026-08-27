@@ -423,6 +423,7 @@ let make_feature (name : string) : feature =
   | "audit" -> audit_feature ()
   | "cache" -> cache_feature ()
   | "clienttrack" -> clienttrack_feature ()
+  | "cost" -> cost_feature ()
   | "debug" -> debug_feature ()
   | "idempotency" -> idempotency_feature ()
   | "log" -> log_feature ()

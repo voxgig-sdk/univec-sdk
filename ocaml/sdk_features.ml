@@ -593,6 +593,230 @@ let audit_feature () : feature =
   f
 
 (* ------------------------------------------------------------------ *)
+(* cost                                                                *)
+(* ------------------------------------------------------------------ *)
+(* Prices every transport ATTEMPT and commits the spend once per
+   OPERATION. Mirrors tm/ts/src/feature/cost/CostFeature.ts; the corpus
+   cases are .sdk/test/feature/cost.aon.
+
+   ORDER MATTERS. Cost must sit INSIDE the cache, or a response served from
+   cache is charged for money that was never spent. Activate in array form
+   with cost first: [{ name: 'cost' }, { name: 'cache' }]. *)
+
+let cost_feature () : feature =
+  let options = ref (empty_map ()) in
+  (* Per-context accumulation: attempts are priced as they happen and the
+     total is committed once, at PreDone. *)
+  let pending : (string, value) Hashtbl.t = Hashtbl.create 8 in
+  let seq = ref 0 in
+  let f = { f_name = "cost"; f_version = "0.0.1"; f_active = true; f_options = Noval;
+            f_init = (fun _ _ -> ()); f_hook = (fun _ _ -> ()) } in
+
+  let per_unit () = opt_num !options "perUnit" ~default:0. in
+  let limit () = opt_num !options "budget" ~default:0. in
+
+  let record ctx =
+    let cl = cc ctx in
+    track_bucket cl "cost" (fun () ->
+        jo [("currency", Str (opt_str !options "currency" ~default:"USD"));
+            ("total", jo [("calls", Num 0.); ("attempts", Num 0.); ("amount", Num 0.);
+                          ("reported", Num 0.); ("estimated", Num 0.)]);
+            ("ops", empty_map ()); ("actors", empty_map ());
+            ("budget", jo [("limit", Num (limit ())); ("spent", Num 0.);
+                           ("remaining", Num (limit ())); ("exceeded", Bool false)]);
+            ("last", Noval)]) in
+
+  let new_pending () =
+    jo [("attempts", Num 0.); ("amount", Num 0.); ("reported", Num 0.);
+        ("estimated", Num 0.); ("source", Str "none"); ("piped", Bool false)] in
+
+  let pending_for ctx =
+    match Hashtbl.find_opt pending ctx.c_id with
+    | Some p -> p
+    | None -> let p = new_pending () in Hashtbl.replace pending ctx.c_id p; p in
+
+  (* A header figure is server-stated, so it beats the table and the unit. *)
+  let price_header res =
+    let name = opt_str !options "header" ~default:"" in
+    if name = "" then None
+    else match header_ci (getp res "headers") name with
+      | Noval | Null -> None
+      | v -> (match float_of_string_opt (vstr_of v) with
+          | Some n -> Some (n *. per_unit (), "header")
+          | None -> None) in
+
+  (* Same lookup grammar as rbac's rules: '<entity>.<op>', then '<op>',
+     then '*'. *)
+  let price_rate ctx =
+    let rates = match getp !options "rates" with Map _ as m -> m | _ -> empty_map () in
+    let entity = match ctx.c_entity with
+      | Some e -> e.e_name
+      | None -> ctx.c_op.op_entity in
+    let opname = ctx.c_op.op_name in
+    let pick k = match getp rates k with Num n -> Some n | _ -> None in
+    match pick (entity ^ "." ^ opname) with
+    | Some n -> Some (n, "table")
+    | None -> (match pick opname with
+        | Some n -> Some (n, "table")
+        | None -> (match pick "*" with Some n -> Some (n, "table") | None -> None)) in
+
+  let price ctx res =
+    match price_header res with
+    | Some p -> p
+    | None ->
+      match price_rate ctx with
+      | Some p -> p
+      | None ->
+        let unit = opt_num !options "unit" ~default:0. in
+        if unit <> 0. then (unit, "unit") else (0., "none") in
+
+  (* A usage figure from the parsed result body, priced by perUnit. Read at
+     commit, not at the transport seam, because the body is one-shot. *)
+  let price_body ctx =
+    let path = opt_str !options "path" ~default:"" in
+    if path = "" then None
+    else match ctx.c_result with
+      | None -> None
+      | Some rt ->
+        (match rt.rt_body with
+         | Map _ ->
+           (match getpath_s rt.rt_body path with
+            | Num n -> Some (n *. per_unit ())
+            | Str s -> (match float_of_string_opt s with
+                | Some n -> Some (n *. per_unit ()) | None -> None)
+            | _ -> None)
+         | _ -> None) in
+
+  let spend rec_ amount reported estimated =
+    let total = getp rec_ "total" in
+    bump_num total "amount" amount;
+    bump_num total "reported" reported;
+    bump_num total "estimated" estimated;
+    let budget = getp rec_ "budget" in
+    let lim = match getp budget "limit" with Num n -> n | _ -> 0. in
+    let spent = match getp total "amount" with Num n -> n | _ -> 0. in
+    setp budget "spent" (Num spent);
+    setp budget "remaining" (Num (if lim > 0. then max 0. (lim -. spent) else 0.));
+    if lim > 0. && spent >= lim then setp budget "exceeded" (Bool true) in
+
+  let bump bucket key amount =
+    let b = match getp bucket key with
+      | Map _ as m -> m
+      | _ -> let m = jo [("calls", Num 0.); ("amount", Num 0.)] in setp bucket key m; m in
+    bump_num b "calls" 1.;
+    bump_num b "amount" amount in
+
+  let commit ctx p entity opname =
+    let rec_ = record ctx in
+    let amount = ref (match getp p "amount" with Num n -> n | _ -> 0.) in
+    let reported = ref (match getp p "reported" with Num n -> n | _ -> 0.) in
+    let estimated = ref (match getp p "estimated" with Num n -> n | _ -> 0.) in
+    let source = ref (vstr_of (getp p "source")) in
+
+    (* A body figure prices the whole call, so it REPLACES the per-attempt
+       estimate rather than adding to it - and, being server-stated, the
+       whole amount counts as reported. *)
+    (match price_body ctx with
+     | Some b -> amount := b; reported := b; estimated := 0.; source := "body"
+     | None -> ());
+
+    spend rec_ !amount !reported !estimated;
+
+    let actor = match ctx.c_ctrl.ctrl_actor with
+      | Str a when a <> "" -> a
+      | _ -> opt_str !options "actor" ~default:"anonymous" in
+
+    bump_num (getp rec_ "total") "calls" 1.;
+    bump (getp rec_ "ops") (entity ^ "." ^ opname) !amount;
+    bump (getp rec_ "actors") actor !amount;
+
+    incr seq;
+    setp rec_ "last"
+      (jo [("seq", Num (float_of_int !seq)); ("entity", Str entity); ("op", Str opname);
+           ("actor", Str actor); ("amount", Num !amount);
+           ("currency", getp rec_ "currency"); ("source", Str !source);
+           ("attempts", getp p "attempts")]) in
+
+  let finish ctx done_ =
+    if f.f_active then
+      match Hashtbl.find_opt pending ctx.c_id with
+      | None -> ()
+      | Some p ->
+        Hashtbl.remove pending ctx.c_id;
+        let attempts = match getp p "attempts" with Num n -> n | _ -> 0. in
+        (* A FAILED operation that made no attempt never reached the network:
+           the budget gate (or rbac, or an unresolvable endpoint) refused it.
+           Committing would count a call that never happened.
+
+           A SUCCEEDED operation that made no attempt is the opposite case: it
+           was served from the cache. That is a real call, and the fact that it
+           cost nothing is the whole point of ordering cost inside the cache. *)
+        if done_ || attempts > 0. then begin
+          let entity = if ctx.c_op.op_entity <> "" then ctx.c_op.op_entity else "_" in
+          let opname = if ctx.c_op.op_name <> "" then ctx.c_op.op_name else "_" in
+          commit ctx p entity opname
+        end in
+
+  let charge ctx url fetchdef inner =
+    (* A rejecting transport still costs an attempt: without this a run of
+       connection-level failures under `retry` would be charged nothing, and
+       an onBudget: 'deny' ceiling could never stop it. *)
+    let (res, err) = inner ctx url fetchdef in
+    let (amount, source) = price ctx res in
+    let p = pending_for ctx in
+    bump_num p "attempts" 1.;
+    bump_num p "amount" amount;
+    bump_num p (if source = "header" || source = "body" then "reported" else "estimated") amount;
+    setp p "source" (Str source);
+    bump_num (getp (record ctx) "total") "attempts" 1.;
+
+    (* direct() and graphql() dispatch no pipeline hooks at all - no PrePoint
+       to gate on and no PreDone to commit - so their spend is committed here
+       or never. `piped` is set by PrePoint, so its absence is the signal. *)
+    if getp p "piped" <> Bool true then begin
+      Hashtbl.remove pending ctx.c_id;
+      commit ctx p "_" "direct"
+    end;
+    (res, err) in
+
+  f.f_init <- (fun ctx opts ->
+      options := (match to_map opts with Map _ -> opts | _ -> empty_map ());
+      f.f_active <- opt_active opts;
+      if f.f_active then begin
+        Hashtbl.reset pending;
+        seq := 0;
+        ignore (record ctx);
+        let u = cu ctx in
+        let inner = u.u_fetcher in
+        u.u_fetcher <- (fun fctx url fd -> charge fctx url fd inner)
+      end);
+
+  f.f_hook <- (fun name ctx ->
+      if f.f_active then
+        match name with
+        | "PrePoint" ->
+          (* Mark the context as piped, so charge knows a PreDone is coming. *)
+          let p = pending_for ctx in
+          setp p "piped" (Bool true);
+          let lim = limit () in
+          if lim > 0. then begin
+            let rec_ = record ctx in
+            let spent = match getp (getp rec_ "total") "amount" with Num n -> n | _ -> 0. in
+            if spent >= lim then begin
+              setp (getp rec_ "budget") "exceeded" (Bool true);
+              if opt_str !options "onBudget" ~default:"warn" = "deny" then begin
+                let err = ctx_make_error ctx "cost_budget"
+                    ("Cost budget of " ^ js_string (Num lim) ^ " " ^ vstr_of (getp rec_ "currency")
+                     ^ " is spent (" ^ js_string (Num spent) ^ " used)") in
+                Hashtbl.replace ctx.c_out "point" (OErr err)
+              end
+            end
+          end
+        | "PreDone" -> finish ctx true
+        | _ -> ());
+  f
+
+(* ------------------------------------------------------------------ *)
 (* clienttrack                                                         *)
 (* ------------------------------------------------------------------ *)
 
