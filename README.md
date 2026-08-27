@@ -12,6 +12,10 @@ Learn more about Voxgig SDKs at [voxgig.com/sdk](https://voxgig.com/sdk/).
 
 > TypeScript, Python, PHP, Golang, Ruby, Lua, C, Clojure, C++, C#, Dart, Elixir, Java, JavaScript, Kotlin, Lean, OCaml, Perl, Python Data, Rust, Scala, Swift, Zig SDKs, a CLI with an interactive REPL, and an MCP server for AI agents — all generated from one OpenAPI spec by [@voxgig/sdkgen](https://github.com/voxgig/sdkgen).
 
+> **Features:** `audit`, `cache`, `clienttrack`, `cost`, `debug`, `idempotency`, `log`, `metrics`, `netsim`, `paging`, `proxy`, `ratelimit`, `rbac`, `retry`, `streaming`, `telemetry`, `test`, `timeout` — opt-in,
+> inactive until switched on, and configured per client. See the Features
+> section of any SDK README below for what each one does.
+
 ## Entities, not endpoints
 
 This SDK exposes the API as a small set of **semantic entities** — Convert, Embed, EphemeralKey and Model — that you

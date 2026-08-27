@@ -458,6 +458,300 @@ Create an instance: `(def model (api/model client nil))`
 (def models (e-model/list (api/model client nil) nil nil))
 ```
 
+## Features
+
+This SDK ships 18 optional features. Each is **inactive until you
+switch it on**, so an SDK you have not configured behaves exactly as if none of
+them existed — no retries, no cache, no logging, no measurable overhead.
+
+Activate a feature by name in the client options, alongside the options shown
+above:
+
+| Feature | What it does |
+|---|---|
+| [`audit`](#audit) | Structured audit trail of operations |
+| [`cache`](#cache) | Response caching for safe read requests |
+| [`clienttrack`](#clienttrack) | Client identity and per-request correlation headers |
+| [`cost`](#cost) | Cost tracking and spend budget for API calls |
+| [`debug`](#debug) | Request/response capture ring buffer for debugging |
+| [`idempotency`](#idempotency) | Idempotency keys for safe retries of mutating operations |
+| [`log`](#log) | Structured request and response logging |
+| [`metrics`](#metrics) | Statistics capture: per-operation counters and latency |
+| [`netsim`](#netsim) | Network behaviour simulation for offline testing (latency, failures, outages) |
+| [`paging`](#paging) | Pagination signals for list operations |
+| [`proxy`](#proxy) | Outbound HTTP(S) proxy routing |
+| [`ratelimit`](#ratelimit) | Client-side rate limiting via a token bucket |
+| [`rbac`](#rbac) | Client-side role/permission enforcement |
+| [`retry`](#retry) | Automatic retry of transient failures with exponential backoff |
+| [`streaming`](#streaming) | Incremental streaming of list results via async iteration |
+| [`telemetry`](#telemetry) | Distributed tracing spans with W3C trace-context propagation |
+| [`test`](#test) | In-memory mock transport for testing without a live server |
+| [`timeout`](#timeout) | Per-request timeout with transport abort |
+
+> **Order matters for `cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `timeout`.** These wrap the
+> transport, so each one wraps whatever is already installed: the order you
+> activate them in IS the nesting order. Activating them as an ordered list
+> rather than a map is what fixes that order.
+
+### audit
+
+Structured audit trail of operations.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `actor` | `'anonymous'` |
+| `max` | `1000` |
+
+Set `feature.audit.active` to enable it, then override any of the options above.
+
+### cache
+
+Response caching for safe read requests.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `max` | `256` |
+| `methods` | `['GET']` |
+| `ttl` | `5000` |
+
+Set `feature.cache.active` to enable it, then override any of the options above.
+
+`cache` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
+### clienttrack
+
+Client identity and per-request correlation headers.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `clientVersion` | `'0.0.1'` |
+
+Set `feature.clienttrack.active` to enable it, then override any of the options above.
+
+### cost
+
+Cost tracking and spend budget for API calls.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `budget` | `0` |
+| `currency` | `'USD'` |
+| `header` | `''` |
+| `onBudget` | `'warn'` |
+| `path` | `''` |
+| `perUnit` | `0` |
+| `rates` | `{}` |
+| `unit` | `0` |
+
+Set `feature.cost.active` to enable it, then override any of the options above.
+
+`cost` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
+### debug
+
+Request/response capture ring buffer for debugging.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `max` | `100` |
+| `redact` | `['authorization', 'cookie', 'set-cookie', 'api-key', 'apikey', 'x-api-key', 'idempotency-key']` |
+
+Set `feature.debug.active` to enable it, then override any of the options above.
+
+### idempotency
+
+Idempotency keys for safe retries of mutating operations.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `header` | `'Idempotency-Key'` |
+| `methods` | `['POST', 'PUT', 'PATCH', 'DELETE']` |
+| `ops` | `['create', 'update', 'remove']` |
+
+Set `feature.idempotency.active` to enable it, then override any of the options above.
+
+### log
+
+Structured request and response logging.
+
+| Option | Default |
+|---|---|
+| `active` | `true` |
+
+Set `feature.log.active` to enable it, then override any of the options above.
+
+### metrics
+
+Statistics capture: per-operation counters and latency.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+
+Set `feature.metrics.active` to enable it, then override any of the options above.
+
+### netsim
+
+Network behaviour simulation for offline testing (latency, failures, outages).
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `errorTimes` | `0` |
+| `failEvery` | `0` |
+| `failRate` | `0` |
+| `failStatus` | `503` |
+| `failTimes` | `0` |
+| `latency` | `0` |
+| `offline` | `false` |
+| `rateLimitTimes` | `0` |
+| `retryAfter` | `0` |
+| `seed` | `1` |
+
+Set `feature.netsim.active` to enable it, then override any of the options above.
+
+`netsim` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
+### paging
+
+Pagination signals for list operations.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `afterVar` | `'after'` |
+| `cursorParam` | `'cursor'` |
+| `firstVar` | `'first'` |
+| `limitParam` | `'limit'` |
+| `pageParam` | `'page'` |
+| `startPage` | `1` |
+
+Set `feature.paging.active` to enable it, then override any of the options above.
+
+### proxy
+
+Outbound HTTP(S) proxy routing.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `fromEnv` | `false` |
+| `noProxy` | `[]` |
+| `url` | `''` |
+
+Set `feature.proxy.active` to enable it, then override any of the options above.
+
+`proxy` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
+### ratelimit
+
+Client-side rate limiting via a token bucket.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `burst` | `5` |
+| `rate` | `5` |
+
+Set `feature.ratelimit.active` to enable it, then override any of the options above.
+
+`ratelimit` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
+### rbac
+
+Client-side role/permission enforcement.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `deny` | `false` |
+| `permissions` | `[]` |
+| `rules` | `{}` |
+
+Set `feature.rbac.active` to enable it, then override any of the options above.
+
+### retry
+
+Automatic retry of transient failures with exponential backoff.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `factor` | `2` |
+| `maxDelay` | `2000` |
+| `minDelay` | `50` |
+| `retries` | `2` |
+| `statuses` | `[408, 425, 429, 500, 502, 503, 504]` |
+
+Set `feature.retry.active` to enable it, then override any of the options above.
+
+`retry` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
+### streaming
+
+Incremental streaming of list results via async iteration.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `chunkDelay` | `0` |
+| `chunkSize` | `0` |
+
+Set `feature.streaming.active` to enable it, then override any of the options above.
+
+### telemetry
+
+Distributed tracing spans with W3C trace-context propagation.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+
+Set `feature.telemetry.active` to enable it, then override any of the options above.
+
+### test
+
+In-memory mock transport for testing without a live server.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+
+Set `feature.test.active` to enable it, then override any of the options above.
+
+### timeout
+
+Per-request timeout with transport abort.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `ms` | `30000` |
+
+Set `feature.timeout.active` to enable it, then override any of the options above.
+
+`timeout` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
 
 ## Advanced
 
