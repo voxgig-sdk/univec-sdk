@@ -341,24 +341,7 @@ Return the entity name.
 
 | Feature | Version | Description |
 | --- | --- | --- |
-| `audit` | 0.0.1 | Structured audit trail of operations |
-| `cache` | 0.0.1 | Response caching for safe read requests |
-| `clienttrack` | 0.0.1 | Client identity and per-request correlation headers |
-| `cost` | 0.0.1 | Cost tracking and spend budget for API calls |
-| `debug` | 0.0.1 | Request/response capture ring buffer for debugging |
-| `idempotency` | 0.0.1 | Idempotency keys for safe retries of mutating operations |
-| `log` | 0.0.1 | Structured request and response logging |
-| `metrics` | 0.0.1 | Statistics capture: per-operation counters and latency |
-| `netsim` | 0.0.1 | Network behaviour simulation for offline testing (latency, failures, outages) |
-| `paging` | 0.0.1 | Pagination signals for list operations |
-| `proxy` | 0.0.1 | Outbound HTTP(S) proxy routing |
-| `ratelimit` | 0.0.1 | Client-side rate limiting via a token bucket |
-| `rbac` | 0.0.1 | Client-side role/permission enforcement |
-| `retry` | 0.0.1 | Automatic retry of transient failures with exponential backoff |
-| `streaming` | 0.0.1 | Incremental streaming of list results via async iteration |
-| `telemetry` | 0.0.1 | Distributed tracing spans with W3C trace-context propagation |
 | `test` | 0.0.1 | In-memory mock transport for testing without a live server |
-| `timeout` | 0.0.1 | Per-request timeout with transport abort |
 
 
 Features are activated via the `feature` option:
@@ -366,24 +349,7 @@ Features are activated via the `feature` option:
 ```go
 client := sdk.NewUnivecSDK(map[string]any{
     "feature": map[string]any{
-        "audit": map[string]any{"active": true},
-        "cache": map[string]any{"active": true},
-        "clienttrack": map[string]any{"active": true},
-        "cost": map[string]any{"active": true},
-        "debug": map[string]any{"active": true},
-        "idempotency": map[string]any{"active": true},
-        "log": map[string]any{"active": true},
-        "metrics": map[string]any{"active": true},
-        "netsim": map[string]any{"active": true},
-        "paging": map[string]any{"active": true},
-        "proxy": map[string]any{"active": true},
-        "ratelimit": map[string]any{"active": true},
-        "rbac": map[string]any{"active": true},
-        "retry": map[string]any{"active": true},
-        "streaming": map[string]any{"active": true},
-        "telemetry": map[string]any{"active": true},
         "test": map[string]any{"active": true},
-        "timeout": map[string]any{"active": true},
     },
 })
 ```

@@ -312,24 +312,7 @@ Return the entity name.
 
 | Feature | Version | Description |
 | --- | --- | --- |
-| `audit` | 0.0.1 | Structured audit trail of operations |
-| `cache` | 0.0.1 | Response caching for safe read requests |
-| `clienttrack` | 0.0.1 | Client identity and per-request correlation headers |
-| `cost` | 0.0.1 | Cost tracking and spend budget for API calls |
-| `debug` | 0.0.1 | Request/response capture ring buffer for debugging |
-| `idempotency` | 0.0.1 | Idempotency keys for safe retries of mutating operations |
-| `log` | 0.0.1 | Structured request and response logging |
-| `metrics` | 0.0.1 | Statistics capture: per-operation counters and latency |
-| `netsim` | 0.0.1 | Network behaviour simulation for offline testing (latency, failures, outages) |
-| `paging` | 0.0.1 | Pagination signals for list operations |
-| `proxy` | 0.0.1 | Outbound HTTP(S) proxy routing |
-| `ratelimit` | 0.0.1 | Client-side rate limiting via a token bucket |
-| `rbac` | 0.0.1 | Client-side role/permission enforcement |
-| `retry` | 0.0.1 | Automatic retry of transient failures with exponential backoff |
-| `streaming` | 0.0.1 | Incremental streaming of list results via async iteration |
-| `telemetry` | 0.0.1 | Distributed tracing spans with W3C trace-context propagation |
 | `test` | 0.0.1 | In-memory mock transport for testing without a live server |
-| `timeout` | 0.0.1 | Per-request timeout with transport abort |
 
 
 Features are activated via the `feature` option:
@@ -337,24 +320,7 @@ Features are activated via the `feature` option:
 ```rust
 let client = UnivecSDK::new(jo(vec![
     ("feature", jo(vec![
-        ("audit", jo(vec![("active", Value::Bool(true))])),
-        ("cache", jo(vec![("active", Value::Bool(true))])),
-        ("clienttrack", jo(vec![("active", Value::Bool(true))])),
-        ("cost", jo(vec![("active", Value::Bool(true))])),
-        ("debug", jo(vec![("active", Value::Bool(true))])),
-        ("idempotency", jo(vec![("active", Value::Bool(true))])),
-        ("log", jo(vec![("active", Value::Bool(true))])),
-        ("metrics", jo(vec![("active", Value::Bool(true))])),
-        ("netsim", jo(vec![("active", Value::Bool(true))])),
-        ("paging", jo(vec![("active", Value::Bool(true))])),
-        ("proxy", jo(vec![("active", Value::Bool(true))])),
-        ("ratelimit", jo(vec![("active", Value::Bool(true))])),
-        ("rbac", jo(vec![("active", Value::Bool(true))])),
-        ("retry", jo(vec![("active", Value::Bool(true))])),
-        ("streaming", jo(vec![("active", Value::Bool(true))])),
-        ("telemetry", jo(vec![("active", Value::Bool(true))])),
         ("test", jo(vec![("active", Value::Bool(true))])),
-        ("timeout", jo(vec![("active", Value::Bool(true))])),
     ])),
 ]));
 ```

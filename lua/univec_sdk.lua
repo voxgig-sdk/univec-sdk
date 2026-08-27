@@ -93,24 +93,7 @@ function UnivecSDK.new(options)
 
   utility.feature_hook(self._rootctx, "PostConstruct")
 
-    -- feature: audit
-  -- feature: cache
-  -- feature: clienttrack
-  -- feature: cost
-  -- feature: debug
-  -- feature: idempotency
-  -- feature: log
-  -- feature: metrics
-  -- feature: netsim
-  -- feature: paging
-  -- feature: proxy
-  -- feature: ratelimit
-  -- feature: rbac
-  -- feature: retry
-  -- feature: streaming
-  -- feature: telemetry
-  -- feature: test
-  -- feature: timeout
+    -- feature: test
 
 
   return self

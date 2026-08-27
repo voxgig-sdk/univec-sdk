@@ -37,24 +37,7 @@ component.* After editing a component run `npm run build` before
 
 ## Features in this target
 
-- [`audit`](./src/feature/audit/AGENTS.md) — Structured audit trail of operations
-- [`cache`](./src/feature/cache/AGENTS.md) — Response caching for safe read requests
-- [`clienttrack`](./src/feature/clienttrack/AGENTS.md) — Client identity and per-request correlation headers
-- [`cost`](./src/feature/cost/AGENTS.md) — Cost tracking and spend budget for API calls
-- [`debug`](./src/feature/debug/AGENTS.md) — Request/response capture ring buffer for debugging
-- [`idempotency`](./src/feature/idempotency/AGENTS.md) — Idempotency keys for safe retries of mutating operations
-- [`log`](./src/feature/log/AGENTS.md) — Structured request and response logging
-- [`metrics`](./src/feature/metrics/AGENTS.md) — Statistics capture: per-operation counters and latency
-- [`netsim`](./src/feature/netsim/AGENTS.md) — Network behaviour simulation for offline testing (latency, failures, outages)
-- [`paging`](./src/feature/paging/AGENTS.md) — Pagination signals for list operations
-- [`proxy`](./src/feature/proxy/AGENTS.md) — Outbound HTTP(S) proxy routing
-- [`ratelimit`](./src/feature/ratelimit/AGENTS.md) — Client-side rate limiting via a token bucket
-- [`rbac`](./src/feature/rbac/AGENTS.md) — Client-side role/permission enforcement
-- [`retry`](./src/feature/retry/AGENTS.md) — Automatic retry of transient failures with exponential backoff
-- [`streaming`](./src/feature/streaming/AGENTS.md) — Incremental streaming of list results via async iteration
-- [`telemetry`](./src/feature/telemetry/AGENTS.md) — Distributed tracing spans with W3C trace-context propagation
 - [`test`](./src/feature/test/AGENTS.md) — In-memory mock transport for testing without a live server
-- [`timeout`](./src/feature/timeout/AGENTS.md) — Per-request timeout with transport abort
 
 Each feature's runtime and its own guide live in `src/feature/<name>/`.
 

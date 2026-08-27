@@ -11,152 +11,11 @@ voxgig_value* make_config(void) {
       "slug", v_str("univec"),
       "version", v_str("0.1.1"),
       "target", v_str("c")),
-    "feature", cmap(18,
-      "audit", cmap(2,
-        "options", cmap(3,
-          "active", v_bool(false),
-          "actor", v_str("anonymous"),
-          "max", v_num(1000)),
-        "transport", v_str("none")),
-      "cache", cmap(2,
-        "options", cmap(4,
-          "active", v_bool(false),
-          "max", v_num(256),
-          "methods", clist(1,
-            v_str("GET")),
-          "ttl", v_num(5000)),
-        "transport", v_str("wrap")),
-      "clienttrack", cmap(2,
-        "options", cmap(2,
-          "active", v_bool(false),
-          "clientVersion", v_str("0.0.1")),
-        "transport", v_str("none")),
-      "cost", cmap(2,
-        "options", cmap(9,
-          "active", v_bool(false),
-          "budget", v_num(0),
-          "currency", v_str("USD"),
-          "header", v_str(""),
-          "onBudget", v_str("warn"),
-          "path", v_str(""),
-          "perUnit", v_num(0),
-          "rates", v_map(),
-          "unit", v_num(0)),
-        "transport", v_str("wrap")),
-      "debug", cmap(2,
-        "options", cmap(3,
-          "active", v_bool(false),
-          "max", v_num(100),
-          "redact", clist(7,
-            v_str("authorization"),
-            v_str("cookie"),
-            v_str("set-cookie"),
-            v_str("api-key"),
-            v_str("apikey"),
-            v_str("x-api-key"),
-            v_str("idempotency-key"))),
-        "transport", v_str("none")),
-      "idempotency", cmap(2,
-        "options", cmap(4,
-          "active", v_bool(false),
-          "header", v_str("Idempotency-Key"),
-          "methods", clist(4,
-            v_str("POST"),
-            v_str("PUT"),
-            v_str("PATCH"),
-            v_str("DELETE")),
-          "ops", clist(3,
-            v_str("create"),
-            v_str("update"),
-            v_str("remove"))),
-        "transport", v_str("none")),
-      "log", cmap(2,
-        "options", cmap(1,
-          "active", v_bool(true)),
-        "transport", v_str("none")),
-      "metrics", cmap(2,
-        "options", cmap(1,
-          "active", v_bool(false)),
-        "transport", v_str("none")),
-      "netsim", cmap(2,
-        "options", cmap(11,
-          "active", v_bool(false),
-          "errorTimes", v_num(0),
-          "failEvery", v_num(0),
-          "failRate", v_num(0),
-          "failStatus", v_num(503),
-          "failTimes", v_num(0),
-          "latency", v_num(0),
-          "offline", v_bool(false),
-          "rateLimitTimes", v_num(0),
-          "retryAfter", v_num(0),
-          "seed", v_num(1)),
-        "transport", v_str("wrap")),
-      "paging", cmap(2,
-        "options", cmap(7,
-          "active", v_bool(false),
-          "afterVar", v_str("after"),
-          "cursorParam", v_str("cursor"),
-          "firstVar", v_str("first"),
-          "limitParam", v_str("limit"),
-          "pageParam", v_str("page"),
-          "startPage", v_num(1)),
-        "transport", v_str("none")),
-      "proxy", cmap(2,
-        "options", cmap(4,
-          "active", v_bool(false),
-          "fromEnv", v_bool(false),
-          "noProxy", v_list(),
-          "url", v_str("")),
-        "transport", v_str("wrap")),
-      "ratelimit", cmap(2,
-        "options", cmap(3,
-          "active", v_bool(false),
-          "burst", v_num(5),
-          "rate", v_num(5)),
-        "transport", v_str("wrap")),
-      "rbac", cmap(2,
-        "options", cmap(4,
-          "active", v_bool(false),
-          "deny", v_bool(false),
-          "permissions", v_list(),
-          "rules", v_map()),
-        "transport", v_str("none")),
-      "retry", cmap(2,
-        "options", cmap(6,
-          "active", v_bool(false),
-          "factor", v_num(2),
-          "maxDelay", v_num(2000),
-          "minDelay", v_num(50),
-          "retries", v_num(2),
-          "statuses", clist(7,
-            v_num(408),
-            v_num(425),
-            v_num(429),
-            v_num(500),
-            v_num(502),
-            v_num(503),
-            v_num(504))),
-        "transport", v_str("wrap")),
-      "streaming", cmap(2,
-        "options", cmap(3,
-          "active", v_bool(false),
-          "chunkDelay", v_num(0),
-          "chunkSize", v_num(0)),
-        "transport", v_str("none")),
-      "telemetry", cmap(2,
-        "options", cmap(1,
-          "active", v_bool(false)),
-        "transport", v_str("none")),
+    "feature", cmap(1,
       "test", cmap(2,
         "options", cmap(1,
           "active", v_bool(false)),
-        "transport", v_str("base")),
-      "timeout", cmap(2,
-        "options", cmap(2,
-          "active", v_bool(false),
-          "ms", v_num(30000)),
-        "transport", v_str("wrap"))),
+        "transport", v_str("base"))),
     "options", cmap(4,
       "base", v_str("https://api.univec.ai"),
       "headers", cmap(1,
@@ -437,43 +296,9 @@ voxgig_value* shared_config(void) {
   return shared_config_val;
 }
 
-Feature* feature_audit_new(void);
-Feature* feature_cache_new(void);
-Feature* feature_clienttrack_new(void);
-Feature* feature_cost_new(void);
-Feature* feature_debug_new(void);
-Feature* feature_idempotency_new(void);
-Feature* feature_log_new(void);
-Feature* feature_metrics_new(void);
-Feature* feature_netsim_new(void);
-Feature* feature_paging_new(void);
-Feature* feature_proxy_new(void);
-Feature* feature_ratelimit_new(void);
-Feature* feature_rbac_new(void);
-Feature* feature_retry_new(void);
-Feature* feature_streaming_new(void);
-Feature* feature_telemetry_new(void);
 Feature* feature_test_new(void);
-Feature* feature_timeout_new(void);
 
 Feature* make_feature(const char* name) {
-  if (strcmp(name, "audit") == 0) return feature_audit_new();
-  if (strcmp(name, "cache") == 0) return feature_cache_new();
-  if (strcmp(name, "clienttrack") == 0) return feature_clienttrack_new();
-  if (strcmp(name, "cost") == 0) return feature_cost_new();
-  if (strcmp(name, "debug") == 0) return feature_debug_new();
-  if (strcmp(name, "idempotency") == 0) return feature_idempotency_new();
-  if (strcmp(name, "log") == 0) return feature_log_new();
-  if (strcmp(name, "metrics") == 0) return feature_metrics_new();
-  if (strcmp(name, "netsim") == 0) return feature_netsim_new();
-  if (strcmp(name, "paging") == 0) return feature_paging_new();
-  if (strcmp(name, "proxy") == 0) return feature_proxy_new();
-  if (strcmp(name, "ratelimit") == 0) return feature_ratelimit_new();
-  if (strcmp(name, "rbac") == 0) return feature_rbac_new();
-  if (strcmp(name, "retry") == 0) return feature_retry_new();
-  if (strcmp(name, "streaming") == 0) return feature_streaming_new();
-  if (strcmp(name, "telemetry") == 0) return feature_telemetry_new();
   if (strcmp(name, "test") == 0) return feature_test_new();
-  if (strcmp(name, "timeout") == 0) return feature_timeout_new();
   return feature_base_new();
 }

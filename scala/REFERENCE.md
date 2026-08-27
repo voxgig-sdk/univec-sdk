@@ -305,48 +305,14 @@ Return the entity name.
 
 | Feature | Version | Description |
 | --- | --- | --- |
-| `audit` | 0.0.1 | Structured audit trail of operations |
-| `cache` | 0.0.1 | Response caching for safe read requests |
-| `clienttrack` | 0.0.1 | Client identity and per-request correlation headers |
-| `cost` | 0.0.1 | Cost tracking and spend budget for API calls |
-| `debug` | 0.0.1 | Request/response capture ring buffer for debugging |
-| `idempotency` | 0.0.1 | Idempotency keys for safe retries of mutating operations |
-| `log` | 0.0.1 | Structured request and response logging |
-| `metrics` | 0.0.1 | Statistics capture: per-operation counters and latency |
-| `netsim` | 0.0.1 | Network behaviour simulation for offline testing (latency, failures, outages) |
-| `paging` | 0.0.1 | Pagination signals for list operations |
-| `proxy` | 0.0.1 | Outbound HTTP(S) proxy routing |
-| `ratelimit` | 0.0.1 | Client-side rate limiting via a token bucket |
-| `rbac` | 0.0.1 | Client-side role/permission enforcement |
-| `retry` | 0.0.1 | Automatic retry of transient failures with exponential backoff |
-| `streaming` | 0.0.1 | Incremental streaming of list results via async iteration |
-| `telemetry` | 0.0.1 | Distributed tracing spans with W3C trace-context propagation |
 | `test` | 0.0.1 | In-memory mock transport for testing without a live server |
-| `timeout` | 0.0.1 | Per-request timeout with transport abort |
 
 
 Features are activated via the `feature` option:
 
 ```scala
 val feature = new java.util.LinkedHashMap[String, Object]()
-feature.put("audit", java.util.Map.of("active", true))
-feature.put("cache", java.util.Map.of("active", true))
-feature.put("clienttrack", java.util.Map.of("active", true))
-feature.put("cost", java.util.Map.of("active", true))
-feature.put("debug", java.util.Map.of("active", true))
-feature.put("idempotency", java.util.Map.of("active", true))
-feature.put("log", java.util.Map.of("active", true))
-feature.put("metrics", java.util.Map.of("active", true))
-feature.put("netsim", java.util.Map.of("active", true))
-feature.put("paging", java.util.Map.of("active", true))
-feature.put("proxy", java.util.Map.of("active", true))
-feature.put("ratelimit", java.util.Map.of("active", true))
-feature.put("rbac", java.util.Map.of("active", true))
-feature.put("retry", java.util.Map.of("active", true))
-feature.put("streaming", java.util.Map.of("active", true))
-feature.put("telemetry", java.util.Map.of("active", true))
 feature.put("test", java.util.Map.of("active", true))
-feature.put("timeout", java.util.Map.of("active", true))
 val options = new java.util.LinkedHashMap[String, Object]()
 options.put("feature", feature)
 val client = new UnivecSDK(options)

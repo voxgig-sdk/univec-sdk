@@ -43,24 +43,7 @@ the runtime under `.sdk/tm/php/feature/` and regenerate.
 
 | Feature | Runtime file | Active hooks |
 | --- | --- | --- |
-| **audit** — Structured audit trail of operations | `feature/AuditFeature.php` | `PreDone`, `PreUnexpected` |
-| **cache** — Response caching for safe read requests | `feature/CacheFeature.php` | — |
-| **clienttrack** — Client identity and per-request correlation headers | `feature/ClienttrackFeature.php` | `PostConstruct`, `PreRequest` |
-| **cost** — Cost tracking and spend budget for API calls | `feature/CostFeature.php` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **debug** — Request/response capture ring buffer for debugging | `feature/DebugFeature.php` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
-| **idempotency** — Idempotency keys for safe retries of mutating operations | `feature/IdempotencyFeature.php` | `PreRequest` |
-| **log** — Structured request and response logging | `feature/LogFeature.php` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **metrics** — Statistics capture: per-operation counters and latency | `feature/MetricsFeature.php` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **netsim** — Network behaviour simulation for offline testing (latency, failures, outages) | `feature/NetsimFeature.php` | — |
-| **paging** — Pagination signals for list operations | `feature/PagingFeature.php` | `PreRequest`, `PreResult` |
-| **proxy** — Outbound HTTP(S) proxy routing | `feature/ProxyFeature.php` | — |
-| **ratelimit** — Client-side rate limiting via a token bucket | `feature/RatelimitFeature.php` | — |
-| **rbac** — Client-side role/permission enforcement | `feature/RbacFeature.php` | `PrePoint` |
-| **retry** — Automatic retry of transient failures with exponential backoff | `feature/RetryFeature.php` | — |
-| **streaming** — Incremental streaming of list results via async iteration | `feature/StreamingFeature.php` | `PreResult` |
-| **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/TelemetryFeature.php` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
 | **test** — In-memory mock transport for testing without a live server | `feature/TestFeature.php` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **timeout** — Per-request timeout with transport abort | `feature/TimeoutFeature.php` | — |
 
 ---
 
