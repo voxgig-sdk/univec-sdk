@@ -36,7 +36,10 @@
   },
   "license": "MIT",
   "dependencies": {},
-  "peerDependencies": {},
+  "peerDependencies": {
+    "pino": ">=10",
+    "pino-pretty": ">=13"
+  },
   "devDependencies": {
     "dotenv": "^17.4.2"
   }

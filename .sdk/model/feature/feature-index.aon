@@ -1,6 +1,8 @@
 # Features
 
 
+
+@"test.aon"
 @"audit.aon"
 @"cache.aon"
 @"clienttrack.aon"
@@ -17,5 +19,4 @@
 @"retry.aon"
 @"streaming.aon"
 @"telemetry.aon"
-@"test.aon"
 @"timeout.aon"

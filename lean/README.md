@@ -176,7 +176,24 @@ a function that receives the context.
 
 The SDK ships with built-in features:
 
+- **AuditFeature**: Structured audit trail of operations
+- **CacheFeature**: Response caching for safe read requests
+- **ClienttrackFeature**: Client identity and per-request correlation headers
+- **CostFeature**: Cost tracking and spend budget for API calls
+- **DebugFeature**: Request/response capture ring buffer for debugging
+- **IdempotencyFeature**: Idempotency keys for safe retries of mutating operations
+- **LogFeature**: Structured request and response logging
+- **MetricsFeature**: Statistics capture: per-operation counters and latency
+- **NetsimFeature**: Network behaviour simulation for offline testing (latency, failures, outages)
+- **PagingFeature**: Pagination signals for list operations
+- **ProxyFeature**: Outbound HTTP(S) proxy routing
+- **RatelimitFeature**: Client-side rate limiting via a token bucket
+- **RbacFeature**: Client-side role/permission enforcement
+- **RetryFeature**: Automatic retry of transient failures with exponential backoff
+- **StreamingFeature**: Incremental streaming of list results via async iteration
+- **TelemetryFeature**: Distributed tracing spans with W3C trace-context propagation
 - **TestFeature**: In-memory mock transport for testing without a live server
+- **TimeoutFeature**: Per-request timeout with transport abort
 
 Features are initialized in order. Hooks fire in the order features
 were added, so later features can override earlier ones.

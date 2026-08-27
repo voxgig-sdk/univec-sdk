@@ -16,10 +16,151 @@ let make_config () : value =
       ("version", (Str "0.1.1"));
       ("target", (Str "ocaml")) ]));
     ("feature", (jo [
+      ("audit", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("actor", (Str "anonymous"));
+          ("max", (Num (1000.))) ]));
+        ("transport", (Str "none")) ]));
+      ("cache", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("max", (Num (256.)));
+          ("methods", (ja [
+            (Str "GET") ]));
+          ("ttl", (Num (5000.))) ]));
+        ("transport", (Str "wrap")) ]));
+      ("clienttrack", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("clientVersion", (Str "0.0.1")) ]));
+        ("transport", (Str "none")) ]));
+      ("cost", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("budget", (Num (0.)));
+          ("currency", (Str "USD"));
+          ("header", (Str ""));
+          ("onBudget", (Str "warn"));
+          ("path", (Str ""));
+          ("perUnit", (Num (0.)));
+          ("rates", (empty_map ()));
+          ("unit", (Num (0.))) ]));
+        ("transport", (Str "wrap")) ]));
+      ("debug", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("max", (Num (100.)));
+          ("redact", (ja [
+            (Str "authorization");
+            (Str "cookie");
+            (Str "set-cookie");
+            (Str "api-key");
+            (Str "apikey");
+            (Str "x-api-key");
+            (Str "idempotency-key") ])) ]));
+        ("transport", (Str "none")) ]));
+      ("idempotency", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("header", (Str "Idempotency-Key"));
+          ("methods", (ja [
+            (Str "POST");
+            (Str "PUT");
+            (Str "PATCH");
+            (Str "DELETE") ]));
+          ("ops", (ja [
+            (Str "create");
+            (Str "update");
+            (Str "remove") ])) ]));
+        ("transport", (Str "none")) ]));
+      ("log", (jo [
+        ("options", (jo [
+          ("active", (Bool true)) ]));
+        ("transport", (Str "none")) ]));
+      ("metrics", (jo [
+        ("options", (jo [
+          ("active", (Bool false)) ]));
+        ("transport", (Str "none")) ]));
+      ("netsim", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("errorTimes", (Num (0.)));
+          ("failEvery", (Num (0.)));
+          ("failRate", (Num (0.)));
+          ("failStatus", (Num (503.)));
+          ("failTimes", (Num (0.)));
+          ("latency", (Num (0.)));
+          ("offline", (Bool false));
+          ("rateLimitTimes", (Num (0.)));
+          ("retryAfter", (Num (0.)));
+          ("seed", (Num (1.))) ]));
+        ("transport", (Str "wrap")) ]));
+      ("paging", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("afterVar", (Str "after"));
+          ("cursorParam", (Str "cursor"));
+          ("firstVar", (Str "first"));
+          ("limitParam", (Str "limit"));
+          ("pageParam", (Str "page"));
+          ("startPage", (Num (1.))) ]));
+        ("transport", (Str "none")) ]));
+      ("proxy", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("fromEnv", (Bool false));
+          ("noProxy", (empty_list ()));
+          ("url", (Str "")) ]));
+        ("transport", (Str "wrap")) ]));
+      ("ratelimit", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("burst", (Num (5.)));
+          ("rate", (Num (5.))) ]));
+        ("transport", (Str "wrap")) ]));
+      ("rbac", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("deny", (Bool false));
+          ("permissions", (empty_list ()));
+          ("rules", (empty_map ())) ]));
+        ("transport", (Str "none")) ]));
+      ("retry", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("factor", (Num (2.)));
+          ("maxDelay", (Num (2000.)));
+          ("minDelay", (Num (50.)));
+          ("retries", (Num (2.)));
+          ("statuses", (ja [
+            (Num (408.));
+            (Num (425.));
+            (Num (429.));
+            (Num (500.));
+            (Num (502.));
+            (Num (503.));
+            (Num (504.)) ])) ]));
+        ("transport", (Str "wrap")) ]));
+      ("streaming", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("chunkDelay", (Num (0.)));
+          ("chunkSize", (Num (0.))) ]));
+        ("transport", (Str "none")) ]));
+      ("telemetry", (jo [
+        ("options", (jo [
+          ("active", (Bool false)) ]));
+        ("transport", (Str "none")) ]));
       ("test", (jo [
         ("options", (jo [
           ("active", (Bool false)) ]));
-        ("transport", (Str "base")) ])) ]));
+        ("transport", (Str "base")) ]));
+      ("timeout", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("ms", (Num (30000.))) ]));
+        ("transport", (Str "wrap")) ])) ]));
     ("options", (jo [
       ("base", (Str "https://api.univec.ai"));
       ("auth", (jo [
@@ -279,5 +420,22 @@ let make_config () : value =
 
 let make_feature (name : string) : feature =
   match name with
+  | "audit" -> audit_feature ()
+  | "cache" -> cache_feature ()
+  | "clienttrack" -> clienttrack_feature ()
+  | "cost" -> cost_feature ()
+  | "debug" -> debug_feature ()
+  | "idempotency" -> idempotency_feature ()
+  | "log" -> log_feature ()
+  | "metrics" -> metrics_feature ()
+  | "netsim" -> netsim_feature ()
+  | "paging" -> paging_feature ()
+  | "proxy" -> proxy_feature ()
+  | "ratelimit" -> ratelimit_feature ()
+  | "rbac" -> rbac_feature ()
+  | "retry" -> retry_feature ()
+  | "streaming" -> streaming_feature ()
+  | "telemetry" -> telemetry_feature ()
   | "test" -> test_feature ()
+  | "timeout" -> timeout_feature ()
   | _ -> base_feature ()

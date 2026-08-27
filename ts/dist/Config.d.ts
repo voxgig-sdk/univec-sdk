@@ -9,9 +9,162 @@ declare class Config {
         target: string;
     };
     feature: {
+        audit: {
+            options: {
+                active: boolean;
+                actor: string;
+                max: number;
+            };
+            transport: string;
+        };
+        cache: {
+            options: {
+                active: boolean;
+                max: number;
+                methods: string[];
+                ttl: number;
+            };
+            transport: string;
+        };
+        clienttrack: {
+            options: {
+                active: boolean;
+                clientVersion: string;
+            };
+            transport: string;
+        };
+        cost: {
+            options: {
+                active: boolean;
+                budget: number;
+                currency: string;
+                header: string;
+                onBudget: string;
+                path: string;
+                perUnit: number;
+                rates: {};
+                unit: number;
+            };
+            transport: string;
+        };
+        debug: {
+            options: {
+                active: boolean;
+                max: number;
+                redact: string[];
+            };
+            transport: string;
+        };
+        idempotency: {
+            options: {
+                active: boolean;
+                header: string;
+                methods: string[];
+                ops: string[];
+            };
+            transport: string;
+        };
+        log: {
+            options: {
+                active: boolean;
+            };
+            transport: string;
+        };
+        metrics: {
+            options: {
+                active: boolean;
+            };
+            transport: string;
+        };
+        netsim: {
+            options: {
+                active: boolean;
+                errorTimes: number;
+                failEvery: number;
+                failRate: number;
+                failStatus: number;
+                failTimes: number;
+                latency: number;
+                offline: boolean;
+                rateLimitTimes: number;
+                retryAfter: number;
+                seed: number;
+            };
+            transport: string;
+        };
+        paging: {
+            options: {
+                active: boolean;
+                afterVar: string;
+                cursorParam: string;
+                firstVar: string;
+                limitParam: string;
+                pageParam: string;
+                startPage: number;
+            };
+            transport: string;
+        };
+        proxy: {
+            options: {
+                active: boolean;
+                fromEnv: boolean;
+                noProxy: never[];
+                url: string;
+            };
+            transport: string;
+        };
+        ratelimit: {
+            options: {
+                active: boolean;
+                burst: number;
+                rate: number;
+            };
+            transport: string;
+        };
+        rbac: {
+            options: {
+                active: boolean;
+                deny: boolean;
+                permissions: never[];
+                rules: {};
+            };
+            transport: string;
+        };
+        retry: {
+            options: {
+                active: boolean;
+                factor: number;
+                maxDelay: number;
+                minDelay: number;
+                retries: number;
+                statuses: number[];
+            };
+            transport: string;
+        };
+        streaming: {
+            options: {
+                active: boolean;
+                chunkDelay: number;
+                chunkSize: number;
+            };
+            transport: string;
+        };
+        telemetry: {
+            options: {
+                active: boolean;
+            };
+            transport: string;
+        };
         test: {
             options: {
                 active: boolean;
+            };
+            transport: string;
+        };
+        timeout: {
+            options: {
+                active: boolean;
+                ms: number;
             };
             transport: string;
         };

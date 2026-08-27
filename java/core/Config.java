@@ -37,8 +37,42 @@ public final class Config {
 
   public static Feature makeFeature(String name) {
     switch (name) {
+      case "audit":
+        return new voxgig.univecsdk.feature.AuditFeature();
+      case "cache":
+        return new voxgig.univecsdk.feature.CacheFeature();
+      case "clienttrack":
+        return new voxgig.univecsdk.feature.ClienttrackFeature();
+      case "cost":
+        return new voxgig.univecsdk.feature.CostFeature();
+      case "debug":
+        return new voxgig.univecsdk.feature.DebugFeature();
+      case "idempotency":
+        return new voxgig.univecsdk.feature.IdempotencyFeature();
+      case "log":
+        return new voxgig.univecsdk.feature.LogFeature();
+      case "metrics":
+        return new voxgig.univecsdk.feature.MetricsFeature();
+      case "netsim":
+        return new voxgig.univecsdk.feature.NetsimFeature();
+      case "paging":
+        return new voxgig.univecsdk.feature.PagingFeature();
+      case "proxy":
+        return new voxgig.univecsdk.feature.ProxyFeature();
+      case "ratelimit":
+        return new voxgig.univecsdk.feature.RatelimitFeature();
+      case "rbac":
+        return new voxgig.univecsdk.feature.RbacFeature();
+      case "retry":
+        return new voxgig.univecsdk.feature.RetryFeature();
+      case "streaming":
+        return new voxgig.univecsdk.feature.StreamingFeature();
+      case "telemetry":
+        return new voxgig.univecsdk.feature.TelemetryFeature();
       case "test":
         return new voxgig.univecsdk.feature.TestFeature();
+      case "timeout":
+        return new voxgig.univecsdk.feature.TimeoutFeature();
       default:
         return new voxgig.univecsdk.feature.BaseFeature();
     }
@@ -54,11 +88,191 @@ public final class Config {
     b.append("  \"target\": \"java\"");
     b.append(" },");
     b.append(" \"feature\": {");
+    b.append("  \"audit\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"actor\": \"anonymous\",");
+    b.append("    \"max\": 1000");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"cache\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"max\": 256,");
+    b.append("    \"methods\": [");
+    b.append("     \"GET\"");
+    b.append("    ],");
+    b.append("    \"ttl\": 5000");
+    b.append("   },");
+    b.append("   \"transport\": \"wrap\"");
+    b.append("  },");
+    b.append("  \"clienttrack\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"clientVersion\": \"0.0.1\"");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"cost\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"budget\": 0,");
+    b.append("    \"currency\": \"USD\",");
+    b.append("    \"header\": \"\",");
+    b.append("    \"onBudget\": \"warn\",");
+    b.append("    \"path\": \"\",");
+    b.append("    \"perUnit\": 0,");
+    b.append("    \"rates\": {},");
+    b.append("    \"unit\": 0");
+    b.append("   },");
+    b.append("   \"transport\": \"wrap\"");
+    b.append("  },");
+    b.append("  \"debug\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"max\": 100,");
+    b.append("    \"redact\": [");
+    b.append("     \"authorization\",");
+    b.append("     \"cookie\",");
+    b.append("     \"set-cookie\",");
+    b.append("     \"api-key\",");
+    b.append("     \"apikey\",");
+    b.append("     \"x-api-key\",");
+    b.append("     \"idempotency-key\"");
+    b.append("    ]");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"idempotency\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"header\": \"Idempotency-Key\",");
+    b.append("    \"methods\": [");
+    b.append("     \"POST\",");
+    b.append("     \"PUT\",");
+    b.append("     \"PATCH\",");
+    b.append("     \"DELETE\"");
+    b.append("    ],");
+    b.append("    \"ops\": [");
+    b.append("     \"create\",");
+    b.append("     \"update\",");
+    b.append("     \"remove\"");
+    b.append("    ]");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"log\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": true");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"metrics\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"netsim\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"errorTimes\": 0,");
+    b.append("    \"failEvery\": 0,");
+    b.append("    \"failRate\": 0,");
+    b.append("    \"failStatus\": 503,");
+    b.append("    \"failTimes\": 0,");
+    b.append("    \"latency\": 0,");
+    b.append("    \"offline\": false,");
+    b.append("    \"rateLimitTimes\": 0,");
+    b.append("    \"retryAfter\": 0,");
+    b.append("    \"seed\": 1");
+    b.append("   },");
+    b.append("   \"transport\": \"wrap\"");
+    b.append("  },");
+    b.append("  \"paging\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"afterVar\": \"after\",");
+    b.append("    \"cursorParam\": \"cursor\",");
+    b.append("    \"firstVar\": \"first\",");
+    b.append("    \"limitParam\": \"limit\",");
+    b.append("    \"pageParam\": \"page\",");
+    b.append("    \"startPage\": 1");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"proxy\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"fromEnv\": false,");
+    b.append("    \"noProxy\": [],");
+    b.append("    \"url\": \"\"");
+    b.append("   },");
+    b.append("   \"transport\": \"wrap\"");
+    b.append("  },");
+    b.append("  \"ratelimit\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"burst\": 5,");
+    b.append("    \"rate\": 5");
+    b.append("   },");
+    b.append("   \"transport\": \"wrap\"");
+    b.append("  },");
+    b.append("  \"rbac\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"deny\": false,");
+    b.append("    \"permissions\": [],");
+    b.append("    \"rules\": {}");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"retry\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"factor\": 2,");
+    b.append("    \"maxDelay\": 2000,");
+    b.append("    \"minDelay\": 50,");
+    b.append("    \"retries\": 2,");
+    b.append("    \"statuses\": [");
+    b.append("     408,");
+    b.append("     425,");
+    b.append("     429,");
+    b.append("     500,");
+    b.append("     502,");
+    b.append("     503,");
+    b.append("     504");
+    b.append("    ]");
+    b.append("   },");
+    b.append("   \"transport\": \"wrap\"");
+    b.append("  },");
+    b.append("  \"streaming\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"chunkDelay\": 0,");
+    b.append("    \"chunkSize\": 0");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
+    b.append("  \"telemetry\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false");
+    b.append("   },");
+    b.append("   \"transport\": \"none\"");
+    b.append("  },");
     b.append("  \"test\": {");
     b.append("   \"options\": {");
     b.append("    \"active\": false");
     b.append("   },");
     b.append("   \"transport\": \"base\"");
+    b.append("  },");
+    b.append("  \"timeout\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"ms\": 30000");
+    b.append("   },");
+    b.append("   \"transport\": \"wrap\"");
     b.append("  }");
     b.append(" },");
     b.append(" \"options\": {");

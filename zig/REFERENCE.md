@@ -319,7 +319,24 @@ Return the entity name.
 
 | Feature | Version | Description |
 | --- | --- | --- |
+| `audit` | 0.0.1 | Structured audit trail of operations |
+| `cache` | 0.0.1 | Response caching for safe read requests |
+| `clienttrack` | 0.0.1 | Client identity and per-request correlation headers |
+| `cost` | 0.0.1 | Cost tracking and spend budget for API calls |
+| `debug` | 0.0.1 | Request/response capture ring buffer for debugging |
+| `idempotency` | 0.0.1 | Idempotency keys for safe retries of mutating operations |
+| `log` | 0.0.1 | Structured request and response logging |
+| `metrics` | 0.0.1 | Statistics capture: per-operation counters and latency |
+| `netsim` | 0.0.1 | Network behaviour simulation for offline testing (latency, failures, outages) |
+| `paging` | 0.0.1 | Pagination signals for list operations |
+| `proxy` | 0.0.1 | Outbound HTTP(S) proxy routing |
+| `ratelimit` | 0.0.1 | Client-side rate limiting via a token bucket |
+| `rbac` | 0.0.1 | Client-side role/permission enforcement |
+| `retry` | 0.0.1 | Automatic retry of transient failures with exponential backoff |
+| `streaming` | 0.0.1 | Incremental streaming of list results via async iteration |
+| `telemetry` | 0.0.1 | Distributed tracing spans with W3C trace-context propagation |
 | `test` | 0.0.1 | In-memory mock transport for testing without a live server |
+| `timeout` | 0.0.1 | Per-request timeout with transport abort |
 
 
 Features are activated via the `feature` option:
@@ -327,7 +344,24 @@ Features are activated via the `feature` option:
 ```zig
 const client = sdk.UnivecSDK.new(h.jo(&.{
     .{ "feature", h.jo(&.{
+        .{ "audit", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "cache", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "clienttrack", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "cost", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "debug", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "idempotency", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "log", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "metrics", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "netsim", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "paging", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "proxy", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "ratelimit", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "rbac", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "retry", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "streaming", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "telemetry", h.jo(&.{.{ "active", h.vbool(true) }}) },
         .{ "test", h.jo(&.{.{ "active", h.vbool(true) }}) },
+        .{ "timeout", h.jo(&.{.{ "active", h.vbool(true) }}) },
     }) },
 }));
 ```

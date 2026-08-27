@@ -1,10 +1,44 @@
 import 'feature/base/BaseFeature.dart';
+import 'feature/audit/AuditFeature.dart';
+import 'feature/cache/CacheFeature.dart';
+import 'feature/clienttrack/ClienttrackFeature.dart';
+import 'feature/cost/CostFeature.dart';
+import 'feature/debug/DebugFeature.dart';
+import 'feature/idempotency/IdempotencyFeature.dart';
+import 'feature/log/LogFeature.dart';
+import 'feature/metrics/MetricsFeature.dart';
+import 'feature/netsim/NetsimFeature.dart';
+import 'feature/paging/PagingFeature.dart';
+import 'feature/proxy/ProxyFeature.dart';
+import 'feature/ratelimit/RatelimitFeature.dart';
+import 'feature/rbac/RbacFeature.dart';
+import 'feature/retry/RetryFeature.dart';
+import 'feature/streaming/StreamingFeature.dart';
+import 'feature/telemetry/TelemetryFeature.dart';
 import 'feature/test/TestFeature.dart';
+import 'feature/timeout/TimeoutFeature.dart';
 
 
 // ignore: non_constant_identifier_names
 final Map<String, BaseFeature Function()> FEATURE_CLASS = {
-    'test': () => TestFeature(),
+    'audit': () => AuditFeature(),
+  'cache': () => CacheFeature(),
+  'clienttrack': () => ClienttrackFeature(),
+  'cost': () => CostFeature(),
+  'debug': () => DebugFeature(),
+  'idempotency': () => IdempotencyFeature(),
+  'log': () => LogFeature(),
+  'metrics': () => MetricsFeature(),
+  'netsim': () => NetsimFeature(),
+  'paging': () => PagingFeature(),
+  'proxy': () => ProxyFeature(),
+  'ratelimit': () => RatelimitFeature(),
+  'rbac': () => RbacFeature(),
+  'retry': () => RetryFeature(),
+  'streaming': () => StreamingFeature(),
+  'telemetry': () => TelemetryFeature(),
+  'test': () => TestFeature(),
+  'timeout': () => TimeoutFeature(),
 
 };
 
@@ -32,11 +66,191 @@ class Config {
   };
 
   final Map<String, dynamic> feature = <String, dynamic>{
-        'test': <String, dynamic>{
+        'audit': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'actor': 'anonymous',
+        'max': 1000,
+      },
+      'transport': 'none',
+    },
+    'cache': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'max': 256,
+        'methods': <dynamic>[
+          'GET',
+        ],
+        'ttl': 5000,
+      },
+      'transport': 'wrap',
+    },
+    'clienttrack': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'clientVersion': '0.0.1',
+      },
+      'transport': 'none',
+    },
+    'cost': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'budget': 0,
+        'currency': 'USD',
+        'header': '',
+        'onBudget': 'warn',
+        'path': '',
+        'perUnit': 0,
+        'rates': <String, dynamic>{},
+        'unit': 0,
+      },
+      'transport': 'wrap',
+    },
+    'debug': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'max': 100,
+        'redact': <dynamic>[
+          'authorization',
+          'cookie',
+          'set-cookie',
+          'api-key',
+          'apikey',
+          'x-api-key',
+          'idempotency-key',
+        ],
+      },
+      'transport': 'none',
+    },
+    'idempotency': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'header': 'Idempotency-Key',
+        'methods': <dynamic>[
+          'POST',
+          'PUT',
+          'PATCH',
+          'DELETE',
+        ],
+        'ops': <dynamic>[
+          'create',
+          'update',
+          'remove',
+        ],
+      },
+      'transport': 'none',
+    },
+    'log': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': true,
+      },
+      'transport': 'none',
+    },
+    'metrics': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+      },
+      'transport': 'none',
+    },
+    'netsim': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'errorTimes': 0,
+        'failEvery': 0,
+        'failRate': 0,
+        'failStatus': 503,
+        'failTimes': 0,
+        'latency': 0,
+        'offline': false,
+        'rateLimitTimes': 0,
+        'retryAfter': 0,
+        'seed': 1,
+      },
+      'transport': 'wrap',
+    },
+    'paging': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'afterVar': 'after',
+        'cursorParam': 'cursor',
+        'firstVar': 'first',
+        'limitParam': 'limit',
+        'pageParam': 'page',
+        'startPage': 1,
+      },
+      'transport': 'none',
+    },
+    'proxy': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'fromEnv': false,
+        'noProxy': <dynamic>[],
+        'url': '',
+      },
+      'transport': 'wrap',
+    },
+    'ratelimit': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'burst': 5,
+        'rate': 5,
+      },
+      'transport': 'wrap',
+    },
+    'rbac': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'deny': false,
+        'permissions': <dynamic>[],
+        'rules': <String, dynamic>{},
+      },
+      'transport': 'none',
+    },
+    'retry': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'factor': 2,
+        'maxDelay': 2000,
+        'minDelay': 50,
+        'retries': 2,
+        'statuses': <dynamic>[
+          408,
+          425,
+          429,
+          500,
+          502,
+          503,
+          504,
+        ],
+      },
+      'transport': 'wrap',
+    },
+    'streaming': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'chunkDelay': 0,
+        'chunkSize': 0,
+      },
+      'transport': 'none',
+    },
+    'telemetry': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+      },
+      'transport': 'none',
+    },
+    'test': <String, dynamic>{
       'options': <String, dynamic>{
         'active': false,
       },
       'transport': 'base',
+    },
+    'timeout': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'ms': 30000,
+      },
+      'transport': 'wrap',
     },
 
   };

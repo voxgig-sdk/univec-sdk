@@ -305,14 +305,48 @@ Return the entity name.
 
 | Feature | Version | Description |
 | --- | --- | --- |
+| `audit` | 0.0.1 | Structured audit trail of operations |
+| `cache` | 0.0.1 | Response caching for safe read requests |
+| `clienttrack` | 0.0.1 | Client identity and per-request correlation headers |
+| `cost` | 0.0.1 | Cost tracking and spend budget for API calls |
+| `debug` | 0.0.1 | Request/response capture ring buffer for debugging |
+| `idempotency` | 0.0.1 | Idempotency keys for safe retries of mutating operations |
+| `log` | 0.0.1 | Structured request and response logging |
+| `metrics` | 0.0.1 | Statistics capture: per-operation counters and latency |
+| `netsim` | 0.0.1 | Network behaviour simulation for offline testing (latency, failures, outages) |
+| `paging` | 0.0.1 | Pagination signals for list operations |
+| `proxy` | 0.0.1 | Outbound HTTP(S) proxy routing |
+| `ratelimit` | 0.0.1 | Client-side rate limiting via a token bucket |
+| `rbac` | 0.0.1 | Client-side role/permission enforcement |
+| `retry` | 0.0.1 | Automatic retry of transient failures with exponential backoff |
+| `streaming` | 0.0.1 | Incremental streaming of list results via async iteration |
+| `telemetry` | 0.0.1 | Distributed tracing spans with W3C trace-context propagation |
 | `test` | 0.0.1 | In-memory mock transport for testing without a live server |
+| `timeout` | 0.0.1 | Per-request timeout with transport abort |
 
 
 Features are activated via the `feature` option:
 
 ```java
 Map<String, Object> feature = new java.util.LinkedHashMap<>();
+feature.put("audit", Map.of("active", true));
+feature.put("cache", Map.of("active", true));
+feature.put("clienttrack", Map.of("active", true));
+feature.put("cost", Map.of("active", true));
+feature.put("debug", Map.of("active", true));
+feature.put("idempotency", Map.of("active", true));
+feature.put("log", Map.of("active", true));
+feature.put("metrics", Map.of("active", true));
+feature.put("netsim", Map.of("active", true));
+feature.put("paging", Map.of("active", true));
+feature.put("proxy", Map.of("active", true));
+feature.put("ratelimit", Map.of("active", true));
+feature.put("rbac", Map.of("active", true));
+feature.put("retry", Map.of("active", true));
+feature.put("streaming", Map.of("active", true));
+feature.put("telemetry", Map.of("active", true));
 feature.put("test", Map.of("active", true));
+feature.put("timeout", Map.of("active", true));
 Map<String, Object> options = new java.util.LinkedHashMap<>();
 options.put("feature", feature);
 UnivecSDK client = new UnivecSDK(options);
