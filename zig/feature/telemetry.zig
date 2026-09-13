@@ -33,7 +33,7 @@ pub const TelemetryFeature = struct {
 
     pub fn make() Feature {
         const self = h.A().create(TelemetryFeature) catch unreachable;
-        self.* = .{ .spans = std.ArrayList(Value).init(h.A()) };
+        self.* = .{ .spans = .empty };
         return .{ .ptr = @ptrCast(self), .vtable = &vtable };
     }
 
@@ -49,9 +49,9 @@ pub const TelemetryFeature = struct {
         }
         // Deterministic-ish sequential id; unique within a client instance.
         self.seq += 1;
-        var buf = std.ArrayList(u8).init(h.A());
-        buf.writer().print("{x:0>4}", .{@as(u64, @intCast(self.seq))}) catch {};
-        while (buf.items.len < 16) buf.append('0') catch {};
+        var buf: std.ArrayList(u8) = .empty;
+        buf.print(h.A(), "{x:0>4}", .{@as(u64, @intCast(self.seq))}) catch {};
+        while (buf.items.len < 16) buf.append(h.A(), '0') catch {};
         const prefix: []const u8 = if (std.mem.eql(u8, kind, "trace")) "t" else "s";
         return std.fmt.allocPrint(h.A(), "{s}{s}", .{ prefix, buf.items }) catch "";
     }
@@ -73,7 +73,7 @@ pub const TelemetryFeature = struct {
         h.setp(span, "ok", h.vbool(ok));
 
         self.active_spans -= 1;
-        self.spans.append(span) catch {};
+        self.spans.append(h.A(), span) catch {};
 
         const exporter = h.getp(self.options, "exporter");
         if (exporter == .function) {

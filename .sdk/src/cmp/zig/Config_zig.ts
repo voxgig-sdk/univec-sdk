@@ -2,12 +2,14 @@
 import {
   Content,
   File,
+  Folder,
   cmp,
   configDefinition,
   configReprSetting,
   each,
   isAuthActive,
   isConfigData,
+  targetFeatures,
 } from '@voxgig/sdkgen'
 
 
@@ -32,7 +34,10 @@ const Config = cmp(async function Config(props: any) {
 
   const model: Model = ctx$.model
 
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  // Gated by the applicability tags, so this target never imports or
+  // registers a feature it has no source for. One rule, one place:
+  // helpers/applicability.
+  const feature = targetFeatures(model, target)
 
   // The canonical config OBJECT and its JSON, from the shared helper. Both
   // representations render from the same `def`, so they cannot describe
@@ -152,14 +157,11 @@ pub fn make_feature(name: []const u8) Feature {
     // the API def does not list it. The built-in set mirrors the feature
     // templates in tm/zig/feature/ (excluding `base`, the fallback, and
     // `support`, a helper module). Any model feature not already built in is
-    // appended so bespoke features still resolve.
-    const builtinFeatures = [
-      'audit', 'cache', 'clienttrack', 'cost', 'debug', 'idempotency', 'log',
-      'metrics', 'netsim', 'paging', 'proxy', 'ratelimit', 'rbac',
-      'retry', 'streaming', 'telemetry', 'test', 'timeout',
-    ]
-
-    const featureNames: string[] = [...builtinFeatures]
+    // appended so bespoke features still resolve - and so does a GATED one
+    // (`secrets`), whose source ships with the tree but whose `@import`s name
+    // build modules that exist only when the model activates it: naming it
+    // here unconditionally would make every zig SDK fail to build.
+    const featureNames: string[] = [...BUILTIN_FEATURES]
     each(feature, (f: any) => {
       if (f.name !== 'base' && !featureNames.includes(f.name)) {
         featureNames.push(f.name)
@@ -179,6 +181,129 @@ pub fn make_feature(name: []const u8) Feature {
 })
 
 
+// The features tm/zig/feature/ ships UNGATED: every zig SDK has their source
+// and root.zig exports their types statically, so Config's factory can name
+// them whatever the model says. Shared with Main_zig, which uses the same
+// list to decide which ACTIVE features still need a root.zig export.
+const BUILTIN_FEATURES = [
+  'audit', 'cache', 'clienttrack', 'cost', 'debug', 'idempotency', 'log',
+  'metrics', 'netsim', 'paging', 'proxy', 'ratelimit', 'rbac',
+  'retry', 'streaming', 'telemetry', 'test', 'timeout',
+]
+
+
+// THE PLUGIN DEFINITIONS, as the root of the `sekretoplugins` build module:
+// feature/<name>/plugins.zig (the zig peer of Config_go's featurePlugins map
+// and of the plugins.rs index Main_rust emits).
+//
+// Upstream sekreto's contract since its registry was retired: a provider
+// kind not handed to the constructor is unknown to that Sekreto. So this
+// file IS the SDK's provider vocabulary - and in zig it is also what makes
+// the plugin trim REAL: a module root reaches only what it names, so a kind
+// missing here is neither in the vocabulary nor compiled, and a kind named
+// here whose file the trim removed is a compile error rather than a silent
+// one. That is exactly the shape upstream recommends for a lean consumer
+// (plugins/all.zig: "roots its plugins module at the one file it needs").
+//
+// It sits one level ABOVE the vendored `plugins/` directory, deliberately:
+// the vendoring guard fails any non-vendored file inside a vendored dir, and
+// a zig module root reaches its whole SUBTREE, so `plugins/<kind>.zig` is
+// within reach from here while the file itself is outside the guarded tree.
+//
+// Emitted only for a feature that is ACTIVE for this target (targetFeatures),
+// which is also exactly when build.zig declares the module that roots here -
+// an inactive model gets neither, so nothing dangles.
+const FeaturePlugins = cmp(async function FeaturePlugins(props: any) {
+  const ctx$ = props.ctx$
+  const target = props.target
+  const model: Model = ctx$.model
+
+  const feature = targetFeatures(model, target)
+
+  each(feature, (feat: any) => {
+    // `only_active: false`, the subtlety pluginExcludesFor documents: the
+    // feature object a component is handed has already been filtered, so a
+    // feature whose plugins are ALL inactive would arrive with nothing here
+    // and the module root build.zig points at would not be emitted at all.
+    const declared = getModelPath(model,
+      `main.${KIT}.feature.${feat.name}.plugin`,
+      { required: false, only_active: false }) || {}
+
+    if (0 === Object.keys(declared).length) {
+      return
+    }
+
+    // symbol -> the file (target-root-relative) that exports it.
+    const defs: Record<string, string> = {}
+
+    each(declared, (plugin: any) => {
+      // Filter on `active` HERE (Config_go's note): getting this wrong names
+      // a file the trim just removed, which is a compile error.
+      if (true !== plugin.active) return
+
+      for (const [sym, one] of Object.entries(plugin.def?.zig || {})) {
+        defs[sym] = String(one)
+      }
+    })
+
+    Folder({ name: 'feature' }, () => {
+      Folder({ name: feat.name }, () => {
+        File({ name: 'plugins.' + target.ext }, () => {
+          Content(`// The plugin definitions the model selected for the \`${feat.name}\`
+// feature (generated - see Config_zig FeaturePlugins). The ROOT of the
+// \`sekretoplugins\` build module: zig analyses only what a module root
+// reaches, so a kind this file does not name is neither in the provider
+// vocabulary nor compiled - this file IS the plugin trim.
+//
+// Upstream sekreto's contract since its registry was retired: a provider
+// kind not handed to the constructor is unknown to that Sekreto.
+
+const sekreto = @import("sekreto");
+
+// The shared HTTP round-trip the vault kinds import by relative path, and
+// the exchange's fetch of last resort (feature/${feat.name}.zig). In NO
+// plugin group, so it is always reachable from here - which is what
+// upstream's own all.zig does.
+pub const httpjson = @import("plugins/httpjson.zig");
+
+`)
+          const syms = Object.keys(defs).sort()
+
+          for (const sym of syms) {
+            // 'feature/secrets/plugins/aws.zig' -> 'plugins/aws.zig', relative
+            // to this file's directory (feature/<name>/).
+            const rel = defs[sym].replace(new RegExp('^feature/' +
+              feat.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/'), '')
+            Content(`pub const ${sym} = @import("${rel}").${sym};
+`)
+          }
+
+          if (0 < syms.length) {
+            Content(`
+pub const SELECTED = [_]sekreto.Definition{
+`)
+            for (const sym of syms) {
+              Content(`    ${sym},
+`)
+            }
+            Content(`};
+`)
+          }
+          else {
+            Content(`// No plugin group is active: the chain can name the four built-in kinds
+// (env, memory, dotenv, file) and nothing else.
+pub const SELECTED = [_]sekreto.Definition{};
+`)
+          }
+        })
+      })
+    })
+  })
+})
+
+
 export {
-  Config
+  Config,
+  FeaturePlugins,
+  BUILTIN_FEATURES,
 }

@@ -6,6 +6,8 @@ import {
   each,
   isAuthActive,
   resolveAuthPrefix,
+  targetFeatures,
+  configDefinition,
 } from '@voxgig/sdkgen'
 
 
@@ -35,9 +37,50 @@ const Config = cmp(async function Config(props: any) {
   const scalapackage = scalaPackage(model)
 
   const entity = getModelPath(model, `main.${KIT}.entity`)
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  const { def: configDef } = configDefinition(model, target.name)
+  // Gated by the applicability tags, so this target never imports or
+  // registers a feature it has no source for. One rule, one place:
+  // helpers/applicability.
+  const feature = targetFeatures(model, target)
 
   const headers = getModelPath(model, `main.${KIT}.config.headers`) || {}
+
+  // PLUGIN DEFINITIONS, per feature (the scala peer of Config_go's
+  // featurePlugins map and Config_ts's pluginDefs).
+  //
+  // Since sekreto retired its import-time registry, provider kinds are
+  // voxgig/plugin definitions: a kind the caller did not pass in via
+  // `plugins` is unknown to that Sekreto. So the config names each active
+  // plugin's exported Definition and hands the list to the feature.
+  //
+  // The scala symbols are fully-qualified top-level `val`s
+  // (`com.voxgig.sekreto.plugins.hashicorp`), so unlike go there is no
+  // import to emit - and an inactive group therefore leaves no reference at
+  // all behind for the generate-time plugin trim to dangle.
+  //
+  // Typed List[Any], never List[Definition]: core must not name a vendored
+  // type, or a tree carrying the feature source without the feature selected
+  // would fail to compile.
+  const featurePlugins: Record<string, string[]> = {}
+  each(feature, (f: any) => {
+    const syms: string[] = []
+    each(f.plugin, (plugin: any) => {
+      // Filter on `active` HERE rather than trusting the feature object to
+      // arrive filtered (the trap Config_ts documents): naming a symbol the
+      // trim just deleted is a build break, not a warning.
+      if (false === plugin.active || null == plugin.active) return
+      for (const sym of Object.keys(plugin.def?.scala || {})) {
+        syms.push(sym)
+      }
+    })
+    if (0 < syms.length) {
+      featurePlugins[f.name] = syms.sort()
+    }
+  })
+
+  const featurePluginsBlock =
+    Object.keys(featurePlugins).sort().map((fname: string) =>
+      `    case "${fname}" => List(${featurePlugins[fname].join(', ')})\n`).join('')
 
   const authActive = isAuthActive(model)
   const authPrefix = resolveAuthPrefix(model)
@@ -64,13 +107,13 @@ const Config = cmp(async function Config(props: any) {
   options.headers = headers
   options.entity = optionsEntity
 
-  const entityConfig = Object.values(entity).reduce((a: any, n: any) => (
-    a[n.name] = cleanModel({
-      fields: n.fields,
-      name: n.name,
-      op: n.op,
-      relations: n.relations,
-    }, true), a), {})
+  // configDefinition's `def.entity` verbatim, NOT rebuilt here. This reduce
+  // was one of fourteen copies of that function's entityDefs loop, and when
+  // configDefinition started reconstructing a point's `parts` from apidef's
+  // segment vector (its ADR-003), only the copies that read `configDef` got
+  // it — this target's literal config emitted paths with no parts at all
+  // while its data config had them. One rule, one place.
+  const entityConfig = configDef.entity
 
   const config = {
     main: { name: model.const.Name },
@@ -107,6 +150,13 @@ object Config {
   private lazy val sharedConfigVal: JMap[String, Object] = makeConfig()
 
   def sharedConfig(): JMap[String, Object] = sharedConfigVal
+
+  // The plugin definitions the model selected per feature, as List[Any] so a
+  // feature consumes them without core naming a vendored type. Empty when no
+  // active feature declares active plugin groups for this target.
+  def featurePlugins(name: String): List[Any] = name match {
+${featurePluginsBlock}    case _ => Nil
+  }
 
   def makeFeature(name: String): Feature = name match {
 `)

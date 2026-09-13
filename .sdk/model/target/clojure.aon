@@ -9,9 +9,32 @@ main: kit: target: clojure: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability (docs/design/feature-tags.md). A vendored sekreto port
+  # lives in this target's feature container (tm/clojure/feature/secrets/),
+  # so a feature that resolves secrets through sekreto can apply here.
+  #
+  # That container is ALSO a classpath root: Clojure resolves
+  # `(require 'voxgig.sekreto.chain)` to voxgig/sekreto/chain.clj searched
+  # from each :paths entry, never by relative import, so Package_clojure
+  # adds `feature/secrets` to :paths whenever this feature is active.
+  provides: { sekreto: true }
+
   deps: &: {
     kind: *'prod' | string
   }
+
+  # RETIREMENT. Nothing is superseded by the omni migration, and the empty
+  # list is the honest answer rather than an oversight: clojure never had a
+  # separate hand-written runner FILE to retire. Its entry loop, matcher and
+  # error handling lived INSIDE test/sdk/test/struct_corpus.clj alongside the
+  # corpus wiring, and that file keeps its name and is rewritten in place, so
+  # regeneration overwrites it and there is nothing for `doctor prune` to
+  # delete. (Contrast go, which retired test/struct_runner_test.go, and lua,
+  # which retired test/struct_runner.lua — both standalone files.)
+  #
+  # test/sdk/test_runner.clj is NOT superseded: despite the name it is the
+  # tools.deps `-M:test` main entry point, not a corpus engine.
+  superseded: []
 
   # struct is vendored under src/voxgig/struct.clj — no external dep.
   # The library itself needs only org.clojure/clojure (declared in deps.edn).

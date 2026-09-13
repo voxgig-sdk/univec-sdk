@@ -16,6 +16,12 @@ import type {
 } from '@voxgig/apidef'
 
 
+import {
+  KIT,
+  getModelPath,
+} from '@voxgig/apidef'
+
+
 // Emits the two MSBuild project files (the C# twin of Package_go's go.mod):
 //   <Name>SDK.csproj       - the library, compiling everything except test/
 //   test/<Name>SDKTest.csproj - the xunit test project (mirrors the
@@ -44,6 +50,24 @@ const Package = cmp(async function Package(props: any) {
     ? `  <ItemGroup>\n${depRefs}\n  </ItemGroup>\n`
     : ''
 
+  // CS8619, and ONLY when the secrets feature's `aws` plugin group is
+  // selected. Upstream sekreto builds its plugin assembly with <Nullable>
+  // disabled; vendored into an SDK that enables it, plugins/Aws.cs:87
+  // reports one nullability mismatch on a tuple conversion. It is a
+  // VENDORED file, so it cannot be fixed here (a silent tweak to vendored
+  // source is exactly what the vendoring guard exists to prevent), and it
+  // is the only such warning in the whole vendored set.
+  //
+  // Gated rather than added to the standing list because the standing list
+  // is a promise about EVERY generated SDK: CS8619 catches a real class of
+  // bug in ordinary code, and switching it off for everyone to quiet one
+  // line in one vendored file would be paying for a feature that is off by
+  // default. `getModelPath` is active-filtered, so this reads as present
+  // only when the group is really on.
+  const awsPlugin = getModelPath(model,
+    `main.${KIT}.feature.secrets.plugin.aws`, { required: false })
+  const vendorNoWarn = null == awsPlugin ? '' : ';CS8619'
+
   File({ name: Name + 'SDK.csproj' }, () => {
     Content(`<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -54,7 +78,7 @@ const Package = cmp(async function Package(props: any) {
     <AssemblyName>${Name}SDK</AssemblyName>
     <RootNamespace>${Name}Sdk</RootNamespace>
     <!-- Loose-object-model port: suppress repetitive nullability noise. -->
-    <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;CS1591</NoWarn>
+    <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;CS1591${vendorNoWarn}</NoWarn>
 
     <!-- NuGet package metadata (publication pending; see Makefile). -->
     <Version>${packageVersion(model, target.name)}</Version>

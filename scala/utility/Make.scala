@@ -254,7 +254,21 @@ object MakeOptions {
       }
     }
 
+    // `auth: null` is the documented way to suppress auth outright, and
+    // prepareAuth honours it before it ever reads the apikey. It cannot survive
+    // validate: a stored null reads as "no value", so the optspec `auth`
+    // default fires and the suppression becomes "use the default auth" -
+    // transmitting the credential the caller withheld. Withhold the key for
+    // validate, then put the null back. Same fix as ts/js/go/java makeOptions.
+    //
+    // Suppliedness cannot be recovered after validate, hence here, and it must
+    // tell an ABSENT auth from a present null: containsKey rather than a get()
+    // null check, which cannot distinguish them.
+    val authSuppressed = options.containsKey("auth") && null == options.get("auth")
+
     var opts = Struct.clone(options).asInstanceOf[JMap[String, Object]]
+
+    if (authSuppressed) opts.remove("auth")
 
     // Feature add-order. options.feature may be given as an ordered LIST of
     // { name, active, ...opts } entries (the list position IS the order in
@@ -306,6 +320,13 @@ object MakeOptions {
         + "\"feature\": { \"`$CHILD`\": {"
         + "  \"`$OPEN`\": true, \"active\": false } },"
         + "\"utility\": {},"
+        // `extend` carries LIVE Feature objects a caller hands in, and an
+        // optspec with no entry for a key makes Struct.validate DROP it -
+        // silently, so `new Client(Map.of("extend", List.of(feature)))`
+        // built a client with no such feature and nothing said so. `$ANY`
+        // passes the list through untouched, which is what go's optspec
+        // does (tm/go/utility/make_options.go).
+        + "\"extend\": \"`$ANY`\","
         + "\"system\": {},"
         + "\"test\": { \"active\": false, \"entity\": { \"`$OPEN`\": true } },"
         + "\"clean\": { \"keys\": \"key,token,id\" }"
@@ -329,6 +350,9 @@ object MakeOptions {
     vopts.put("errs", new ArrayList[Object]())
     val validated = Struct.validate(merged, optspec, vopts)
     opts = validated.asInstanceOf[JMap[String, Object]]
+
+    // Restore the suppression the optspec default would otherwise erase.
+    if (authSuppressed) opts.put("auth", null)
 
     // Restore system.fetch.
     if (sysFetch != null) {

@@ -1,8 +1,20 @@
 // Voxgig Struct corpus driver — C++ port.
-// Mirrors java/src/test/StructCorpusTest.java.
 //
-// Loads build/test/test.json, drives every (category, name) pair, and prints
-// a per-.jsonic-file scoreboard plus a totals line.
+// Drives the shared struct corpus (../.sdk/test/test.json, root key
+// "struct") against the vendored struct utility THROUGH the VENDORED omni
+// runner (test/omni_resolver.hpp over test/vendor/omni) — the engine half
+// of the retired test/struct_runner.hpp. Mirrors
+// tm/java/test/StructCorpusTest.java.
+//
+// Two behaviour changes came with the swap, both deliberate:
+//
+//  - A missing category, a missing section or an EMPTY set now FAILS. The
+//    retired runner skipped all three silently, so a renamed fixture
+//    reported PASS while running zero assertions.
+//  - omni THROWS on the first bad entry in a group instead of recording
+//    every one, so a group reports its FIRST failure and the scoreboard
+//    below counts the entries that actually ran. Each group is its own
+//    T_RUN-style unit, so one bad group never hides the rest.
 
 #include <cstdio>
 #include <fstream>
@@ -11,21 +23,32 @@
 #include <string>
 #include <vector>
 
-#include "../utility/voxgigstruct/value.hpp"
-#include "../utility/voxgigstruct/value_io.hpp"
-#include "../utility/voxgigstruct/voxgig_struct.hpp"
-#include "struct_runner.hpp"
+#include "omni_resolver.hpp"
+#include "testlib.hpp"
 
 using namespace voxgig::structlib;
-using runner::get_spec;
-using runner::Result;
-using runner::runset;
-using runner::runsetflags;
-using runner::Subject;
+namespace res = sdk::resolver;
 
 namespace {
 
-std::map<std::string, Result> SCOREBOARD;
+// One corpus subject in the shape the groups below are written in: one
+// value in, one value out. `in` is args[0], and because a Value shares its
+// container by shared_ptr, an in-place rewrite by the subject reaches
+// omni's `match: {args: ...}` through the resolver's refill.
+using StructSubject = std::function<Value(const Value&)>;
+
+res::Subject onearg(const StructSubject& subject) {
+  return [subject](std::vector<Value>& args) -> Value {
+    return subject(args.empty() ? Value::undef() : args[0]);
+  };
+}
+
+struct GroupResult {
+  long long cases = 0;
+  bool ok = true;
+};
+
+std::map<std::string, GroupResult> SCOREBOARD;
 
 const std::map<std::string, std::string>& category_to_file() {
   static const std::map<std::string, std::string> M = {
@@ -33,15 +56,78 @@ const std::map<std::string, std::string>& category_to_file() {
       {"merge", "merge.jsonic"},       {"getpath", "getpath.jsonic"},
       {"inject", "inject.jsonic"},     {"transform", "transform.jsonic"},
       {"validate", "validate.jsonic"}, {"select", "select.jsonic"},
+      {"nullsem", "nullsem.jsonic"},
   };
   return M;
 }
 
-void run(const std::string& cat, const std::string& name, bool null_flag, const Subject& s) {
+// One client + one corpus runner for the whole binary.
+res::Run& structRun() {
+  static res::Run run =
+      res::makeRunner("../.sdk/test/test.json", sdk::UnivecSDK::testSDK())
+          .runner("struct", Value::undef());
+  return run;
+}
+
+// Resolve one corpus group, failing LOUDLY when it would run zero cases.
+Value group_spec(const std::string& cat, const std::string& name, const std::string& full) {
+  Value category = structRun().set(cat);
+  if (!category.is_map()) {
+    sdktest::record_fail(full, "struct corpus category missing: " + cat +
+                                   " - check .sdk/test/struct/");
+    return Value::undef();
+  }
+  Value spec = sdk::getp(category, Value(name));
+  if (!spec.is_map()) {
+    sdktest::record_fail(full, "struct corpus section missing: " + full +
+                                   " - check .sdk/test/struct/");
+    return Value::undef();
+  }
+  Value set = sdk::getp(spec, Value("set"));
+  if (!set.is_list() || set.as_list()->empty()) {
+    sdktest::record_fail(full, "struct corpus section is EMPTY: " + full +
+                                   " - zero cases would run");
+    return Value::undef();
+  }
+  return spec;
+}
+
+// Run one corpus group. A failing entry throws omni::OmniError naming the
+// entry; it is recorded and the next group still runs.
+void runflags(const std::string& cat, const std::string& name, bool null_flag,
+              const res::Subject& subject) {
   std::string full = cat + "." + name;
-  Value spec = get_spec(cat, name);
-  Result r = runsetflags(full, spec, null_flag, s);
-  SCOREBOARD[full] = r;
+  sdktest::tests()++;
+  sdktest::checks()++;
+
+  GroupResult result;
+  long long before = res::cases();
+
+  Value spec = group_spec(cat, name, full);
+  if (spec.is_map()) {
+    try {
+      structRun().runsetflags(full, spec, null_flag, subject);
+    } catch (const res::OmniError& e) {
+      result.ok = false;
+      sdktest::record_fail(full, e.what());
+    } catch (const sdk::SdkErrorPtr& e) {
+      result.ok = false;
+      sdktest::record_fail(full, std::string("uncaught SdkError: ") + e->getMessage());
+    } catch (const std::exception& e) {
+      result.ok = false;
+      sdktest::record_fail(full, std::string("uncaught exception: ") + e.what());
+    }
+  } else {
+    result.ok = false;
+  }
+
+  result.cases = res::cases() - before;
+  SCOREBOARD[full] = result;
+}
+
+void run(const std::string& cat, const std::string& name, bool null_flag,
+         const StructSubject& subject) {
+  runflags(cat, name, null_flag, onearg(subject));
 }
 
 // Extract a named field from a test-spec object. This mirrors the canonical
@@ -54,6 +140,29 @@ inline Value getp(const Value& in, const std::string& k) {
 }
 inline Value getpDef(const Value& in, const std::string& k, const Value& def) {
   return lookup_v(in, Value(k)).is_undef() ? def : lookup_v(in, Value(k));
+}
+
+// The struct-corpus nullModifier (was struct_runner.hpp's null_modifier): a
+// bare "__NULL__" becomes a real null, and an embedded "__NULL__" inside a
+// larger string is rewritten to the literal text "null".
+void null_modifier(const Value& val, const Value& key, const Value& parent, Injection&,
+                   const Value&) {
+  if (!val.is_string())
+    return;
+  const std::string& s = val.as_string();
+  if (s == res::NULLMARK) {
+    setprop(parent, key, Value(nullptr));
+    return;
+  }
+  if (s.find(res::NULLMARK) != std::string::npos) {
+    std::string out = s;
+    std::string::size_type pos = 0;
+    while ((pos = out.find(res::NULLMARK, pos)) != std::string::npos) {
+      out.replace(pos, res::NULLMARK.size(), "null");
+      pos += 4;
+    }
+    setprop(parent, key, Value(out));
+  }
 }
 
 } // namespace
@@ -103,7 +212,7 @@ int main() {
     Value val = getpDef(in, "val", Value::undef());
     // Canonical subject: a stored-null (the NULLMARK in null mode) stringifies
     // as the literal text "null".
-    if (val.is_string() && val.as_string() == runner::NULLMARK())
+    if (val.is_string() && val.as_string() == res::NULLMARK)
       val = Value("null");
     Value max = getp(in, "max");
     int m = max.is_int() ? static_cast<int>(max.as_int()) : -1;
@@ -119,7 +228,7 @@ int main() {
     // path *element* (the marker) is stripped from the rendered string; and a
     // wholly-null path renders "<unknown-path:null>".
     Value path = getpDef(in, "path", Value::undef());
-    bool path_was_null = path.is_string() && path.as_string() == runner::NULLMARK();
+    bool path_was_null = path.is_string() && path.as_string() == res::NULLMARK;
     if (path_was_null)
       path = Value::undef();
     Value from = getp(in, "from");
@@ -336,7 +445,7 @@ int main() {
     // Canonical subject passes { modify: nullModifier }: an injected stored-null
     // (the marker, in null mode) renders as the literal text "null".
     Injection inj(Value::undef(), Value::undef());
-    inj.modify = runner::null_modifier;
+    inj.modify = null_modifier;
     return inject(getp(in, "val"), getp(in, "store"), &inj);
   });
   run("inject", "deep", true,
@@ -427,49 +536,64 @@ int main() {
     return Value(out);
   });
 
-  // Aggregate per-file scoreboard.
-  std::map<std::string, std::pair<int, int>> by_file;
+  // ===== nullsem =====
+  // Does a PRESENT key holding a JSON null read as "no value"? Every lane
+  // runs {null: false}: with the flag on, the runner rewrites every null to
+  // "__NULL__" and the section asserts nothing about null at all.
+  run("nullsem", "getprop", false, [](const Value& in) {
+    Value alt = getpDef(in, "alt", Value::undef());
+    return alt.is_undef() ? getprop(getp(in, "val"), getp(in, "key"))
+                          : getprop(getp(in, "val"), getp(in, "key"), alt);
+  });
+  run("nullsem", "getelem", false, [](const Value& in) {
+    Value alt = getpDef(in, "alt", Value::undef());
+    return alt.is_undef() ? getelem(getp(in, "val"), getp(in, "key"))
+                          : getelem(getp(in, "val"), getp(in, "key"), alt);
+  });
+  run("nullsem", "getpath", false,
+      [](const Value& in) { return getpath_v(getp(in, "store"), getp(in, "path")); });
+  run("nullsem", "haskey", false,
+      [](const Value& in) { return Value(haskey(getp(in, "src"), getp(in, "key"))); });
+  run("nullsem", "keysof", false, [](const Value& in) {
+    auto out = std::make_shared<List>();
+    for (const auto& k : keysof(in))
+      out->push_back(Value(k));
+    return Value(out);
+  });
+
+  // ===== scoreboard =====
+  // Per-.jsonic-file case counts. `cases` is what the vendored runner
+  // actually DROVE: a group that throws stops at its first bad entry, so a
+  // count below the fixture's set size is itself a failure signal.
+  std::map<std::string, std::pair<long long, int>> by_file; // cases, failed groups
   std::map<std::string, std::vector<std::pair<std::string, std::string>>> details;
-  int totalP = 0, totalT = 0;
+  long long total_cases = 0;
+  int failed_groups = 0;
+
   for (const auto& [key, r] : SCOREBOARD) {
     std::string cat = key.substr(0, key.find('.'));
     auto it = category_to_file().find(cat);
     std::string file = it == category_to_file().end() ? cat + ".jsonic" : it->second;
-    by_file[file].first += r.passed;
-    by_file[file].second += r.total;
-    details[file].push_back({key, std::to_string(r.passed) + "/" + std::to_string(r.total)});
-    totalP += r.passed;
-    totalT += r.total;
+    by_file[file].first += r.cases;
+    by_file[file].second += r.ok ? 0 : 1;
+    details[file].push_back({key, std::to_string(r.cases) + (r.ok ? "" : " FAILED")});
+    total_cases += r.cases;
+    if (!r.ok)
+      failed_groups++;
   }
 
   std::cout << "\n========= STRUCT CORPUS SCOREBOARD =========\n";
   for (const auto& [file, pt] : by_file) {
-    std::printf("  %-18s %4d / %4d\n", file.c_str(), pt.first, pt.second);
+    std::printf("  %-18s %5lld cases%s\n", file.c_str(), pt.first,
+                pt.second > 0 ? "  (FAILURES)" : "");
     for (const auto& [name, tally] : details[file]) {
       std::printf("      %-30s %s\n", name.c_str(), tally.c_str());
     }
   }
-  std::printf("  %-18s %4d / %4d\n", "TOTAL", totalP, totalT);
+  std::printf("  %-18s %5lld cases, %d group(s) failed\n", "TOTAL", total_cases, failed_groups);
   std::cout << "============================================\n";
 
-  // Optionally print failure details when CORPUS_VERBOSE is set.
-  if (const char* v = std::getenv("CORPUS_VERBOSE"); v && std::string(v) != "0") {
-    for (const auto& [name, r] : SCOREBOARD) {
-      if (r.failures.empty())
-        continue;
-      std::cerr << "\n--- " << name << " (" << r.passed << "/" << r.total << ") ---\n";
-      int shown = 0;
-      for (const auto& f : r.failures) {
-        std::cerr << "  " << f << "\n";
-        if (++shown >= 5) {
-          std::cerr << "  ... " << (r.failures.size() - shown) << " more\n";
-          break;
-        }
-      }
-    }
-  }
-
-  // Write target/corpus-scoreboard.json
+  // Write corpus-scoreboard.json beside the binary's working directory.
   std::ofstream out("corpus-scoreboard.json");
   if (out) {
     out << "{\n  \"files\": {\n";
@@ -478,17 +602,20 @@ int main() {
       if (!first)
         out << ",\n";
       first = false;
-      out << "    \"" << file << "\": {\"passed\": " << pt.first << ", \"total\": " << pt.second
+      out << "    \"" << file << "\": {\"cases\": " << pt.first << ", \"failed\": " << pt.second
           << "}";
     }
-    out << "\n  },\n  \"total\": {\"passed\": " << totalP << ", \"total\": " << totalT << "}\n}\n";
+    out << "\n  },\n  \"total\": {\"cases\": " << total_cases << ", \"failed\": " << failed_groups
+        << "}\n}\n";
   }
 
-  // Green-bar: any failing corpus entry fails the test binary.
-  if (totalP != totalT) {
-    std::cerr << "struct corpus: " << (totalT - totalP) << " FAILED of " << totalT << "\n";
-    return 1;
+  if (failed_groups > 0) {
+    std::cerr << "struct corpus: " << failed_groups << " group(s) FAILED of " << SCOREBOARD.size()
+              << "\n";
+  } else {
+    std::cout << "struct corpus: " << total_cases << " cases PASSED across " << SCOREBOARD.size()
+              << " groups\n";
   }
-  std::cout << "struct corpus: " << totalP << "/" << totalT << " PASSED\n";
-  return 0;
+
+  return sdktest::summary("struct_corpus_test");
 }

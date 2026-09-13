@@ -1,9 +1,16 @@
 // Primary utility corpus tests. Port of ts test/utility/PrimaryUtility.test.ts:
 // drives the scaffold corpus (group "primary") through the SDK's utility
-// functions via the ported runner (test/runner.dart).
+// functions via the VENDORED @voxgig/omni runner, reached through the
+// resolver in test/omni.dart (which supersedes the hand-written
+// test/runner.dart).
+//
+// The call sites below are unchanged by the swap: a ctx-carrying entry still
+// reaches its subject as a real Context, because the resolver materialises
+// one from omni's ctx map at the subject boundary and writes the Context's
+// observable state back for `match: {ctx: ...}` (test/omni.dart, decision 3).
 
 import 'harness.dart';
-import 'runner.dart';
+import 'omni.dart';
 
 import '../lib/UnivecSDK.dart';
 import '../lib/Point.dart';
@@ -16,14 +23,16 @@ dynamic _spec;
 dynamic _runset;
 dynamic _client;
 dynamic _utility;
+Run? _run;
 
 Future<void>? _setupF;
 
 Future<void> _setup() {
   return _setupF ??= () async {
-    final runner = await makeRunner(TEST_JSON_FILE, UnivecSDK.test());
-    final run = await runner('primary');
+    final runner = makeRunner(TEST_JSON_FILE, UnivecSDK.test());
+    final run = runner('primary');
 
+    _run = run;
     _spec = run.spec;
     _runset = run.runset;
     _client = run.client;
@@ -39,6 +48,39 @@ void _fixctx(dynamic ctx) {
 }
 
 dynamic _g(String path) => vs.getpath(_spec, path);
+
+// Drive one primary corpus section by name. A MISSING, non-set or EMPTY
+// section fails HERE, before any subject runs — the same guard struct_test's
+// `_sec` carries, and the hole this file used to leave open: a fixture that
+// shipped `set: []` drove zero assertions and reported PASS (the stale
+// "preparePath has no cases" note this file carried was exactly that state
+// going unnoticed).
+//
+// The post-check counts what the ENGINE EXECUTED, not what the spec declares:
+// `Run.caseCount` only advances inside omni's execute pass, one increment per
+// subject call it actually made (test/omni.dart, decision 1). So the equality
+// below is spec-vs-engine, and a disconnected or short-circuited engine fails
+// it — a count that could not tell those apart would be worse than none.
+Future<void> _sec(String name, dynamic subject) async {
+  final secspec = _g(name);
+  ok(null != secspec,
+      'primary corpus section missing: ' + name +
+          ' - check .sdk/test/test.json');
+
+  final testset = vs.getprop(secspec, 'set');
+  ok(testset is List && testset.isNotEmpty,
+      'primary corpus section is EMPTY: ' + name +
+          ' - zero cases would run');
+
+  final declared = (testset as List).length;
+  final before = _run!.caseCount;
+  await _runset(secspec, subject);
+  final drove = _run!.caseCount - before;
+
+  equal(declared, drove,
+      'primary corpus section ' + name +
+          ' declares cases the engine did not drive');
+}
 
 void tests() {
   describe('PrimaryUtility', () {
@@ -60,24 +102,24 @@ void tests() {
 
     test('context-basic', (t) async {
       await _setup();
-      await _runset(_g('makeContext.basic'), _utility.makeContext);
+      await _sec('makeContext.basic', _utility.makeContext);
     });
 
     test('method-basic', (t) async {
       await _setup();
-      await _runset(_g('prepareMethod.basic'), _utility.prepareMethod);
+      await _sec('prepareMethod.basic', _utility.prepareMethod);
     });
 
     test('headers-basic', (t) async {
       await _setup();
-      await _runset(_g('prepareHeaders.basic'), _utility.prepareHeaders);
+      await _sec('prepareHeaders.basic', _utility.prepareHeaders);
     });
 
     test('auth-basic', (t) async {
       await _setup();
       final sdkopts = vs.getpath(_spec, 'prepareAuth.DEF.setup.a') ?? {};
       final authClient = UnivecSDK.test({}, sdkopts);
-      await _runset(_g('prepareAuth.basic'), (dynamic ctx) {
+      await _sec('prepareAuth.basic', (dynamic ctx) {
         ctx.client = authClient;
         _fixctx(ctx);
         return _utility.prepareAuth(ctx);
@@ -86,24 +128,26 @@ void tests() {
 
     test('params-basic', (t) async {
       await _setup();
-      await _runset(_g('prepareParams.basic'), _utility.prepareParams);
+      await _sec('prepareParams.basic', _utility.prepareParams);
     });
 
     test('query-basic', (t) async {
       await _setup();
-      await _runset(_g('prepareQuery.basic'), _utility.prepareQuery);
+      await _sec('prepareQuery.basic', _utility.prepareQuery);
     });
 
-    // preparePath shipped as an empty `set: []`, so no port drove it and
-    // several kept private hand-written cases instead.
+    // preparePath once shipped as an empty `set: []`, so no port drove it and
+    // several kept private hand-written cases instead. It carries real cases
+    // now, and `_sec` is what keeps that true: were it emptied again, this
+    // case would fail instead of quietly asserting nothing.
     test('path-basic', (t) async {
       await _setup();
-      await _runset(_g('preparePath.basic'), _utility.preparePath);
+      await _sec('preparePath.basic', _utility.preparePath);
     });
 
     test('body-basic', (t) async {
       await _setup();
-      await _runset(_g('prepareBody.basic'), (dynamic ctx) {
+      await _sec('prepareBody.basic', (dynamic ctx) {
         _fixctx(ctx);
         return _utility.prepareBody(ctx);
       });
@@ -111,17 +155,17 @@ void tests() {
 
     test('findparam-basic', (t) async {
       await _setup();
-      await _runset(_g('param.basic'), _utility.param);
+      await _sec('param.basic', _utility.param);
     });
 
     test('fullurl-basic', (t) async {
       await _setup();
-      await _runset(_g('makeUrl.basic'), _utility.makeUrl);
+      await _sec('makeUrl.basic', _utility.makeUrl);
     });
 
     test('operator-basic', (t) async {
       await _setup();
-      await _runset(_g('operator.basic'), (dynamic opmap) {
+      await _sec('operator.basic', (dynamic opmap) {
         return {
           'entity': opmap['entity'] ?? '_',
           'name': opmap['name'] ?? '_',
@@ -133,7 +177,7 @@ void tests() {
 
     test('options-basic', (t) async {
       await _setup();
-      await _runset(_g('makeOptions.basic'), (dynamic vin) {
+      await _sec('makeOptions.basic', (dynamic vin) {
         final ctx = _utility.makeContext(
             {'options': vin['options'], 'config': vin['config']});
         ctx.client = _client;
@@ -146,7 +190,7 @@ void tests() {
       await _setup();
       final sdkopts = vs.getpath(_spec, 'makeSpec.DEF.setup.a') ?? {};
       final specClient = UnivecSDK.test({}, sdkopts);
-      await _runset(_g('makeSpec.basic'), (dynamic ctx) {
+      await _sec('makeSpec.basic', (dynamic ctx) {
         ctx.client = specClient;
         ctx.options = specClient.options();
         return _utility.makeSpec(ctx);
@@ -155,17 +199,17 @@ void tests() {
 
     test('reqform-basic', (t) async {
       await _setup();
-      await _runset(_g('transformRequest.basic'), _utility.transformRequest);
+      await _sec('transformRequest.basic', _utility.transformRequest);
     });
 
     test('resform-basic', (t) async {
       await _setup();
-      await _runset(_g('transformResponse.basic'), _utility.transformResponse);
+      await _sec('transformResponse.basic', _utility.transformResponse);
     });
 
     test('resbasic-basic', (t) async {
       await _setup();
-      await _runset(_g('resultBasic.basic'), (dynamic ctx) {
+      await _sec('resultBasic.basic', (dynamic ctx) {
         _fixctx(ctx);
         return _utility.resultBasic(ctx);
       });
@@ -173,7 +217,7 @@ void tests() {
 
     test('resheaders-basic', (t) async {
       await _setup();
-      await _runset(_g('resultHeaders.basic'), (dynamic ctx) {
+      await _sec('resultHeaders.basic', (dynamic ctx) {
         // Header keys reach the pipeline lowercased by the transport.
         if (null != ctx.response && ctx.response.headers is Map) {
           final h = <String, dynamic>{};
@@ -187,7 +231,7 @@ void tests() {
 
     test('resbody-basic', (t) async {
       await _setup();
-      await _runset(_g('resultBody.basic'), (dynamic ctx) async {
+      await _sec('resultBody.basic', (dynamic ctx) async {
         if (null != ctx.response && null == ctx.response.jsonFn) {
           final body = ctx.response.body;
           ctx.response.jsonFn = () => body;
@@ -209,7 +253,7 @@ void tests() {
         'system': {'fetch': mockFetch}
       });
       final reqUtility = reqClient.utility();
-      await _runset(_g('makeRequest.basic'), (dynamic ctx) async {
+      await _sec('makeRequest.basic', (dynamic ctx) async {
         ctx.client = reqClient;
         ctx.utility = reqUtility;
         ctx.options = reqClient.options();
@@ -219,7 +263,7 @@ void tests() {
 
     test('response-basic', (t) async {
       await _setup();
-      await _runset(_g('makeResponse.basic'), (dynamic ctx) async {
+      await _sec('makeResponse.basic', (dynamic ctx) async {
         _fixctx(ctx);
         if (null != ctx.response && null == ctx.response.jsonFn) {
           final body = ctx.response.body;
@@ -237,7 +281,7 @@ void tests() {
 
     test('done-basic', (t) async {
       await _setup();
-      await _runset(_g('done.basic'), (dynamic ctx) {
+      await _sec('done.basic', (dynamic ctx) {
         _fixctx(ctx);
         return _utility.done(ctx);
       });
@@ -245,7 +289,7 @@ void tests() {
 
     test('error-basic', (t) async {
       await _setup();
-      await _runset(_g('makeError.basic'), (dynamic ctx, [dynamic err]) {
+      await _sec('makeError.basic', (dynamic ctx, [dynamic err]) {
         _fixctx(ctx);
         return _utility.makeError(ctx, err);
       });
@@ -379,6 +423,20 @@ void tests() {
       final val = {'key': 'secret123', 'name': 'test'};
       final cleaned = _utility.clean(ctx, val);
       ok(null != cleaned);
+    });
+
+    // The whole-suite backstop, behind `_sec`'s per-section guards: those
+    // pin each section to the case count the engine actually drove for it,
+    // so a shrunken or emptied section fails in its own case, named. This
+    // catches what they cannot — a drive site DELETED outright, which takes
+    // its guard with it. Runs last, so it sees every case above.
+    test('corpus-cases', (t) async {
+      await _setup();
+      final cases = _run!.caseCount;
+      print('primary corpus: cases ' + cases.toString());
+      ok(60 < cases,
+          'primary corpus drove only ' + cases.toString() +
+              ' cases - the corpus stopped running');
     });
   });
 }

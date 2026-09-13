@@ -252,11 +252,11 @@ pub fn feature_add_util(ctx: *Context, f: Feature) void {
             while (i < feats.items.len) : (i += 1) {
                 const nm = feats.items[i].name();
                 if (before.len != 0 and std.mem.eql(u8, before, nm)) {
-                    feats.insert(i, f) catch {};
+                    feats.insert(h.A(), i, f) catch {};
                     return;
                 }
                 if (after.len != 0 and std.mem.eql(u8, after, nm)) {
-                    feats.insert(i + 1, f) catch {};
+                    feats.insert(h.A(), i + 1, f) catch {};
                     return;
                 }
                 if (replace.len != 0 and std.mem.eql(u8, replace, nm)) {
@@ -266,14 +266,14 @@ pub fn feature_add_util(ctx: *Context, f: Feature) void {
             }
         }
     }
-    client.features.append(f) catch {};
+    client.features.append(h.A(), f) catch {};
 }
 
 pub fn feature_hook_util(ctx: *Context, name: []const u8) void {
     const client = ctx.client orelse return;
     // Snapshot so a hook that mutates the feature set is safe to iterate.
-    var snap = std.ArrayList(Feature).init(h.A());
-    for (client.features.items) |f| snap.append(f) catch {};
+    var snap: std.ArrayList(Feature) = .empty;
+    for (client.features.items) |f| snap.append(h.A(), f) catch {};
     for (snap.items) |f| f.dispatch(name, ctx);
 }
 
@@ -318,7 +318,25 @@ pub fn make_options_util(ctx: *Context) Value {
         }
     }
 
+    // `auth: null` is the documented way to suppress auth outright, and
+    // prepare_auth honours it before it ever reads the apikey. It cannot
+    // survive validate: a stored null reads as "no value", so the optspec
+    // `auth` default fires and the suppression becomes "use the default auth"
+    // - transmitting the credential the caller withheld. Withhold the key for
+    // validate, then put the null back. Same fix as ts/js/go make_options.
+    //
+    // Value has no separate undefined variant (is_noval IS `== .null`), so
+    // getp cannot tell an absent key from a stored null. The raw MapRef.get
+    // optional can: a null OPTIONAL is absent, a `.null` payload is a stored
+    // JSON null.
+    const auth_suppressed = switch (options) {
+        .object => |m| if (m.get("auth")) |a| a == .null else false,
+        else => false,
+    };
+
     var opts = h.clone(options);
+
+    if (auth_suppressed) h.del_prop(opts, h.vstr("auth"));
 
     // Feature add-order. options.feature may be an ordered list of
     // { name, active, ...opts } entries (the list position IS the order in
@@ -354,7 +372,7 @@ pub fn make_options_util(ctx: *Context) Value {
         .{ "base", h.vstr("http://localhost:8000") },
         .{ "prefix", h.vstr("") },
         .{ "suffix", h.vstr("") },
-        .{ "auth", h.jo(&.{.{ "prefix", h.vstr("") }}) },
+        .{ "auth", h.jo(&.{ .{ "prefix", h.vstr("") }, .{ "basic", h.vbool(false) } }) },
         .{ "headers", h.jo(&.{.{ "`$CHILD`", h.vstr("`$STRING`") }}) },
         .{ "allow", h.jo(&.{
             .{ "method", h.vstr("GET,PUT,POST,PATCH,DELETE,OPTIONS") },
@@ -396,6 +414,11 @@ pub fn make_options_util(ctx: *Context) Value {
         if (vr.err == null and vr.out == .object) opts = vr.out;
     }
 
+    // Restore the suppression the optspec default would otherwise erase. setp
+    // does a direct map put, so the explicit null is STORED, not treated as a
+    // delete.
+    if (auth_suppressed) h.setp(opts, "auth", h.vnull());
+
     // Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
     // Every placeholder must resolve to a non-empty value: from options.server
     // (user), else the Config default. A placeholder that resolves to "" is a
@@ -418,11 +441,11 @@ pub fn make_options_util(ctx: *Context) Value {
                     else => "SDK",
                 };
 
-                var out = std.ArrayList(u8).init(h.A());
+                var out: std.ArrayList(u8) = .empty;
                 var i: usize = 0;
                 while (i < base.len) {
                     if ('{' != base[i]) {
-                        out.append(base[i]) catch {};
+                        out.append(h.A(), base[i]) catch {};
                         i += 1;
                         continue;
                     }
@@ -431,7 +454,7 @@ pub fn make_options_util(ctx: *Context) Value {
                         j += 1;
                     }
                     if (j >= base.len or '}' != base[j] or j == i + 1) {
-                        out.append(base[i]) catch {};
+                        out.append(h.A(), base[i]) catch {};
                         i += 1;
                         continue;
                     }
@@ -442,8 +465,8 @@ pub fn make_options_util(ctx: *Context) Value {
                     };
                     if (0 == val.len) {
                         if (testmode) {
-                            out.appendSlice("test-") catch {};
-                            out.appendSlice(name) catch {};
+                            out.appendSlice(h.A(), "test-") catch {};
+                            out.appendSlice(h.A(), name) catch {};
                         } else {
                             std.debug.panic(
                                 "{s}: the server variable '{s}' is required: the API " ++
@@ -453,11 +476,11 @@ pub fn make_options_util(ctx: *Context) Value {
                             );
                         }
                     } else {
-                        out.appendSlice(val) catch {};
+                        out.appendSlice(h.A(), val) catch {};
                     }
                     i = j + 1;
                 }
-                h.setp(opts, "base", h.vstr(out.toOwnedSlice() catch base));
+                h.setp(opts, "base", h.vstr(out.toOwnedSlice(h.A()) catch base));
             }
         },
         else => {},
@@ -479,11 +502,11 @@ pub fn make_options_util(ctx: *Context) Value {
         else => "key,token,id",
     };
 
-    var parts = std.ArrayList([]const u8).init(h.A());
+    var parts: std.ArrayList([]const u8) = .empty;
     var it = std.mem.splitScalar(u8, clean_keys, ',');
     while (it.next()) |p| {
         const t = std.mem.trim(u8, p, " \t");
-        if (t.len != 0) parts.append(h.esc_re(t)) catch {};
+        if (t.len != 0) parts.append(h.A(), h.esc_re(t)) catch {};
     }
     const keyre = std.mem.join(h.A(), "|", parts.items) catch "";
 
@@ -493,9 +516,9 @@ pub fn make_options_util(ctx: *Context) Value {
     if (feature_order.array.data.items.len == 0) {
         const fmapv = h.getp(opts, "feature");
         if (fmapv == .object) {
-            var names = std.ArrayList([]const u8).init(h.A());
+            var names: std.ArrayList([]const u8) = .empty;
             var nit = fmapv.object.iterator();
-            while (nit.next()) |kv| names.append(kv.key_ptr.*) catch {};
+            while (nit.next()) |kv| names.append(h.A(), kv.key_ptr.*) catch {};
             std.mem.sort([]const u8, names.items, {}, mo_str_less);
             var has_test = false;
             for (names.items) |nm| {
@@ -1036,7 +1059,7 @@ pub fn prepare_headers_util(ctx: *Context) Value {
     if (h.is_noval(headers)) return h.omap();
 
     return switch (h.clone(headers)) {
-        .object => |_| h.clone(headers),
+        .object => h.clone(headers),
         else => h.omap(),
     };
 }
@@ -1397,7 +1420,10 @@ pub fn transform_request_util(ctx: *Context) Value {
     if (h.is_noval(reqform)) return ctx.reqdata;
 
     const store = h.jo(&.{.{ "reqdata", ctx.reqdata }});
-    return vs.transform(h.A(), store, reqform) catch ctx.reqdata;
+    // transform now reports collected injection errors beside the value; .out
+    // is what it used to return on its own, errors or not.
+    const tres = vs.transform(h.A(), store, reqform) catch return ctx.reqdata;
+    return tres.out;
 }
 
 pub fn transform_response_util(ctx: *Context) Value {
@@ -1426,7 +1452,8 @@ pub fn transform_response_util(ctx: *Context) Value {
         .{ "resmatch", res.resmatch },
     });
 
-    const resdata = vs.transform(h.A(), store, resform) catch return h.vnull();
+    const tres = vs.transform(h.A(), store, resform) catch return h.vnull();
+    const resdata = tres.out;
     res.resdata = resdata;
     return resdata;
 }

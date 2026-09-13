@@ -3,7 +3,8 @@ import type {
   ModelEntity
 } from '@voxgig/apidef'
 
-import { cmp, each, Folder, File, Content, entityCollection } from '@voxgig/sdkgen'
+import { cmp, each, Folder, File, Content, entityCollection,
+  TestControl } from '@voxgig/sdkgen'
 
 
 import { TestEntity } from './TestEntity_rust'
@@ -19,6 +20,9 @@ const Test = cmp(function Test(props: any) {
   const rustcrate = crateIdent(model)
 
   Folder({ name: 'tests' }, () => {
+
+    // Write-once: a project's edited control file survives regeneration.
+    TestControl({ target, dir: 'tests' })
 
     // exists test — the SDK constructs in test mode.
     File({ name: 'exists_test.' + target.ext }, () => {

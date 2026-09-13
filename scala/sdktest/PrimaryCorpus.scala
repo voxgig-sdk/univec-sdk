@@ -1,10 +1,14 @@
 // Primary-utility corpus driver.
 //
 // Drives every `primary` section of the shared corpus (../.sdk/test/test.json)
-// through this SDK's utilities, the way the ts reference harness does. The
-// match/args/err machinery is reused from Runner (StructCorpus.scala); what
-// this file adds is the bridge between the corpus Value ADT and the SDK's
-// Java-collection world, plus a live Context built from each corpus entry.
+// through this SDK's utilities, the way the ts reference harness does.
+//
+// The ENGINE is the vendored @voxgig/omni runner (sdktest/vendor/omni),
+// reached through sdktest/OmniResolver.scala — this file was REWRITTEN IN
+// PLACE by the vendor-tag rollout and keeps its name, so no emitted call site
+// moved. What it still owns is the bridge only this SDK can supply: the
+// corpus Value ADT <-> the SDK's Java-collection world, plus a live Context
+// built from each corpus entry and published back for `match` to read.
 
 import voxgig.struct.{clone as sclone, *}
 import voxgig.univecsdk.core.*
@@ -31,6 +35,8 @@ object PrimaryCorpus {
     case VNum(n)  =>
       // The corpus writes whole numbers as JSON integers; handing the SDK a
       // Double turned "1" into "1.0" everywhere it reached a URL or header.
+      // (omni parses every JSON number as a Double, so the narrowing has to
+      // happen on THIS boundary, not the omni one.)
       if (n == Math.floor(n) && !n.isInfinite) java.lang.Long.valueOf(n.toLong)
       else java.lang.Double.valueOf(n)
     case _ => null
@@ -72,15 +78,22 @@ object PrimaryCorpus {
 
   // ---- corpus access -----------------------------------------------------
 
-  private var CORPUS: Value = Noval
+  // The whole corpus, and the omni runner built over it. One RunnerPack for
+  // the run; a section is resolved from it on demand (omni's own
+  // `primary.<name>` lookup, so the section names below ARE the corpus
+  // lookup keys).
+  private var ALL: voxgig.omni.Json = voxgig.omni.Json.Absent
+  private var PACK: voxgig.omni.RunnerPack = null
+  private var REPORT: OmniReport = null
 
-  private def sectionBasic(name: String): Value = vget(vget(vget(CORPUS, "primary"), name), "basic")
+  private def sectionRun(name: String): OmniRun =
+    OmniResolver.section(PACK, ALL, name, REPORT)
 
   // makeSpec and prepareAuth read defaults off the CLIENT, as the ts reference
   // does via client.options(), so a section's DEF.setup cannot reach them
   // through ctx.options — those sections get their own client.
-  private def sectionSetup(name: String): Value =
-    vget(vget(vget(vget(vget(CORPUS, "primary"), name), "DEF"), "setup"), "a")
+  private def sectionSetup(run: OmniRun): Value =
+    OmniResolver.tostruct(run.set("DEF", "setup", "a"))
 
   // ---- live context from a corpus map ------------------------------------
 
@@ -151,11 +164,17 @@ object PrimaryCorpus {
 
   // The match reads the corpus map while the utilities mutate the live objects
   // hanging off the context, so without this every ctx.* assertion reads null.
+  //
+  // The map written here is args(0), which the resolver converts BACK into
+  // omni's own argument list after the call — that is why the `match: {ctx:
+  // ...}` assertions are retargeted onto `match: {args: {"0": ...}}`
+  // (OmniResolver decision 3): omni's Json is an immutable value model, so
+  // the copy it keeps in `entry.ctx` can never see these writes.
   private def publishCtx(ctxmap: Value, ctx: Context): Unit = ctxmap match {
     case VMap(m) =>
       if (ctx.spec != null) m.put("spec", specValue(ctx.spec))
       if (ctx.result != null) m.put("result", resultValue(ctx.result))
-      if (ctx.response != null) m.put("response", VStr(Runner.EXISTSMARK))
+      if (ctx.response != null) m.put("response", VStr(OmniResolver.EXISTSMARK))
     case _ =>
   }
 
@@ -191,29 +210,37 @@ object PrimaryCorpus {
 
   private def argAt(args: Seq[Value], i: Int): Value = if (i < args.length) args(i) else Noval
 
-  // A section driven with a ctx built from the corpus entry.
-  private def runset(name: String, client: UnivecSDK)(f: (Context, Seq[Value]) => Value): Unit =
-    Runner.runSet(name, sectionBasic(name), (args: Seq[Value]) => {
+  // A section driven with a ctx built from the corpus entry. `run.group`
+  // rather than `run.set`: the group carries its parent, so a `basic` that
+  // has gone missing out of a section this corpus carries FAILS instead of
+  // being skipped past (OmniResolver decision 7).
+  private def runset(name: String, client: UnivecSDK)(f: (Context, Seq[Value]) => Value): Unit = {
+    val run = sectionRun(name)
+    run.runsetargs(name, run.group("basic")) { args =>
       val ctxmap = argAt(args, 0)
       val ctx = corpusCtx(client, ctxmap)
       val out = f(ctx, args)
       publishCtx(ctxmap, ctx)
       out
-    })
+    }
+  }
 
   // A section that takes a bare map or explicit args rather than a ctx.
-  private def runsetArgs(name: String)(f: Seq[Value] => Value): Unit =
-    Runner.runSet(name, sectionBasic(name), f)
+  private def runsetArgs(name: String)(f: Seq[Value] => Value): Unit = {
+    val run = sectionRun(name)
+    run.runsetargs(name, run.group("basic"))(f)
+  }
 
   private def clientFor(name: String, shared: UnivecSDK): UnivecSDK =
-    sectionSetup(name) match {
+    sectionSetup(sectionRun(name)) match {
       case m @ VMap(_) => UnivecSDK.testSDK(null, jmap(m))
       case _           => shared
     }
 
   def run(testfile: String): Int = {
-    val src = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(testfile)), "UTF-8")
-    CORPUS = Runner.jsonRead(src)
+    ALL = OmniResolver.loadspec(testfile)
+    PACK = OmniResolver.makeRunner(ALL)
+    REPORT = new OmniReport("PRIMARY CORPUS: ")
 
     val sdk = UnivecSDK.testSDK()
     val u = sdk.getUtility()
@@ -282,7 +309,8 @@ object PrimaryCorpus {
       VMap(m)
     }
 
-    Runner.reportPrimary()
+    REPORT.requireran("primary")
+    REPORT.finish()
   }
 }
 

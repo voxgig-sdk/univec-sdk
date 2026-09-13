@@ -1,340 +1,29 @@
-/- Struct corpus runner: drives the `struct` subtree of the shared
-   ../.sdk/test/test.json (the project's own compiled corpus, same file the
-   other targets read) against the vendored voxgig-struct port.
-   Self-contained: an in-tree JSON reader builds the library's `Value` type
-   directly, so the Lean port is exercised exactly as in production. -/
+/- Struct corpus: drives the `struct` subtree of the shared
+   ../.sdk/test/test.json — the project's own compiled corpus, the same file
+   every other target reads — through the vendored voxgig/struct port, on the
+   vendored @voxgig/omni engine.
+
+   The ENGINE is no longer in this file. It used to be: an in-tree JSON
+   reader, `fixJson`, `eqv`, `matchval`, `doMatch`, `resolveArgs`,
+   `checkResult`, `handleError` and `runSet` — this port's own copy of omni's
+   algorithm, drifting from it by construction. All of it is gone; every
+   group below is handed to omni through OmniResolver. What remains is what
+   actually belongs to this SDK: WHICH corpus group drives WHICH struct
+   function, and with which flags.
+
+   The file keeps its name (and the `structcorpus` executable keeps its
+   root), so no call site — Makefile, lakefile, CI — needed churn.
+
+   Flags mirror canonical: typescript/test/utility/StructUtility.test.ts. -/
 
 import VoxgigStruct
+import Omni
+import OmniResolver
 
 open VoxgigStruct
+open OmniResolver
 
-def nullmark : String := "__NULL__"
-def undefmark : String := "__UNDEF__"
-def existsmark : String := "__EXISTS__"
-
--- ---------------- JSON reader -> Value ----------------
-
-structure JState where
-  src : Array Char
-  pos : Nat
-
-partial def jPeek (s : JState) : Option Char := s.src[s.pos]?
-
-partial def jSkipWs (s : JState) : JState := Id.run do
-  let mut p := s.pos
-  while p < s.src.size &&
-      (s.src[p]! == ' ' || s.src[p]! == '\t' || s.src[p]! == '\n' || s.src[p]! == '\r') do
-    p := p + 1
-  return { s with pos := p }
-
-partial def jStr (s0 : JState) : SIO (String × JState) := do
-  -- assumes current char is '"'
-  let src := s0.src
-  let mut p := s0.pos + 1
-  let mut b := ""
-  repeat do
-    if p >= src.size then break
-    let c := src[p]!
-    p := p + 1
-    if c == '"' then break
-    if c == '\\' then
-      let e := src[p]!
-      p := p + 1
-      match e with
-      | '"' => b := b.push '"'
-      | '\\' => b := b.push '\\'
-      | '/' => b := b.push '/'
-      | 'n' => b := b.push '\n'
-      | 't' => b := b.push '\t'
-      | 'r' => b := b.push '\r'
-      | 'b' => b := b.push '\x08'
-      | 'f' => b := b.push '\x0c'
-      | 'u' => do
-        let mut code : Nat := 0
-        for _ in [0:4] do
-          let h := src[p]!
-          p := p + 1
-          let d :=
-            if h >= '0' && h <= '9' then h.toNat - '0'.toNat
-            else if h >= 'a' && h <= 'f' then 10 + h.toNat - 'a'.toNat
-            else if h >= 'A' && h <= 'F' then 10 + h.toNat - 'A'.toNat
-            else 0
-          code := code * 16 + d
-        b := b.push (Char.ofNat code)
-      | c => b := b.push c
-    else
-      b := b.push c
-  return (b, { s0 with pos := p })
-
-mutual
-
-partial def jVal (s0 : JState) : SIO (Value × JState) := do
-  let s := jSkipWs s0
-  match jPeek s with
-  | some '{' => jObj s
-  | some '[' => jArr s
-  | some '"' => do
-    let (str, s') ← jStr s
-    pure (.str str, s')
-  | some 't' => pure (.bool true, { s with pos := s.pos + 4 })
-  | some 'f' => pure (.bool false, { s with pos := s.pos + 5 })
-  | some 'n' => pure (.null, { s with pos := s.pos + 4 })
-  | _ => jNum s
-
-partial def jObj (s0 : JState) : SIO (Value × JState) := do
-  let s := jSkipWs { s0 with pos := s0.pos + 1 }
-  if jPeek s == some '}' then
-    pure (← emptyMap, { s with pos := s.pos + 1 })
-  else do
-    let m ← emptyMap
-    let sRef ← IO.mkRef s
-    repeat do
-      let s1 := jSkipWs (← sRef.get)
-      let (k, s2) ← jStr s1
-      let s3 := jSkipWs s2
-      let s4 := { s3 with pos := s3.pos + 1 }  -- ':'
-      let (v, s5) ← jVal s4
-      let _ ← setprop m (.str k) v
-      let s6 := jSkipWs s5
-      let c := (jPeek s6).getD '}'
-      sRef.set { s6 with pos := s6.pos + 1 }
-      if c != ',' then break
-    pure (m, ← sRef.get)
-
-partial def jArr (s0 : JState) : SIO (Value × JState) := do
-  let s := jSkipWs { s0 with pos := s0.pos + 1 }
-  if jPeek s == some ']' then
-    pure (← emptyList, { s with pos := s.pos + 1 })
-  else do
-    let sRef ← IO.mkRef s
-    let accRef ← IO.mkRef (#[] : Array Value)
-    repeat do
-      let (v, s1) ← jVal (← sRef.get)
-      accRef.modify (·.push v)
-      let s2 := jSkipWs s1
-      let c := (jPeek s2).getD ']'
-      sRef.set { s2 with pos := s2.pos + 1 }
-      if c != ',' then break
-    pure (← newList (← accRef.get), ← sRef.get)
-
-partial def jNum (s0 : JState) : SIO (Value × JState) := do
-  let src := s0.src
-  let mut p := s0.pos
-  let start := p
-  while p < src.size &&
-      (let c := src[p]!
-       (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == 'e' || c == 'E') do
-    p := p + 1
-  let tok := String.ofList (src.extract start p).toList
-  pure (.num ((parseFloatJS tok).getD 0.0), { s0 with pos := p })
-
-end
-
-def jsonRead (s : String) : SIO Value := do
-  pure (← jVal { src := s.toList.toArray, pos := 0 }).1
-
--- ---------------- fixJSON / equality ----------------
-
-partial def fixJson (v : Value) (flagNull : Bool) : SIO Value := do
-  match v with
-  | .noval | .null => if flagNull then pure (.str nullmark) else pure v
-  | .map id => do
-    let o ← emptyMap
-    for (k, x) in (← mapEntries id) do
-      let _ ← setprop o (.str k) (← fixJson x flagNull)
-    pure o
-  | .list id => do
-    let mut out : Array Value := #[]
-    for x in (← listItems id) do
-      out := out.push (← fixJson x flagNull)
-    newList out
-  | _ => pure v
-
-/-- Order-independent deep equality for maps; sequence equality for lists. -/
-partial def eqv (a b : Value) : SIO Bool := do
-  match a, b with
-  | .noval, .noval | .noval, .null | .null, .noval | .null, .null => pure true
-  | .bool x, .bool y => pure (x == y)
-  | .num x, .num y => pure (x == y)
-  | .str x, .str y => pure (x == y)
-  | .list x, .list y => do
-    let xs ← listItems x
-    let ys ← listItems y
-    if xs.size != ys.size then pure false
-    else do
-      for i in [0:xs.size] do
-        if !(← eqv xs[i]! ys[i]!) then return false
-      pure true
-  | .map x, .map y => do
-    let xes ← mapEntries x
-    let yes ← mapEntries y
-    if xes.size != yes.size then pure false
-    else do
-      for (k, v) in xes do
-        match omapGet yes k with
-        | some w =>
-          if !(← eqv v w) then return false
-        | none => return false
-      pure true
-  | _, _ => pure (a == b)
-
--- ---------------- match support ----------------
-
-def strContainsSub (hay needle : String) : Bool := Id.run do
-  let h := hay.toList.toArray
-  let nd := needle.toList.toArray
-  if nd.size == 0 then return true
-  if nd.size > h.size then return false
-  for i in [0:h.size - nd.size + 1] do
-    let mut ok := true
-    for j in [0:nd.size] do
-      if h[i + j]! != nd[j]! then ok := false
-    if ok then return true
-  return false
-
-partial def matchval (check0 base : Value) : SIO Bool := do
-  let check := if check0 == .str undefmark || check0 == .str nullmark then Value.noval
-               else check0
-  if ← eqv check base then pure true
-  else match check with
-    | .str cs => do
-      let basestr ← stringify base
-      let csArr := cs.toList.toArray
-      if csArr.size >= 2 && csArr[0]! == '/' && csArr[csArr.size - 1]! == '/' then
-        pure (Vregex.testStr (String.ofList (csArr.extract 1 (csArr.size - 1)).toList) basestr)
-      else
-        pure (strContainsSub basestr.toLower (← stringify check).toLower)
-    | .func _ => pure true
-    | _ => pure false
-
-partial def doMatch (check base0 : Value) : SIO Unit := do
-  let base ← clone base0
-  let _ ← walk check (before := some (fun _k v _p path => do
-    if !(isnode v) then do
-      let baseval ← getpath base path
-      if ← eqv baseval v then pure ()
-      else if v == .str undefmark && isNullish baseval then pure ()
-      else if v == .str existsmark && !(isNullish baseval) then pure ()
-      else if !(← matchval v baseval) then do
-        let mut parts : List String := []
-        for x in (← listItemsOf path) do
-          parts := (← jsString x) :: parts
-        throw (IO.userError ("MATCH: " ++ String.intercalate "." parts.reverse
-          ++ ": [" ++ (← stringify v) ++ "] <=> [" ++ (← stringify baseval) ++ "]"))
-    pure v))
-  pure ()
-
--- ---------------- result tracking ----------------
-
-initialize npass : IO.Ref Nat ← IO.mkRef 0
-initialize nfail : IO.Ref Nat ← IO.mkRef 0
-initialize failures : IO.Ref (List String) ← IO.mkRef []
-
-def record (group name : String) (ok : Bool) (msg : String) : IO Unit := do
-  if ok then npass.modify (· + 1)
-  else do
-    nfail.modify (· + 1)
-    failures.modify (("FAIL " ++ group ++ " " ++ name ++ " - " ++ msg) :: ·)
-
--- ---------------- per-entry runner ----------------
-
-def omapV (kvs : List (String × Value)) : SIO Value := do
-  let m ← emptyMap
-  for (k, v) in kvs do
-    let _ ← setprop m (.str k) v
-  pure m
-
-def entryGet (e : Value) (k : String) : SIO Value := do
-  match e with
-  | .map id => pure ((omapGet (← mapEntries id) k).getD .noval)
-  | _ => pure .noval
-
-def entryHas (e : Value) (k : String) : SIO Bool := do
-  match e with
-  | .map id => pure (omapHas (← mapEntries id) k)
-  | _ => pure false
-
-def resolveArgs (entry : Value) : SIO (List Value) := do
-  if ← entryHas entry "ctx" then pure [← entryGet entry "ctx"]
-  else if ← entryHas entry "args" then pure (← listItemsOf (← entryGet entry "args")).toList
-  else if ← entryHas entry "in" then pure [← clone (← entryGet entry "in")]
-  else pure [.noval]
-
-def checkResult (entry : Value) (args : List Value) (res : Value) : SIO Unit := do
-  let mut matched := false
-  if ← entryHas entry "match" then do
-    doMatch (← entryGet entry "match")
-      (← omapV [("in", ← entryGet entry "in"), ("args", ← newList args.toArray),
-                ("out", ← entryGet entry "res"), ("ctx", ← entryGet entry "ctx")])
-    matched := true
-  let out ← entryGet entry "out"
-  if ← eqv out res then pure ()
-  else if matched && (out == .str nullmark || isNullish out) then pure ()
-  else
-    throw (IO.userError ("Expected: " ++ (← stringify out) ++ ", got: " ++ (← stringify res)))
-
-def handleError (entry : Value) (err : IO.Error) : SIO Unit := do
-  let msg := err.toString
-  if ← entryHas entry "err" then do
-    let entryErr ← entryGet entry "err"
-    if entryErr == .bool true || (← matchval entryErr (.str msg)) then do
-      if ← entryHas entry "match" then
-        doMatch (← entryGet entry "match")
-          (← omapV [("in", ← entryGet entry "in"), ("out", ← entryGet entry "res"),
-                    ("ctx", ← entryGet entry "ctx"), ("err", .str msg)])
-    else
-      throw (IO.userError ("ERROR MATCH: [" ++ (← stringify entryErr) ++ "] <=> [" ++ msg ++ "]"))
-  else throw err
-
-def runSet (group : String) (node : Value) (subject : List Value → SIO Value)
-    (flagNull : Bool := true) : SIO Unit := do
-  let fixed ← fixJson node flagNull
-  let testset ← listItemsOf (← getprop fixed (.str "set"))
-  for entry in testset do
-    let name ← jsString (← entryGet entry "name")
-    try
-      if !(← entryHas entry "out") && flagNull then
-        let _ ← setprop entry (.str "out") (.str nullmark)
-      let args ← resolveArgs entry
-      let res ← fixJson (← subject args) flagNull
-      let _ ← setprop entry (.str "res") res
-      checkResult entry args res
-      record group name true ""
-    catch e =>
-      try
-        handleError entry e
-        record group name true ""
-      catch e2 =>
-        record group name false e2.toString
-
-def getpropRawPub (e : Value) (k : String) : SIO Value := entryGet e k
-
-def runSingle (group : String) (node : Value) (actualFn : Value → SIO Value) : SIO Unit := do
-  try
-    let expected ← getpropRawPub node "out"
-    let actual ← actualFn (← getpropRawPub node "in")
-    if ← eqv expected actual then record group "single" true ""
-    else
-      record group "single" false
-        ("Expected: " ++ (← stringify expected) ++ ", got: " ++ (← stringify actual))
-  catch e => record group "single" false e.toString
-
--- ---------------- arg helpers ----------------
-
-def arg1 (f : Value → SIO Value) : List Value → SIO Value :=
-  fun args => f (args.headD .noval)
-
-def vget (vin : Value) (k : String) : SIO Value := do
-  match vin with
-  | .map id => pure ((omapGet (← mapEntries id) k).getD .noval)
-  | _ => pure .noval
-
-def vhas (vin : Value) (k : String) : SIO Bool := do
-  match vin with
-  | .map id => pure (omapHas (← mapEntries id) k)
-  | _ => pure false
-
--- ---------------- test groups ----------------
+-- ---------------- subjects that need more than one expression ----------
 
 def nullModifier : ModifyFn := fun v key parent _inj => do
   if v == .str nullmark then
@@ -344,26 +33,22 @@ def nullModifier : ModifyFn := fun v key parent _inj => do
       let _ ← setprop parent key (.str (s.replace nullmark "null"))
     | _ => pure ()
 
-def runWalkLog (group : String) (node : Value) : SIO Unit := do
-  try
-    let testData ← clone node
-    let log ← emptyList
-    let walklog : WalkFn := fun key v parent path => do
-      let ks ← if isNullish key then stringify .noval else stringify key
-      let vs ← stringify v
-      let ps ← if isNullish parent then stringify .noval else stringify parent
-      let ts ← pathify path
-      let n ← size log
-      let _ ← setprop log (vInt n)
-        (.str ("k=" ++ ks ++ ", v=" ++ vs ++ ", p=" ++ ps ++ ", t=" ++ ts))
-      pure v
-    let _ ← walk (← getpropRawPub testData "in") (after := some walklog)
-    let expected ← getprop (← getpropRawPub testData "out") (.str "after")
-    if ← eqv expected log then record group "log" true ""
-    else
-      record group "log" false
-        ("Expected: " ++ (← stringify expected) ++ ", got: " ++ (← stringify log))
-  catch e => record group "log" false e.toString
+/-- walk/log is authored as one {in, out} pair whose `out.after` is the log of
+an after-walk. The subject builds that log and returns it; the resolver's
+`single (out := ["after"])` selects the half the corpus asserts on. -/
+def walkLogSubject (vin : Value) : SIO Value := do
+  let log ← emptyList
+  let walklog : WalkFn := fun key v parent path => do
+    let ks ← if isNullish key then stringify .noval else stringify key
+    let vs ← stringify v
+    let ps ← if isNullish parent then stringify .noval else stringify parent
+    let ts ← pathify path
+    let n ← size log
+    let _ ← setprop log (vInt n)
+      (.str ("k=" ++ ks ++ ", v=" ++ vs ++ ", p=" ++ ps ++ ", t=" ++ ts))
+    pure v
+  let _ ← walk vin (after := some walklog)
+  pure log
 
 def walkCopySubject (vin : Value) : SIO Value := do
   let cur ← IO.mkRef (← newList #[.noval])
@@ -408,127 +93,129 @@ def walkDepthSubject (vin : Value) : SIO Value := do
     else
       let _ ← setprop (← curr.get) key v
     pure v
-  let _ ← walk (← vget vin "src") (before := some copy) (maxdepth := ← vget vin "maxdepth")
+  let _ ← walk (← getp vin "src") (before := some copy) (maxdepth := ← getp vin "maxdepth")
   top.get
 
-def runAll (spec : Value) : SIO Unit := do
-  let g := getpropRawPub spec
-  let minor ← g "minor"
-  let walks ← g "walk"
-  let merges ← g "merge"
-  let getpaths ← g "getpath"
-  let injects ← g "inject"
-  let transforms ← g "transform"
-  let validates ← g "validate"
-  let selects ← g "select"
-  let sentinels ← g "sentinels"
-  let mg := getpropRawPub minor
+-- ---------------- test groups ------------------------------------------
+
+def runAll (r : Run) : SIO Unit := do
 
   -- minor
-  runSet "minor.isnode" (← mg "isnode") (arg1 (fun v => pure (.bool (isnode v))))
-  runSet "minor.ismap" (← mg "ismap") (arg1 (fun v => pure (.bool (ismap v))))
-  runSet "minor.islist" (← mg "islist") (arg1 (fun v => pure (.bool (islist v))))
-  runSet "minor.iskey" (← mg "iskey") (arg1 (fun v => pure (.bool (iskey v))))
-    (flagNull := false)
-  runSet "minor.strkey" (← mg "strkey") (arg1 (fun v => pure (.str (strkey v))))
-    (flagNull := false)
-  runSet "minor.isempty" (← mg "isempty") (arg1 (fun v => do pure (.bool (← isempty v))))
-    (flagNull := false)
-  runSet "minor.isfunc" (← mg "isfunc") (arg1 (fun v => pure (.bool (isfunc v))))
-  runSet "minor.clone" (← mg "clone") (arg1 clone) (flagNull := false)
-  runSet "minor.escre" (← mg "escre") (arg1 escre)
-  runSet "minor.escurl" (← mg "escurl") (arg1 escurl)
-  runSet "minor.stringify" (← mg "stringify")
-    (arg1 (fun vin => do
-      if ← vhas vin "val" then
-        pure (.str (← stringify (← vget vin "val") (maxlen := ← vget vin "max")))
+  runset r "minor.isnode" (getset r ["minor", "isnode"])
+    (fun v => pure (.bool (isnode v)))
+  runset r "minor.ismap" (getset r ["minor", "ismap"])
+    (fun v => pure (.bool (ismap v)))
+  runset r "minor.islist" (getset r ["minor", "islist"])
+    (fun v => pure (.bool (islist v)))
+  runset r "minor.iskey" (getset r ["minor", "iskey"])
+    (fun v => pure (.bool (iskey v))) (nullflag := false)
+  runset r "minor.strkey" (getset r ["minor", "strkey"])
+    (fun v => pure (.str (strkey v))) (nullflag := false)
+  runset r "minor.isempty" (getset r ["minor", "isempty"])
+    (fun v => do pure (.bool (← isempty v))) (nullflag := false)
+  runset r "minor.isfunc" (getset r ["minor", "isfunc"])
+    (fun v => pure (.bool (isfunc v)))
+  runset r "minor.clone" (getset r ["minor", "clone"]) clone (nullflag := false)
+  runset r "minor.escre" (getset r ["minor", "escre"]) escre
+  runset r "minor.escurl" (getset r ["minor", "escurl"]) escurl
+  runset r "minor.stringify" (getset r ["minor", "stringify"])
+    (fun vin => do
+      if ← hasp vin "val" then
+        pure (.str (← stringify (← getp vin "val") (maxlen := ← getp vin "max")))
       else
-        pure (.str (← stringify .noval))))
-    (flagNull := false)
-  runSet "minor.jsonify" (← mg "jsonify")
-    (arg1 (fun vin => do
-      pure (.str (← jsonify (← vget vin "val") (flags := ← vget vin "flags")))))
-    (flagNull := false)
-  runSet "minor.getelem" (← mg "getelem")
-    (arg1 (fun vin => do
-      let alt ← vget vin "alt"
-      if isNullish alt then getelem (← vget vin "val") (← vget vin "key")
-      else getelem (← vget vin "val") (← vget vin "key") alt))
-    (flagNull := false)
-  runSet "minor.delprop" (← mg "delprop")
-    (arg1 (fun vin => do delprop (← vget vin "parent") (← vget vin "key")))
-  runSet "minor.size" (← mg "size") (arg1 (fun v => do pure (vInt (← size v))))
-    (flagNull := false)
-  runSet "minor.slice" (← mg "slice")
-    (arg1 (fun vin => do
-      slice (← vget vin "val") (start := ← vget vin "start") (stop := ← vget vin "end")))
-    (flagNull := false)
-  runSet "minor.pad" (← mg "pad")
-    (arg1 (fun vin => do
-      pure (.str (← pad (← vget vin "val") (padding := ← vget vin "pad")
-        (padchar := ← vget vin "char")))))
-    (flagNull := false)
-  runSet "minor.pathify" (← mg "pathify")
-    (arg1 (fun vin => do
-      if ← vhas vin "path" then
-        pure (.str (← pathify (← vget vin "path") (startin := ← vget vin "from")))
+        pure (.str (← stringify .noval)))
+    (nullflag := false)
+  runset r "minor.jsonify" (getset r ["minor", "jsonify"])
+    (fun vin => do
+      pure (.str (← jsonify (← getp vin "val") (flags := ← getp vin "flags"))))
+    (nullflag := false)
+  -- `alt` is read by NULLISHNESS here and by PRESENCE for getprop below.
+  -- That is canonical's own split: it omits getprop's alt only when the KEY
+  -- is missing (`undefined === vin.alt`), so a present `alt: null` still
+  -- goes through, while getelem's rule is the looser `null == vin.alt`.
+  -- `minor/getprop#50` and `#51` are the entries that separate them — and
+  -- the retired hand-written engine hid the difference, because its `eqv`
+  -- matched a no-value against a null. The vendored engine does not.
+  runset r "minor.getelem" (getset r ["minor", "getelem"])
+    (fun vin => do
+      let alt ← getp vin "alt"
+      if isNullish alt then getelem (← getp vin "val") (← getp vin "key")
+      else getelem (← getp vin "val") (← getp vin "key") alt)
+    (nullflag := false)
+  runset r "minor.delprop" (getset r ["minor", "delprop"])
+    (fun vin => do delprop (← getp vin "parent") (← getp vin "key"))
+  runset r "minor.size" (getset r ["minor", "size"])
+    (fun v => do pure (vInt (← size v))) (nullflag := false)
+  runset r "minor.slice" (getset r ["minor", "slice"])
+    (fun vin => do
+      slice (← getp vin "val") (start := ← getp vin "start") (stop := ← getp vin "end"))
+    (nullflag := false)
+  runset r "minor.pad" (getset r ["minor", "pad"])
+    (fun vin => do
+      pure (.str (← pad (← getp vin "val") (padding := ← getp vin "pad")
+        (padchar := ← getp vin "char"))))
+    (nullflag := false)
+  runset r "minor.pathify" (getset r ["minor", "pathify"])
+    (fun vin => do
+      if ← hasp vin "path" then
+        pure (.str (← pathify (← getp vin "path") (startin := ← getp vin "from")))
       else
-        pure (.str (← pathify .noval (startin := ← vget vin "from") (absent := true)))))
-    (flagNull := false)
-  runSet "minor.items" (← mg "items") (arg1 items)
-  runSet "minor.getprop" (← mg "getprop")
-    (arg1 (fun vin => do
-      let alt ← vget vin "alt"
-      if isNullish alt then getprop (← vget vin "val") (← vget vin "key")
-      else getprop (← vget vin "val") (← vget vin "key") alt))
-    (flagNull := false)
-  runSet "minor.setprop" (← mg "setprop")
-    (arg1 (fun vin => do
-      setprop (← vget vin "parent") (← vget vin "key") (← vget vin "val")))
-  runSet "minor.haskey" (← mg "haskey")
-    (arg1 (fun vin => do
-      pure (.bool (← haskey (← vget vin "src") (← vget vin "key")))))
-    (flagNull := false)
-  runSet "minor.keysof" (← mg "keysof")
-    (arg1 (fun v => do newList ((← keysof v).map (fun s => Value.str s))))
-  runSet "minor.join" (← mg "join")
-    (arg1 (fun vin => do
-      let url := (← vget vin "url") == .bool true
-      pure (.str (← join (← vget vin "val") (sep := ← vget vin "sep") (url := url)))))
-    (flagNull := false)
-  runSet "minor.typify" (← mg "typify")
-    (arg1 (fun v => pure (vInt (typify v))))
-    (flagNull := false)
-  runSet "minor.setpath" (← mg "setpath")
-    (arg1 (fun vin => do
-      setpath (← vget vin "store") (← vget vin "path") (← vget vin "val")))
-    (flagNull := false)
-  runSet "minor.filter" (← mg "filter")
-    (arg1 (fun vin => do
-      let checkV ← vget vin "check"
+        pure (.str (← pathify .noval (startin := ← getp vin "from") (absent := true))))
+    (nullflag := false)
+  runset r "minor.items" (getset r ["minor", "items"]) items
+  runset r "minor.getprop" (getset r ["minor", "getprop"])
+    (fun vin => do
+      if ← hasp vin "alt" then
+        getprop (← getp vin "val") (← getp vin "key") (← getp vin "alt")
+      else getprop (← getp vin "val") (← getp vin "key"))
+    (nullflag := false)
+  runset r "minor.setprop" (getset r ["minor", "setprop"])
+    (fun vin => do
+      setprop (← getp vin "parent") (← getp vin "key") (← getp vin "val"))
+  runset r "minor.haskey" (getset r ["minor", "haskey"])
+    (fun vin => do
+      pure (.bool (← haskey (← getp vin "src") (← getp vin "key"))))
+    (nullflag := false)
+  runset r "minor.keysof" (getset r ["minor", "keysof"])
+    (fun v => do newList ((← keysof v).map (fun s => Value.str s)))
+  runset r "minor.join" (getset r ["minor", "join"])
+    (fun vin => do
+      let url := (← getp vin "url") == .bool true
+      pure (.str (← join (← getp vin "val") (sep := ← getp vin "sep") (url := url))))
+    (nullflag := false)
+  runset r "minor.typify" (getset r ["minor", "typify"])
+    (fun v => pure (vInt (typify v))) (nullflag := false)
+  runset r "minor.setpath" (getset r ["minor", "setpath"])
+    (fun vin => do
+      setpath (← getp vin "store") (← getp vin "path") (← getp vin "val"))
+    (nullflag := false)
+  runset r "minor.filter" (getset r ["minor", "filter"])
+    (fun vin => do
+      let checkV ← getp vin "check"
       let check : (String × Value) → Bool :=
         if checkV == .str "gt3" then
           fun (_, x) => match x with | .num n => n > 3.0 | _ => false
         else if checkV == .str "lt3" then
           fun (_, x) => match x with | .num n => n < 3.0 | _ => false
         else fun _ => false
-      filter (← vget vin "val") check))
-  runSet "minor.typename" (← mg "typename")
-    (arg1 (fun v => do
+      filter (← getp vin "val") check)
+  runset r "minor.typename" (getset r ["minor", "typename"])
+    (fun v => do
       let t : Int := match v with
         | .num n => fToInt n
         | _ => 0
-      pure (.str (typename t))))
-  runSet "minor.flatten" (← mg "flatten")
-    (arg1 (fun vin => do
-      match (← vget vin "depth") with
-      | .num n => flatten (← vget vin "val") (depth := fToInt n)
-      | _ => flatten (← vget vin "val")))
+      pure (.str (typename t)))
+  runset r "minor.flatten" (getset r ["minor", "flatten"])
+    (fun vin => do
+      match (← getp vin "depth") with
+      | .num n => flatten (← getp vin "val") (depth := fToInt n)
+      | _ => flatten (← getp vin "val"))
 
   -- walk
-  runWalkLog "walk.log" (← getpropRawPub walks "log")
-  runSet "walk.basic" (← getpropRawPub walks "basic")
-    (arg1 (fun vin => do
+  runset r "walk.log" (single (getset r ["walk", "log"]) (out := ["after"]))
+    walkLogSubject
+  runset r "walk.basic" (getset r ["walk", "basic"])
+    (fun vin => do
       walk vin (after := some (fun _k v _p path => do
         match v with
         | .str s => do
@@ -536,162 +223,146 @@ def runAll (spec : Value) : SIO Unit := do
           for x in (← listItemsOf path) do
             parts := (← jsString x) :: parts
           pure (.str (s ++ "~" ++ String.intercalate "." parts.reverse))
-        | _ => pure v))))
-  runSet "walk.copy" (← getpropRawPub walks "copy") (arg1 walkCopySubject)
-  runSet "walk.depth" (← getpropRawPub walks "depth") (arg1 walkDepthSubject)
-    (flagNull := false)
+        | _ => pure v)))
+  runset r "walk.copy" (getset r ["walk", "copy"]) walkCopySubject
+  runset r "walk.depth" (getset r ["walk", "depth"]) walkDepthSubject
+    (nullflag := false)
 
   -- merge
-  runSingle "merge.basic" (← getpropRawPub merges "basic")
+  runset r "merge.basic" (single (getset r ["merge", "basic"]))
     (fun vin => do merge (← clone vin))
-  runSet "merge.cases" (← getpropRawPub merges "cases") (arg1 (fun v => merge v))
-  runSet "merge.array" (← getpropRawPub merges "array") (arg1 (fun v => merge v))
-  runSet "merge.integrity" (← getpropRawPub merges "integrity") (arg1 (fun v => merge v))
-  runSet "merge.depth" (← getpropRawPub merges "depth")
-    (arg1 (fun vin => do
-      merge (← vget vin "val") (maxdepth := ← vget vin "depth")))
+  runset r "merge.cases" (getset r ["merge", "cases"]) (fun v => merge v)
+  runset r "merge.array" (getset r ["merge", "array"]) (fun v => merge v)
+  runset r "merge.integrity" (getset r ["merge", "integrity"]) (fun v => merge v)
+  runset r "merge.depth" (getset r ["merge", "depth"])
+    (fun vin => do merge (← getp vin "val") (maxdepth := ← getp vin "depth"))
 
   -- getpath
-  runSet "getpath.basic" (← getpropRawPub getpaths "basic")
-    (arg1 (fun vin => do getpath (← vget vin "store") (← vget vin "path")))
-  runSet "getpath.relative" (← getpropRawPub getpaths "relative")
-    (arg1 (fun vin => do
-      let dpath ← match (← vget vin "dpath") with
+  runset r "getpath.basic" (getset r ["getpath", "basic"])
+    (fun vin => do getpath (← getp vin "store") (← getp vin "path"))
+  runset r "getpath.relative" (getset r ["getpath", "relative"])
+    (fun vin => do
+      let dpath ← match (← getp vin "dpath") with
         | .str s => newList ((s.splitOn ".").map (fun x => Value.str x)).toArray
         | _ => pure Value.noval
-      let d : InjDef := { dDparent := ← vget vin "dparent", dDpath := dpath }
-      getpath (← vget vin "store") (← vget vin "path") (.idef d)))
-  runSet "getpath.special" (← getpropRawPub getpaths "special")
-    (arg1 (fun vin => do
-      let injm ← vget vin "inj"
+      let d : InjDef := { dDparent := ← getp vin "dparent", dDpath := dpath }
+      getpath (← getp vin "store") (← getp vin "path") (.idef d))
+  runset r "getpath.special" (getset r ["getpath", "special"])
+    (fun vin => do
+      let injm ← getp vin "inj"
       let d : InjDef := {
         dBase := ← getprop injm (.str "base"), dMeta := ← getprop injm (.str "meta"),
         dDparent := ← getprop injm (.str "dparent"), dDpath := ← getprop injm (.str "dpath"),
         dKey := ← getprop injm (.str "key") }
-      getpath (← vget vin "store") (← vget vin "path")
-        (if isNullish injm then .inone else .idef d)))
-  runSet "getpath.handler" (← getpropRawPub getpaths "handler")
-    (arg1 (fun vin => do
+      getpath (← getp vin "store") (← getp vin "path")
+        (if isNullish injm then .inone else .idef d))
+  runset r "getpath.handler" (getset r ["getpath", "handler"])
+    (fun vin => do
       let foo ← vFunc (fun _ _ _ _ => pure (.str "foo"))
-      let store ← omapV [("$TOP", ← vget vin "store"), ("$FOO", foo)]
+      let store ← omapV [("$TOP", ← getp vin "store"), ("$FOO", foo)]
       let h ← registerFunc (fun _inj v _ref _store => do
         match v with
         | .func fid => callFunc fid (← getDummyInj) .noval "" .noval
         | _ => pure v)
       let d : InjDef := { dHandler := some h }
-      getpath store (← vget vin "path") (.idef d)))
+      getpath store (← getp vin "path") (.idef d))
 
   -- inject
-  runSingle "inject.basic" (← getpropRawPub injects "basic")
+  runset r "inject.basic" (single (getset r ["inject", "basic"]))
     (fun vin => do
-      inject (← clone (← getpropRawPub vin "val")) (← clone (← getpropRawPub vin "store")))
-  runSet "inject.string" (← getpropRawPub injects "string")
-    (arg1 (fun vin => do
+      inject (← clone (← getp vin "val")) (← clone (← getp vin "store")))
+  runset r "inject.string" (getset r ["inject", "string"])
+    (fun vin => do
       let mid ← registerModify nullModifier
-      let d : InjDef := { dModify := some mid, dExtra := ← vget vin "current" }
-      inject (← vget vin "val") (← vget vin "store") (.idef d)))
-  runSet "inject.deep" (← getpropRawPub injects "deep")
-    (arg1 (fun vin => do inject (← vget vin "val") (← vget vin "store")))
+      let d : InjDef := { dModify := some mid, dExtra := ← getp vin "current" }
+      inject (← getp vin "val") (← getp vin "store") (.idef d))
+  runset r "inject.deep" (getset r ["inject", "deep"])
+    (fun vin => do inject (← getp vin "val") (← getp vin "store"))
 
   -- transform
-  runSingle "transform.basic" (← getpropRawPub transforms "basic")
-    (fun vin => do
-      transform (← getpropRawPub vin "data") (← getpropRawPub vin "spec"))
+  runset r "transform.basic" (single (getset r ["transform", "basic"]))
+    (fun vin => do transform (← getp vin "data") (← getp vin "spec"))
   for gn in ["paths", "cmds", "each", "pack", "ref"] do
-    runSet ("transform." ++ gn) (← getpropRawPub transforms gn)
-      (arg1 (fun vin => do transform (← vget vin "data") (← vget vin "spec")))
-  runSet "transform.modify" (← getpropRawPub transforms "modify")
-    (arg1 (fun vin => do
+    runset r ("transform." ++ gn) (getset r ["transform", gn])
+      (fun vin => do transform (← getp vin "data") (← getp vin "spec"))
+  runset r "transform.modify" (getset r ["transform", "modify"])
+    (fun vin => do
       let mid ← registerModify (fun v key parent _inj => do
         match v with
         | .str s =>
           if !(isNullish key) && !(isNullish parent) then
             let _ ← setprop parent key (.str ("@" ++ s))
         | _ => pure ())
-      let d : InjDef := { dModify := some mid, dExtra := ← vget vin "store" }
-      transform (← vget vin "data") (← vget vin "spec") (.idef d)))
-  runSet "transform.format" (← getpropRawPub transforms "format")
-    (arg1 (fun vin => do transform (← vget vin "data") (← vget vin "spec")))
-    (flagNull := false)
-  runSet "transform.apply" (← getpropRawPub transforms "apply")
-    (arg1 (fun vin => do transform (← vget vin "data") (← vget vin "spec")))
+      let d : InjDef := { dModify := some mid, dExtra := ← getp vin "store" }
+      transform (← getp vin "data") (← getp vin "spec") (.idef d))
+  runset r "transform.format" (getset r ["transform", "format"])
+    (fun vin => do transform (← getp vin "data") (← getp vin "spec"))
+    (nullflag := false)
+  runset r "transform.apply" (getset r ["transform", "apply"])
+    (fun vin => do transform (← getp vin "data") (← getp vin "spec"))
 
   -- validate
-  runSet "validate.basic" (← getpropRawPub validates "basic")
-    (arg1 (fun vin => do validate (← vget vin "data") (← vget vin "spec")))
-    (flagNull := false)
+  runset r "validate.basic" (getset r ["validate", "basic"])
+    (fun vin => do validate (← getp vin "data") (← getp vin "spec"))
+    (nullflag := false)
   for gn in ["child", "one", "exact"] do
-    runSet ("validate." ++ gn) (← getpropRawPub validates gn)
-      (arg1 (fun vin => do validate (← vget vin "data") (← vget vin "spec")))
-  runSet "validate.invalid" (← getpropRawPub validates "invalid")
-    (arg1 (fun vin => do validate (← vget vin "data") (← vget vin "spec")))
-    (flagNull := false)
-  runSet "validate.special" (← getpropRawPub validates "special")
-    (arg1 (fun vin => do
-      let injm ← vget vin "inj"
+    runset r ("validate." ++ gn) (getset r ["validate", gn])
+      (fun vin => do validate (← getp vin "data") (← getp vin "spec"))
+  runset r "validate.invalid" (getset r ["validate", "invalid"])
+    (fun vin => do validate (← getp vin "data") (← getp vin "spec"))
+    (nullflag := false)
+  runset r "validate.special" (getset r ["validate", "special"])
+    (fun vin => do
+      let injm ← getp vin "inj"
       let d : InjDef := { dMeta := ← getprop injm (.str "meta") }
-      validate (← vget vin "data") (← vget vin "spec")
-        (if isNullish injm then .inone else .idef d)))
+      validate (← getp vin "data") (← getp vin "spec")
+        (if isNullish injm then .inone else .idef d))
 
   -- select
   for gn in ["basic", "operators", "edge", "alts"] do
-    runSet ("select." ++ gn) (← getpropRawPub selects gn)
-      (arg1 (fun vin => do select (← vget vin "obj") (← vget vin "query")))
+    runset r ("select." ++ gn) (getset r ["select", gn])
+      (fun vin => do select (← getp vin "obj") (← getp vin "query"))
 
-  -- regex (parity floor: Go stdlib regexp — see design/REGEX_API.md)
-  let regexs ← g "regex"
-  runSet "regex.test" (← getpropRawPub regexs "test")
-    (arg1 (fun vin => do
-      reTest (← vget vin "pattern") (← vget vin "input")))
-  runSet "regex.find" (← getpropRawPub regexs "find")
-    (arg1 (fun vin => do
-      reFind (← vget vin "pattern") (← vget vin "input")))
-  runSet "regex.find_all" (← getpropRawPub regexs "find_all")
-    (arg1 (fun vin => do
-      reFindAll (← vget vin "pattern") (← vget vin "input")))
-  runSet "regex.replace" (← getpropRawPub regexs "replace")
-    (arg1 (fun vin => do
-      reReplace (← vget vin "pattern") (← vget vin "input") (← vget vin "replacement")))
-  runSet "regex.escape" (← getpropRawPub regexs "escape")
-    (arg1 (fun vin => do
-      reEscape (← vget vin "val")))
+  -- nullsem: does a PRESENT key holding a JSON null read as "no value"?
+  -- Every group runs {null: false} — the whole point of the section is the
+  -- distinction the null flag would erase.
+  --
+  -- This section used to be looked up as `sentinels`, under six group names
+  -- (`getprop_unify`, `getelem_absent`, `haskey_unify`, `isempty_unify`,
+  -- `isnode_unify`, `stringify_null`) the shipped corpus has never carried —
+  -- alongside a `regex` section it has never carried either. All eleven
+  -- groups therefore ran ZERO cases, silently. The vendored engine names a
+  -- missing group out loud (`SKIP`), which is how that was found; the
+  -- regex groups are gone because this port's `reTest`/`reFind`/... have no
+  -- corpus to answer, and nullsem is driven under the name it actually has.
+  runset r "nullsem.getprop" (getset r ["nullsem", "getprop"])
+    (fun vin => do
+      if ← hasp vin "alt" then
+        getprop (← getp vin "val") (← getp vin "key") (← getp vin "alt")
+      else getprop (← getp vin "val") (← getp vin "key"))
+    (nullflag := false)
+  runset r "nullsem.getelem" (getset r ["nullsem", "getelem"])
+    (fun vin => do
+      if ← hasp vin "alt" then
+        getelem (← getp vin "val") (← getp vin "key") (← getp vin "alt")
+      else getelem (← getp vin "val") (← getp vin "key"))
+    (nullflag := false)
+  runset r "nullsem.getpath" (getset r ["nullsem", "getpath"])
+    (fun vin => do getpath (← getp vin "store") (← getp vin "path"))
+    (nullflag := false)
+  runset r "nullsem.haskey" (getset r ["nullsem", "haskey"])
+    (fun vin => do
+      pure (.bool (← haskey (← getp vin "src") (← getp vin "key"))))
+    (nullflag := false)
+  runset r "nullsem.keysof" (getset r ["nullsem", "keysof"])
+    (fun v => do newList ((← keysof v).map (fun s => Value.str s)))
+    (nullflag := false)
 
-  -- sentinels
-  runSet "sentinels.getprop_unify" (← getpropRawPub sentinels "getprop_unify")
-    (arg1 (fun vin => do
-      getprop (← vget vin "val") (← vget vin "key") (← vget vin "alt")))
-    (flagNull := false)
-  runSet "sentinels.getelem_absent" (← getpropRawPub sentinels "getelem_absent")
-    (arg1 (fun vin => do
-      getelem (← vget vin "val") (← vget vin "key") (← vget vin "alt")))
-    (flagNull := false)
-  runSet "sentinels.haskey_unify" (← getpropRawPub sentinels "haskey_unify")
-    (arg1 (fun vin => do
-      pure (.bool (← haskey (← vget vin "val") (← vget vin "key")))))
-    (flagNull := false)
-  runSet "sentinels.isempty_unify" (← getpropRawPub sentinels "isempty_unify")
-    (arg1 (fun v => do pure (.bool (← isempty v))))
-    (flagNull := false)
-  runSet "sentinels.isnode_unify" (← getpropRawPub sentinels "isnode_unify")
-    (arg1 (fun v => pure (.bool (isnode v))))
-    (flagNull := false)
-  runSet "sentinels.stringify_null" (← getpropRawPub sentinels "stringify_null")
-    (arg1 (fun vin => do pure (.str (← stringify vin))))
-    (flagNull := false)
-
--- ---------------- main ----------------
+-- ---------------- main --------------------------------------------------
 
 def main (argv : List String) : IO UInt32 := do
-  let testfile := argv.headD "../.sdk/test/test.json"
-  let raw ← IO.FS.readFile testfile
-  let ctx ← mkCtx
-  let go : SIO Unit := do
-    let alltests ← jsonRead raw
-    let spec ← getpropRawPub alltests "struct"
-    runAll spec
-  go.run ctx
-  for f in (← failures.get).reverse do
-    IO.println f
-  IO.println ""
-  IO.println ("PASS " ++ toString (← npass.get) ++ "  FAIL " ++ toString (← nfail.get))
-  if (← nfail.get) > 0 then return 1 else return 0
+  let testfile ← resolveSpecPath argv
+  let r ← makeRun testfile "struct"
+  let sctx ← mkCtx
+  (runAll r).run sctx
+  report r "STRUCT CORPUS: "

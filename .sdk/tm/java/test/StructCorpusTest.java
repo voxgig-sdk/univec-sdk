@@ -1,14 +1,19 @@
 package JAVAPACKAGE.sdktest;
 
-// Drives the shared struct corpus (../.sdk/test/test.json, root key "struct")
-// against the vendored struct utility, mirroring the go target's
-// struct_utility_test.go coverage. Adapted from the voxgig struct java
-// port's StructCorpusTest; here the corpus is a green-bar test — any
-// failing entry fails the build. Categories absent from this SDK's
-// test.json are skipped.
+// Drives the shared struct corpus (../.sdk/test/test.json, root key
+// "struct") against the vendored struct utility THROUGH the vendored omni
+// runner (OmniResolver over test/vendor/omni) - the engine half of the
+// retired StructRunner. Mirrors the go target's struct_utility_test.go
+// coverage. A missing category or section FAILS (the old runner skipped it
+// silently - a renamed fixture reported PASS while running zero
+// assertions); a failing entry throws OmniError with the entry named.
 
-import org.junit.jupiter.api.AfterAll;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 import java.util.ArrayList;
@@ -17,15 +22,34 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 import java.util.function.Function;
 
+import JAVAPACKAGE.core.Helpers;
+import JAVAPACKAGE.core.UnivecSDK;
 import JAVAPACKAGE.utility.struct.Struct;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class StructCorpusTest {
 
-  private static final Map<String, StructRunner.Result> SCOREBOARD = new TreeMap<>();
+  static final String TEST_JSON_FILE = "../.sdk/test/test.json";
+
+  private static OmniResolver.Run RUN;
+
+  static synchronized OmniResolver.Run structRun() {
+    if (RUN == null) {
+      RUN = OmniResolver
+          .makeRunner(TEST_JSON_FILE, UnivecSDK.testSDK())
+          .runner("struct", new LinkedHashMap<String, Object>());
+      assertNotNull(RUN.spec, "struct section not found in test.json");
+    }
+    return RUN;
+  }
+
+  /** A subject in the struct-corpus shape: one argument in, one value out. */
+  @FunctionalInterface
+  interface StructSubject {
+    Object apply(Object in) throws Exception;
+  }
 
   private static Object getp(Object in, String key) {
     if (in instanceof Map<?, ?> m) {
@@ -40,6 +64,33 @@ public class StructCorpusTest {
     }
     return def;
   }
+
+  // The struct-corpus nullModifier (was StructRunner.NULL_MODIFIER): a bare
+  // "__NULL__" becomes a real null, and an embedded "__NULL__" inside a
+  // larger string is rewritten to the literal text "null". Mirrors omni's
+  // nullmodifier for struct's own Modify callback shape.
+  static final Struct.Modify NULL_MODIFIER =
+      (val, key, parent, inj, store) -> {
+        if (!(val instanceof String s)) {
+          return;
+        }
+        Object repl;
+        if (OmniResolver.NULLMARK.equals(s)) {
+          repl = null;
+        }
+        else if (s.contains(OmniResolver.NULLMARK)) {
+          repl = s.replace(OmniResolver.NULLMARK, "null");
+        }
+        else {
+          return;
+        }
+        if (parent instanceof Map<?, ?> m) {
+          ((Map<String, Object>) m).put(Objects.toString(key), repl);
+        }
+        else if (parent instanceof List<?> l && key instanceof Number n) {
+          ((List<Object>) l).set(n.intValue(), repl);
+        }
+      };
 
   @TestFactory
   Iterable<DynamicTest> corpus() {
@@ -242,10 +293,10 @@ public class StructCorpusTest {
 
     // ===== inject =====
     // inject.string passes the nullModifier so a resolved JSON null (encoded by
-    // the runner's fixJSON as "__NULL__") renders as the literal text "null".
+    // the runner as "__NULL__") renders as the literal text "null".
     add(tests, "inject", "string", true, in -> {
       Map<String, Object> opts = new LinkedHashMap<>();
-      opts.put("modify", StructRunner.NULL_MODIFIER);
+      opts.put("modify", NULL_MODIFIER);
       return Struct.inject(getp(in, "val"), getp(in, "store"), opts);
     });
     add(tests, "inject", "deep", true, in -> Struct.inject(getp(in, "val"), getp(in, "store")));
@@ -306,46 +357,72 @@ public class StructCorpusTest {
     return tests;
   }
 
+  // The struct.nullsem section: does a PRESENT key holding a JSON null
+  // read as "no value"? Opt-in per target (create-sdkgen ships it; an
+  // older project corpus may predate it - the abort below says so OUT
+  // LOUD, as a skipped test, rather than passing vacuously). All lanes
+  // run {null: false}: without the flag the runner rewrites every null to
+  // '__NULL__' and the section asserts nothing about null at all.
+  @Test
+  public void nullsem() {
+    OmniResolver.Run run = structRun();
+    Map<String, Object> nullsem = Helpers.toMapAny(run.spec.get("nullsem"));
+    if (nullsem == null) {
+      Assumptions.abort(
+          "corpus predates struct.nullsem - refresh .sdk/test/struct from create-sdkgen");
+    }
+    Map<String, Object> flags = OmniResolver.flags("null", false);
+
+    run.runsetflags(nullsem.get("getprop"), flags, (args) -> {
+      Object in = args[0];
+      Object alt = getpDef(in, "alt", Struct.UNDEF);
+      return alt == Struct.UNDEF
+          ? Struct.getprop(getp(in, "val"), getp(in, "key"))
+          : Struct.getprop(getp(in, "val"), getp(in, "key"), alt);
+    });
+
+    run.runsetflags(nullsem.get("getelem"), flags, (args) -> {
+      Object in = args[0];
+      Object alt = getpDef(in, "alt", Struct.UNDEF);
+      return alt == Struct.UNDEF
+          ? Struct.getelem(getp(in, "val"), getp(in, "key"))
+          : Struct.getelem(getp(in, "val"), getp(in, "key"), alt);
+    });
+
+    run.runsetflags(nullsem.get("getpath"), flags, (args) ->
+        Struct.getpath(getp(args[0], "store"), getp(args[0], "path")));
+
+    run.runsetflags(nullsem.get("haskey"), flags, (args) ->
+        Struct.haskey(getp(args[0], "src"), getp(args[0], "key")));
+
+    run.runsetflags(nullsem.get("keysof"), flags, (args) ->
+        Struct.keysof(args[0]));
+  }
+
   private void add(
       List<DynamicTest> tests,
       String category,
       String name,
       boolean nullFlag,
-      StructRunner.Subject subject) {
+      StructSubject subject) {
     tests.add(
         DynamicTest.dynamicTest(
             category + "-" + name,
             () -> {
-              Map<String, Object> spec = StructRunner.getSpec(category, name);
-              if (spec == null) {
-                // Category/name absent from this SDK's corpus: skip.
-                return;
-              }
-              StructRunner.Result r =
-                  StructRunner.runsetflags(category + "." + name, spec, nullFlag, subject);
-              SCOREBOARD.put(category + "." + name, r);
-              if (!r.failures.isEmpty()) {
-                throw new AssertionError(
-                    category + "." + name + ": " + r.passed + "/" + r.total
-                        + " passed; failures:\n  " + String.join("\n  ", r.failures));
-              }
+              OmniResolver.Run run = structRun();
+              Map<String, Object> cat = Helpers.toMapAny(run.spec.get(category));
+              assertNotNull(cat, "struct corpus category missing: " + category
+                  + " - check .sdk/test/struct/");
+              Map<String, Object> spec = Helpers.toMapAny(cat.get(name));
+              assertNotNull(spec, "struct corpus section missing: "
+                  + category + "." + name + " - check .sdk/test/struct/");
+              Object set = spec.get("set");
+              assertTrue(set instanceof List && !((List<Object>) set).isEmpty(),
+                  "struct corpus section is EMPTY: " + category + "." + name
+                      + " - zero cases would run");
+              run.runsetflags(spec, OmniResolver.flags("null", nullFlag),
+                  (args) -> subject.apply(
+                      0 < args.length ? args[0] : Struct.UNDEF));
             }));
-  }
-
-  @AfterAll
-  static void printScoreboard() {
-    int totalP = 0;
-    int totalT = 0;
-    StringBuilder banner = new StringBuilder();
-    banner.append("\n========= STRUCT CORPUS SCOREBOARD =========\n");
-    for (Map.Entry<String, StructRunner.Result> e : SCOREBOARD.entrySet()) {
-      StructRunner.Result r = e.getValue();
-      banner.append(String.format("  %-30s %4d / %4d%n", e.getKey(), r.passed, r.total));
-      totalP += r.passed;
-      totalT += r.total;
-    }
-    banner.append(String.format("  %-30s %4d / %4d%n", "TOTAL", totalP, totalT));
-    banner.append("============================================\n");
-    System.out.println(banner);
   }
 }

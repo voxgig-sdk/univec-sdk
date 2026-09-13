@@ -52,7 +52,7 @@ func TestEmbedEntity(t *testing.T) {
 		// CREATE
 		embedRef01Ent := client.Embed(nil)
 		embedRef01Data := core.ToMapAny(vs.GetProp(
-			vs.GetPath([]any{"new", "embed"}, setup.data), "embed_ref01"))
+			vs.GetPath(setup.data, []any{"new", "embed"}), "embed_ref01"))
 
 		embedRef01DataResult, err := embedRef01Ent.Create(embedRef01Data, nil)
 		if err != nil {
@@ -90,7 +90,7 @@ func embedBasicSetup(extra map[string]any) *entityTestSetup {
 	client := sdk.TestSDK(options, extra)
 
 	// Generate idmap via transform, matching TS pattern.
-	idmap := vs.Transform(
+	idmap, _ := vs.Transform(
 		[]any{"embed01", "embed02", "embed03"},
 		map[string]any{
 			"`$PACK`": []any{"", map[string]any{
@@ -110,7 +110,7 @@ func embedBasicSetup(extra map[string]any) *entityTestSetup {
 		"UNIVEC_TEST_EMBED_ENTID": idmap,
 		"UNIVEC_TEST_LIVE":      "FALSE",
 		"UNIVEC_TEST_EXPLAIN":   "FALSE",
-		"UNIVEC_APIKEY":         "NONE",
+		"UNIVEC_APIKEY":         "",
 	})
 
 	idmapResolved := core.ToMapAny(env["UNIVEC_TEST_EMBED_ENTID"])
@@ -119,11 +119,23 @@ func embedBasicSetup(extra map[string]any) *entityTestSetup {
 	}
 
 	if env["UNIVEC_TEST_LIVE"] == "TRUE" {
+		// An empty map, not a nil one: Merge returns nil when its last entry
+		// is nil, and BasicSetup is normally called with no extras - so a
+		// bare nil silently discarded the apikey and server values below.
+		extraOpts := extra
+		if extraOpts == nil {
+			extraOpts = map[string]any{}
+		}
+
 		mergedOpts := vs.Merge([]any{
+			// liveClientOptions() FIRST, so the generated fields below win:
+			// sdk-test-control.json's test.client.options adds to the live
+			// client, it does not redirect it.
+			liveClientOptions(),
 			map[string]any{
 				"apikey": env["UNIVEC_APIKEY"],
 			},
-			extra,
+			extraOpts,
 		})
 		client = sdk.NewUnivecSDK(core.ToMapAny(mergedOpts))
 	}

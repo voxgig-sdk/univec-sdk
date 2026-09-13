@@ -11,6 +11,7 @@ import {
   File,
   cmp,
   snakify,
+  pointParts,
 } from '@voxgig/sdkgen'
 
 
@@ -79,13 +80,13 @@ const TestDirect = cmp(function TestDirect(props: any) {
   // Load point info.
   const loadPoint = loadOp?.points?.[0]
   const loadPath = loadPoint
-    ? normalizePathParams(loadPoint.parts || [], loadPoint?.args?.params || [], loadPoint?.rename?.param)
+    ? normalizePathParams(pointParts(loadPoint), loadPoint?.args?.params || [], loadPoint?.rename?.param)
     : ''
   const allLoadParams = loadPoint?.args?.params || []
   // Only path params that actually appear in the URL template drive the
   // direct-test path-param setup and URL-substitution asserts.
   const _pathPlaceholders = new Set<string>()
-  for (const part of (loadPoint?.parts || [])) {
+  for (const part of pointParts(loadPoint)) {
     if (typeof part === 'string' && part.startsWith('{') && part.endsWith('}')) {
       _pathPlaceholders.add(part.slice(1, -1))
     }
@@ -104,7 +105,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
   // List point info.
   const listPoint = listOp?.points?.[0]
   const listPath = listPoint
-    ? normalizePathParams(listPoint.parts || [], listPoint?.args?.params || [], listPoint?.rename?.param)
+    ? normalizePathParams(pointParts(listPoint), listPoint?.args?.params || [], listPoint?.rename?.param)
     : ''
   const listParams = listPoint?.args?.params || []
 

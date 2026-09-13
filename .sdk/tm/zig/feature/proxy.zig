@@ -9,6 +9,7 @@
 
 const std = @import("std");
 const h = @import("../core/helpers.zig");
+const mem = @import("../core/mem.zig");
 const err = @import("../core/error.zig");
 const types = @import("../core/types.zig");
 const sup = @import("support.zig");
@@ -65,22 +66,22 @@ pub const ProxyFeature = struct {
             if (no_proxy_opt == null) {
                 const np = first_env(&.{ "NO_PROXY", "no_proxy" });
                 if (np.len != 0) {
-                    var list = std.ArrayList([]const u8).init(h.A());
+                    var list: std.ArrayList([]const u8) = .empty;
                     var it = std.mem.splitScalar(u8, np, ',');
-                    while (it.next()) |s| list.append(s) catch {};
-                    no_proxy_opt = list.toOwnedSlice() catch null;
+                    while (it.next()) |s| list.append(h.A(), s) catch {};
+                    no_proxy_opt = list.toOwnedSlice(h.A()) catch null;
                 }
             }
         }
 
-        var np_list = std.ArrayList([]const u8).init(h.A());
+        var np_list: std.ArrayList([]const u8) = .empty;
         if (no_proxy_opt) |arr| {
             for (arr) |s| {
                 const trimmed = std.mem.trim(u8, s, " \t\r\n");
-                if (trimmed.len != 0) np_list.append(trimmed) catch {};
+                if (trimmed.len != 0) np_list.append(h.A(), trimmed) catch {};
             }
         }
-        const no_proxy: []const []const u8 = np_list.toOwnedSlice() catch &.{};
+        const no_proxy: []const []const u8 = np_list.toOwnedSlice(h.A()) catch &.{};
 
         self.track.url = url;
         self.track.no_proxy = no_proxy;
@@ -120,9 +121,15 @@ fn wrapCall(p: *anyopaque, ctx: *Context, url: []const u8, fetchdef: Value) err.
     return w.inner.invoke(ctx, url, routed);
 }
 
+// Zig 0.16 has no free-standing environment lookup: the block the process was
+// started with is owned by an Io implementation, and library code is expected
+// to be handed one. The SDK's Io is the process-global singleton (core/mem.zig),
+// and the startup code fills its environment block in, so that is where a
+// `fromEnv` proxy config reads HTTP(S)_PROXY / NO_PROXY from.
 fn first_env(names: []const []const u8) []const u8 {
+    const environ = mem.threaded().environ.process_environ;
     for (names) |name| {
-        if (std.process.getEnvVarOwned(h.A(), name)) |v| {
+        if (environ.getAlloc(h.A(), name)) |v| {
             if (v.len != 0) return v;
         } else |_| {}
     }
@@ -150,7 +157,7 @@ fn bypass(no_proxy: []const []const u8, url: []const u8) bool {
     const host = host_of(url);
     for (no_proxy) |np| {
         if (std.mem.eql(u8, np, "*")) return true;
-        const np_trim = std.mem.trimLeft(u8, np, ".");
+        const np_trim = std.mem.trimStart(u8, np, ".");
         if (std.mem.eql(u8, host, np)) return true;
         const suffix = std.fmt.allocPrint(h.A(), ".{s}", .{np_trim}) catch continue;
         if (std.mem.endsWith(u8, host, suffix)) return true;

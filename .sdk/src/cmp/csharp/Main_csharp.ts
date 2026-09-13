@@ -4,6 +4,8 @@ import * as Path from 'node:path'
 import {
   cmp, each,
   File, Content, Copy, Folder, Fragment,
+  pluginExcludes,
+  TEST_CONTROL_EXCLUDE
 } from '@voxgig/sdkgen'
 
 
@@ -40,9 +42,16 @@ const Main = cmp(async function Main(props: any) {
 
   // Copy tm/csharp files with replacements. `src/` holds only the
   // per-feature extension folders (not shipped into the SDK output).
+  //
+  // pluginExcludes: the generate-time plugin trim (a DECLARED-but-INACTIVE
+  // plugin group's files are never copied). Without it every group's files
+  // ship regardless of the model, and an SDK whose chain is [dotenv, env]
+  // carries AWS request signing and seven HTTP vault clients - the whole
+  // point of the trim. Feature-level trimming happens at `target add`
+  // time; this is the per-plugin cut inside a feature that IS selected.
   Copy({
     from: 'tm/' + target.name,
-    exclude: [/src\//],
+    exclude: [/src\//, TEST_CONTROL_EXCLUDE, ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
     }

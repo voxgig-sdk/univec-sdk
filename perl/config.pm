@@ -270,62 +270,100 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
               "kind": "http",
               "method": "POST",
               "orig": "/v1/convert",
-              "parts": [
-                "v1",
-                "convert"
+              "segments": [
+                {
+                  "lit": "v1"
+                },
+                {
+                  "lit": "convert"
+                }
               ],
               "select": {},
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
-              }
+              },
+              "parts": [
+                "v1",
+                "convert"
+              ]
             },
             {
               "args": {},
               "kind": "http",
               "method": "POST",
               "orig": "/v1/embed-bridge",
-              "parts": [
-                "v1",
-                "embed-bridge"
+              "segments": [
+                {
+                  "lit": "v1"
+                },
+                {
+                  "lit": "embed-bridge"
+                }
               ],
               "select": {},
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
-              }
+              },
+              "parts": [
+                "v1",
+                "embed-bridge"
+              ]
             },
             {
               "args": {},
               "kind": "http",
               "method": "POST",
               "orig": "/v1/ephemeral/convert",
-              "parts": [
-                "v1",
-                "ephemeral",
-                "convert"
+              "segments": [
+                {
+                  "lit": "v1"
+                },
+                {
+                  "lit": "ephemeral"
+                },
+                {
+                  "lit": "convert"
+                }
               ],
               "select": {},
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
-              }
+              },
+              "parts": [
+                "v1",
+                "ephemeral",
+                "convert"
+              ]
             },
             {
               "args": {},
               "kind": "http",
               "method": "POST",
               "orig": "/v1/ephemeral/embed-bridge",
-              "parts": [
-                "v1",
-                "ephemeral",
-                "embed-bridge"
+              "segments": [
+                {
+                  "lit": "v1"
+                },
+                {
+                  "lit": "ephemeral"
+                },
+                {
+                  "lit": "embed-bridge"
+                }
               ],
               "select": {},
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
-              }
+              },
+              "parts": [
+                "v1",
+                "ephemeral",
+                "embed-bridge"
+              ]
             }
           ]
         }
@@ -366,31 +404,50 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
               "kind": "http",
               "method": "POST",
               "orig": "/v1/embed",
-              "parts": [
-                "v1",
-                "embed"
+              "segments": [
+                {
+                  "lit": "v1"
+                },
+                {
+                  "lit": "embed"
+                }
               ],
               "select": {},
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
-              }
+              },
+              "parts": [
+                "v1",
+                "embed"
+              ]
             },
             {
               "args": {},
               "kind": "http",
               "method": "POST",
               "orig": "/v1/ephemeral/embed",
-              "parts": [
-                "v1",
-                "ephemeral",
-                "embed"
+              "segments": [
+                {
+                  "lit": "v1"
+                },
+                {
+                  "lit": "ephemeral"
+                },
+                {
+                  "lit": "embed"
+                }
               ],
               "select": {},
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
-              }
+              },
+              "parts": [
+                "v1",
+                "ephemeral",
+                "embed"
+              ]
             }
           ]
         }
@@ -420,6 +477,7 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
           "type": "`$STRING`"
         },
         {
+          "format": "date-time",
           "name": "resetsAt",
           "req": true,
           "short": "When the daily allowance resets.",
@@ -437,16 +495,27 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
               "kind": "http",
               "method": "POST",
               "orig": "/v1/ephemeral/key",
-              "parts": [
-                "v1",
-                "ephemeral",
-                "key"
+              "segments": [
+                {
+                  "lit": "v1"
+                },
+                {
+                  "lit": "ephemeral"
+                },
+                {
+                  "lit": "key"
+                }
               ],
               "select": {},
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
-              }
+              },
+              "parts": [
+                "v1",
+                "ephemeral",
+                "key"
+              ]
             }
           ]
         }
@@ -523,15 +592,23 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
               "kind": "http",
               "method": "GET",
               "orig": "/v1/models",
-              "parts": [
-                "v1",
-                "models"
+              "segments": [
+                {
+                  "lit": "v1"
+                },
+                {
+                  "lit": "models"
+                }
               ],
               "select": {},
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
-              }
+              },
+              "parts": [
+                "v1",
+                "models"
+              ]
             }
           ]
         }

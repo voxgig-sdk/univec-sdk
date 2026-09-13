@@ -5,9 +5,26 @@ main: kit: target: lean: {
   ext: lean
   comment: line: "--"
   module: name: 'univec'
-  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
-  package: '@voxgig/sdkgen'
+  base: 'node_modules/@voxgig/sdkgen-langpack/.sdk'
+  package: '@voxgig/sdkgen-langpack'
   srcfeature: false
+
+  # RETIREMENT. Retired by the move to the vendored @voxgig/omni corpus
+  # runner (vendor-tag rollout): NOTHING, deliberately, and the empty list
+  # says so rather than leaving the key off.
+  #
+  # Lean's corpus ENGINE was never a file of its own. It lived FUSED inside
+  # test/StructCorpus.lean (its own JSON reader, fixJson, eqv, matchval,
+  # doMatch, resolveArgs, checkResult, handleError and runSet) and again
+  # inside test/TPrimaryUtility.lean (runset, deepEq, strCheck, matchDeep).
+  # Both files were rewritten IN PLACE onto test/OmniResolver.lean, so both
+  # KEEP THEIR NAMES, the `structcorpus` and `primary` lean_exe roots are
+  # unchanged, and no emitted call site needed churn. test/TFeature.lean is a
+  # hand-written behavioural suite, not a corpus runner, and is RETAINED;
+  # test/Runner.lean (generated) is the entity/pipeline lane, likewise
+  # RETAINED despite the name. There is therefore no whole-file leftover for
+  # `doctor` to report or `doctor prune` to delete.
+  superseded: []
 
   # Entities are generic (config-driven F.makeEntity), so no per-entity or
   # per-feature generated modules — the same model as the Haskell target. The

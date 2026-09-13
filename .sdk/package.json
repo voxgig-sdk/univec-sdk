@@ -23,13 +23,14 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": ">=25.6",
-    "typescript": ">=6.0",
     "@voxgig/apidef": ">=8.0",
     "@voxgig/model": ">=10.0",
     "@voxgig/sdkgen": ">=4.0",
-    "@voxgig/util": ">=0.5",
+    "@voxgig/sdkgen-langpack": "^0.0.3",
     "@voxgig/struct": ">=0.2",
+    "@voxgig/util": ">=0.5",
+    "aontu": ">=0.52",
     "jostraca": ">=0.33.1",
-    "aontu": ">=0.52"
+    "typescript": ">=6.0"
   }
 }

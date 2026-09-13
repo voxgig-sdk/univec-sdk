@@ -35,8 +35,13 @@ $REGISTRY{prepare_method} = sub {
     return uc($pm) if defined $pm && !ref($pm) && '' ne $pm;
   }
 
-  my $m = $METHOD_MAP{ $ctx->{op}{name} };
-  return defined $m ? $m : 'GET';
+  # No default: an op name outside the convention resolves to no method,
+  # exactly as the ts reference (`methodMap[key]` is undefined there).
+  # The silent-pass inline runner hid a stray 'GET' fallback here; the
+  # shared corpus (prepareMethod, opname "bad" -> null) pins it now.
+  my $opname = $ctx->{op} ? $ctx->{op}{name} : undef;
+  return undef unless defined $opname && !ref $opname;
+  return $METHOD_MAP{$opname};
 };
 
 1;

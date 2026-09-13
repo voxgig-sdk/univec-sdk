@@ -1,7 +1,14 @@
 // Primary utility test suite - drives every utility on the client utility
-// object, partly via the shared corpus in ../../.sdk/test/test.json
-// ("primary" section) and partly via direct checks. Swift twin of
+// object against the shared corpus in ../../../.sdk/test/test.json
+// ("primary" section) through the VENDORED omni runner (OmniResolver over
+// Tests/vendor/omni), plus direct checks. Swift twin of
 // tm/csharp/test/PrimaryUtilityTest.cs and tm/go/test/primary_utility_test.go.
+//
+// Subjects receive omni's native argument list in the SDK's value model: a
+// ctx entry arrives as args[0], a MAP - OmniResolver.omniCtx builds the
+// typed Context a generated utility takes, and OmniResolver.omniSyncCtx
+// writes the observable ctx state back for `match: {ctx: ...}` assertions
+// (which the resolver retargets onto `match.args.0`, its decision 3).
 
 import XCTest
 
@@ -28,16 +35,78 @@ final class TestInitFeature: BaseFeature {
 }
 
 final class PrimaryUtilityTest: XCTestCase {
+  // PENDING sections are the ones deliberately left EMPTY in the shared
+  // corpus (.sdk/test/primary/<name>.aon). Everything else MUST contribute
+  // cases: a renamed section or a fixture that failed to compile used to
+  // report PASS while running zero assertions.
+  private static let PENDING: Set<String> = [
+    "fetcher", "makeFetchDef", "makeResult",
+    "featureAdd", "featureHook", "featureInit",
+  ]
+
+  // One corpus runner for the whole suite (XCTest builds a fresh instance
+  // per test method, so the runner is static).
+  private static var RUN: OmniResolver.Run?
+  private static let runLock = NSLock()
+
+  private static func primaryRun() throws -> OmniResolver.Run {
+    runLock.lock()
+    defer { runLock.unlock() }
+    if let run = RUN { return run }
+    let run = try OmniResolver.makeRunner(
+      SdkRunner.testJsonPath(), UnivecSDK.testSDK(nil, nil))("primary")
+    RUN = run
+    return run
+  }
+
   // XCTestCase has no custom init; set these up per test.
-  private var primary: Value!
   private var client: UnivecSDK!
   private var utility: Utility!
 
   override func setUp() {
     super.setUp()
-    primary = SdkRunner.loadPrimary()
     client = UnivecSDK.testSDK(nil, nil)
     utility = client.getUtility()
+  }
+
+  // Run one corpus section through the vendored engine, failing loudly when
+  // it would run ZERO cases.
+  private func runsection(
+    _ name: String, _ subject: @escaping OmniResolver.Subject,
+    file: StaticString = #filePath, line: UInt = #line
+  ) {
+    do {
+      let run = try PrimaryUtilityTest.primaryRun()
+
+      let section = run.spec.get(name)
+      guard section.isMap else {
+        return XCTFail("test corpus section \"\(name)\" missing - check the " +
+          "name against .sdk/test/primary/", file: file, line: line)
+      }
+      let basic = section.get("basic")
+      guard let count = basic.setCount else {
+        return XCTFail("test corpus section \"\(name)\" has no basic.set list " +
+          "- zero cases would run", file: file, line: line)
+      }
+      if 0 == count && !PrimaryUtilityTest.PENDING.contains(name) {
+        return XCTFail("test corpus section \"\(name)\" is EMPTY - zero cases " +
+          "would run; add cases, or mark the fixture PENDING in " +
+          ".sdk/test/primary/", file: file, line: line)
+      }
+      if 0 == count { return }
+
+      try run.runset(basic, subject)
+      print("ok primary.\(name): \(count)/\(count)")
+    } catch {
+      XCTFail("primary.\(name): \(OmniResolver.message(error))",
+        file: file, line: line)
+    }
+  }
+
+  // The DEF.setup options a section names, as SDK options.
+  private func setupOptions(_ name: String, _ key: String) throws -> VMap? {
+    try PrimaryUtilityTest.primaryRun().spec
+      .get([name, "DEF", "setup", key]).value.asMap
   }
 
   // MARK: - Local helpers
@@ -141,30 +210,19 @@ final class PrimaryUtilityTest: XCTestCase {
   }
 
   func testDoneBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "done", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
-      SdkRunner.fixCtx(ctx, self.client)
+    runsection("done") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
       return try self.utility.done(ctx)
     }
   }
 
   func testMakeErrorBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "makeError", "basic")) { entry in
-      var argsList = entry.entries["args"]?.asList
-      if argsList == nil || argsList!.items.isEmpty {
-        let l = VList()
-        l.items.append(.map(VMap()))
-        argsList = l
-      }
-      let args = argsList!
-
-      let ctxmap = args.items[0].asMap ?? VMap()
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
-      SdkRunner.fixCtx(ctx, self.client)
+    runsection("makeError") { args in
+      let ctxarg = args.first ?? .map(VMap())
+      let ctx = OmniResolver.omniCtx(ctxarg, self.client, self.utility)
 
       var err: Error? = nil
-      if args.items.count > 1, let errMap = args.items[1].asMap {
+      if 1 < args.count, let errMap = args[1].asMap {
         err = SdkRunner.errFromMap(errMap)
       }
 
@@ -226,6 +284,36 @@ final class PrimaryUtilityTest: XCTestCase {
 
     initUtility.featureInit(ctx, feature)
     XCTAssertTrue(initCalled, "expected init to be called")
+  }
+
+  // THE `extend` SEAM IS REAL. options.extend is the runtime
+  // feature-injection seam the README documents, and the constructor reads
+  // it - but only after makeOptions' validate, which used to REJECT the key
+  // because buildOptSpec never named it. The seam was dead: a caller could
+  // not hand in a feature the model did not activate, and every suite that
+  // adopts a feature through `extend` passed VACUOUSLY on a client that
+  // never held it. Pinned here, in the ungated suite, so the seam is proven
+  // whatever features a project selects. Delete the `extend` optspec entry
+  // and this goes red.
+  func testExtendOptionInstallsAndInitialisesTheFeature() {
+    var initCalled = false
+    let feature = TestInitFeature()
+    feature.name = "extra"
+    feature.initFn = { initCalled = true }
+
+    let opts = VMap()
+    opts.entries["feature"] = .map(vm(("extra", .map(vm(("active", .bool(true)))))))
+    opts.entries["extend"] = .list([.nat(feature)])
+
+    let client = UnivecSDK.testSDK(nil, opts)
+
+    XCTAssertTrue(client.features.contains { $0 === feature },
+      "options.extend did not install the feature; installed: "
+        + client.features.map { $0.getName() }.joined(separator: ","))
+    XCTAssertTrue(initCalled,
+      "the extended feature was installed but never initialised")
+    XCTAssertFalse(isNil(gp(client.optionsMap(), "extend")),
+      "options.extend was validated away by makeOptions")
   }
 
   func testFeatureInitInactive() {
@@ -301,8 +389,8 @@ final class PrimaryUtilityTest: XCTestCase {
   }
 
   func testMakeContextBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "makeContext", "basic")) { entry in
-      guard let inMap = entry.entries["in"]?.asMap else { return .noval }
+    runsection("makeContext") { args in
+      guard let inMap = args.first?.asMap else { return .noval }
       let ctx = self.utility.makeContext(self.nativeCtxMap(inMap), nil)
       let result = VMap()
       result.entries["id"] = .string(ctx.id)
@@ -368,8 +456,8 @@ final class PrimaryUtilityTest: XCTestCase {
   }
 
   func testMakeOptionsBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "makeOptions", "basic")) { entry in
-      let inMap = entry.entries["in"]?.asMap ?? VMap()
+    runsection("makeOptions") { args in
+      let inMap = args.first?.asMap ?? VMap()
       var nctx: [String: Any?] = [:]
       if let o = inMap.entries["options"]?.asMap { nctx["options"] = o }
       if let c = inMap.entries["config"]?.asMap { nctx["config"] = c }
@@ -381,42 +469,24 @@ final class PrimaryUtilityTest: XCTestCase {
   }
 
   func testMakeRequestBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "makeRequest", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("makeRequest") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
       ctx.options = self.client.optionsMap()
 
       _ = try self.utility.makeRequest(ctx)
 
-      // Update entry ctx for match checking.
-      if let ctxmap = ctxmap {
-        if ctx.response != nil { ctxmap.entries["response"] = .string("exists") }
-        if ctx.result != nil { ctxmap.entries["result"] = .string("exists") }
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return .noval
     }
   }
 
   func testMakeResponseBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "makeResponse", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
-      SdkRunner.fixCtx(ctx, self.client)
+    runsection("makeResponse") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
 
       _ = try self.utility.makeResponse(ctx)
 
-      // Update entry ctx for match checking with result data.
-      if let ctxmap = ctxmap, let result = ctx.result {
-        let rm = VMap()
-        rm.entries["ok"] = .bool(result.ok)
-        rm.entries["status"] = .int(Int64(result.status))
-        rm.entries["statusText"] = .string(result.statusText)
-        rm.entries["headers"] = .map(result.headers)
-        rm.entries["body"] = result.body
-        ctxmap.entries["result"] = .map(rm)
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return .noval
     }
   }
@@ -467,32 +537,18 @@ final class PrimaryUtilityTest: XCTestCase {
     XCTAssertThrowsError(try utility.makeResult(ctx))
   }
 
-  func testMakeSpecBasic() {
-    let setupOpts = SdkRunner.spec(primary, "makeSpec", "DEF", "setup", "a").asMap
+  func testMakeSpecBasic() throws {
+    let setupOpts = try setupOptions("makeSpec", "a")
     let specClient = UnivecSDK.testSDK(nil, setupOpts)
     let specUtility = specClient.getUtility()
 
-    SdkRunner.runSet(SdkRunner.spec(primary, "makeSpec", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, specClient, specUtility)
+    runsection("makeSpec") { args in
+      let ctx = OmniResolver.omniCtx(args[0], specClient, specUtility)
       ctx.options = specClient.optionsMap()
 
-      _ = try self.utility.makeSpec(ctx)
+      _ = try specUtility.makeSpec(ctx)
 
-      // Update entry ctx for match.
-      if let ctxmap = ctxmap, let spec = ctx.spec {
-        let sm = VMap()
-        sm.entries["base"] = .string(spec.base)
-        sm.entries["prefix"] = .string(spec.prefix)
-        sm.entries["suffix"] = .string(spec.suffix)
-        sm.entries["method"] = .string(spec.method)
-        sm.entries["params"] = .map(spec.params)
-        sm.entries["query"] = .map(spec.query)
-        sm.entries["headers"] = .map(spec.headers)
-        sm.entries["step"] = .string(spec.step)
-        ctxmap.entries["spec"] = .map(sm)
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return .noval
     }
   }
@@ -515,17 +571,16 @@ final class PrimaryUtilityTest: XCTestCase {
   }
 
   func testMakeUrlBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "makeUrl", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("makeUrl") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
       if ctx.result == nil { ctx.result = Result(nil) }
       return .string(try self.utility.makeUrl(ctx))
     }
   }
 
   func testOperatorBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "operator", "basic")) { entry in
-      let inMap = entry.entries["in"]?.asMap ?? VMap()
+    runsection("operator") { args in
+      let inMap = args.first?.asMap ?? VMap()
       let op = Operation(inMap)
       let out = VMap()
       out.entries["entity"] = .string(op.entity)
@@ -539,101 +594,67 @@ final class PrimaryUtilityTest: XCTestCase {
   }
 
   func testParamBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "param", "basic")) { entry in
-      guard let args = entry.entries["args"]?.asList, args.items.count >= 2 else {
-        return .noval
-      }
+    runsection("param") { args in
+      guard 2 <= args.count else { return .noval }
 
-      let ctxmap = args.items[0].asMap ?? VMap()
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
-      let paramdef = args.items[1]
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
+      let result = self.utility.param(ctx, args[1])
 
-      let result = self.utility.param(ctx, paramdef)
-
-      // Copy spec alias back to entry ctx for matching.
-      if let matchSpec = entry.entries["match"]?.asMap,
-        let ctxMatch = matchSpec.entries["ctx"]?.asMap,
-        let specMatch = ctxMatch.entries["spec"]?.asMap,
-        specMatch.entries["alias"] != nil,
-        let spec = ctx.spec
-      {
-        let aliasHolder = VMap()
-        aliasHolder.entries["alias"] = .map(spec.alias)
-        if let entryCtx = entry.entries["ctx"]?.asMap {
-          entryCtx.entries["spec"] = .map(aliasHolder)
-        } else {
-          let newCtx = VMap()
-          newCtx.entries["spec"] = .map(aliasHolder)
-          entry.entries["ctx"] = .map(newCtx)
-        }
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return result
     }
   }
 
-  func testPrepareAuthBasic() {
-    let setupOpts = SdkRunner.spec(primary, "prepareAuth", "DEF", "setup", "a").asMap
+  func testPrepareAuthBasic() throws {
+    let setupOpts = try setupOptions("prepareAuth", "a")
     let authClient = UnivecSDK.testSDK(nil, setupOpts)
     let authUtility = authClient.getUtility()
 
-    SdkRunner.runSet(SdkRunner.spec(primary, "prepareAuth", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, authClient, authUtility)
-      SdkRunner.fixCtx(ctx, authClient)
+    runsection("prepareAuth") { args in
+      let ctx = OmniResolver.omniCtx(args[0], authClient, authUtility)
 
-      _ = try self.utility.prepareAuth(ctx)
+      _ = try authUtility.prepareAuth(ctx)
 
-      // Update entry ctx for match.
-      if let ctxmap = ctxmap, let spec = ctx.spec {
-        let sm = VMap()
-        sm.entries["headers"] = .map(spec.headers)
-        ctxmap.entries["spec"] = .map(sm)
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return .noval
     }
   }
 
   func testPrepareBodyBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "prepareBody", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
-      SdkRunner.fixCtx(ctx, self.client)
+    runsection("prepareBody") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
       return self.utility.prepareBody(ctx)
     }
   }
 
   func testPrepareHeadersBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "prepareHeaders", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("prepareHeaders") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
       return .map(self.utility.prepareHeaders(ctx))
     }
   }
 
   func testPrepareMethodBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "prepareMethod", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
-      return .string(self.utility.prepareMethod(ctx))
+    runsection("prepareMethod") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
+      // An op the API does not define resolves NO method: "" is Swift's
+      // spelling of that, and the corpus expects a null (the entry for
+      // opname "bad" carries no `out`).
+      let method = self.utility.prepareMethod(ctx)
+      return method.isEmpty ? .noval : .string(method)
     }
   }
 
   func testPrepareParamsBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "prepareParams", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("prepareParams") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
       return .map(self.utility.prepareParams(ctx))
     }
   }
 
   func testPreparePathBasic() {
-    // Was hand-written cases that had drifted out of the shared corpus
-    // (the preparePath fixture shipped as an empty `set: []`).
-    SdkRunner.runSet(SdkRunner.spec(primary, "preparePath", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("preparePath") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
       return .string(self.utility.preparePath(ctx))
     }
   }
@@ -650,18 +671,15 @@ final class PrimaryUtilityTest: XCTestCase {
   }
 
   func testPrepareQueryBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "prepareQuery", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("prepareQuery") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
       return .map(self.utility.prepareQuery(ctx))
     }
   }
 
   func testResultBasicBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "resultBasic", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
-      SdkRunner.fixCtx(ctx, self.client)
+    runsection("resultBasic") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
 
       let result = self.utility.resultBasic(ctx)
 
@@ -679,70 +697,45 @@ final class PrimaryUtilityTest: XCTestCase {
   }
 
   func testResultBodyBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "resultBody", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("resultBody") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
 
       _ = self.utility.resultBody(ctx)
 
-      if let ctxmap = ctxmap, let result = ctx.result {
-        let rm = VMap()
-        rm.entries["body"] = result.body
-        ctxmap.entries["result"] = .map(rm)
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return .noval
     }
   }
 
   func testResultHeadersBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "resultHeaders", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("resultHeaders") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
 
       _ = self.utility.resultHeaders(ctx)
 
-      if let ctxmap = ctxmap, let result = ctx.result {
-        let rm = VMap()
-        rm.entries["headers"] = .map(result.headers)
-        ctxmap.entries["result"] = .map(rm)
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return .noval
     }
   }
 
   func testTransformRequestBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "transformRequest", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("transformRequest") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
 
       let result = self.utility.transformRequest(ctx)
 
-      // Update entry ctx for match (step changed).
-      if let ctxmap = ctxmap, let spec = ctx.spec,
-        let specMap = ctxmap.entries["spec"]?.asMap
-      {
-        specMap.entries["step"] = .string(spec.step)
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return result
     }
   }
 
   func testTransformResponseBasic() {
-    SdkRunner.runSet(SdkRunner.spec(primary, "transformResponse", "basic")) { entry in
-      let ctxmap = entry.entries["ctx"]?.asMap
-      let ctx = SdkRunner.makeCtxFromMap(ctxmap, self.client, self.utility)
+    runsection("transformResponse") { args in
+      let ctx = OmniResolver.omniCtx(args[0], self.client, self.utility)
 
       let result = self.utility.transformResponse(ctx)
 
-      if let ctxmap = ctxmap, let spec = ctx.spec,
-        let specMap = ctxmap.entries["spec"]?.asMap
-      {
-        specMap.entries["step"] = .string(spec.step)
-      }
-
+      OmniResolver.omniSyncCtx(args[0], ctx)
       return result
     }
   }

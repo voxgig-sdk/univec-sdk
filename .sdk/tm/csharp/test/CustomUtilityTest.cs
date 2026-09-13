@@ -85,8 +85,13 @@ public class CustomUtilityTest
         // transport: 'base' - it REPLACES the transport by design - so a client
         // in test mode would shadow the scripted fetcher and this would assert
         // nothing.
+        // ["test"] is the OPTION, not the `test` FEATURE: it says "this
+        // client is not live", so a REQUIRED OpenAPI server variable resolves
+        // to a deterministic test-<name> instead of failing construction. It
+        // installs no transport, so the override under test still stands.
         var client = new UnivecSDK(new Dictionary<string, object?>
         {
+            ["test"] = new Dictionary<string, object?> { ["active"] = true },
             ["utility"] = new Dictionary<string, object?> { ["fetcher"] = scripted },
         });
 
@@ -122,8 +127,13 @@ public class CustomUtilityTest
             };
         };
 
+        // ["test"] is the OPTION, not the `test` FEATURE: it says "this
+        // client is not live", so a REQUIRED OpenAPI server variable resolves
+        // to a deterministic test-<name> instead of failing construction. It
+        // installs no transport, so the override under test still stands.
         var client = new UnivecSDK(new Dictionary<string, object?>
         {
+            ["test"] = new Dictionary<string, object?> { ["active"] = true },
             ["utility"] = new Dictionary<string, object?> { ["fetcher"] = scripted },
         });
 
@@ -141,8 +151,13 @@ public class CustomUtilityTest
     [Fact]
     public void AnUnknownKeyIsStillAttached()
     {
+        // ["test"] is the OPTION, not the `test` FEATURE: it says "this
+        // client is not live", so a REQUIRED OpenAPI server variable resolves
+        // to a deterministic test-<name> instead of failing construction. It
+        // installs no transport, so the override under test still stands.
         var client = new UnivecSDK(new Dictionary<string, object?>
         {
+            ["test"] = new Dictionary<string, object?> { ["active"] = true },
             ["utility"] = new Dictionary<string, object?>
             {
                 ["notAUtilityMember"] = Util("EXTRA"),

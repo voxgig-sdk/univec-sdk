@@ -11,7 +11,10 @@ import {
   File,
   cmp,
   snakify,
-  isAuthActive, envName, envToken
+  isAuthActive,
+  serverVarEnv,
+  serverVariables, envName, envToken,
+  pointParts,
 } from '@voxgig/sdkgen'
 
 
@@ -87,6 +90,20 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   const authActive = isAuthActive(model)
 
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: MakeOptions throws rather than
+  // request a URL with a literal `{account_id}` in it. Taken from the
+  // environment, the same way the apikey is.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `    envm.put("${serverVarEnv(PROJECTNAME, v.name)}", ${JSON.stringify(v.dflt)});\n`).join('')
+  const serverLiveField = 0 === svars.length ? '' :
+    `      Map<String, Object> serveropt = new LinkedHashMap<>();\n` +
+    svars.map((v: any) =>
+      `      serveropt.put("${v.name}", env.get("${serverVarEnv(PROJECTNAME, v.name)}"));\n`).join('') +
+    `      mergedOpts.put("server", serveropt);\n`
+
   const opnames = Object.keys(entity.op || {})
   const hasLoad = opnames.includes('load')
   const hasList = opnames.includes('list')
@@ -100,12 +117,12 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   // Get load point info
   const loadPoint = loadOp?.points?.[0]
-  const loadPath = loadPoint ? normalizePathParams(loadPoint.parts || [], loadPoint?.args?.params || [], loadPoint?.rename?.param) : ''
+  const loadPath = loadPoint ? normalizePathParams(pointParts(loadPoint), loadPoint?.args?.params || [], loadPoint?.rename?.param) : ''
   const allLoadParams = loadPoint?.args?.params || []
   // Only path params that actually appear in the URL template drive
   // direct-test path-param setup and URL-substitution asserts.
   const _pathPlaceholders = new Set<string>()
-  for (const part of (loadPoint?.parts || [])) {
+  for (const part of pointParts(loadPoint)) {
     if (typeof part === 'string' && part.startsWith('{') && part.endsWith('}')) {
       _pathPlaceholders.add(part.slice(1, -1))
     }
@@ -123,7 +140,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   // Get list point info
   const listPoint = listOp?.points?.[0]
-  const listPath = listPoint ? normalizePathParams(listPoint.parts || [], listPoint?.args?.params || [], listPoint?.rename?.param) : ''
+  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listPoint?.args?.params || [], listPoint?.rename?.param) : ''
   const listParams = listPoint?.args?.params || []
 
   // Required query params with spec-provided examples — needed in live mode.
@@ -465,7 +482,7 @@ ${loadSkipBlock}    ${SDK} client = setup.client;
     Map<String, Object> envm = new LinkedHashMap<>();
     envm.put("${entidEnvVar}", new LinkedHashMap<>());
     envm.put("${PROJECTNAME}_TEST_LIVE", "FALSE");
-${authActive ? `    envm.put("${PROJECTNAME}_APIKEY", "NONE");\n` : ''}    Map<String, Object> env = RunnerSupport.envOverride(envm);
+${authActive ? `    envm.put("${PROJECTNAME}_APIKEY", "");\n` : ''}${serverEnvEntry}    Map<String, Object> env = RunnerSupport.envOverride(envm);
 
     boolean live = "TRUE".equals(env.get("${PROJECTNAME}_TEST_LIVE"));
 
@@ -473,8 +490,11 @@ ${authActive ? `    envm.put("${PROJECTNAME}_APIKEY", "NONE");\n` : ''}    Map<S
     setup.calls = calls;
 
     if (live) {
-      Map<String, Object> mergedOpts = new LinkedHashMap<>();
-${authActive ? `      mergedOpts.put("apikey", env.get("${PROJECTNAME}_APIKEY"));\n` : ''}      setup.client = new ${SDK}(mergedOpts);
+      // sdk-test-control.json's test.client.options seeds the live
+      // client; the generated fields below overwrite anything they name.
+      Map<String, Object> mergedOpts =
+          new LinkedHashMap<>(RunnerSupport.liveClientOptions());
+${authActive ? `      mergedOpts.put("apikey", env.get("${PROJECTNAME}_APIKEY"));\n` : ''}${serverLiveField}      setup.client = new ${SDK}(mergedOpts);
       setup.live = true;
 
       Map<String, Object> idmap = new LinkedHashMap<>();

@@ -33,7 +33,7 @@ class Utility private constructor(register: Boolean) {
   lateinit var prepareAuth: (Context) -> Spec
   lateinit var prepareBody: (Context) -> Any?
   lateinit var prepareHeaders: (Context) -> MutableMap<String, Any?>
-  lateinit var prepareMethod: (Context) -> String
+  lateinit var prepareMethod: (Context) -> String?
   lateinit var prepareParams: (Context) -> MutableMap<String, Any?>
   lateinit var preparePath: (Context) -> String
   lateinit var prepareQuery: (Context) -> MutableMap<String, Any?>

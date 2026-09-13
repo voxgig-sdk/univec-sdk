@@ -5,8 +5,13 @@ PERL ?= perl
 # Run the WHOLE suite (entity, direct, utility, pipeline, feature and
 # netsim tests) with prove (TAP). -Ilib puts the generated SDK module on
 # @INC; helper .pm files in t/ are loaded by path.
+#
+# `-r` IS LOAD-BEARING: prove is NON-RECURSIVE by default, so without it a
+# gated suite under t/feature/ is collected by nothing and the target
+# reports a clean run. A suite that never runs looks exactly like a suite
+# that passes.
 test:
-	prove -Ilib t/
+	prove -r -Ilib t/
 
 # No build step - pure-Perl module.
 build:

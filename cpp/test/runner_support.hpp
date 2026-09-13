@@ -1,18 +1,25 @@
-// Univec SDK — shared test runner support (mirrors java
+// Univec SDK — shared test runner SUPPORT (mirrors java
 // test/RunnerSupport.java): env overrides, sdk-test-control.json skips, the
-// ../.sdk/test/test.json loader, and the runset/match engine.
+// ../.sdk/test/test.json loader, and Context construction from a test-entry
+// ctx map.
+//
+// SUPPORT ONLY. The runset/match ENGINE that used to live here (and the
+// whole of the retired test/struct_runner.hpp) was replaced by the vendored
+// @voxgig/omni runner — see test/omni_resolver.hpp, which drives it and
+// calls make_ctx_from_map/fixctx below. The file KEEPS ITS NAME because the
+// generated entity suites (<entity>_direct_test.cpp, <entity>_entity_test.cpp)
+// include it for read_file, load_env_local, env_override,
+// is_control_skipped, entity_list_to_data and now_ms.
 
 #ifndef SDK_TEST_RUNNER_SUPPORT_HPP
 #define SDK_TEST_RUNNER_SUPPORT_HPP
 
 #include <cctype>
 #include <chrono>
-#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <map>
-#include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -155,183 +162,6 @@ inline Value get_spec(const Value& spec, std::initializer_list<std::string> keys
   return Helpers::toMapAny(cur);
 }
 
-// ---- normalisation / matching ----------------------------------------
-
-inline Value json_normalize(const Value& v) {
-  // Roundtrip through JSON to drop function values and canonicalise numbers.
-  return vs::parse_json(vs::jsonify(v, 0));
-}
-
-// canon: integer-valued numbers -> int; maps sorted; recursive. Returns a
-// normalised Value used only for deep-equality.
-inline Value canon(const Value& v) {
-  if (v.is_double()) {
-    double d = v.as_double();
-    if (std::isfinite(d) && std::floor(d) == d) return Value((int64_t)d);
-    return v;
-  }
-  if (v.is_list()) {
-    Value out = vlist();
-    for (const auto& e : *v.as_list()) out.as_list()->push_back(canon(e));
-    return out;
-  }
-  if (v.is_map()) {
-    std::vector<std::string> keys = Struct::keysof(v); // sorted
-    Value out = vmap();
-    for (const auto& k : keys) map_put(out, k, canon(getp(v, k)));
-    return out;
-  }
-  return v;
-}
-
-inline bool canon_eq(const Value& a, const Value& b) { return canon(a) == canon(b); }
-
-inline std::string to_lower(std::string s) {
-  for (auto& c : s) c = static_cast<char>(std::tolower((unsigned char)c));
-  return s;
-}
-
-inline bool match_string(const std::string& pattern, const std::string& val) {
-  if (pattern.size() >= 2 && pattern.front() == '/' && pattern.back() == '/') {
-    try {
-      std::regex re(pattern.substr(1, pattern.size() - 2));
-      return std::regex_search(val, re);
-    } catch (...) { return false; }
-  }
-  return to_lower(val).find(to_lower(pattern)) != std::string::npos;
-}
-
-// match_deep: walk `check`; every leaf must equal/match base at that path.
-inline void match_deep(const std::string& where, const Value& check, const Value& base,
-                       const std::string& path) {
-  if (check.is_undef()) return;
-  if (check.is_map()) {
-    for (const auto& kv : *check.as_map()) {
-      Value bv = base.is_map() ? getp(base, kv.first) : Value::undef();
-      match_deep(where, kv.second, bv, path + "." + kv.first);
-    }
-    return;
-  }
-  if (check.is_list()) {
-    auto cl = check.as_list();
-    for (size_t i = 0; i < cl->size(); i++) {
-      Value bv = Value::undef();
-      if (base.is_list() && i < base.as_list()->size()) bv = (*base.as_list())[i];
-      match_deep(where, (*cl)[i], bv, path + "[" + std::to_string(i) + "]");
-    }
-    return;
-  }
-  // leaf
-  if (check.is_string() && check.as_string() == "__EXISTS__") {
-    sdktest::checks()++;
-    if (is_nullish(base)) sdktest::record_fail(where, "match " + path + ": expected value to exist");
-    return;
-  }
-  if (check.is_string() && check.as_string() == "__UNDEF__") {
-    sdktest::checks()++;
-    if (!is_nullish(base)) sdktest::record_fail(where, "match " + path + ": expected undef, got " + vs::jsonify(base, 0));
-    return;
-  }
-  Value nc = json_normalize(check);
-  Value nb = json_normalize(base);
-  sdktest::checks()++;
-  if (!canon_eq(nc, nb)) {
-    if (check.is_string() && !check.as_string().empty() &&
-        match_string(check.as_string(), Struct::stringify(base))) {
-      return;
-    }
-    sdktest::record_fail(where, "match " + path + ": got " + vs::jsonify(nb, 0) + ", want " + vs::jsonify(nc, 0));
-  }
-}
-
-// runset — drive a test.json entry set against a subject (which returns a
-// Value or throws SdkErrorPtr). Records failures via testlib.
-using RunSubject = std::function<Value(const Value& entry)>;
-
-inline void runset(const std::string& label, const Value& testspec, RunSubject subject) {
-  if (!testspec.is_map()) return;
-  Value set = getp(testspec, "set");
-  if (!set.is_list()) return;
-
-  auto entries = set.as_list();
-  for (size_t i = 0; i < entries->size(); i++) {
-    const Value& entry = (*entries)[i];
-    if (!entry.is_map()) continue;
-    std::string where = label + "#" + std::to_string(i);
-
-    Value result = Value::undef();
-    SdkErrorPtr err;
-    std::string errMsg;
-    try {
-      result = subject(entry);
-    } catch (const SdkErrorPtr& e) {
-      err = e;
-      errMsg = e->getMessage();
-    } catch (const std::exception& e) {
-      err = std::make_shared<SdkError>("", e.what(), nullptr);
-      errMsg = e.what();
-    }
-
-    Value expectedErr = getp(entry, "err");
-
-    if (err) {
-      if (!is_nullish(expectedErr)) {
-        sdktest::checks()++;
-        if (expectedErr.is_string() && !match_string(expectedErr.as_string(), errMsg)) {
-          sdktest::record_fail(where, "error mismatch: got \"" + errMsg + "\", want contains \"" + expectedErr.as_string() + "\"");
-        }
-        Value matchSpec = Helpers::toMapAny(getp(entry, "match"));
-        if (matchSpec.is_map()) {
-          Value resultMap = vmap();
-          map_put(resultMap, "in", getp(entry, "in"));
-          map_put(resultMap, "out", json_normalize(result));
-          Value errRec = vmap();
-          map_put(errRec, "message", Value(errMsg));
-          map_put(resultMap, "err", errRec);
-          match_deep(where, matchSpec, resultMap, "");
-        }
-        continue;
-      }
-      sdktest::checks()++;
-      sdktest::record_fail(where, "unexpected error: " + errMsg);
-      continue;
-    }
-
-    if (!is_nullish(expectedErr)) {
-      sdktest::checks()++;
-      sdktest::record_fail(where, "expected error containing \"" + Struct::stringify(expectedErr) + "\" but got " + vs::jsonify(json_normalize(result), 0));
-      continue;
-    }
-
-    bool matched = false;
-    Value matchSpec = Helpers::toMapAny(getp(entry, "match"));
-    if (matchSpec.is_map()) {
-      Value resultMap = vmap();
-      map_put(resultMap, "in", getp(entry, "in"));
-      map_put(resultMap, "out", json_normalize(result));
-      if (!is_nullish(getp(entry, "args"))) {
-        map_put(resultMap, "args", getp(entry, "args"));
-      } else if (!is_nullish(getp(entry, "in"))) {
-        map_put(resultMap, "args", vlist({getp(entry, "in")}));
-      }
-      if (!is_nullish(getp(entry, "ctx"))) map_put(resultMap, "ctx", getp(entry, "ctx"));
-      match_deep(where, matchSpec, resultMap, "");
-      matched = true;
-    }
-
-    Value expectedOut = getp(entry, "out");
-    if (is_nullish(expectedOut) && matched) continue;
-    if (!is_nullish(expectedOut)) {
-      sdktest::checks()++;
-      Value nr = json_normalize(result);
-      Value ne = json_normalize(expectedOut);
-      if (!canon_eq(nr, ne)) {
-        sdktest::record_fail(where, "output mismatch: got " + vs::jsonify(nr, 0) + ", want " + vs::jsonify(ne, 0));
-      }
-    }
-  }
-}
-
 // ---- Context construction from a JSON ctx map ------------------------
 
 struct EntityTestSetup {
@@ -344,6 +174,39 @@ struct EntityTestSetup {
   bool synthetic_only = false;
   long long now = 0;
 };
+
+// A minimal Entity for a test-entry ctx map. Context resolves the operation
+// through the Entity INTERFACE — resolveOp keys the config lookup on
+// entity->getName() — and a literal {"name": "planet"} map out of the
+// fixture is not one, so entname would be "" and every op lookup would miss,
+// reporting point_no_points for the whole makePoint group. (java's peer is
+// PrimaryUtilityTest.PlEntity, go's is plEntity. cpp keeps it here rather
+// than at the call site because Context holds a RAW Entity*, so the instance
+// must outlive the Context: named_entity interns one per name for the life
+// of the test binary.)
+class NamedEntity : public Entity {
+public:
+  explicit NamedEntity(std::string name) : name_(std::move(name)) {}
+  std::string getName() override { return name_; }
+  EntityPtr make() override { return std::make_shared<NamedEntity>(name_); }
+  Value data(const Value& arg) override { return Value::undef(); }
+  Value match(const Value& arg) override { return Value::undef(); }
+  void markDeleted() override { deleted_ = true; }
+  bool deleted() override { return deleted_; }
+
+private:
+  std::string name_;
+  bool deleted_ = false;
+};
+
+inline Entity* named_entity(const std::string& name) {
+  static std::map<std::string, std::shared_ptr<NamedEntity>> interned;
+  auto it = interned.find(name);
+  if (it == interned.end()) {
+    it = interned.emplace(name, std::make_shared<NamedEntity>(name)).first;
+  }
+  return it->second.get();
+}
 
 // makeCtxFromMap — build a Context from a test-entry ctx/args map.
 inline CtxPtr make_ctx_from_map(const Value& ctxmap_, std::shared_ptr<UnivecSDK> client,
@@ -369,6 +232,30 @@ inline CtxPtr make_ctx_from_map(const Value& ctxmap_, std::shared_ptr<UnivecSDK>
   if (reqmatch.is_map()) cs.reqmatch = reqmatch;
   Value point = Helpers::toMapAny(getp(ctxmap, "point"));
   if (point.is_map()) cs.point = point;
+
+  // An entry may carry the whole operation lookup — the API config, the SDK
+  // options that gate it, and the entity it hangs off. makePoint's group is
+  // built entirely out of these three (java reads the same keys in its
+  // Context constructor); without them ctx.config falls back to the client's
+  // BAKED-IN config and the group asserts against the wrong endpoints.
+  Value configMap = Helpers::toMapAny(getp(ctxmap, "config"));
+  if (configMap.is_map()) cs.config = configMap;
+  Value optionsMap = Helpers::toMapAny(getp(ctxmap, "options"));
+  if (optionsMap.is_map()) cs.options = optionsMap;
+  Value entityMap = Helpers::toMapAny(getp(ctxmap, "entity"));
+  if (entityMap.is_map()) {
+    Value entname = getp(entityMap, "name");
+    if (entname.is_string()) cs.entity = named_entity(entname.as_string());
+  }
+
+  // EVERY entry gets its OWN op cache. resolveOp memoises on
+  // "<entity>:<opname>", and makePoint drives seven entries that all read
+  // planet:list from a DIFFERENT config — inheriting the client's root opmap
+  // would serve entry one's operation to all seven and the group would pass
+  // while testing one case. (java gets this for free: its makeCtxFromMap
+  // builds `new Context(ctxmap, null)`, so there is no base context to
+  // inherit a cache from.)
+  cs.opmap = std::make_shared<OpMap>();
 
   CtxPtr ctx = utility->makeContext(cs, client ? client->getRootCtx() : nullptr);
 

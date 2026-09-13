@@ -5,6 +5,7 @@ import {
   cmp,
   collectDeps,
   pkgDescription,
+  targetFeatures,
 } from '@voxgig/sdkgen'
 
 
@@ -26,6 +27,17 @@ const Package = cmp(async function Package(props: any) {
   // CPAN-style distribution name, namespaced to model.origin
   // (e.g. "Voxgig::SDK::Solar" -> dist voxgig-sdk-solar).
   const Name = model.const.Name
+
+  // THE PERL FLOOR IS A FUNCTION OF THE FEATURE SET, not a constant.
+  //
+  // The base SDK is pure 5.018 perl. The secrets feature is not: the
+  // vendored voxgig/plugin runtime it depends on opens with
+  // `use builtin qw(is_bool)`, which is 5.36's and is the only way that
+  // port can tell `true` from `1`. Shipping 5.018 in the manifest of an
+  // SDK that cannot run on 5.018 installs cleanly and then dies at
+  // require time, so the floor moves with the feature.
+  const secrets = null != (targetFeatures(model, target) as any).secrets
+  const minperl = secrets ? '5.036' : '5.018'
 
   const deps = collectDeps(model, target.name, target.deps, ctx$.log)
   const prereq = deps
@@ -51,7 +63,7 @@ WriteMakefile(
     ABSTRACT         => '${pkgDescription(model, target.name)}',
     AUTHOR           => 'Voxgig',
     LICENSE          => 'mit',
-    MIN_PERL_VERSION => '5.018',
+    MIN_PERL_VERSION => '${minperl}',
 ${prereq ? `    PREREQ_PM        => {\n${prereq}\n    },\n` : ''});
 `)
   })

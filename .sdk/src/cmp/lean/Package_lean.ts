@@ -36,6 +36,22 @@ version = "${packageVersion(model, target.name)}"
 defaultTargets = ["SdkClient"]
 
 ${libBlocks}
+# The corpus ENGINE: the vendored @voxgig/omni Lean port, source rather than
+# a dependency. Its own lean_lib so Lake can find the module, and
+# deliberately NOT in defaultTargets: only the test executables import it, so
+# \`lake build\` compiles the shipped library without it and nothing a
+# consumer installs ever names omni. Lake has no test-scoped dependency, so
+# vendoring is what keeps that isolation.
+[[lean_lib]]
+name = "Omni"
+srcDir = "test/vendor/omni"
+
+# The adapter that drives omni's native API with subjects built from this
+# SDK's own utilities. Imported by the corpus suites and the smoke test.
+[[lean_lib]]
+name = "OmniResolver"
+srcDir = "test"
+
 [[lean_exe]]
 name = "runner"
 srcDir = "test"
@@ -55,6 +71,13 @@ root = "TPrimaryUtility"
 name = "feature"
 srcDir = "test"
 root = "TFeature"
+
+# Smoke test for the vendored engine itself: a runner that cannot FAIL a bad
+# entry would turn every corpus suite vacuously green.
+[[lean_exe]]
+name = "omnismoke"
+srcDir = "test"
+root = "OmniSmoke"
 `)
   })
 

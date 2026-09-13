@@ -9,6 +9,21 @@ main: kit: target: rust: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability (docs/design/feature-tags.md). A vendored sekreto port
+  # lives in this target's feature container (tm/rust/feature/secrets/), so
+  # a feature that resolves secrets through sekreto can apply here.
+  provides: { sekreto: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the hand-written struct corpus runner, superseded
+  # by the vendored @voxgig/omni engine driven through
+  # tests/omni_resolver/mod.rs. `doctor` reports leftovers; `doctor prune`
+  # deletes them. (tests/common/mod.rs is NOT listed: it kept its name and
+  # its support half, and only the corpus engine inside it was retired.)
+  superseded: [
+    'tests/struct_runner/mod.rs'
+  ]
+
   deps: &: {
     kind: *'prod' | string
   }

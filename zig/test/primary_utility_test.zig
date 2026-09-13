@@ -93,12 +93,12 @@ const FetchRec = struct {
     calls: std.ArrayList(Value),
     fn call(p: *anyopaque, _: std.mem.Allocator, arg: Value) anyerror!Value {
         const self: *FetchRec = @ptrCast(@alignCast(p));
-        self.calls.append(arg) catch {};
+        self.calls.append(h.A(), arg) catch {};
         return h.jo(&.{ .{ "status", h.vnum(200) }, .{ "statusText", h.vstr("OK") } });
     }
     fn new() *FetchRec {
         const s = h.A().create(FetchRec) catch unreachable;
-        s.* = .{ .calls = std.ArrayList(Value).init(h.A()) };
+        s.* = .{ .calls = .empty };
         return s;
     }
     fn fn_val(self: *FetchRec) Value {
@@ -283,7 +283,7 @@ test "primary feature_hook basic" {
     var hooked = false;
     var inited = false;
     client.features.clearRetainingCapacity();
-    client.features.append(ProbeFeature.make("probe", true, &hooked, &inited)) catch unreachable;
+    client.features.append(h.A(), ProbeFeature.make("probe", true, &hooked, &inited)) catch unreachable;
 
     utility.feature_hook(ctx, "TestHook");
     try testing.expect(hooked);
@@ -353,10 +353,18 @@ test "primary new sdk smoke" {
 // cannot drift from the reference implementation. That is what moves zig from
 // the MIRRORED parity tier to FULL: a mirrored suite cannot notice a corpus
 // case that changed, or one that was added.
+//
+// The ENGINE is vendored @voxgig/omni, driven through test/omniresolver.zig
+// (its header carries the adapter decisions). A subject here receives omni's
+// own argument list - the contextified `ctx`, the entry's `args`, or its `in`
+// - builds the typed SDK context at the call site, and publishes the
+// observable ctx state back through `po` so a `match: {ctx: ...}` assertion
+// has something to read.
 // ---------------------------------------------------------------------------
 
-const runner = @import("struct_runner.zig");
-const vs = @import("../utility/voxgigstruct/struct.zig");
+const omni = @import("omni");
+const omnirun = @import("omniresolver.zig");
+const vs = @import("voxgig-struct");
 
 const StdJson = std.json.Value;
 
@@ -453,70 +461,63 @@ fn corpusCtxOpts(alloc: std.mem.Allocator, ctxstd: StdJson, sdkopts: sdk.Value) 
 
 /// Publish a neutral-named view of the mutated ctx, for `match: ctx.*`.
 fn publishCtx(alloc: std.mem.Allocator, ctx: *sdk.Context) !StdJson {
-    var out = std.json.ObjectMap.init(alloc);
-    if (ctx.spec) |sp| try out.put("spec", try vs.toStdJson(alloc, sp.to_value()));
-    if (ctx.result) |rt| try out.put("result", try vs.toStdJson(alloc, rt.to_value()));
+    var out: std.json.ObjectMap = .empty;
+    if (ctx.spec) |sp| try out.put(alloc, "spec", try vs.toStdJson(alloc, sp.to_value()));
+    if (ctx.result) |rt| try out.put(alloc, "result", try vs.toStdJson(alloc, rt.to_value()));
     if (ctx.response) |rs| {
         // makeRequest asserts `ctx.response: __EXISTS__`, so the response has
         // to appear here at all; publish a neutral view of it while we are at
         // it, since the corpus is camelCase and this port stores status_text.
-        var r = std.json.ObjectMap.init(alloc);
-        try r.put("status", StdJson{ .integer = @intCast(rs.status) });
-        try r.put("statusText", StdJson{ .string = rs.status_text });
-        try r.put("headers", try vs.toStdJson(alloc, rs.headers));
-        try r.put("body", try vs.toStdJson(alloc, rs.body));
-        try out.put("response", StdJson{ .object = r });
+        var r: std.json.ObjectMap = .empty;
+        try r.put(alloc, "status", StdJson{ .integer = @intCast(rs.status) });
+        try r.put(alloc, "statusText", StdJson{ .string = rs.status_text });
+        try r.put(alloc, "headers", try vs.toStdJson(alloc, rs.headers));
+        try r.put(alloc, "body", try vs.toStdJson(alloc, rs.body));
+        try out.put(alloc, "response", StdJson{ .object = r });
     }
     return StdJson{ .object = out };
 }
 
-/// A section's `basic` set. The corpus nests one level — {"basic": {"set": []}}
-/// — and passing the section node itself found no `set`, so every case was
-/// skipped and the suite passed having run nothing.
-fn section(spec: runner.Spec, name: []const u8) !StdJson {
-    const sec = spec.get(name) orelse return error.NoSection;
-    if (sec != .object) return error.NoSection;
-    return sec.object.get("basic") orelse error.NoSection;
-}
-
-/// A section's DEF.setup.a block, as SDK options.
-fn setupOpts(a_unused: std.mem.Allocator, spec: runner.Spec, name: []const u8) !sdk.Value {
+/// A section's DEF.setup.a block, as SDK options. Read straight off the
+/// loaded spec, BEFORE omni's null normalisation — a DEF block is
+/// configuration, not a test entry.
+fn setupOpts(r: *const omnirun.Runner, name: []const u8) !sdk.Value {
     // The SDK's own arena, not the testing allocator: these values outlive the
     // call and are owned by the SDK for the run, so allocating them from the
     // test allocator reports a leak at teardown.
-    _ = a_unused;
     const a = h.A();
-    const sec = spec.get(name) orelse return sdk.Value{ .null = {} };
-    if (sec != .object) return sdk.Value{ .null = {} };
-    const def = sec.object.get("DEF") orelse return sdk.Value{ .null = {} };
-    if (def != .object) return sdk.Value{ .null = {} };
-    const setup = def.object.get("setup") orelse return sdk.Value{ .null = {} };
-    if (setup != .object) return sdk.Value{ .null = {} };
-    const aa = setup.object.get("a") orelse return sdk.Value{ .null = {} };
+    const setup = omni.jget(omni.jget(omni.jget(r.spec(), name), "DEF"), "setup");
+    const aa = omni.jget(setup, "a") orelse return sdk.Value{ .null = {} };
     return try vs.fromStdJson(a, aa);
+}
+
+/// One positional argument of the entry, as omni resolved it: the
+/// contextified `ctx`, an element of `args`, or `in`. Absent reads as null,
+/// which is what every one of these subjects did with a missing field.
+fn entryarg(args: []const StdJson, index: usize) StdJson {
+    if (index < args.len) return args[index];
+    return StdJson{ .null = {} };
 }
 
 var setup_spec: sdk.Value = .{ .null = {} };
 var setup_auth: sdk.Value = .{ .null = {} };
 
-fn entryCtx(entry: StdJson) StdJson {
-    if (entry == .object) {
-        if (entry.object.get("ctx")) |c| return c;
-    }
-    return StdJson{ .null = {} };
-}
+// The shared primary corpus is the same fixture set in every SDK, so these
+// are real numbers rather than token ones. A legitimate drop below them is a
+// corpus change worth reading.
+const CASES_FLOOR = 60;
+const SECTIONS_FLOOR = 20;
 
 test "primary corpus: the shared cases drive this SDK's utilities" {
-    const alloc = testing.allocator;
-    var pack = try runner.makeRunnerFor(alloc, "primary");
-    defer pack.deinit();
+    var run = try omnirun.makeRunner(testing.allocator, "primary");
+    defer run.deinit();
 
-    setup_spec = try setupOpts(alloc, pack.spec, "makeSpec");
-    setup_auth = try setupOpts(alloc, pack.spec, "prepareAuth");
+    setup_spec = try setupOpts(&run, "makeSpec");
+    setup_auth = try setupOpts(&run, "prepareAuth");
 
     const S = struct {
-        fn ctxOf(a: std.mem.Allocator, entry: StdJson) anyerror!*sdk.Context {
-            return corpusCtx(a, entryCtx(entry));
+        fn ctxOf(a: std.mem.Allocator, args: []const StdJson) anyerror!*sdk.Context {
+            return corpusCtx(a, entryarg(args, 0));
         }
 
         /// Record the SDK's own message before letting the error propagate.
@@ -525,62 +526,35 @@ test "primary corpus: the shared cases drive this SDK's utilities" {
             return e;
         }
 
-        fn argAt(a: std.mem.Allocator, entry: StdJson, i: usize) anyerror!sdk.Value {
-            if (entry == .object) {
-                if (entry.object.get("args")) |args| {
-                    if (args == .array and i < args.array.items.len) {
-                        return try vs.fromStdJson(a, args.array.items[i]);
-                    }
-                }
-            }
-            return sdk.Value{ .null = {} };
-        }
-
-        fn argStd(entry: StdJson, i: usize) StdJson {
-            if (entry == .object) {
-                if (entry.object.get("args")) |args| {
-                    if (args == .array and i < args.array.items.len) return args.array.items[i];
-                }
-            }
-            return StdJson{ .null = {} };
-        }
-
-        fn inOf(entry: StdJson) StdJson {
-            if (entry == .object) {
-                if (entry.object.get("in")) |v| return v;
-            }
-            return StdJson{ .null = {} };
-        }
-
-        fn done(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
-            const ctx = try ctxOf(a, e);
+        fn done(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+            const ctx = try ctxOf(a, args);
             const v = util.done_util(ctx) catch |er| return sdkfail(ctx, em, er);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, v);
         }
 
-        fn makeContext(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn makeContext(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try corpusCtx(a, inOf(e));
+            const ctx = try corpusCtx(a, entryarg(args, 0));
             po.* = try publishCtx(a, ctx);
-            var out = std.json.ObjectMap.init(a);
-            var op = std.json.ObjectMap.init(a);
-            try op.put("entity", StdJson{ .string = ctx.op.entity });
-            try op.put("name", StdJson{ .string = ctx.op.name });
-            try op.put("input", StdJson{ .string = ctx.op.input });
-            try op.put("points", try vs.toStdJson(a, ctx.op.points));
-            try out.put("op", StdJson{ .object = op });
+            var out: std.json.ObjectMap = .empty;
+            var op: std.json.ObjectMap = .empty;
+            try op.put(a, "entity", StdJson{ .string = ctx.op.entity });
+            try op.put(a, "name", StdJson{ .string = ctx.op.name });
+            try op.put(a, "input", StdJson{ .string = ctx.op.input });
+            try op.put(a, "points", try vs.toStdJson(a, ctx.op.points));
+            try out.put(a, "op", StdJson{ .object = op });
             return StdJson{ .object = out };
         }
 
-        fn makeError(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
-            const ctx = try corpusCtx(a, argStd(e, 0));
+        fn makeError(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+            const ctx = try corpusCtx(a, entryarg(args, 0));
 
             // make_error_util takes no error argument — it reads one off the
             // ctx (pending_err, else result.err). The corpus passes it as
             // args[1], so put it where the utility will find it, or every case
             // reports "unknown error".
-            const errarg = argStd(e, 1);
+            const errarg = entryarg(args, 1);
             if (errarg == .object) {
                 if (errarg.object.get("message")) |m| {
                     if (m == .string and 0 < m.string.len) {
@@ -599,11 +573,11 @@ test "primary corpus: the shared cases drive this SDK's utilities" {
             return try vs.toStdJson(a, v);
         }
 
-        fn makeOptions(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn makeOptions(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
             // `in` is {config, options}, not a ctx — the utility reads them off
             // the context, so split them out rather than passing the wrapper.
-            const inv = inOf(e);
+            const inv = entryarg(args, 0);
             const ctx = try corpusCtx(a, StdJson{ .null = {} });
             if (inv == .object) {
                 if (inv.object.get("config")) |c| ctx.config = try vs.fromStdJson(a, c);
@@ -614,149 +588,149 @@ test "primary corpus: the shared cases drive this SDK's utilities" {
             return try vs.toStdJson(a, v);
         }
 
-        fn makeRequest(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
-            const ctx = try ctxOf(a, e);
+        fn makeRequest(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+            const ctx = try ctxOf(a, args);
             _ = util.make_request_util(ctx) catch |er| return sdkfail(ctx, em, er);
             po.* = try publishCtx(a, ctx);
             return StdJson{ .null = {} };
         }
 
-        fn makeResponse(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
-            const ctx = try ctxOf(a, e);
+        fn makeResponse(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+            const ctx = try ctxOf(a, args);
             _ = util.make_response_util(ctx) catch |er| return sdkfail(ctx, em, er);
             po.* = try publishCtx(a, ctx);
             return StdJson{ .null = {} };
         }
 
-        fn makeSpec(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
-            const ctx = try corpusCtxOpts(a, entryCtx(e), setup_spec);
+        fn makeSpec(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+            const ctx = try corpusCtxOpts(a, entryarg(args, 0), setup_spec);
             const sp = util.make_spec_util(ctx) catch |er| return sdkfail(ctx, em, er);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, sp.to_value());
         }
 
-        fn url(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
-            const ctx = try ctxOf(a, e);
+        fn url(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+            const ctx = try ctxOf(a, args);
             const u = util.make_url_util(ctx) catch |er| return sdkfail(ctx, em, er);
             po.* = try publishCtx(a, ctx);
             return StdJson{ .string = u };
         }
 
-        fn operator(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn operator(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = po;
             _ = em;
-            const op = sdk.Operation.make(try vs.fromStdJson(a, inOf(e)));
-            var out = std.json.ObjectMap.init(a);
-            try out.put("entity", StdJson{ .string = op.entity });
-            try out.put("input", StdJson{ .string = op.input });
-            try out.put("name", StdJson{ .string = op.name });
-            try out.put("points", try vs.toStdJson(a, op.points));
+            const op = sdk.Operation.make(try vs.fromStdJson(a, entryarg(args, 0)));
+            var out: std.json.ObjectMap = .empty;
+            try out.put(a, "entity", StdJson{ .string = op.entity });
+            try out.put(a, "input", StdJson{ .string = op.input });
+            try out.put(a, "name", StdJson{ .string = op.name });
+            try out.put(a, "points", try vs.toStdJson(a, op.points));
             return StdJson{ .object = out };
         }
 
-        fn param(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn param(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try corpusCtx(a, argStd(e, 0));
-            const pd = try argAt(a, e, 1);
+            const ctx = try corpusCtx(a, entryarg(args, 0));
+            const pd = try vs.fromStdJson(a, entryarg(args, 1));
             const v = util.param_util(ctx, pd);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, v);
         }
 
-        fn auth(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
-            const ctx = try corpusCtxOpts(a, entryCtx(e), setup_auth);
+        fn auth(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+            const ctx = try corpusCtxOpts(a, entryarg(args, 0), setup_auth);
             _ = util.prepare_auth_util(ctx) catch |er| return sdkfail(ctx, em, er);
             po.* = try publishCtx(a, ctx);
             return StdJson{ .null = {} };
         }
 
-        fn body(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn body(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const v = util.prepare_body_util(ctx);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, v);
         }
 
-        fn headers(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn headers(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const v = util.prepare_headers_util(ctx);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, v);
         }
 
-        fn method(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn method(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const m = util.prepare_method_util(ctx);
             po.* = try publishCtx(a, ctx);
             if (m.len == 0) return StdJson{ .null = {} };
             return StdJson{ .string = m };
         }
 
-        fn params(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn params(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const v = util.prepare_params_util(ctx);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, v);
         }
 
-        fn path(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn path(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const v = util.prepare_path_util(ctx);
             po.* = try publishCtx(a, ctx);
             return StdJson{ .string = v };
         }
 
-        fn query(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn query(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const v = util.prepare_query_util(ctx);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, v);
         }
 
-        fn rbasic(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn rbasic(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const r = util.result_basic_util(ctx);
             po.* = try publishCtx(a, ctx);
             if (r) |rr| return try vs.toStdJson(a, rr.to_value());
             return StdJson{ .null = {} };
         }
 
-        fn rbody(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn rbody(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const r = util.result_body_util(ctx);
             po.* = try publishCtx(a, ctx);
             if (r) |rr| return try vs.toStdJson(a, rr.to_value());
             return StdJson{ .null = {} };
         }
 
-        fn rheaders(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn rheaders(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const r = util.result_headers_util(ctx);
             po.* = try publishCtx(a, ctx);
             if (r) |rr| return try vs.toStdJson(a, rr.to_value());
             return StdJson{ .null = {} };
         }
 
-        fn treq(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn treq(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const v = util.transform_request_util(ctx);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, v);
         }
 
-        fn tres(a: std.mem.Allocator, e: StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
+        fn tres(a: std.mem.Allocator, args: []const StdJson, po: *?StdJson, em: *?[]const u8) anyerror!StdJson {
             _ = em;
-            const ctx = try ctxOf(a, e);
+            const ctx = try ctxOf(a, args);
             const v = util.transform_response_util(ctx);
             po.* = try publishCtx(a, ctx);
             return try vs.toStdJson(a, v);
@@ -764,28 +738,44 @@ test "primary corpus: the shared cases drive this SDK's utilities" {
     };
 
     // Every section the corpus carries, looked up in `primary` and driven.
-    try pack.runsetEntry(try section(pack.spec, "done"), S.done);
-    try pack.runsetEntry(try section(pack.spec, "makeContext"), S.makeContext);
-    try pack.runsetEntry(try section(pack.spec, "makeError"), S.makeError);
-    try pack.runsetEntry(try section(pack.spec, "makeOptions"), S.makeOptions);
-    try pack.runsetEntry(try section(pack.spec, "makeRequest"), S.makeRequest);
-    try pack.runsetEntry(try section(pack.spec, "makeResponse"), S.makeResponse);
-    try pack.runsetEntry(try section(pack.spec, "makeSpec"), S.makeSpec);
-    try pack.runsetEntry(try section(pack.spec, "makeUrl"), S.url);
-    try pack.runsetEntry(try section(pack.spec, "operator"), S.operator);
-    try pack.runsetEntry(try section(pack.spec, "param"), S.param);
-    try pack.runsetEntry(try section(pack.spec, "prepareAuth"), S.auth);
-    try pack.runsetEntry(try section(pack.spec, "prepareBody"), S.body);
-    try pack.runsetEntry(try section(pack.spec, "prepareHeaders"), S.headers);
-    try pack.runsetEntry(try section(pack.spec, "prepareMethod"), S.method);
-    try pack.runsetEntry(try section(pack.spec, "prepareParams"), S.params);
-    try pack.runsetEntry(try section(pack.spec, "preparePath"), S.path);
-    try pack.runsetEntry(try section(pack.spec, "prepareQuery"), S.query);
-    try pack.runsetEntry(try section(pack.spec, "resultBasic"), S.rbasic);
-    try pack.runsetEntry(try section(pack.spec, "resultBody"), S.rbody);
-    try pack.runsetEntry(try section(pack.spec, "resultHeaders"), S.rheaders);
-    try pack.runsetEntry(try section(pack.spec, "transformRequest"), S.treq);
-    try pack.runsetEntry(try section(pack.spec, "transformResponse"), S.tres);
+    try run.runsetctx(run.group("done", "basic"), .{ .name = "done" }, S.done);
+    try run.runsetctx(run.group("makeContext", "basic"), .{ .name = "makeContext" }, S.makeContext);
+    try run.runsetctx(run.group("makeError", "basic"), .{ .name = "makeError" }, S.makeError);
+    try run.runsetctx(run.group("makeOptions", "basic"), .{ .name = "makeOptions" }, S.makeOptions);
+    try run.runsetctx(run.group("makeRequest", "basic"), .{ .name = "makeRequest" }, S.makeRequest);
+    try run.runsetctx(run.group("makeResponse", "basic"), .{ .name = "makeResponse" }, S.makeResponse);
+    try run.runsetctx(run.group("makeSpec", "basic"), .{ .name = "makeSpec" }, S.makeSpec);
+    try run.runsetctx(run.group("makeUrl", "basic"), .{ .name = "makeUrl" }, S.url);
+    try run.runsetctx(run.group("operator", "basic"), .{ .name = "operator" }, S.operator);
+    try run.runsetctx(run.group("param", "basic"), .{ .name = "param" }, S.param);
+    try run.runsetctx(run.group("prepareAuth", "basic"), .{ .name = "prepareAuth" }, S.auth);
+    try run.runsetctx(run.group("prepareBody", "basic"), .{ .name = "prepareBody" }, S.body);
+    try run.runsetctx(run.group("prepareHeaders", "basic"), .{ .name = "prepareHeaders" }, S.headers);
+    try run.runsetctx(run.group("prepareMethod", "basic"), .{ .name = "prepareMethod" }, S.method);
+    try run.runsetctx(run.group("prepareParams", "basic"), .{ .name = "prepareParams" }, S.params);
+    try run.runsetctx(run.group("preparePath", "basic"), .{ .name = "preparePath" }, S.path);
+    try run.runsetctx(run.group("prepareQuery", "basic"), .{ .name = "prepareQuery" }, S.query);
+    try run.runsetctx(run.group("resultBasic", "basic"), .{ .name = "resultBasic" }, S.rbasic);
+    try run.runsetctx(run.group("resultBody", "basic"), .{ .name = "resultBody" }, S.rbody);
+    try run.runsetctx(run.group("resultHeaders", "basic"), .{ .name = "resultHeaders" }, S.rheaders);
+    try run.runsetctx(run.group("transformRequest", "basic"), .{ .name = "transformRequest" }, S.treq);
+    try run.runsetctx(run.group("transformResponse", "basic"), .{ .name = "transformResponse" }, S.tres);
 
-    try testing.expect(0 < pack.ran);
+    // The count is the guard: every section above compared its SUBJECT
+    // INVOCATIONS against the entries its group declares (omniresolver
+    // decision 6), and the census holds the whole file to a floor. A
+    // primary section that stopped driving the SDK, or a driver list that
+    // lost a line, shows up here as a number rather than as silence.
+    std.debug.print(
+        "\n  primary corpus: {d} cases across {d} sections\n",
+        .{ omnirun.CASES, omnirun.GROUPS },
+    );
+
+    if (omnirun.CASES < CASES_FLOOR or omnirun.GROUPS < SECTIONS_FLOOR) {
+        std.debug.print(
+            "  EXPECTED at least {d} cases across {d} sections\n",
+            .{ CASES_FLOOR, SECTIONS_FLOOR },
+        );
+        return error.CorpusUnderRun;
+    }
 }

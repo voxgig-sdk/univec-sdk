@@ -1,8 +1,14 @@
 package KOTLINPACKAGE.sdktest
 
-// Shared test-runner support: env overrides, sdk-test-control.json skips, the
-// ../.sdk/test/test.json spec loader, and the runset/match engine whose
-// matching logic mirrors js/test/runner.js (and the go runner_test.go).
+// Shared test-runner SUPPORT (vendor-tag rollout): env overrides, the
+// sdk-test-control.json skip machinery, live pacing, the
+// ../.sdk/test/test.json spec loader, ctx/entity conversion helpers, and
+// the canon comparison helper the feature tests use. The corpus ENGINE
+// that used to live beside them (runset/matchDeep/matchString) is
+// retired: both corpora now run on the vendored omni runner through
+// OmniResolver.kt. The object name is unchanged so the emitted
+// TestEntity/TestDirect call sites (RunnerSupport.skipReason,
+// RunnerSupport.envOverride, ...) need no churn.
 
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -19,7 +25,6 @@ import KOTLINPACKAGE.core.SdkError
 import KOTLINPACKAGE.core.Spec
 import KOTLINPACKAGE.core.Utility
 import KOTLINPACKAGE.utility.Json
-import KOTLINPACKAGE.utility.struct.Struct
 
 @Suppress("UNCHECKED_CAST")
 object RunnerSupport {
@@ -184,118 +189,6 @@ object RunnerSupport {
     return Helpers.toMapAny(cur)
   }
 
-  fun interface RunSubject {
-    fun run(entry: MutableMap<String, Any?>): Any?
-  }
-
-  // runset drives a test.json entry set against a subject.
-  fun runset(testspec: Map<String, Any?>?, subject: RunSubject) {
-    if (testspec == null || testspec["set"] !is List<*>) {
-      return
-    }
-    val set = testspec["set"] as List<Any?>
-
-    val failures = mutableListOf<String>()
-
-    for (i in set.indices) {
-      val entry = Helpers.toMapAny(set[i]) ?: continue
-
-      val mark = if (entry["mark"] == null) "" else " (mark=" + entry["mark"] + ")"
-
-      var result: Any? = null
-      var err: Exception? = null
-      try {
-        result = subject.run(entry)
-      } catch (e: Exception) {
-        err = e
-      }
-
-      val expectedErr = entry["err"]
-
-      if (err != null) {
-        if (expectedErr != null) {
-          val errMsg = err.message ?: err.toString()
-          if (expectedErr is String && !matchString(expectedErr, errMsg)) {
-            failures.add("entry $i$mark: error mismatch: got \"$errMsg\", want contains \"$expectedErr\"")
-          }
-          val matchSpec = Helpers.toMapAny(entry["match"])
-          if (matchSpec != null) {
-            val resultMap = linkedMapOf<String, Any?>()
-            resultMap["in"] = entry["in"]
-            resultMap["out"] = jsonNormalize(result)
-            val errRec = linkedMapOf<String, Any?>()
-            errRec["message"] = errMsg
-            resultMap["err"] = errRec
-            matchDeep(failures, i, mark, matchSpec, resultMap, "")
-          }
-          continue
-        }
-        failures.add("entry $i$mark: unexpected error: $err")
-        continue
-      }
-
-      if (expectedErr != null) {
-        failures.add("entry $i$mark: expected error containing \"$expectedErr\" but got result: ${jsonStr(result)}")
-        continue
-      }
-
-      var matched = false
-      val matchSpec = Helpers.toMapAny(entry["match"])
-      if (matchSpec != null) {
-        val resultMap = linkedMapOf<String, Any?>()
-        resultMap["in"] = entry["in"]
-        resultMap["out"] = jsonNormalize(result)
-        if (entry["args"] != null) {
-          resultMap["args"] = entry["args"]
-        } else if (entry["in"] != null) {
-          val args = mutableListOf<Any?>()
-          args.add(entry["in"])
-          resultMap["args"] = args
-        }
-        if (entry["ctx"] != null) {
-          resultMap["ctx"] = entry["ctx"]
-        }
-        matchDeep(failures, i, mark, matchSpec, resultMap, "")
-        matched = true
-      }
-
-      val expectedOut = entry["out"]
-      if (expectedOut == null && matched) {
-        continue
-      }
-      if (expectedOut != null) {
-        val normResult = jsonNormalize(result)
-        val normExpected = jsonNormalize(expectedOut)
-        if (canon(normResult) != canon(normExpected)) {
-          failures.add("entry $i$mark: output mismatch:\n  got:  ${jsonStr(normResult)}\n  want: ${jsonStr(normExpected)}")
-        }
-      }
-    }
-
-    if (failures.isNotEmpty()) {
-      throw AssertionError(failures.joinToString("\n"))
-    }
-  }
-
-  fun jsonNormalize(v: Any?): Any? {
-    if (v == null) {
-      return null
-    }
-    return try {
-      Json.parse(Struct.jsonify(v))
-    } catch (e: RuntimeException) {
-      v
-    }
-  }
-
-  fun jsonStr(v: Any?): String {
-    return try {
-      Struct.jsonify(v)
-    } catch (e: RuntimeException) {
-      v.toString()
-    }
-  }
-
   fun canon(v: Any?): Any? {
     if (v == null) {
       return null
@@ -325,68 +218,6 @@ object RunnerSupport {
       return out
     }
     return v.toString()
-  }
-
-  fun matchDeep(failures: MutableList<String>, entryIdx: Int, mark: String, check: Any?, base: Any?, path: String) {
-    if (check == null) {
-      return
-    }
-
-    if (check is Map<*, *>) {
-      for (e in (check as Map<String, Any?>).entries) {
-        val childPath = "$path.${e.key}"
-        val baseVal = if (base is Map<*, *>) (base as Map<String, Any?>)[e.key] else null
-        matchDeep(failures, entryIdx, mark, e.value, baseVal, childPath)
-      }
-    } else if (check is List<*>) {
-      for (i in check.indices) {
-        val childPath = "$path[$i]"
-        var baseVal: Any? = null
-        if (base is List<*> && i < base.size) {
-          baseVal = base[i]
-        }
-        matchDeep(failures, entryIdx, mark, check[i], baseVal, childPath)
-      }
-    } else {
-      if ("__EXISTS__" == check) {
-        if (base == null) {
-          failures.add("entry $entryIdx$mark: match $path: expected value to exist but got null")
-        }
-        return
-      }
-      if ("__UNDEF__" == check) {
-        if (base != null) {
-          failures.add("entry $entryIdx$mark: match $path: expected null but got $base")
-        }
-        return
-      }
-
-      val normCheck = jsonNormalize(check)
-      val normBase = jsonNormalize(base)
-
-      if (canon(normCheck) != canon(normBase)) {
-        if (check is String && "" != check) {
-          val baseStr = Struct.stringify(base)
-          if (matchString(check, baseStr)) {
-            return
-          }
-        }
-        failures.add("entry $entryIdx$mark: match $path: got ${jsonStr(normBase)}, want ${jsonStr(normCheck)}")
-      }
-    }
-  }
-
-  // matchString checks if val matches pattern. If pattern is /regex/, use
-  // regex; otherwise do case-insensitive contains.
-  fun matchString(pattern: String, v: String): Boolean {
-    if (pattern.length >= 2 && pattern.startsWith("/") && pattern.endsWith("/")) {
-      return try {
-        Regex(pattern.substring(1, pattern.length - 1)).containsMatchIn(v)
-      } catch (e: RuntimeException) {
-        false
-      }
-    }
-    return v.lowercase().contains(pattern.lowercase())
   }
 
   // makeCtxFromMap creates a Context from a JSON test entry's ctx or args map.

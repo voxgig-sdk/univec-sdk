@@ -28,10 +28,10 @@ final class PrepareMethod {
       return ((String) pm).toUpperCase();
     }
 
-    String m = METHOD_MAP.get(opname);
-    if (m != null) {
-      return m;
-    }
-    return "GET";
+    // No default: an op name outside the convention resolves to NO method,
+    // exactly as the ts reference (`methodMap[key]` is undefined there).
+    // The silent-pass engine hid a stray "GET" fallback here; the shared
+    // corpus (prepareMethod, opname "bad" -> null) pins it now.
+    return METHOD_MAP.get(opname);
   }
 }

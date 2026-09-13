@@ -1,63 +1,142 @@
-/* Voxgig Struct corpus driver — C port. Mirrors cpp/tests/struct_corpus_test.cpp. */
+/* Voxgig Struct corpus driver — C port, on the VENDORED @voxgig/omni
+ * runner (tests/vendor/omni, driven through tests/omni_resolver.h).
+ *
+ * Every `struct.<category>.<name>` section of the shared corpus
+ * (.sdk/test/test.json) is run by omni itself: omni resolves the section,
+ * normalises its values, calls the subject once per entry and compares
+ * `out` / `match` / `err`. The hand-written engine this file used to call
+ * (tests/runner.h run_subject) is retired; the subjects below crossed over
+ * verbatim, because the resolver keeps their signature.
+ *
+ * Two behaviours changed with the engine, both deliberately:
+ *
+ *   * A MISSING OR EMPTY SECTION IS NOW A FAILURE. Six `sentinels.*`
+ *     sections had been renamed to `struct.nullsem` in the corpus; the old
+ *     runner scored them a silent 0/0 and nullsem itself went unrun. The
+ *     five real nullsem sections (33 entries) are driven below, and any
+ *     section that resolves to nothing is reported OUT LOUD.
+ *
+ *   * `match` IS CHECKED. The old engine ignored it, so
+ *     struct.minor.setpath's "the subject mutated its argument" assertions
+ *     and struct.merge.integrity's "the subject did NOT" assertions were
+ *     dead. omni checks both (see decision 3 in omni_resolver.h).
+ *
+ * SCOREBOARD. omni reports pass/fail per SET, stopping at the first
+ * failing entry, so per-entry credit is no longer knowable. Each row
+ * therefore carries the number of cases the section HOLDS — the count that
+ * proves the corpus still runs — plus its pass/fail.
+ */
 
-#include "runner.h"
+#include "omni_resolver.h"
 #include "voxgig_struct.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static voxgig_value* CORPUS = NULL;
+/* The shared corpus, compiled by the project build. Relative to the target
+ * root, which is where the Makefile runs each test binary from. */
+#define TEST_JSON_FILE "../.sdk/test/test.json"
 
-static voxgig_value* get_spec(const char* category, const char* name) {
-  if (!CORPUS) {
-    CORPUS = voxgig_parse_json_file("../.sdk/test/test.json");
-  }
-  voxgig_value* sk = voxgig_new_string("struct");
-  voxgig_value* sv = voxgig_getprop(CORPUS, sk, NULL);
-  voxgig_release(sk);
-  voxgig_value* ck = voxgig_new_string(category);
-  voxgig_value* cat = voxgig_getprop(sv, ck, NULL);
-  voxgig_release(ck);
-  voxgig_release(sv);
-  voxgig_value* nk = voxgig_new_string(name);
-  voxgig_value* spec = voxgig_getprop(cat, nk, NULL);
-  voxgig_release(nk);
-  voxgig_release(cat);
-  return spec;
-}
+static omni_pool* POOL = NULL;
+static omni_runpack* PACK = NULL;
 
-/* Scoreboard. */
+/* Scoreboard: one row per corpus section. */
 typedef struct slot {
-  char* key;
-  runner_result r;
+  char* name;
+  size_t cases;
+  int failed;
+  char* err;
 } slot;
 
 static slot* SB = NULL;
 static size_t SB_LEN = 0;
 static size_t SB_CAP = 0;
 
-static void sb_add(const char* key, runner_result r) {
+static void sb_add(const char* name, size_t cases, int failed, const char* err) {
   if (SB_LEN + 1 > SB_CAP) {
     size_t nc = SB_CAP == 0 ? 64 : SB_CAP * 2;
     SB = (slot*)realloc(SB, nc * sizeof(slot));
     SB_CAP = nc;
   }
-  SB[SB_LEN].key = strdup(key);
-  SB[SB_LEN].r = r;
+  SB[SB_LEN].name = strdup(name);
+  SB[SB_LEN].cases = cases;
+  SB[SB_LEN].failed = failed;
+  SB[SB_LEN].err = err ? strdup(err) : NULL;
   SB_LEN++;
 }
 
-static void run(const char* cat, const char* name, bool null_flag, runner_subject_fn s, void* ud) {
-  char full[256];
-  snprintf(full, sizeof(full), "%s.%s", cat, name);
-  voxgig_value* spec = get_spec(cat, name);
-  runner_result r;
-  runner_result_init(&r, full);
-  run_subject(&r, spec, null_flag, s, ud);
-  voxgig_release(spec);
-  sb_add(full, r);
+/* Resolve `struct.<cat>.<name>`. NULL (with the reason recorded) when the
+ * corpus does not carry it. */
+static omni_json* section(const char* cat, const char* name, const char* full) {
+  omni_json* cats = omni_set(PACK, cat);
+  omni_json* spec;
+  if (!omni_ismap(cats)) {
+    sb_add(full, 0, 1, "corpus category missing - check .sdk/test/struct/");
+    return NULL;
+  }
+  spec = omni_map_get(cats, name);
+  if (!omni_ismap(spec)) {
+    sb_add(full, 0, 1, "corpus section missing - check .sdk/test/struct/");
+    return NULL;
+  }
+  return spec;
 }
+
+/* Run one corpus section through omni. */
+static void run(const char* cat, const char* name, int nullflag, omnivx_subject_fn fn, void* ud) {
+  char full[256];
+  omni_json* spec;
+  size_t cases;
+  char* err = NULL;
+  int failed;
+
+  snprintf(full, sizeof(full), "%s.%s", cat, name);
+
+  spec = section(cat, name, full);
+  if (NULL == spec) {
+    return;
+  }
+
+  cases = omnivx_setsize(spec);
+  if (0 == cases) {
+    sb_add(full, 0, 1, "corpus section is EMPTY - zero cases would run");
+    return;
+  }
+
+  failed =
+      omni_runsetflags(PACK, spec, omnivx_flags(nullflag, full), omnivx_subject(POOL, fn, ud), &err);
+  sb_add(full, cases, failed, err);
+}
+
+/* `struct.merge.basic` and `struct.inject.basic` are authored as a bare
+ * {in, out} node with no `set`, so the old runner scored them 0/0 and
+ * asserted nothing. Wrap each as a one-entry set. */
+static void run_one(const char* cat, const char* name, int nullflag, omnivx_subject_fn fn,
+                    void* ud) {
+  char full[256];
+  omni_json* entry;
+  omni_json* spec;
+  char* err = NULL;
+  int failed;
+
+  snprintf(full, sizeof(full), "%s.%s", cat, name);
+
+  entry = section(cat, name, full);
+  if (NULL == entry) {
+    return;
+  }
+  if (omni_isabsent(omni_map_get(entry, "in")) && omni_isabsent(omni_map_get(entry, "out"))) {
+    sb_add(full, 0, 1, "corpus section is neither a set nor an {in,out} entry");
+    return;
+  }
+
+  spec = omnivx_oneset(POOL, entry);
+  failed =
+      omni_runsetflags(PACK, spec, omnivx_flags(nullflag, full), omnivx_subject(POOL, fn, ud), &err);
+  sb_add(full, 1, failed, err);
+}
+
 
 /* Helpers. */
 /* Raw map lookup for runner field extraction. Unlike voxgig_getprop (Group A,
@@ -143,13 +222,18 @@ static voxgig_value* subj_haskey(voxgig_value* in, char** err, void* ud) {
   voxgig_release(key);
   return voxgig_new_bool(r);
 }
+/* `alt` is taken by LITERAL presence (voxgig_map_get), not by voxgig_haskey:
+ * haskey is Group A and reads a stored null as "no value", which would
+ * collapse `{alt: null}` (pass null as the alternative) into "no alt given"
+ * — a distinction minor.getprop and struct.nullsem both assert on. */
 static voxgig_value* subj_getprop(voxgig_value* in, char** err, void* ud) {
   (void)ud;
   voxgig_value* val = getp(in, "val");
   voxgig_value* key = getp(in, "key");
-  voxgig_value* altk = voxgig_new_string("alt");
-  voxgig_value* alt = voxgig_haskey(in, altk) ? voxgig_getprop(in, altk, NULL) : NULL;
-  voxgig_release(altk);
+  /* getp, not voxgig_getprop: fetching the alternative must not itself
+   * apply Group A, or `{alt: null}` would arrive as UNDEF. */
+  voxgig_value* alt =
+      (voxgig_is_map(in) && voxgig_map_get(voxgig_as_map(in), "alt")) ? getp(in, "alt") : NULL;
   voxgig_value* r = voxgig_getprop(val, key, alt);
   voxgig_release(val);
   voxgig_release(key);
@@ -160,9 +244,10 @@ static voxgig_value* subj_getelem(voxgig_value* in, char** err, void* ud) {
   (void)ud;
   voxgig_value* val = getp(in, "val");
   voxgig_value* key = getp(in, "key");
-  voxgig_value* altk = voxgig_new_string("alt");
-  voxgig_value* alt = voxgig_haskey(in, altk) ? voxgig_getprop(in, altk, NULL) : NULL;
-  voxgig_release(altk);
+  /* getp, not voxgig_getprop: fetching the alternative must not itself
+   * apply Group A, or `{alt: null}` would arrive as UNDEF. */
+  voxgig_value* alt =
+      (voxgig_is_map(in) && voxgig_map_get(voxgig_as_map(in), "alt")) ? getp(in, "alt") : NULL;
   voxgig_value* r = voxgig_getelem(val, key, alt);
   voxgig_release(val);
   voxgig_release(key);
@@ -538,71 +623,33 @@ static voxgig_value* subj_getpath_handler(voxgig_value* in, char** err, void* ud
   return r;
 }
 
-/* Sentinels: getprop/getelem with val/key/alt. */
-static voxgig_value* subj_sent_getprop(voxgig_value* in, char** err, void* ud) {
-  (void)err;
+/* The struct-corpus null modifier (was runner.h's unused null_substitute):
+ * under the default null flag omni rewrites every JSON null in the section
+ * to the "__NULL__" marker, so a resolved null arrives as that text. A bare
+ * marker becomes a real null again; a marker EMBEDDED in a longer string
+ * becomes the literal word "null", which is what `inject.string` asserts
+ * ("`an`x" over {an: null} renders "nullx"). */
+static void null_modifier(voxgig_value* val, voxgig_value* key, voxgig_value* parent,
+                          voxgig_injection* inj, voxgig_value* store, void* ud) {
+  (void)inj;
+  (void)store;
   (void)ud;
-  voxgig_value* val = getp(in, "val");
-  voxgig_value* key = getp(in, "key");
-  voxgig_value* altk = voxgig_new_string("alt");
-  voxgig_value* alt =
-      (voxgig_map_get(voxgig_as_map(in), "alt")) ? voxgig_getprop(in, altk, NULL) : NULL;
-  voxgig_release(altk);
-  voxgig_value* r = voxgig_getprop(val, key, alt);
-  voxgig_release(val);
-  voxgig_release(key);
-  voxgig_release(alt);
-  return r;
-}
-static voxgig_value* subj_sent_getelem(voxgig_value* in, char** err, void* ud) {
-  (void)err;
-  (void)ud;
-  voxgig_value* val = getp(in, "val");
-  voxgig_value* key = getp(in, "key");
-  voxgig_value* altk = voxgig_new_string("alt");
-  voxgig_value* alt =
-      (voxgig_map_get(voxgig_as_map(in), "alt")) ? voxgig_getprop(in, altk, NULL) : NULL;
-  voxgig_release(altk);
-  voxgig_value* r = voxgig_getelem(val, key, alt);
-  voxgig_release(val);
-  voxgig_release(key);
-  voxgig_release(alt);
-  return r;
-}
-static voxgig_value* subj_sent_haskey(voxgig_value* in, char** err, void* ud) {
-  (void)err;
-  (void)ud;
-  voxgig_value* val = getp(in, "val");
-  voxgig_value* key = getp(in, "key");
-  bool r = voxgig_haskey(val, key);
-  voxgig_release(val);
-  voxgig_release(key);
-  return voxgig_new_bool(r);
-}
-static voxgig_value* subj_sent_isempty(voxgig_value* in, char** err, void* ud) {
-  (void)err;
-  (void)ud;
-  return voxgig_new_bool(voxgig_isempty(in));
-}
-static voxgig_value* subj_sent_isnode(voxgig_value* in, char** err, void* ud) {
-  (void)err;
-  (void)ud;
-  return voxgig_new_bool(voxgig_isnode(in));
-}
-static voxgig_value* subj_sent_stringify(voxgig_value* in, char** err, void* ud) {
-  (void)err;
-  (void)ud;
-  char* s = voxgig_stringify(in, -1);
-  voxgig_value* r = voxgig_new_string(s);
-  free(s);
-  return r;
-}
-
-/* Inject basic. */
-static voxgig_value* subj_inject_basic(voxgig_value* in, char** err, void* ud) {
-  (void)err;
-  (void)ud;
-  return voxgig_inject(in, in, NULL);
+  if (!voxgig_is_string(val) || !parent || !key)
+    return;
+  {
+    const char* s = voxgig_as_string(val);
+    if (0 == strcmp(s, "__NULL__")) {
+      voxgig_setprop(parent, key, voxgig_new_null());
+      return;
+    }
+    if (NULL != strstr(s, "__NULL__")) {
+      char* rep = voxgig_replace_str(s, "__NULL__", "null");
+      voxgig_value* rv = voxgig_new_string(rep);
+      free(rep);
+      voxgig_setprop(parent, key, rv);
+      voxgig_release(rv);
+    }
+  }
 }
 
 /* Walk subjects. */
@@ -686,6 +733,20 @@ static voxgig_value* subj_inject(voxgig_value* in, char** err, void* ud) {
   voxgig_value* val = getp(in, "val");
   voxgig_value* store = getp(in, "store");
   voxgig_value* r = voxgig_inject(val, store, NULL);
+  voxgig_release(val);
+  voxgig_release(store);
+  return r;
+}
+static voxgig_value* subj_inject_nullmod(voxgig_value* in, char** err, void* ud) {
+  (void)ud;
+  voxgig_value* val = getp(in, "val");
+  voxgig_value* store = getp(in, "store");
+  voxgig_injection* inj = voxgig_inj_new(NULL, NULL);
+  inj->mode = 0;
+  voxgig_release(inj->modify_val);
+  inj->modify_val = voxgig_new_modify(null_modifier, NULL);
+  voxgig_value* r = voxgig_inject(val, store, inj);
+  voxgig_inj_free(inj);
   voxgig_release(val);
   voxgig_release(store);
   return r;
@@ -782,137 +843,154 @@ static const char* category_to_file(const char* cat) {
     return "validate.jsonic";
   if (strcmp(cat, "select") == 0)
     return "select.jsonic";
-  if (strcmp(cat, "sentinels") == 0)
-    return "sentinels.jsonic";
+  if (strcmp(cat, "nullsem") == 0)
+    return "nullsem.jsonic";
   return cat;
 }
 
 int main(void) {
+  char* err = NULL;
+  omni_runner* runner;
+  int failed = 0;
+  size_t cases = 0;
+  size_t i;
+  FILE* f;
+
+  POOL = omni_pool_new();
+
+  runner = omni_make_runner(POOL, TEST_JSON_FILE, NULL, NULL, &err);
+  if (NULL == runner) {
+    fprintf(stderr, "struct corpus: %s\n", NULL == err ? "cannot make runner" : err);
+    return 1;
+  }
+
+  PACK = omni_runner_run(runner, "struct", NULL, &err);
+  if (NULL == PACK || !omni_ismap(omni_spec(PACK))) {
+    fprintf(stderr, "struct corpus: struct section not found in %s\n", TEST_JSON_FILE);
+    return 1;
+  }
+
+  /* The `null` flag of each section is the shared one: with it, omni
+   * rewrites every JSON null in the section to the "__NULL__" marker
+   * before the subject sees it; without it, nulls stay null. It is a
+   * property of the CASES, so it matches the reference harness section for
+   * section. */
+
   /* minor */
-  run("minor", "isnode", true, subj_isnode, NULL);
-  run("minor", "ismap", true, subj_ismap, NULL);
-  run("minor", "islist", true, subj_islist, NULL);
-  run("minor", "iskey", false, subj_iskey, NULL);
-  run("minor", "strkey", false, subj_strkey, NULL);
-  run("minor", "isempty", false, subj_isempty, NULL);
-  run("minor", "isfunc", true, subj_isfunc, NULL);
-  run("minor", "typify", true, subj_typify, NULL);
-  run("minor", "typename", true, subj_typename, NULL);
-  run("minor", "clone", false, subj_clone, NULL);
-  run("minor", "size", true, subj_size, NULL);
-  run("minor", "keysof", true, subj_keysof, NULL);
-  run("minor", "items", true, subj_items, NULL);
-  run("minor", "haskey", true, subj_haskey, NULL);
-  run("minor", "getprop", true, subj_getprop, NULL);
-  run("minor", "getelem", true, subj_getelem, NULL);
-  run("minor", "setprop", true, subj_setprop, NULL);
-  run("minor", "delprop", true, subj_delprop, NULL);
-  run("minor", "stringify", true, subj_stringify, NULL);
-  run("minor", "jsonify", true, subj_jsonify, NULL);
-  run("minor", "pathify", true, subj_pathify, NULL);
-  run("minor", "escre", true, subj_escre, NULL);
-  run("minor", "escurl", true, subj_escurl, NULL);
-  run("minor", "join", true, subj_join, NULL);
-  run("minor", "flatten", true, subj_flatten, NULL);
-  run("minor", "filter", true, subj_filter, NULL);
-  run("minor", "slice", true, subj_slice, NULL);
-  run("minor", "pad", true, subj_pad, NULL);
-  run("minor", "setpath", false, subj_setpath, NULL);
+  run("minor", "isnode", 1, subj_isnode, NULL);
+  run("minor", "ismap", 1, subj_ismap, NULL);
+  run("minor", "islist", 1, subj_islist, NULL);
+  run("minor", "iskey", 0, subj_iskey, NULL);
+  run("minor", "strkey", 0, subj_strkey, NULL);
+  run("minor", "isempty", 0, subj_isempty, NULL);
+  run("minor", "isfunc", 1, subj_isfunc, NULL);
+  run("minor", "typify", 0, subj_typify, NULL);
+  run("minor", "typename", 1, subj_typename, NULL);
+  run("minor", "clone", 0, subj_clone, NULL);
+  run("minor", "size", 0, subj_size, NULL);
+  run("minor", "keysof", 1, subj_keysof, NULL);
+  run("minor", "items", 1, subj_items, NULL);
+  run("minor", "haskey", 0, subj_haskey, NULL);
+  run("minor", "getprop", 0, subj_getprop, NULL);
+  run("minor", "getelem", 0, subj_getelem, NULL);
+  run("minor", "setprop", 1, subj_setprop, NULL);
+  run("minor", "delprop", 1, subj_delprop, NULL);
+  run("minor", "stringify", 0, subj_stringify, NULL);
+  run("minor", "jsonify", 0, subj_jsonify, NULL);
+  run("minor", "pathify", 0, subj_pathify, NULL);
+  run("minor", "escre", 1, subj_escre, NULL);
+  run("minor", "escurl", 1, subj_escurl, NULL);
+  run("minor", "join", 0, subj_join, NULL);
+  run("minor", "flatten", 1, subj_flatten, NULL);
+  run("minor", "filter", 1, subj_filter, NULL);
+  run("minor", "slice", 0, subj_slice, NULL);
+  run("minor", "pad", 0, subj_pad, NULL);
+  run("minor", "setpath", 0, subj_setpath, NULL);
 
   /* walk */
-  run("walk", "basic", true, subj_walk_basic, NULL);
-  run("walk", "depth", false, subj_walk_depth, NULL);
+  run("walk", "basic", 1, subj_walk_basic, NULL);
+  run("walk", "depth", 0, subj_walk_depth, NULL);
 
   /* merge */
-  run("merge", "basic", true, subj_merge, NULL);
-  run("merge", "cases", true, subj_merge, NULL);
-  run("merge", "array", true, subj_merge, NULL);
-  run("merge", "integrity", true, subj_merge, NULL);
-  run("merge", "depth", true, subj_merge_depth, NULL);
+  run_one("merge", "basic", 1, subj_merge, NULL);
+  run("merge", "cases", 1, subj_merge, NULL);
+  run("merge", "array", 1, subj_merge, NULL);
+  run("merge", "integrity", 1, subj_merge, NULL);
+  run("merge", "depth", 1, subj_merge_depth, NULL);
 
   /* getpath */
-  run("getpath", "basic", true, subj_getpath_basic, NULL);
-  run("getpath", "relative", true, subj_getpath_relative, NULL);
-  run("getpath", "special", true, subj_getpath_special, NULL);
-  run("getpath", "handler", true, subj_getpath_handler, NULL);
+  run("getpath", "basic", 1, subj_getpath_basic, NULL);
+  run("getpath", "relative", 1, subj_getpath_relative, NULL);
+  run("getpath", "special", 1, subj_getpath_special, NULL);
+  run("getpath", "handler", 1, subj_getpath_handler, NULL);
 
-  /* sentinels */
-  run("sentinels", "getprop_unify", true, subj_sent_getprop, NULL);
-  run("sentinels", "getelem_absent", true, subj_sent_getelem, NULL);
-  run("sentinels", "haskey_unify", true, subj_sent_haskey, NULL);
-  run("sentinels", "isempty_unify", true, subj_sent_isempty, NULL);
-  run("sentinels", "isnode_unify", true, subj_sent_isnode, NULL);
-  run("sentinels", "stringify_null", true, subj_sent_stringify, NULL);
+  /* nullsem — does a PRESENT key holding a JSON null read as "no value"?
+   * Every lane runs {null: 0}: with the flag on, the runner rewrites each
+   * null to "__NULL__" and the section would assert nothing about null at
+   * all. This is the section the six vacuous `sentinels.*` rows hid. */
+  run("nullsem", "getprop", 0, subj_getprop, NULL);
+  run("nullsem", "getelem", 0, subj_getelem, NULL);
+  run("nullsem", "getpath", 0, subj_getpath_basic, NULL);
+  run("nullsem", "haskey", 0, subj_haskey, NULL);
+  run("nullsem", "keysof", 0, subj_keysof, NULL);
 
   /* inject */
-  run("inject", "basic", true, subj_inject_basic, NULL);
-  run("inject", "string", true, subj_inject, NULL);
-  run("inject", "deep", true, subj_inject, NULL);
+  run_one("inject", "basic", 1, subj_inject, NULL);
+  run("inject", "string", 1, subj_inject_nullmod, NULL);
+  run("inject", "deep", 1, subj_inject, NULL);
 
   /* transform */
-  run("transform", "paths", true, subj_transform, NULL);
-  run("transform", "cmds", true, subj_transform, NULL);
-  run("transform", "each", true, subj_transform, NULL);
-  run("transform", "pack", true, subj_transform, NULL);
-  run("transform", "ref", true, subj_transform, NULL);
+  run("transform", "paths", 1, subj_transform, NULL);
+  run("transform", "cmds", 1, subj_transform, NULL);
+  run("transform", "each", 1, subj_transform, NULL);
+  run("transform", "pack", 1, subj_transform, NULL);
+  run("transform", "ref", 1, subj_transform, NULL);
 
   /* validate */
-  run("validate", "basic", true, subj_validate, NULL);
-  run("validate", "invalid", true, subj_validate, NULL);
-  run("validate", "child", true, subj_validate, NULL);
-  run("validate", "one", true, subj_validate, NULL);
-  run("validate", "exact", true, subj_validate, NULL);
+  run("validate", "basic", 0, subj_validate, NULL);
+  run("validate", "invalid", 0, subj_validate, NULL);
+  run("validate", "child", 1, subj_validate, NULL);
+  run("validate", "one", 1, subj_validate, NULL);
+  run("validate", "exact", 1, subj_validate, NULL);
 
   /* select */
-  run("select", "basic", true, subj_select, NULL);
-  run("select", "operators", true, subj_select, NULL);
-  run("select", "edge", true, subj_select, NULL);
-  run("select", "alts", true, subj_select, NULL);
+  run("select", "basic", 1, subj_select, NULL);
+  run("select", "operators", 1, subj_select, NULL);
+  run("select", "edge", 1, subj_select, NULL);
+  run("select", "alts", 1, subj_select, NULL);
 
   /* Aggregate scoreboard. */
-  int totalP = 0, totalT = 0;
-  /* Group by file. */
   printf("\n========= STRUCT CORPUS SCOREBOARD =========\n");
-  /* Per-test print, sorted-ish (insertion order is fine). */
-  for (size_t i = 0; i < SB_LEN; i++) {
-    printf("  %-30s %d / %d\n", SB[i].r.name, SB[i].r.passed, SB[i].r.total);
-    totalP += SB[i].r.passed;
-    totalT += SB[i].r.total;
+  for (i = 0; i < SB_LEN; i++) {
+    printf("  %-30s %-4s %4zu cases\n", SB[i].name, SB[i].failed ? "FAIL" : "ok", SB[i].cases);
+    cases += SB[i].cases;
+    failed += SB[i].failed ? 1 : 0;
   }
-  printf("  %-30s %d / %d\n", "TOTAL", totalP, totalT);
+  printf("  %-30s %-4s %4zu cases in %zu sections\n", "TOTAL", failed ? "FAIL" : "ok", cases,
+         SB_LEN);
   printf("============================================\n");
 
-  /* If CORPUS_VERBOSE, dump failures. */
-  const char* vrb = getenv("CORPUS_VERBOSE");
-  if (vrb && strcmp(vrb, "0") != 0) {
-    for (size_t i = 0; i < SB_LEN; i++) {
-      if (SB[i].r.fail_len == 0)
-        continue;
-      fprintf(stderr, "\n--- %s (%d/%d) ---\n", SB[i].r.name, SB[i].r.passed, SB[i].r.total);
-      int shown = 0;
-      for (size_t j = 0; j < SB[i].r.fail_len; j++) {
-        fprintf(stderr, "  %s\n", SB[i].r.failures[j]);
-        if (++shown >= 5) {
-          fprintf(stderr, "  ... %zu more\n", SB[i].r.fail_len - shown);
-          break;
-        }
-      }
+  for (i = 0; i < SB_LEN; i++) {
+    if (SB[i].failed) {
+      fprintf(stderr, "\n--- %s ---\n%s\n", SB[i].name,
+              NULL == SB[i].err ? "(no message)" : SB[i].err);
     }
   }
 
-  /* Write target/corpus-scoreboard.json */
-  FILE* f = fopen("corpus-scoreboard.json", "w");
+  /* Write target/corpus-scoreboard.json. Same schema as before; `passed`
+   * is the section's case count when the section passed, because omni
+   * stops a set at its first failure and partial credit is unknowable. */
+  f = fopen("corpus-scoreboard.json", "w");
   if (f) {
+    size_t passedcases = 0;
+    int first = 1;
     fprintf(f, "{\n  \"files\": {\n");
-    /* Group. */
-    /* For simplicity, just dump per-test. */
-    bool first = true;
-    for (size_t i = 0; i < SB_LEN; i++) {
-      const char* dot = strchr(SB[i].r.name, '.');
-      const char* cat = SB[i].r.name;
+    for (i = 0; i < SB_LEN; i++) {
+      const char* dot = strchr(SB[i].name, '.');
+      const char* cat = SB[i].name;
       char catbuf[64];
       if (dot) {
-        size_t cl = dot - cat;
+        size_t cl = (size_t)(dot - cat);
         if (cl >= sizeof(catbuf))
           cl = sizeof(catbuf) - 1;
         memcpy(catbuf, cat, cl);
@@ -921,19 +999,21 @@ int main(void) {
       }
       if (!first)
         fprintf(f, ",\n");
-      first = false;
-      fprintf(f, "    \"%s\": {\"passed\": %d, \"total\": %d}", category_to_file(cat),
-              SB[i].r.passed, SB[i].r.total);
+      first = 0;
+      fprintf(f, "    \"%s\": {\"passed\": %zu, \"total\": %zu}", category_to_file(cat),
+              SB[i].failed ? (size_t)0 : SB[i].cases, SB[i].cases);
+      passedcases += SB[i].failed ? 0 : SB[i].cases;
     }
-    fprintf(f, "\n  },\n  \"total\": {\"passed\": %d, \"total\": %d}\n}\n", totalP, totalT);
+    fprintf(f, "\n  },\n  \"total\": {\"passed\": %zu, \"total\": %zu}\n}\n", passedcases, cases);
     fclose(f);
   }
 
-  for (size_t i = 0; i < SB_LEN; i++) {
-    runner_result_free(&SB[i].r);
-    free(SB[i].key);
+  for (i = 0; i < SB_LEN; i++) {
+    free(SB[i].name);
+    free(SB[i].err);
   }
   free(SB);
-  voxgig_release(CORPUS);
-  return (totalP == totalT) ? 0 : 1;
+  omni_pool_free(POOL);
+
+  return 0 == failed ? 0 : 1;
 }

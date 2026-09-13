@@ -9,11 +9,17 @@ import Foundation
 private func invalidTypeMsg(
   _ path: [String], _ needtype: String, _ vt: Int, _ v: Value, _ whence: String
 ) -> String {
-  let vs = v.isNoval ? "no value" : stringify(v)
+  // Canonical is `null == v`, which in JS is TRUE for a JSON null as well
+  // as for undefined - both render as "no value", with no type prefix. The
+  // corpus pins it through validate.invalid ("Expected string, but found
+  // no value." for `data: null`), whose err entries the silent-pass inline
+  // runner used to skip.
+  let novalue = v.isNoval || v.isNull
+  let vs = novalue ? "no value" : stringify(v)
   let field =
     path.count > 1
     ? "field " + pathify(.list(VList(path.map { Value.string($0) })), 1) + " to be " : ""
-  let extra = v.isNoval ? "" : typename(vt) + S_VIZ
+  let extra = novalue ? "" : typename(vt) + S_VIZ
   return "Expected " + field + needtype + ", but found " + extra + vs + "."
 }
 
@@ -144,9 +150,13 @@ public func validate_ONE(_ inj: Injection, _ val: Value, _ ref: String, _ store:
     }
     inj.keyI = inj.keys.count
     inj.setval(inj.dparent, ancestor: 2)
-    if inj.path.count > 1 {
-      inj.path = Array(inj.path.suffix(inj.path.count - 1))
-    }
+    // Canonical is `inj.path = slice(inj.path, -1)`, which in struct's own
+    // slice means DROP THE LAST element (start<0 => end = len+start,
+    // start = 0) - not "keep the last". Dropping the FIRST instead named
+    // the wrong field in every $ONE failure ("field 0" for "field x0");
+    // the corpus pins it through validate.one, whose err entries the
+    // silent-pass inline runner used to skip.
+    inj.path = Array(inj.path.dropLast())
     inj.key = inj.path.last ?? ""
     let tvals = slice(parent, 1)
     guard case .list(let tl) = tvals else { return .noval }

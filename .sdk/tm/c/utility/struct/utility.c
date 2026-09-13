@@ -1941,10 +1941,15 @@ voxgig_value* voxgig_getpath(voxgig_value* store, voxgig_value* path, voxgig_inj
             val = dparent ? voxgig_retain(dparent) : voxgig_new_undef();
           }
         } else {
+          /* Group A at every step, exactly as voxgig_getprop reads a single
+             key: a stored JSON null is "no value", not a value. The raw
+             voxgig_lookup used here returned the null itself, so
+             getpath({a: null}, 'a') answered null where getprop({a: null},
+             'a') answered undefined - two readings of one rule. The
+             struct.nullsem.getpath cases pin the getprop one. */
           voxgig_value* k = voxgig_new_string(part);
-          voxgig_value* nv = voxgig_lookup(val, k);
+          voxgig_value* tv = voxgig_getprop(val, k, NULL);
           voxgig_release(k);
-          voxgig_value* tv = nv ? voxgig_retain(nv) : voxgig_new_undef();
           voxgig_release(val);
           val = tv;
         }

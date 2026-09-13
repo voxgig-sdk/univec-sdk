@@ -17,7 +17,9 @@ import {
   each,
   buildIdNames,
   getMatchEntries,
-  isAuthActive, envName, envToken
+  isAuthActive, envName, envToken,
+  serverVarEnv,
+  serverVariables
 } from '@voxgig/sdkgen'
 
 
@@ -59,11 +61,25 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const authActive = isAuthActive(model)
   const apikeyEnvEntry = authActive
-    ? `\n            ["${PROJUPPER}_APIKEY"] = "NONE",`
+    ? `\n            ["${PROJUPPER}_APIKEY"] = "",`
     : ''
   const apikeyLiveField = authActive
     ? `\n                    ["apikey"] = env["${PROJUPPER}_APIKEY"],`
     : ''
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: makeOptions raises rather than
+  // request a URL with a literal `{account_id}` in it. So the live suite
+  // takes them from the environment the same way it takes the apikey.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `\n            ["${serverVarEnv(PROJUPPER, v.name)}"] = ${JSON.stringify(v.dflt)},`).join('')
+  const serverLiveField = 0 === svars.length ? '' : `
+                    ["server"] = new Dictionary<string, object?>
+                    {${svars
+      .map((v: any) => `
+                        ["${v.name}"] = env["${serverVarEnv(PROJUPPER, v.name)}"],`).join('')}
+                    },`
 
   const idnames = buildIdNames(entity, basicflow)
   const idnamesStr = idnames.map(n => `"${n}"`).join(', ')
@@ -266,7 +282,7 @@ ${allSteps.length > 0 ? '        var client = setup.Client;\n\n' : ''}`)
         {
             ["${PROJUPPER}_TEST_${ENTUPPER}_ENTID"] = idmap,
             ["${PROJUPPER}_TEST_LIVE"] = "FALSE",
-            ["${PROJUPPER}_TEST_EXPLAIN"] = "FALSE",${apikeyEnvEntry}
+            ["${PROJUPPER}_TEST_EXPLAIN"] = "FALSE",${apikeyEnvEntry}${serverEnvEntry}
         });
 
         var idmapResolved = Helpers.ToMapAny(env["${PROJUPPER}_TEST_${ENTUPPER}_ENTID"])
@@ -288,12 +304,20 @@ ${allSteps.length > 0 ? '        var client = setup.Client;\n\n' : ''}`)
     Content(`
         if (Equals(env["${PROJUPPER}_TEST_LIVE"], "TRUE"))
         {
+            // 'extra ?? new ...', not a bare 'extra': Merge returns null when
+            // the last entry is null, and BasicSetup is normally called with no
+            // argument at all - so a bare 'extra' silently discarded the apikey
+            // and server values above and handed the SDK null.
+            var extraOpts = extra ?? new Dictionary<string, object?>();
             var mergedOpts = StructUtils.Merge(new List<object?>
             {
+                // FIRST, so the generated fields below win: sdk-test-control.json's
+                // test.client.options adds to the live client, it does not redirect it.
+                TestRunner.LiveClientOptions(),
                 new Dictionary<string, object?>
-                {${apikeyLiveField}
+                {${apikeyLiveField}${serverLiveField}
                 },
-                extra,
+                extraOpts,
             });
             client = new ${Name}SDK(Helpers.ToMapAny(mergedOpts));
         }

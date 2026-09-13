@@ -46,6 +46,11 @@
                 "parts" (vs/jt
                   "v1"
                   "convert")
+                "segments" (vs/jt
+                  (vs/jm
+                    "lit" "v1")
+                  (vs/jm
+                    "lit" "convert"))
                 "select" (vs/jm)
                 "transform" (vs/jm
                   "req" "`reqdata`"
@@ -58,6 +63,11 @@
                 "parts" (vs/jt
                   "v1"
                   "embed-bridge")
+                "segments" (vs/jt
+                  (vs/jm
+                    "lit" "v1")
+                  (vs/jm
+                    "lit" "embed-bridge"))
                 "select" (vs/jm)
                 "transform" (vs/jm
                   "req" "`reqdata`"
@@ -71,6 +81,13 @@
                   "v1"
                   "ephemeral"
                   "convert")
+                "segments" (vs/jt
+                  (vs/jm
+                    "lit" "v1")
+                  (vs/jm
+                    "lit" "ephemeral")
+                  (vs/jm
+                    "lit" "convert"))
                 "select" (vs/jm)
                 "transform" (vs/jm
                   "req" "`reqdata`"
@@ -84,6 +101,13 @@
                   "v1"
                   "ephemeral"
                   "embed-bridge")
+                "segments" (vs/jt
+                  (vs/jm
+                    "lit" "v1")
+                  (vs/jm
+                    "lit" "ephemeral")
+                  (vs/jm
+                    "lit" "embed-bridge"))
                 "select" (vs/jm)
                 "transform" (vs/jm
                   "req" "`reqdata`"
@@ -121,6 +145,11 @@
                 "parts" (vs/jt
                   "v1"
                   "embed")
+                "segments" (vs/jt
+                  (vs/jm
+                    "lit" "v1")
+                  (vs/jm
+                    "lit" "embed"))
                 "select" (vs/jm)
                 "transform" (vs/jm
                   "req" "`reqdata`"
@@ -134,6 +163,13 @@
                   "v1"
                   "ephemeral"
                   "embed")
+                "segments" (vs/jt
+                  (vs/jm
+                    "lit" "v1")
+                  (vs/jm
+                    "lit" "ephemeral")
+                  (vs/jm
+                    "lit" "embed"))
                 "select" (vs/jm)
                 "transform" (vs/jm
                   "req" "`reqdata`"
@@ -158,6 +194,7 @@
             "short" "The ephemeral API key, prefixed `eph_`."
             "type" "`$STRING`")
           (vs/jm
+            "format" "date-time"
             "name" "resetsAt"
             "req" true
             "short" "When the daily allowance resets."
@@ -177,6 +214,13 @@
                   "v1"
                   "ephemeral"
                   "key")
+                "segments" (vs/jt
+                  (vs/jm
+                    "lit" "v1")
+                  (vs/jm
+                    "lit" "ephemeral")
+                  (vs/jm
+                    "lit" "key"))
                 "select" (vs/jm)
                 "transform" (vs/jm
                   "req" "`reqdata`"
@@ -243,6 +287,11 @@
                 "parts" (vs/jt
                   "v1"
                   "models")
+                "segments" (vs/jt
+                  (vs/jm
+                    "lit" "v1")
+                  (vs/jm
+                    "lit" "models"))
                 "select" (vs/jm)
                 "transform" (vs/jm
                   "req" "`reqdata`"
@@ -411,3 +460,9 @@
         "model" (vs/jm))
       "headers" (vs/jm
         "content-type" "application/json"))))
+
+(def feature-plugins
+  {})
+
+(def feature-extra
+  {})

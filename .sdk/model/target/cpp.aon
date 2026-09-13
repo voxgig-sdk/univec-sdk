@@ -9,6 +9,24 @@ main: kit: target: cpp: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability tags (docs/design/feature-tags.md): this target vendors
+  # the cpp port of @voxgig/sekreto (with voxgig/plugin under it) inside
+  # its gated `feature/secrets/` container, so the `secrets` feature
+  # applies. The port is a multi-translation-unit library where the SDK
+  # itself is header-only; tm/cpp/Makefile compiles it into an archive only
+  # through the generated feature/secrets/kinds.mk it `-include`s.
+  provides: { sekreto: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the struct-corpus runner header
+  # (test/runner_support.hpp is support-only — the file/env loaders,
+  # sdk-test-control skips, make_ctx_from_map/fixctx, entity_list_to_data —
+  # and is RETAINED, name unchanged, because the generated entity suites
+  # include it). `doctor` reports leftovers; `doctor prune` deletes them.
+  superseded: [
+    'test/struct_runner.hpp'
+  ]
+
   deps: &: {
     kind: *'prod' | string
   }
@@ -16,6 +34,16 @@ main: kit: target: cpp: {
   # struct is vendored under utility/voxgigstruct — no external dep. The SDK
   # is header-only; JSON parsing is the vendored struct parser and the mock
   # transport needs no network. Tests need only a C++17 compiler (g++).
+  #
+  # The one external dependency a cpp SDK can have arrives with the
+  # `secrets` feature, and only when it is active WITH a plugin group: the
+  # vendored vault kinds link OpenSSL (-lssl -lcrypto, plugins/Tls.cpp),
+  # and the feature's token-exchange transport of last resort (the
+  # generated feature/secrets/kinds.cpp) rides on the same vendored HTTPS
+  # client rather than adding libcurl - so there is exactly one HTTP stack
+  # and one -l pair. The generated feature/secrets/kinds.mk turns it on
+  # from the model, so an SDK with secrets inactive, or with no plugin
+  # group, links libstdc++ and libc alone.
   deps: {}
 }
 

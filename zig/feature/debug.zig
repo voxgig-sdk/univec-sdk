@@ -38,7 +38,7 @@ pub const DebugFeature = struct {
 
     pub fn make() Feature {
         const self = h.A().create(DebugFeature) catch unreachable;
-        self.* = .{ .entries = std.ArrayList(Value).init(h.A()) };
+        self.* = .{ .entries = .empty };
         return .{ .ptr = @ptrCast(self), .vtable = &vtable };
     }
 
@@ -49,9 +49,9 @@ pub const DebugFeature = struct {
     fn redact(self: *DebugFeature, headers: Value) Value {
         const out = h.omap();
         const patterns: [][]const u8 = sup.fopt_str_list(self.options, "redact") orelse blk: {
-            var l = std.ArrayList([]const u8).init(h.A());
-            for (DEBUG_DEFAULT_REDACT) |p| l.append(p) catch {};
-            break :blk l.toOwnedSlice() catch &.{};
+            var l: std.ArrayList([]const u8) = .empty;
+            for (DEBUG_DEFAULT_REDACT) |p| l.append(h.A(), p) catch {};
+            break :blk l.toOwnedSlice(h.A()) catch &.{};
         };
         if (headers == .object) {
             var it = headers.object.iterator();
@@ -92,7 +92,7 @@ pub const DebugFeature = struct {
             if (ctx.result) |r| h.setp(entry, "status", h.vnum(r.status));
         }
 
-        self.entries.append(entry) catch {};
+        self.entries.append(h.A(), entry) catch {};
         const max: usize = @intCast(@max(sup.fopt_int(self.options, "max", 100), 0));
         while (self.entries.items.len > max) {
             _ = self.entries.orderedRemove(0);

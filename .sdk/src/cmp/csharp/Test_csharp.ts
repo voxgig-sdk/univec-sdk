@@ -3,7 +3,8 @@ import type {
   ModelEntity
 } from '@voxgig/apidef'
 
-import { cmp, each, Folder, entityCollection } from '@voxgig/sdkgen'
+import { cmp, each, Folder, entityCollection,
+  TestControl } from '@voxgig/sdkgen'
 
 
 import { TestEntity } from './TestEntity_csharp'
@@ -20,6 +21,9 @@ const Test = cmp(function Test(props: any) {
   // templates in tm/csharp/test. Only the API-specific entity/direct
   // tests are generated here.
   Folder({ name: 'test' }, () => {
+
+    // Write-once: a project's edited control file survives regeneration.
+    TestControl({ target, dir: 'test' })
 
     const entity = each(entityCollection(model))
       .filter((e: any) => false !== e.active)

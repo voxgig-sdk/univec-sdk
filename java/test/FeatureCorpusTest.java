@@ -128,7 +128,14 @@ public class FeatureCorpusTest {
     Map<String, Object> utility = new LinkedHashMap<>();
     utility.put("fetcher", scriptedFetcher(kase.get("res")));
 
+    // "test" is the OPTION, not the `test` FEATURE: it says "this client is
+    // not live", so a REQUIRED OpenAPI server variable resolves to a
+    // deterministic test-<name> instead of failing construction. It installs
+    // no transport, so the scripted fetcher still stands.
     Map<String, Object> opts = new LinkedHashMap<>();
+    Map<String, Object> testopt = new LinkedHashMap<>();
+    testopt.put("active", true);
+    opts.put("test", testopt);
     opts.put("utility", utility);
     if (kase.get("feature") != null) {
       opts.put("feature", kase.get("feature"));

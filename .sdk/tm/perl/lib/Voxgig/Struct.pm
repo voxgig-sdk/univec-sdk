@@ -1,3 +1,6 @@
+# VENDORED: @voxgig/struct 0.1.1 (perl/lib/Voxgig/Struct.pm)
+# Source: https://github.com/voxgig/struct @ abd93227e3295151f8dcd18597c3f3f2577af8b7  [tag: sdk-20260911-2013-0]
+# License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 # Copyright (c) 2025-2026 Voxgig Ltd. MIT LICENSE.
 # Perl port of the canonical TypeScript implementation (ts/src/StructUtility.ts).
 # See ../REPORT.md for cross-language parity.
@@ -8,7 +11,7 @@ use strict;
 use warnings;
 use utf8;
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 
 use Scalar::Util qw(blessed reftype looks_like_number refaddr);
 use List::Util qw();
@@ -320,10 +323,30 @@ sub _map_keys {
     return () unless defined $ref;
     my $rt = reftype($ref) // '';
     return () unless $rt eq 'HASH';
+    my @keys;
     if (my $tied = tied(%$ref)) {
-        return $tied->Keys;
+        @keys = $tied->Keys;
     }
-    return keys %$ref;
+    else {
+        # A plain Perl hash has no insertion order at all — `keys` is
+        # randomised per process. Sorting is what makes an untied map render
+        # the same way twice, which `jsonify` needs: canonical emits map keys
+        # in insertion order, and where there is none, sorted is the only
+        # stable answer. Go's port reaches the same place through
+        # `json.Marshal`, which also sorts. A map built with `jm()` is tied,
+        # and keeps its own order.
+        @keys = sort keys %$ref;
+    }
+    return @keys;
+}
+
+# How many keys a map has. Separate from `_map_keys` because that returns a
+# LIST, and a list in scalar context is its last element, not its length -
+# `scalar _map_keys($m)` silently answered the wrong thing.
+sub _map_count {
+    my ($ref) = @_;
+    my @keys = _map_keys($ref);
+    return scalar @keys;
 }
 
 # Ensure a hash is tied to Tie::IxHash (preserving current keys/values in
@@ -423,7 +446,7 @@ sub isempty {
         return $val eq '' ? 1 : 0;
     }
     if (islist($val)) { return @$val == 0 ? 1 : 0 }
-    if (ismap($val))  { return _map_keys($val) == 0 ? 1 : 0 }
+    if (ismap($val))  { return 0 == _map_count($val) ? 1 : 0 }
     return 0;
 }
 
@@ -438,7 +461,7 @@ sub size {
     if (is_jbool($val)) { return $$val ? 1 : 0 }
     if (ref $val) {
         if (islist($val)) { return scalar @$val }
-        if (ismap($val))  { return scalar _map_keys($val) }
+        if (ismap($val))  { return _map_count($val) }
         return 0;
     }
     if (looks_like_number($val) && "$val" !~ /[^0-9eE.+\-]/) {
@@ -1265,7 +1288,15 @@ sub parse_json {
 
 sub walk {
     my ($val, $before, $after, $maxdepth) = @_;
-    $maxdepth = MAXDEPTH unless defined $maxdepth;
+    # Canonical: `maxdepth = null != maxdepth && 0 <= maxdepth ? maxdepth :
+    # MAXDEPTH`. A NEGATIVE maxdepth is not "stop immediately" - it falls back
+    # to the default, so walk(val, before, after, -1) is a full walk. Taking
+    # the negative literally made `$depth >= $maxdepth` true at the root and
+    # returned before descending at all.
+    $maxdepth =
+      ( defined $maxdepth && looks_like_number($maxdepth) && 0 <= $maxdepth )
+      ? $maxdepth
+      : MAXDEPTH;
     return _walk_inner($val, undef, undef, [], $before, $after, $maxdepth, 0);
 }
 
@@ -1305,11 +1336,28 @@ sub merge {
     return $vals unless islist($vals);
     return unless @$vals;
     return $vals->[0] if @$vals == 1;
+
+    # Canonical clamps the depth at zero (`slice(maxdepth ?? MAXDEPTH, 0)`),
+    # so a negative depth is the same as zero rather than a smaller-than-zero
+    # depth that merges nothing and leaves the FIRST element standing.
+    my $md =
+      ( defined $depth && looks_like_number($depth) )
+      ? ( $depth < 0 ? 0 : $depth )
+      : MAXDEPTH;
+
     my $out = $vals->[0];
-    $depth = MAXDEPTH unless defined $depth;
     for (my $i = 1; $i < @$vals; $i++) {
-        $out = _merge_pair($out, $vals->[$i], $depth, 0);
+        $out = _merge_pair($out, $vals->[$i], $md, 0);
     }
+
+    # Depth zero means nothing merges, and canonical answers the LAST element
+    # rather than the first - emptied when it is a container, because an
+    # unmerged container carries no keys anyone asked for.
+    if (0 == $md) {
+        $out = getelem($vals, -1);
+        $out = islist($out) ? [] : ismap($out) ? _mkmap() : $out;
+    }
+
     return $out;
 }
 
@@ -1469,7 +1517,8 @@ sub getpath {
                     $part = stringify(getpath($inj->{meta}, $sub));
                 }
                 $part = '' unless defined $part;
-                $part =~ s/\$\$/\$/g;
+                # $$ escapes $ (skip the regex for the common no-'$$' segment)
+                $part =~ s/\$\$/\$/g if index($part, '$$') >= 0;
                 if ($part eq S_MT) {
                     my $ascends = 0;
                     while ($pI + 1 < $numparts && $parts[$pI + 1] eq S_MT) {
@@ -2369,8 +2418,21 @@ sub validate_CHILD {
             setprop($parent, $n->[0], clone($childtm));
         });
         slice($parent, 0, scalar @{ $inj->{dparent} }, 1);
-        $inj->{keyI} = 0;
-        return getprop($inj->{dparent}, 0);
+
+        # NOTE: modifying inj! This extends the child value loop in inject
+        # to cover every cloned child.
+        for my $ckeyI (size($keys) .. size($parent) - 1) {
+            push @$keys, strkey($ckeyI);
+        }
+
+        # Restart the child value loop at the first element (the loop
+        # increments keyI on resume) so that the first element is also
+        # validated against the child template.
+        $inj->{keyI} = -1;
+
+        # SKIP leaves the cloned child template in place at the first
+        # element so the resumed loop can validate it.
+        return SKIP();
     }
     return NONE();
 }
@@ -2887,8 +2949,22 @@ sub re_replace {
         }ge;
         return $s;
     }
+    # String replacement: expand $& and $1..$9 (JS-style; $$ is a literal $).
     my $s = $input;
-    $s =~ s/$re/$replacement/g;
+    $s =~ s{$re}{
+        my $whole = substr($input, $-[0], $+[0] - $-[0]);
+        my @caps;
+        for (my $i = 1; $i < scalar @-; $i++) {
+            push @caps, defined $-[$i]
+                ? substr($input, $-[$i], $+[$i] - $-[$i])
+                : '';
+        }
+        my $r = $replacement;
+        $r =~ s/\$(\$|&|[1-9])/
+            '$' eq $1 ? '$' : '&' eq $1 ? $whole : ($caps[$1 - 1] \/\/ '')
+        /ge;
+        $r;
+    }ge;
     return $s;
 }
 

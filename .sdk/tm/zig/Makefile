@@ -9,6 +9,16 @@ build:
 # filter the output: if "N/N tests passed" with N==total, treat as success.
 # `--summary all` is required so the count is printed.
 #
+# THE SUMMARY IS PARSED IN TWO SPELLINGS. Older toolchains wrote the test
+# tally as "217/223 tests passed; 6 skipped"; 0.16 writes the annotations as
+# a parenthesised list instead - "217/223 tests passed (6 skipped)", and
+# "(6 skipped, 1 crashed)" when something did go wrong. Reading only the
+# semicolon form off 0.16 finds no skip count at all, so "passed + skipped"
+# falls short of "total" and the tolerance refuses a run that was in fact
+# clean - failing precisely when the teardown crash it exists for happens.
+# Both spellings are accepted below, and any "failed"/"crashed"/"timed out"
+# in that same annotation is a real failure, never a teardown crash.
+#
 # A TEST THAT DID NOT COMPILE IS NOT IN THE TALLY. The tolerance above is for a
 # crash AFTER the tests ran, and it must never cover a build that failed: a
 # compile error means those test binaries never ran, so they never reach
@@ -32,11 +42,15 @@ test:
 		echo "zig: compilation errors — not a teardown crash"; \
 		exit 1; \
 	fi; \
-	summary=$$(echo "$$out" | grep -oE '[0-9]+/[0-9]+ tests passed(; [0-9]+ skipped)?' | tail -1); \
+	summary=$$(echo "$$out" | grep -oE '[0-9]+/[0-9]+ tests passed( \([^)]*\))?(; [0-9]+ skipped)?' | tail -1); \
 	passed=$$(echo "$$summary" | sed -E 's#([0-9]+)/([0-9]+).*#\1#'); \
 	total=$$(echo "$$summary" | sed -E 's#([0-9]+)/([0-9]+).*#\2#'); \
 	skipped=$$(echo "$$summary" | grep -oE '[0-9]+ skipped' | grep -oE '[0-9]+'); \
 	[ -n "$$skipped" ] || skipped=0; \
+	if echo "$$summary" | grep -qE '[0-9]+ (failed|crashed|timed out)'; then \
+		echo "zig: $$summary — tests failed, so this is not a teardown crash"; \
+		exit 1; \
+	fi; \
 	if [ -n "$$passed" ] && [ "$$total" -gt 0 ] && [ $$((passed + skipped)) -eq "$$total" ]; then \
 		exit 0; \
 	fi; \

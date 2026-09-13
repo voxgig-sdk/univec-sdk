@@ -69,7 +69,22 @@ $REGISTRY{make_options} = sub {
   # reads options.extend, but clone/validate dropped the instances.
   my $extend_raw = UnivecHelpers::gp($options, 'extend');
 
+  # `auth => undef` is the documented way to disable auth outright, and
+  # prepare_auth honours it before it ever reads the apikey. It cannot survive
+  # validate: depending on the struct port a stored null is either REPLACED by
+  # the optspec default - transmitting the credential the caller withheld - or
+  # REJECTED outright. Withhold the key for validate, then put the undef back.
+  # Same fix as ts/js/go make_options.
+  #
+  # Suppliedness cannot be recovered after validate, hence here, and it must
+  # tell an ABSENT auth from a present undef: exists rather than defined,
+  # which is false for both.
+  my $authsuppressed =
+    (ref($options) eq 'HASH' && exists $options->{auth} && !defined $options->{auth}) ? 1 : 0;
+
   my $opts = Voxgig::Struct::clone($options);
+
+  delete $opts->{auth} if $authsuppressed && ref($opts) eq 'HASH';
   $opts = {} unless Voxgig::Struct::ismap($opts);
   delete $opts->{extend};
 
@@ -142,6 +157,9 @@ $REGISTRY{make_options} = sub {
   my $merged = Voxgig::Struct::merge([{}, Voxgig::Struct::clone($cfgopts), $opts]);
   my $validated = Voxgig::Struct::validate($merged, $optspec);
   $opts = Voxgig::Struct::ismap($validated) ? $validated : {};
+
+  # Restore the suppression the optspec default would otherwise erase.
+  $opts->{auth} = undef if $authsuppressed;
 
   if ($sys_fetch) {
     $opts->{system} = {} unless Voxgig::Struct::ismap($opts->{system});

@@ -874,7 +874,13 @@ inline std::string prepareMethod(CtxPtr ctx) {
   if (opname == "list") return "GET";
   if (opname == "remove") return "DELETE";
   if (opname == "patch") return "PATCH";
-  return "GET";
+
+  // An op the API does not define resolves NO method — ts answers undefined
+  // here (`methodMap[key]`), and "" is C++'s spelling of the same "no
+  // value", as it is go's. The stray "GET" that used to sit here was hidden
+  // by the retired silent-pass engine; the shared corpus pins it now
+  // (primary.prepareMethod, opname "bad" -> no output).
+  return "";
 }
 
 // ---- prepareBody ------------------------------------------------------
@@ -1107,7 +1113,25 @@ inline Value makeOptions(CtxPtr ctx) {
     }
   }
 
+  // `auth: null` is the documented way to disable auth outright, and
+  // prepareAuth honours it before it ever reads the apikey. It cannot survive
+  // validate: this port follows the Group A rule, so a stored null reads as
+  // "no value" and the optspec's `auth` default fires instead - transmitting
+  // the credential the caller withheld. Withhold the key for validate, then
+  // put the null back. Same fix as ts/js/go makeOptions.
+  //
+  // mapget rather than getp: getp applies Group A and collapses a stored null
+  // to undef, so it cannot tell an ABSENT auth from a suppressed one. And the
+  // test is is_null, NOT is_nullish - a present-but-UNDEF auth is a missing
+  // value, which the ts/js reference lets the optspec default fill in. Only an
+  // explicit null is a suppression.
+  bool authSuppressed = mapget(options, "auth").is_null();
+
   Value opts = Struct::clone(options);
+
+  if (authSuppressed) {
+    map_remove(opts, "auth");
+  }
 
   // Feature add-order. options.feature may be an ordered list of
   // { name, active, ...opts } entries (the list position IS the order in which
@@ -1158,6 +1182,11 @@ inline Value makeOptions(CtxPtr ctx) {
   map_put(vopts, "errs", vlist());
   Value validated = Struct::validate(merged, optspec, vopts);
   opts = validated;
+
+  // Restore the suppression the optspec default would otherwise erase.
+  if (authSuppressed) {
+    map_put(opts, "auth", Value(nullptr));
+  }
 
   if (!is_nullish(sysFetch)) {
     Value sys = Helpers::toMapAny(getp(opts, "system"));

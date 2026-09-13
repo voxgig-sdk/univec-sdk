@@ -1,7 +1,13 @@
 // Primary utility test suite - drives every utility on the client utility
-// object, partly via the shared corpus in ../../.sdk/test/test.json
-// ("primary" section) and partly via direct checks. C# twin of
+// object against the shared corpus in ../../.sdk/test/test.json ("primary"
+// section) through the VENDORED omni runner (OmniResolver over
+// test/vendor/omni), plus direct checks. C# twin of
 // tm/go/test/primary_utility_test.go.
+//
+// Subjects receive omni's native argument list: a ctx entry arrives as
+// args[0], a MAP - OmniResolver.OmniCtx builds the typed Context a
+// generated utility takes, and OmniResolver.OmniSyncCtx writes the
+// observable ctx state back for `match: {ctx: ...}` assertions.
 
 using Xunit;
 
@@ -34,21 +40,79 @@ internal class TestInitFeature : BaseFeature
 
 public class PrimaryUtilityTest
 {
-    private readonly Dictionary<string, object?> _primary;
-    private readonly UnivecSDK _client;
-    private readonly Utility _utility;
-
-    public PrimaryUtilityTest()
+    // PENDING sections are the ones deliberately left empty in the shared
+    // corpus (.sdk/test/primary/<name>.aon). Everything else MUST
+    // contribute cases.
+    private static readonly HashSet<string> Pending = new()
     {
-        var spec = TestRunner.LoadTestSpec();
-        _primary = TestRunner.GetSpec(spec, "primary")
-            ?? throw new InvalidOperationException("primary section not found in test.json");
-        _client = UnivecSDK.TestSDK(null, null);
-        _utility = _client.GetUtility();
+        "fetcher", "makeFetchDef", "makeResult",
+        "featureAdd", "featureHook", "featureInit",
+    };
+
+    // One client + one corpus runner for the whole suite (the go shape).
+    private static UnivecSDK? CLIENT;
+    private static Utility? UTILITY;
+    private static OmniResolver.Run? RUN;
+    private static readonly object RunLock = new();
+
+    private static OmniResolver.Run Run()
+    {
+        lock (RunLock)
+        {
+            if (RUN == null)
+            {
+                CLIENT = UnivecSDK.TestSDK(null, null);
+                UTILITY = CLIENT.GetUtility();
+                RUN = OmniResolver.MakeRunner(StructRunner.TestJsonPath(), CLIENT)("primary");
+                Assert.True(0 < RUN.Spec.Count,
+                    "primary section not found in test.json");
+            }
+            return RUN;
+        }
+    }
+
+    private static UnivecSDK GetClient()
+    {
+        Run();
+        return CLIENT!;
+    }
+
+    private static Utility GetUtil()
+    {
+        Run();
+        return UTILITY!;
+    }
+
+    // Run one corpus section, failing loudly when it would run ZERO cases.
+    // A renamed section, a fixture that failed to compile, or an empty set
+    // used to report PASS while running zero assertions - the whole point
+    // of a shared oracle lost without a single red test. (The guard lives
+    // here rather than in the runner, which is vendored verbatim; the
+    // shared corpus is a v0 spec, and v0 tolerates an empty set.)
+    private static void runsection(string name, OmniResolver.Subject subject)
+    {
+        var run = Run();
+        var section = run.Spec.TryGetValue(name, out var s)
+            ? s as Dictionary<string, object?> : null;
+        Assert.True(null != section, "test corpus section \"" + name +
+            "\" missing - check the name against .sdk/test/primary/");
+        var basic = section!.TryGetValue("basic", out var b)
+            ? b as Dictionary<string, object?> : null;
+        var set = basic != null && basic.TryGetValue("set", out var sv)
+            ? sv as List<object?> : null;
+        Assert.True(null != set, "test corpus section \"" + name +
+            "\" has no basic.set list - zero cases would run");
+        if (0 == set!.Count && !Pending.Contains(name))
+        {
+            Assert.Fail("test corpus section \"" + name + "\" is EMPTY - " +
+                "zero cases would run; add cases, or mark the fixture " +
+                "PENDING in .sdk/test/primary/");
+        }
+        run.RunSet(basic, subject);
     }
 
     // Helper: create basic test context.
-    private Context MakeTestCtx(UnivecSDK client, Utility utility,
+    private static Context MakeTestCtx(UnivecSDK client, Utility utility,
         Dictionary<string, object?>? overrides)
     {
         var ctxmap = new Dictionary<string, object?>
@@ -68,7 +132,7 @@ public class PrimaryUtilityTest
     }
 
     // Helper: create full test context with point and match.
-    private Context MakeTestFullCtx(UnivecSDK client, Utility utility)
+    private static Context MakeTestFullCtx(UnivecSDK client, Utility utility)
     {
         var ctx = MakeTestCtx(client, utility, null);
         ctx.Point = new Dictionary<string, object?>
@@ -99,95 +163,98 @@ public class PrimaryUtilityTest
     [Fact]
     public void Exists()
     {
-        Assert.NotNull(_utility.Clean);
-        Assert.NotNull(_utility.Done);
-        Assert.NotNull(_utility.MakeError);
-        Assert.NotNull(_utility.FeatureAdd);
-        Assert.NotNull(_utility.FeatureHook);
-        Assert.NotNull(_utility.FeatureInit);
-        Assert.NotNull(_utility.Fetcher);
-        Assert.NotNull(_utility.MakeFetchDef);
-        Assert.NotNull(_utility.MakeContext);
-        Assert.NotNull(_utility.MakeOptions);
-        Assert.NotNull(_utility.MakeRequest);
-        Assert.NotNull(_utility.MakeResponse);
-        Assert.NotNull(_utility.MakeResult);
-        Assert.NotNull(_utility.MakePoint);
-        Assert.NotNull(_utility.MakeSpec);
-        Assert.NotNull(_utility.MakeUrl);
-        Assert.NotNull(_utility.Param);
-        Assert.NotNull(_utility.PrepareAuth);
-        Assert.NotNull(_utility.PrepareBody);
-        Assert.NotNull(_utility.PrepareHeaders);
-        Assert.NotNull(_utility.PrepareMethod);
-        Assert.NotNull(_utility.PrepareParams);
-        Assert.NotNull(_utility.PreparePath);
-        Assert.NotNull(_utility.PrepareQuery);
-        Assert.NotNull(_utility.ResultBasic);
-        Assert.NotNull(_utility.ResultBody);
-        Assert.NotNull(_utility.ResultHeaders);
-        Assert.NotNull(_utility.TransformRequest);
-        Assert.NotNull(_utility.TransformResponse);
+        var utility = GetUtil();
+        Assert.NotNull(utility.Clean);
+        Assert.NotNull(utility.Done);
+        Assert.NotNull(utility.MakeError);
+        Assert.NotNull(utility.FeatureAdd);
+        Assert.NotNull(utility.FeatureHook);
+        Assert.NotNull(utility.FeatureInit);
+        Assert.NotNull(utility.Fetcher);
+        Assert.NotNull(utility.MakeFetchDef);
+        Assert.NotNull(utility.MakeContext);
+        Assert.NotNull(utility.MakeOptions);
+        Assert.NotNull(utility.MakeRequest);
+        Assert.NotNull(utility.MakeResponse);
+        Assert.NotNull(utility.MakeResult);
+        Assert.NotNull(utility.MakePoint);
+        Assert.NotNull(utility.MakeSpec);
+        Assert.NotNull(utility.MakeUrl);
+        Assert.NotNull(utility.Param);
+        Assert.NotNull(utility.PrepareAuth);
+        Assert.NotNull(utility.PrepareBody);
+        Assert.NotNull(utility.PrepareHeaders);
+        Assert.NotNull(utility.PrepareMethod);
+        Assert.NotNull(utility.PrepareParams);
+        Assert.NotNull(utility.PreparePath);
+        Assert.NotNull(utility.PrepareQuery);
+        Assert.NotNull(utility.ResultBasic);
+        Assert.NotNull(utility.ResultBody);
+        Assert.NotNull(utility.ResultHeaders);
+        Assert.NotNull(utility.TransformRequest);
+        Assert.NotNull(utility.TransformResponse);
     }
 
     [Fact]
     public void CleanBasic()
     {
-        var ctx = MakeTestCtx(_client, _utility, null);
+        var ctx = MakeTestCtx(GetClient(), GetUtil(), null);
         var val = new Dictionary<string, object?>
         {
             ["key"] = "secret123",
             ["name"] = "test",
         };
-        var cleaned = _utility.Clean(ctx, val);
+        var cleaned = GetUtil().Clean(ctx, val);
         Assert.NotNull(cleaned);
+    }
+
+    [Fact]
+    public void CleanCorpus()
+    {
+        runsection("clean", args =>
+        {
+            if (2 != args.Length)
+            {
+                throw new InvalidOperationException(
+                    "clean: expected 2 args, got " + args.Length);
+            }
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            return GetUtil().Clean(ctx, args[1]);
+        });
     }
 
     [Fact]
     public void DoneBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "done", "basic"), entry =>
+        runsection("done", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            TestRunner.FixCtx(ctx, _client);
-            return _utility.Done(ctx);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            return GetUtil().Done(ctx);
         });
     }
 
     [Fact]
     public void MakeErrorBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "makeError", "basic"), entry =>
+        runsection("makeError", args =>
         {
-            var args = entry.TryGetValue("args", out var a)
-                ? a as List<object?> : null;
-            args ??= new List<object?> { new Dictionary<string, object?>() };
-            if (args.Count == 0)
-            {
-                args = new List<object?> { new Dictionary<string, object?>() };
-            }
-
-            var ctxmap = args[0] as Dictionary<string, object?>
-                ?? new Dictionary<string, object?>();
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            TestRunner.FixCtx(ctx, _client);
+            var ctxarg = 0 < args.Length ? args[0] : null;
+            var ctx = OmniResolver.OmniCtx(ctxarg, GetClient(), GetUtil());
 
             Exception? err = null;
-            if (args.Count > 1 && args[1] is Dictionary<string, object?> errMap)
+            if (1 < args.Length && args[1] is Dictionary<string, object?> errMap)
             {
                 err = TestRunner.ErrFromMap(errMap);
             }
 
-            return _utility.MakeError(ctx, err);
+            return GetUtil().MakeError(ctx, err);
         });
     }
 
     [Fact]
     public void MakeErrorNoThrow()
     {
-        var ctx = MakeTestFullCtx(_client, _utility);
+        var ctx = MakeTestFullCtx(GetClient(), GetUtil());
         ctx.Ctrl.Throw = false;
         ctx.Result = new Result(new Dictionary<string, object?>
         {
@@ -195,7 +262,7 @@ public class PrimaryUtilityTest
             ["resdata"] = new Dictionary<string, object?> { ["id"] = "safe01" },
         });
 
-        var result = _utility.MakeError(ctx, ctx.MakeError("test_code", "test message"));
+        var result = GetUtil().MakeError(ctx, ctx.MakeError("test_code", "test message"));
         var om = result as Dictionary<string, object?>;
         Assert.True(om != null && Equals(om["id"], "safe01"),
             $"expected id=safe01, got {result}");
@@ -204,13 +271,14 @@ public class PrimaryUtilityTest
     [Fact]
     public void FeatureAddBasic()
     {
-        var ctx = MakeTestCtx(_client, _utility, null);
-        var startLen = _client.Features.Count;
+        var client = GetClient();
+        var ctx = MakeTestCtx(client, GetUtil(), null);
+        var startLen = client.Features.Count;
 
         var feature = new BaseFeature();
-        _utility.FeatureAdd(ctx, feature);
+        GetUtil().FeatureAdd(ctx, feature);
 
-        Assert.Equal(startLen + 1, _client.Features.Count);
+        Assert.Equal(startLen + 1, client.Features.Count);
     }
 
     [Fact]
@@ -278,8 +346,12 @@ public class PrimaryUtilityTest
     public void FetcherLive()
     {
         var calls = new List<Dictionary<string, object?>>();
+        // Concrete base: a live construction must satisfy any server
+        // variables a templated base URL declares; a literal base
+        // sidesteps the requirement.
         var liveClient = new UnivecSDK(new Dictionary<string, object?>
         {
+            ["base"] = "http://localhost:8080",
             ["system"] = new Dictionary<string, object?>
             {
                 ["fetch"] = (Func<string, Dictionary<string, object?>, Dictionary<string, object?>>)
@@ -320,9 +392,10 @@ public class PrimaryUtilityTest
     public void FetcherBlockedTestMode()
     {
         // Create a live SDK then set mode to test (not using TestSDK, which
-        // installs the test feature).
+        // installs the test feature). Concrete base: see FetcherLive.
         var blockedClient = new UnivecSDK(new Dictionary<string, object?>
         {
+            ["base"] = "http://localhost:8080",
             ["system"] = new Dictionary<string, object?>
             {
                 ["fetch"] = (Func<string, Dictionary<string, object?>, Dictionary<string, object?>>)
@@ -352,12 +425,11 @@ public class PrimaryUtilityTest
     [Fact]
     public void MakeContextBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "makeContext", "basic"), entry =>
+        runsection("makeContext", args =>
         {
-            if (entry.TryGetValue("in", out var inRaw) &&
-                inRaw is Dictionary<string, object?> inMap)
+            if (args[0] is Dictionary<string, object?> inMap)
             {
-                var ctx = _utility.MakeContext(inMap, null);
+                var ctx = GetUtil().MakeContext(inMap, null);
                 var result = new Dictionary<string, object?>
                 {
                     ["id"] = ctx.Id,
@@ -379,7 +451,7 @@ public class PrimaryUtilityTest
     [Fact]
     public void MakeFetchDefBasic()
     {
-        var ctx = MakeTestFullCtx(_client, _utility);
+        var ctx = MakeTestFullCtx(GetClient(), GetUtil());
         ctx.Spec = new Spec(new Dictionary<string, object?>
         {
             ["base"] = "http://localhost:8080",
@@ -397,7 +469,7 @@ public class PrimaryUtilityTest
         });
         ctx.Result = new Result(new Dictionary<string, object?>());
 
-        var fetchdef = _utility.MakeFetchDef(ctx);
+        var fetchdef = GetUtil().MakeFetchDef(ctx);
         Assert.Equal("GET", fetchdef["method"]);
         var url = fetchdef["url"] as string ?? "";
         Assert.Contains("/api/items/item01", url);
@@ -410,7 +482,7 @@ public class PrimaryUtilityTest
     [Fact]
     public void MakeFetchDefWithBody()
     {
-        var ctx = MakeTestFullCtx(_client, _utility);
+        var ctx = MakeTestFullCtx(GetClient(), GetUtil());
         ctx.Spec = new Spec(new Dictionary<string, object?>
         {
             ["base"] = "http://localhost:8080",
@@ -426,7 +498,7 @@ public class PrimaryUtilityTest
         });
         ctx.Result = new Result(new Dictionary<string, object?>());
 
-        var fetchdef = _utility.MakeFetchDef(ctx);
+        var fetchdef = GetUtil().MakeFetchDef(ctx);
         Assert.Equal("POST", fetchdef["method"]);
         var bodyStr = Assert.IsType<string>(fetchdef["body"]);
         Assert.Contains("\"name\"", bodyStr);
@@ -435,46 +507,34 @@ public class PrimaryUtilityTest
     [Fact]
     public void MakeOptionsBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "makeOptions", "basic"), entry =>
+        runsection("makeOptions", args =>
         {
-            var inMap = entry.TryGetValue("in", out var i)
-                ? i as Dictionary<string, object?> : null;
-            inMap ??= new Dictionary<string, object?>();
-            var ctx = _utility.MakeContext(new Dictionary<string, object?>
+            var inMap = args[0] as Dictionary<string, object?>;
+            var ctxmap = new Dictionary<string, object?>();
+            if (inMap != null)
             {
-                ["options"] = inMap.TryGetValue("options", out var o) ? o : null,
-                ["config"] = inMap.TryGetValue("config", out var c) ? c : null,
-            }, null);
-            ctx.Client = _client;
-            ctx.Utility = _utility;
-            return _utility.MakeOptions(ctx);
+                ctxmap["options"] = inMap.TryGetValue("options", out var o) ? o : null;
+                ctxmap["config"] = inMap.TryGetValue("config", out var c) ? c : null;
+            }
+            var ctx = GetUtil().MakeContext(ctxmap, null);
+            ctx.Client = GetClient();
+            ctx.Utility = GetUtil();
+            return GetUtil().MakeOptions(ctx);
         });
     }
 
     [Fact]
     public void MakeRequestBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "makeRequest", "basic"), entry =>
+        runsection("makeRequest", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            ctx.Options = _client.OptionsMap();
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            ctx.Options = GetClient().OptionsMap();
 
-            _utility.MakeRequest(ctx);
+            GetUtil().MakeRequest(ctx);
 
-            // Update entry ctx for match checking.
-            if (ctxmap != null)
-            {
-                if (ctx.Response != null)
-                {
-                    ctxmap["response"] = "exists";
-                }
-                if (ctx.Result != null)
-                {
-                    ctxmap["result"] = "exists";
-                }
-            }
+            // Expose response/result existence for the match assertions.
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return null;
         });
@@ -483,27 +543,13 @@ public class PrimaryUtilityTest
     [Fact]
     public void MakeResponseBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "makeResponse", "basic"), entry =>
+        runsection("makeResponse", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            TestRunner.FixCtx(ctx, _client);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
 
-            _utility.MakeResponse(ctx);
+            GetUtil().MakeResponse(ctx);
 
-            // Update entry ctx for match checking with result data.
-            if (ctxmap != null && ctx.Result != null)
-            {
-                ctxmap["result"] = new Dictionary<string, object?>
-                {
-                    ["ok"] = ctx.Result.Ok,
-                    ["status"] = ctx.Result.Status,
-                    ["statusText"] = ctx.Result.StatusText,
-                    ["headers"] = ctx.Result.Headers,
-                    ["body"] = ctx.Result.Body,
-                };
-            }
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return null;
         });
@@ -512,7 +558,7 @@ public class PrimaryUtilityTest
     [Fact]
     public void MakeResultBasic()
     {
-        var ctx = MakeTestFullCtx(_client, _utility);
+        var ctx = MakeTestFullCtx(GetClient(), GetUtil());
         ctx.Spec = new Spec(new Dictionary<string, object?>
         {
             ["base"] = "http://localhost:8080",
@@ -538,14 +584,14 @@ public class PrimaryUtilityTest
             },
         });
 
-        var result = _utility.MakeResult(ctx);
+        var result = GetUtil().MakeResult(ctx);
         Assert.Equal(200, result.Status);
     }
 
     [Fact]
     public void MakeResultNoSpec()
     {
-        var ctx = MakeTestFullCtx(_client, _utility);
+        var ctx = MakeTestFullCtx(GetClient(), GetUtil());
         ctx.Spec = null;
         ctx.Result = new Result(new Dictionary<string, object?>
         {
@@ -555,98 +601,118 @@ public class PrimaryUtilityTest
             ["headers"] = new Dictionary<string, object?>(),
         });
 
-        Assert.ThrowsAny<Exception>(() => _utility.MakeResult(ctx));
+        Assert.ThrowsAny<Exception>(() => GetUtil().MakeResult(ctx));
     }
 
     [Fact]
     public void MakeResultNoResult()
     {
-        var ctx = MakeTestFullCtx(_client, _utility);
+        var ctx = MakeTestFullCtx(GetClient(), GetUtil());
         ctx.Spec = new Spec(new Dictionary<string, object?> { ["step"] = "start" });
         ctx.Result = null;
 
-        Assert.ThrowsAny<Exception>(() => _utility.MakeResult(ctx));
+        Assert.ThrowsAny<Exception>(() => GetUtil().MakeResult(ctx));
     }
 
     [Fact]
     public void MakeSpecBasic()
     {
-        var setupOpts = TestRunner.GetSpec(_primary, "makeSpec", "DEF", "setup", "a");
+        var setupOpts = TestRunner.GetSpec(Run().Spec, "makeSpec", "DEF", "setup", "a");
         var specClient = UnivecSDK.TestSDK(null, setupOpts);
         var specUtility = specClient.GetUtility();
 
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "makeSpec", "basic"), entry =>
+        runsection("makeSpec", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, specClient, specUtility);
+            var ctx = OmniResolver.OmniCtx(args[0], specClient, specUtility);
             ctx.Options = specClient.OptionsMap();
 
-            _utility.MakeSpec(ctx);
+            specUtility.MakeSpec(ctx);
 
-            // Update entry ctx for match.
-            if (ctxmap != null && ctx.Spec != null)
-            {
-                ctxmap["spec"] = new Dictionary<string, object?>
-                {
-                    ["base"] = ctx.Spec.Base,
-                    ["prefix"] = ctx.Spec.Prefix,
-                    ["suffix"] = ctx.Spec.Suffix,
-                    ["method"] = ctx.Spec.Method,
-                    ["params"] = ctx.Spec.Params,
-                    ["query"] = ctx.Spec.Query,
-                    ["headers"] = ctx.Spec.Headers,
-                    ["step"] = ctx.Spec.Step,
-                };
-            }
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return null;
         });
     }
 
+    // A minimal IEntity: Context resolves the op through the entity
+    // interface, and a literal {name: ...} map from the fixture is not one
+    // - entname would be "" and every lookup would miss, reporting
+    // point_no_points for all cases. TS reads the same field with getprop
+    // and accepts the plain map. (The go peer is plEntity.)
+    private sealed class PlEntity : IEntity
+    {
+        private readonly string name;
+
+        public PlEntity(string name)
+        {
+            this.name = name;
+        }
+
+        public string GetName() => name;
+
+        public IEntity Make() => new PlEntity(name);
+
+        public object? Data(object? data = null) => null;
+
+        public object? Match(object? match = null) => null;
+
+        public void MarkDeleted() { }
+
+        public bool Deleted() => false;
+    }
+
+    // Corpus-driven, like go: TS returns the error AS the value; C# throws
+    // UnivecError. The corpus says `match: out: code` for both, so
+    // the error is normalised to a map carrying its code here rather than
+    // forking the fixture per language.
     [Fact]
     public void MakePointBasic()
     {
-        var ctx = MakeTestCtx(_client, _utility, null);
-        var point = new Dictionary<string, object?>
+        runsection("makePoint", args =>
         {
-            ["parts"] = new List<object?> { "items", "{id}" },
-            ["args"] = new Dictionary<string, object?>
-            {
-                ["params"] = new List<object?>(),
-            },
-            ["params"] = new List<object?>(),
-            ["alias"] = new Dictionary<string, object?>(),
-            ["select"] = new Dictionary<string, object?>(),
-            ["active"] = true,
-            ["transform"] = new Dictionary<string, object?>(),
-        };
-        ctx.Op!.Points = new List<Dictionary<string, object?>> { point };
+            var ctxmap = args[0] as Dictionary<string, object?>
+                ?? new Dictionary<string, object?>();
 
-        _utility.MakePoint(ctx);
-        Assert.NotNull(ctx.Point);
+            if (ctxmap.TryGetValue("entity", out var em) &&
+                em is Dictionary<string, object?> entityMap)
+            {
+                var name = entityMap.TryGetValue("name", out var n)
+                    ? n as string ?? "" : "";
+                ctxmap = new Dictionary<string, object?>(ctxmap)
+                {
+                    ["entity"] = new PlEntity(name),
+                };
+            }
+
+            var ctx = OmniResolver.OmniCtx(ctxmap, GetClient(), GetUtil());
+            try
+            {
+                return GetUtil().MakePoint(ctx);
+            }
+            catch (UnivecError e)
+            {
+                return new Dictionary<string, object?> { ["code"] = e.Code };
+            }
+        });
     }
 
     [Fact]
     public void MakeUrlBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "makeUrl", "basic"), entry =>
+        runsection("makeUrl", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
             ctx.Result ??= new Result(new Dictionary<string, object?>());
-            return _utility.MakeUrl(ctx);
+            return GetUtil().MakeUrl(ctx);
         });
     }
 
     [Fact]
     public void OperatorBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "operator", "basic"), entry =>
+        runsection("operator", args =>
         {
-            var inMap = entry.TryGetValue("in", out var i)
-                ? i as Dictionary<string, object?> : null;
+            var inMap = args[0] as Dictionary<string, object?>;
             var op = new Operation(inMap ?? new Dictionary<string, object?>());
             return new Dictionary<string, object?>
             {
@@ -661,51 +727,20 @@ public class PrimaryUtilityTest
     [Fact]
     public void ParamBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "param", "basic"), entry =>
+        runsection("param", args =>
         {
-            var args = entry.TryGetValue("args", out var a)
-                ? a as List<object?> : null;
-            if (args == null || args.Count < 2)
+            if (args.Length < 2)
             {
                 return null;
             }
 
-            var ctxmap = args[0] as Dictionary<string, object?>
-                ?? new Dictionary<string, object?>();
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
             var paramdef = args[1];
 
-            var result = _utility.Param(ctx, paramdef);
+            var result = GetUtil().Param(ctx, paramdef);
 
-            // Copy spec alias back to entry ctx for matching.
-            if (entry.TryGetValue("match", out var msRaw) &&
-                msRaw is Dictionary<string, object?> matchSpec &&
-                matchSpec.TryGetValue("ctx", out var cmRaw) &&
-                cmRaw is Dictionary<string, object?> ctxMatch &&
-                ctxMatch.TryGetValue("spec", out var smRaw) &&
-                smRaw is Dictionary<string, object?> specMatch &&
-                specMatch.ContainsKey("alias") &&
-                ctx.Spec != null)
-            {
-                if (entry.TryGetValue("ctx", out var ec) &&
-                    ec is Dictionary<string, object?> entryCtx)
-                {
-                    entryCtx["spec"] = new Dictionary<string, object?>
-                    {
-                        ["alias"] = ctx.Spec.Alias,
-                    };
-                }
-                else
-                {
-                    entry["ctx"] = new Dictionary<string, object?>
-                    {
-                        ["spec"] = new Dictionary<string, object?>
-                        {
-                            ["alias"] = ctx.Spec.Alias,
-                        },
-                    };
-                }
-            }
+            // The spec alias mutation is what the match assertions read.
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return result;
         });
@@ -714,27 +749,17 @@ public class PrimaryUtilityTest
     [Fact]
     public void PrepareAuthBasic()
     {
-        var setupOpts = TestRunner.GetSpec(_primary, "prepareAuth", "DEF", "setup", "a");
+        var setupOpts = TestRunner.GetSpec(Run().Spec, "prepareAuth", "DEF", "setup", "a");
         var authClient = UnivecSDK.TestSDK(null, setupOpts);
         var authUtility = authClient.GetUtility();
 
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "prepareAuth", "basic"), entry =>
+        runsection("prepareAuth", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, authClient, authUtility);
-            TestRunner.FixCtx(ctx, authClient);
+            var ctx = OmniResolver.OmniCtx(args[0], authClient, authUtility);
 
-            _utility.PrepareAuth(ctx);
+            authUtility.PrepareAuth(ctx);
 
-            // Update entry ctx for match.
-            if (ctxmap != null && ctx.Spec != null)
-            {
-                ctxmap["spec"] = new Dictionary<string, object?>
-                {
-                    ["headers"] = ctx.Spec.Headers,
-                };
-            }
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return null;
         });
@@ -743,91 +768,79 @@ public class PrimaryUtilityTest
     [Fact]
     public void PrepareBodyBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "prepareBody", "basic"), entry =>
+        runsection("prepareBody", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            TestRunner.FixCtx(ctx, _client);
-            return _utility.PrepareBody(ctx);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            return GetUtil().PrepareBody(ctx);
         });
     }
 
     [Fact]
     public void PrepareHeadersBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "prepareHeaders", "basic"), entry =>
+        runsection("prepareHeaders", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            return _utility.PrepareHeaders(ctx);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            return GetUtil().PrepareHeaders(ctx);
         });
     }
 
     [Fact]
     public void PrepareMethodBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "prepareMethod", "basic"), entry =>
+        runsection("prepareMethod", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            return _utility.PrepareMethod(ctx);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            // An op the API does not define resolves NO method; ts answers
+            // undefined there and C# answers null - both are "no value" to
+            // the corpus.
+            var method = GetUtil().PrepareMethod(ctx);
+            return string.IsNullOrEmpty(method) ? null : method;
         });
     }
 
     [Fact]
     public void PrepareParamsBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "prepareParams", "basic"), entry =>
+        runsection("prepareParams", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            return _utility.PrepareParams(ctx);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            return GetUtil().PrepareParams(ctx);
         });
     }
 
     // Was two hand-written cases that had drifted out of the shared corpus
-    // (the preparePath fixture shipped as an empty `set: []`). Now driven by
-    // the corpus like every other section, so all ports assert the same
+    // (the preparePath fixture shipped as an empty `set: []`). Now driven
+    // by the corpus like every other section, so all ports assert the same
     // separator / blank-segment behaviour.
     [Fact]
     public void PreparePathBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "preparePath", "basic"), entry =>
+        runsection("preparePath", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            return _utility.PreparePath(ctx);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            return GetUtil().PreparePath(ctx);
         });
     }
 
     [Fact]
     public void PrepareQueryBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "prepareQuery", "basic"), entry =>
+        runsection("prepareQuery", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            return _utility.PrepareQuery(ctx);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
+            return GetUtil().PrepareQuery(ctx);
         });
     }
 
     [Fact]
     public void ResultBasicBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "resultBasic", "basic"), entry =>
+        runsection("resultBasic", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
-            TestRunner.FixCtx(ctx, _client);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
 
-            var result = _utility.ResultBasic(ctx);
+            var result = GetUtil().ResultBasic(ctx);
 
             var res = new Dictionary<string, object?>
             {
@@ -849,21 +862,13 @@ public class PrimaryUtilityTest
     [Fact]
     public void ResultBodyBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "resultBody", "basic"), entry =>
+        runsection("resultBody", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
 
-            _utility.ResultBody(ctx);
+            GetUtil().ResultBody(ctx);
 
-            if (ctxmap != null && ctx.Result != null)
-            {
-                ctxmap["result"] = new Dictionary<string, object?>
-                {
-                    ["body"] = ctx.Result.Body,
-                };
-            }
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return null;
         });
@@ -872,21 +877,13 @@ public class PrimaryUtilityTest
     [Fact]
     public void ResultHeadersBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "resultHeaders", "basic"), entry =>
+        runsection("resultHeaders", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
 
-            _utility.ResultHeaders(ctx);
+            GetUtil().ResultHeaders(ctx);
 
-            if (ctxmap != null && ctx.Result != null)
-            {
-                ctxmap["result"] = new Dictionary<string, object?>
-                {
-                    ["headers"] = ctx.Result.Headers,
-                };
-            }
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return null;
         });
@@ -895,21 +892,14 @@ public class PrimaryUtilityTest
     [Fact]
     public void TransformRequestBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "transformRequest", "basic"), entry =>
+        runsection("transformRequest", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
 
-            var result = _utility.TransformRequest(ctx);
+            var result = GetUtil().TransformRequest(ctx);
 
-            // Update entry ctx for match (step changed).
-            if (ctxmap != null && ctx.Spec != null &&
-                ctxmap.TryGetValue("spec", out var smRaw) &&
-                smRaw is Dictionary<string, object?> specMap)
-            {
-                specMap["step"] = ctx.Spec.Step;
-            }
+            // The step advance is what the match assertion reads.
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return result;
         });
@@ -918,20 +908,13 @@ public class PrimaryUtilityTest
     [Fact]
     public void TransformResponseBasic()
     {
-        TestRunner.RunSet(TestRunner.GetSpec(_primary, "transformResponse", "basic"), entry =>
+        runsection("transformResponse", args =>
         {
-            var ctxmap = entry.TryGetValue("ctx", out var c)
-                ? c as Dictionary<string, object?> : null;
-            var ctx = TestRunner.MakeCtxFromMap(ctxmap, _client, _utility);
+            var ctx = OmniResolver.OmniCtx(args[0], GetClient(), GetUtil());
 
-            var result = _utility.TransformResponse(ctx);
+            var result = GetUtil().TransformResponse(ctx);
 
-            if (ctxmap != null && ctx.Spec != null &&
-                ctxmap.TryGetValue("spec", out var smRaw) &&
-                smRaw is Dictionary<string, object?> specMap)
-            {
-                specMap["step"] = ctx.Spec.Step;
-            }
+            OmniResolver.OmniSyncCtx(args[0], ctx);
 
             return result;
         });

@@ -109,7 +109,7 @@ func (f *PagingFeature) graphqlPreRequest(ctx *core.Context, paging map[string]a
 	// Only bind variables the operation actually declares, or the server
 	// rejects the document.
 	declared := map[string]bool{}
-	if varlist, ok := vs.GetPath([]any{"graphql", "vars"}, ctx.Point).([]any); ok {
+	if varlist, ok := vs.GetPath(ctx.Point, []any{"graphql", "vars"}).([]any); ok {
 		for _, v := range varlist {
 			if name, ok := vs.GetProp(v, "name").(string); ok {
 				declared[name] = true
@@ -160,7 +160,7 @@ func (f *PagingFeature) PreResult(ctx *core.Context) {
 
 	// Relay connections carry the cursor in pageInfo, at the path the model
 	// recorded for this op.
-	page := vs.GetPath([]any{"graphql", "page"}, ctx.Point)
+	page := vs.GetPath(ctx.Point, []any{"graphql", "page"})
 	if pm, ok := page.(map[string]any); ok {
 		if _, isMap := body.(map[string]any); isMap {
 			// `connpath` locates the connection object inside the response
@@ -168,18 +168,18 @@ func (f *PagingFeature) PreResult(ctx *core.Context) {
 			// to it.
 			conn := body
 			if cp, ok := pm["connpath"].(string); ok && cp != "" {
-				if sub := vs.GetPath(cp, body); sub != nil {
+				if sub := vs.GetPath(body, cp); sub != nil {
 					conn = sub
 				}
 			}
 
 			if cp, ok := pm["cursor"].(string); ok && cp != "" {
-				if cursor := vs.GetPath(cp, conn); cursor != nil {
+				if cursor := vs.GetPath(conn, cp); cursor != nil {
 					paging["cursor"] = cursor
 				}
 			}
 			if mp, ok := pm["more"].(string); ok && mp != "" {
-				if more, ok := vs.GetPath(mp, conn).(bool); ok {
+				if more, ok := vs.GetPath(conn, mp).(bool); ok {
 					paging["hasMore"] = more
 					explicitMore = true
 				}

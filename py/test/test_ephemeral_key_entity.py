@@ -85,7 +85,7 @@ def _ephemeral_key_basic_setup(extra):
         "UNIVEC_TEST_EPHEMERAL_KEY_ENTID": idmap,
         "UNIVEC_TEST_LIVE": "FALSE",
         "UNIVEC_TEST_EXPLAIN": "FALSE",
-        "UNIVEC_APIKEY": "NONE",
+        "UNIVEC_APIKEY": "",
     })
 
     idmap_resolved = helpers.to_map(
@@ -95,6 +95,10 @@ def _ephemeral_key_basic_setup(extra):
 
     if env.get("UNIVEC_TEST_LIVE") == "TRUE":
         merged_opts = vs.merge([
+            # FIRST, so the generated fields below win: sdk-test-control.json's
+            # test.client.options adds to the live client, it does not
+            # redirect it.
+            runner.live_client_options(),
             {
                 "apikey": env.get("UNIVEC_APIKEY"),
             },

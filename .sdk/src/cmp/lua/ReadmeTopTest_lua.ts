@@ -1,5 +1,5 @@
 
-import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape, luaKey } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -15,10 +15,6 @@ function luaLit(type: any): string {
   if ('BOOLEAN' === k) return 'true'
   if ('ARRAY' === k || 'OBJECT' === k) return '{}'
   return '"example"'
-}
-
-function luaKey(name: string): string {
-  return /^[A-Za-z_]\w*$/.test(name) ? name : `["${name}"]`
 }
 
 

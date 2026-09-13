@@ -105,7 +105,7 @@ fn iterate(options: Value, resdata: Value) []Value {
 
     const items: []const Value = if (resdata == .array) resdata.array.data.items else &[_]Value{};
 
-    var out = std.ArrayList(Value).init(h.A());
+    var out: std.ArrayList(Value) = .empty;
 
     if (chunk_size > 0) {
         const cs: usize = @intCast(chunk_size);
@@ -113,15 +113,15 @@ fn iterate(options: Value, resdata: Value) []Value {
         while (i < items.len) {
             if (chunk_delay > 0) sup.fopt_sleep(options, chunk_delay);
             const end = @min(i + cs, items.len);
-            out.append(h.ja(items[i..end])) catch {};
+            out.append(h.A(), h.ja(items[i..end])) catch {};
             i = end;
         }
-        return out.toOwnedSlice() catch &.{};
+        return out.toOwnedSlice(h.A()) catch &.{};
     }
 
     for (items) |item| {
         if (chunk_delay > 0) sup.fopt_sleep(options, chunk_delay);
-        out.append(item) catch {};
+        out.append(h.A(), item) catch {};
     }
-    return out.toOwnedSlice() catch &.{};
+    return out.toOwnedSlice(h.A()) catch &.{};
 }

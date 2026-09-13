@@ -367,7 +367,7 @@ func (f *CostFeature) body(ctx *core.Context) (float64, bool) {
 		return 0, false
 	}
 
-	switch n := vs.GetPath(path, ctx.Result.Body).(type) {
+	switch n := vs.GetPath(ctx.Result.Body, path).(type) {
 	case int:
 		return float64(n) * f.perUnit(), true
 	case int64:

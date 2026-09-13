@@ -71,12 +71,25 @@ def isErrV (v : Value) : SIO Bool := do
 -- Operation naming
 -- ---------------------------------------------------------------------------
 
+/-- The op-name convention, used only when the API definition names no
+    method for the point.
+
+    NO CATCH-ALL GET. The ts reference returns `methodMap[key]`, which is
+    undefined for an op the map does not name — the request is then rejected
+    rather than silently issued. A `| _ => "GET"` here turned every
+    unrecognised op into a GET, which is both a divergence from the corpus
+    (`primary/prepareMethod` case 6, opname "bad", expects no method) and the
+    more dangerous of the two behaviours: a mistyped or unsupported op quietly
+    fetched. "" is Lean's spelling of the same "no value"; the seven other
+    targets that carried this bug answer it identically. -/
 def opMethodOf : String → String
   | "create" => "POST"
   | "update" => "PUT"
+  | "load"   => "GET"
+  | "list"   => "GET"
   | "remove" => "DELETE"
   | "patch"  => "PATCH"
-  | _        => "GET"
+  | _        => ""
 
 def opInputOf : String → String
   | "create" => "data"
@@ -260,8 +273,19 @@ def prepareAuth (ctx : Value) : SIO (Value × Option Value) := do
   | .map _ => do
     let headers ← gpMap specV "headers"
     let options ← gp ctx "options"
+    -- `auth: null` is the documented way to suppress auth outright: NO
+    -- authorization header, whatever the apikey says. Without this the
+    -- withheld credential goes on the wire.
+    --
+    -- The ports that run options through validate against an optspec carrying
+    -- an `auth` default can use absence as the signal (validate guarantees the
+    -- key is present otherwise). lean's makeOptions has no optspec, so `auth`
+    -- is ABSENT in the ordinary case and absence must stay the ordinary case.
+    -- getpropRaw is the only reader that tells a STORED null from an absent
+    -- key - gp collapses both to .noval - so the stored null alone suppresses.
+    let authRaw ← getpropRaw options "auth"
     let apikey ← gpS options "apikey"
-    if apikey == "" then do
+    if authRaw == .null || apikey == "" then do
       dp headers "authorization"
       pure (specV, none)
     else do

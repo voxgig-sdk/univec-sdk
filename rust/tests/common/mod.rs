@@ -1,6 +1,13 @@
-// Shared SDK test infrastructure (mirrors tm/go/test/runner_test.go plus
-// the fh* feature-test harness from tm/go/test/feature_test.go). Each test
-// binary includes this module with `mod common;`.
+// Shared SDK test SUPPORT: the helpers the generated entity/direct tests and
+// the corpus call sites share — env loading, the sdk-test-control.json skip
+// and pacing machinery, corpus access, entity-data conversion, ctx
+// construction from a JSON test entry, and the fh* feature-test harness
+// (mirrors tm/go/test/testsupport_test.go plus the fh* harness from
+// tm/go/test/feature_test.go). Each test binary includes it with
+// `mod common;`.
+//
+// The corpus ENGINE half of this file was retired by the vendor-tag rollout:
+// see the note where it used to be, and tests/omni_resolver/mod.rs.
 
 #![allow(dead_code)]
 
@@ -9,7 +16,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use univec_sdk::core::helpers::{
-    get_bool, get_str, getp, ja, jo, json_thunk, now_ms, setp, to_int, to_map,
+    get_bool, get_str, getp, jo, json_thunk, now_ms, setp, to_int, to_map,
 };
 use univec_sdk::utility::voxgigstruct as vs;
 use univec_sdk::{
@@ -91,6 +98,38 @@ pub fn is_control_skipped(kind: &str, name: &str, mode: &str) -> (bool, String) 
         }
     }
     (false, String::new())
+}
+
+/// Extra SDK options every LIVE client is constructed with, read from
+/// sdk-test-control.json `test.client.options`.
+///
+/// The generated live client knows two things: the base URL (from the spec)
+/// and the credential (from the environment). Everything else about how a
+/// particular API wants to be talked to - which features to switch on, and
+/// with what settings - is a property of THAT API, known to the project and
+/// to nothing in the toolchain.
+///
+/// Merged UNDER the generated fields, so the suite's own base/apikey/server
+/// values win: this ADDS to the live client, it does not redirect it.
+///
+/// Reserved fields are stripped HERE rather than at each merge site: the
+/// generated map only names a field when the model calls for one, so a
+/// "base" in this block would face no competing value and would silently
+/// redirect the whole suite - credential included - to another host.
+pub const LIVE_RESERVED: [&str; 6] =
+    ["base", "prefix", "suffix", "server", "apikey", "secret"];
+
+pub fn live_client_options() -> Value {
+    let ctrl = load_test_control();
+    let out = Value::empty_map();
+    if let Value::Map(m) = get_spec(&ctrl, &["test", "client", "options"]) {
+        for (k, v) in m.borrow().iter() {
+            if !LIVE_RESERVED.contains(&k.as_str()) {
+                setp(&out, k, v.clone());
+            }
+        }
+    }
+    out
 }
 
 /// Configured per-test live delay in ms; default 500.
@@ -201,244 +240,14 @@ pub fn json_normalize(v: &Value) -> Value {
     }
 }
 
-/// matchString: /re/ patterns via the vendored regex engine, otherwise
-/// case-insensitive substring.
-pub fn match_string(pattern: &str, val: &str) -> bool {
-    if pattern.len() >= 2 && pattern.starts_with('/') && pattern.ends_with('/') {
-        return univec_sdk::utility::voxgigstruct::re::Regex::new(
-            &pattern[1..pattern.len() - 1],
-        )
-        .map(|re| re.is_match(val))
-        .unwrap_or(false);
-    }
-    val.to_lowercase().contains(&pattern.to_lowercase())
-}
-
-/// matchDeep (mirrors go): every leaf of `check` must equal/match the same
-/// path in `base`; returns Some(reason) on the first mismatch.
-pub fn match_deep(check: &Value, base: &Value) -> Option<String> {
-    fn rec(check: &Value, base: &Value, path: &mut Vec<String>) -> Option<String> {
-        match check {
-            Value::Map(cm) => {
-                for (k, cv) in cm.borrow().iter() {
-                    let bv = getp(base, k);
-                    path.push(k.clone());
-                    let r = rec(cv, &bv, path);
-                    path.pop();
-                    if r.is_some() {
-                        return r;
-                    }
-                }
-                None
-            }
-            Value::List(cl) => {
-                for (i, cv) in cl.borrow().iter().enumerate() {
-                    let bv = vs::get_elem(base, &Value::Num(i as f64), Value::Noval);
-                    path.push(i.to_string());
-                    let r = rec(cv, &bv, path);
-                    path.pop();
-                    if r.is_some() {
-                        return r;
-                    }
-                }
-                None
-            }
-            leaf => {
-                if let Value::Str(s) = leaf {
-                    if s == EXISTSMARK {
-                        if base.is_noval() || base.is_null() {
-                            return Some(format!(
-                                "{}: expected value to exist",
-                                path.join(".")
-                            ));
-                        }
-                        return None;
-                    }
-                    if s == UNDEFMARK {
-                        if !base.is_noval() && !base.is_null() {
-                            return Some(format!(
-                                "{}: expected undefined, got {}",
-                                path.join("."),
-                                vs::stringify(base, Some(60), false)
-                            ));
-                        }
-                        return None;
-                    }
-                }
-
-                let nc = json_normalize(leaf);
-                let nb = json_normalize(base);
-                if nc == nb {
-                    return None;
-                }
-                if let Value::Str(cs) = leaf {
-                    if !cs.is_empty() && match_string(cs, &vs::stringify(base, None, false)) {
-                        return None;
-                    }
-                }
-                Some(format!(
-                    "{}: got {}, want {}",
-                    path.join("."),
-                    vs::stringify(&nb, Some(120), false),
-                    vs::stringify(&nc, Some(120), false)
-                ))
-            }
-        }
-    }
-    let mut path = Vec::new();
-    rec(check, base, &mut path)
-}
-
-// ---- runset (mirrors go runner_test.go runset) -----------------------------------
-
-// Sections deliberately left empty in the shared corpus
-// (.sdk/test/primary/<name>.aon carries a PENDING header). Everything else
-// MUST contribute cases.
-pub const PENDING_SECTIONS: &[&str] = &[
-    "fetcher", "makeFetchDef", "makeResult", "featureAdd",
-    "featureHook", "featureInit",
-];
-
-pub fn runset(
-    testspec: &Value,
-    subject: &mut dyn FnMut(&Value) -> Result<Value, UnivecError>,
-) {
-    runset_named("", testspec, subject)
-}
-
-/// Drive one section of the shared test corpus.
-///
-/// This used to `return` silently when "set" was missing or not a list, so a
-/// renamed section, a fixture that failed to compile, or an empty set reported
-/// PASS while running zero assertions — the whole point of a shared oracle lost
-/// without a single red test. Both conditions now panic, except for the
-/// sections explicitly marked PENDING in the corpus.
-pub fn runset_named(
-    name: &str,
-    testspec: &Value,
-    subject: &mut dyn FnMut(&Value) -> Result<Value, UnivecError>,
-) {
-    let set = match getp(testspec, "set") {
-        Value::List(l) => Value::List(l),
-        _ => panic!(
-            "test corpus section {:?} has no `set` list — zero cases would run",
-            name
-        ),
-    };
-
-    if let Value::List(l) = &set {
-        if l.borrow().is_empty() && !PENDING_SECTIONS.contains(&name) {
-            panic!(
-                "test corpus section {:?} is EMPTY — zero cases would run; add \
-                 cases, or mark the fixture PENDING in .sdk/test/primary/",
-                name
-            );
-        }
-    }
-
-    let entries: Vec<Value> = match &set {
-        Value::List(l) => l.borrow().clone(),
-        _ => Vec::new(),
-    };
-
-    for (i, entry) in entries.iter().enumerate() {
-        if !matches!(entry, Value::Map(_)) {
-            continue;
-        }
-
-        let mark = match getp(entry, "mark") {
-            Value::Noval => String::new(),
-            m => format!(" (mark={})", vs::stringify(&m, None, false)),
-        };
-
-        let result = subject(entry);
-        let expected_err = getp(entry, "err");
-
-        match result {
-            Err(err) => {
-                if !expected_err.is_noval() && !expected_err.is_null() {
-                    let errmsg = err.msg.clone();
-                    if let Value::Str(exp) = &expected_err {
-                        if !match_string(exp, &errmsg) {
-                            panic!(
-                                "entry {}{}: error mismatch: got {:?}, want contains {:?}",
-                                i, mark, errmsg, exp
-                            );
-                        }
-                    }
-                    // err: true means any error is acceptable.
-                    if let Value::Map(_) = getp(entry, "match") {
-                        let result_map = jo(vec![
-                            ("in", getp(entry, "in")),
-                            (
-                                "err",
-                                jo(vec![("message", Value::str(errmsg.clone()))]),
-                            ),
-                        ]);
-                        if let Some(why) =
-                            match_deep(&getp(entry, "match"), &result_map)
-                        {
-                            panic!("entry {}{}: match: {}", i, mark, why);
-                        }
-                    }
-                    continue;
-                }
-                panic!("entry {}{}: unexpected error: {}", i, mark, err.msg);
-            }
-            Ok(out) => {
-                if !expected_err.is_noval() && !expected_err.is_null() {
-                    panic!(
-                        "entry {}{}: expected error containing {} but got result: {}",
-                        i,
-                        mark,
-                        vs::stringify(&expected_err, None, false),
-                        vs::stringify(&out, Some(160), false)
-                    );
-                }
-
-                let mut matched = false;
-                if let Value::Map(_) = getp(entry, "match") {
-                    let result_map = jo(vec![
-                        ("in", getp(entry, "in")),
-                        ("out", json_normalize(&out)),
-                    ]);
-                    let args = getp(entry, "args");
-                    if !args.is_noval() {
-                        setp(&result_map, "args", args);
-                    } else if !getp(entry, "in").is_noval() {
-                        setp(&result_map, "args", ja(vec![getp(entry, "in")]));
-                    }
-                    let ctx_data = getp(entry, "ctx");
-                    if !ctx_data.is_noval() {
-                        setp(&result_map, "ctx", ctx_data);
-                    }
-                    if let Some(why) = match_deep(&getp(entry, "match"), &result_map) {
-                        panic!("entry {}{}: match: {}", i, mark, why);
-                    }
-                    matched = true;
-                }
-
-                let expected_out = getp(entry, "out");
-                if expected_out.is_noval() && matched {
-                    continue;
-                }
-                if !expected_out.is_noval() {
-                    let norm_result = json_normalize(&out);
-                    let norm_expected = json_normalize(&expected_out);
-                    if norm_result != norm_expected {
-                        panic!(
-                            "entry {}{}: output mismatch:\n  got:  {}\n  want: {}",
-                            i,
-                            mark,
-                            vs::stringify(&norm_result, Some(240), false),
-                            vs::stringify(&norm_expected, Some(240), false)
-                        );
-                    }
-                }
-            }
-        }
-    }
-}
+// The corpus ENGINE that used to live here — `runset` / `runset_named`
+// (the entry loop) and `match_deep` / `match_string` (the match engine) —
+// is superseded by the vendored @voxgig/omni runner, driven through the
+// adapter in tests/omni_resolver/mod.rs (vendor-tag rollout, Decision 4).
+// This file keeps its SUPPORT half under its own name — env loading, the
+// sdk-test-control skip/pacing machinery, corpus and entity-data access,
+// ctx construction from a JSON entry, and the fh feature harness — so the
+// emitted call sites did not move.
 
 // ---- ctx construction from JSON test entries --------------------------------------
 

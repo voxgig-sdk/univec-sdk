@@ -86,7 +86,7 @@ public class ModelDirectTest {
     Map<String, Object> envm = new LinkedHashMap<>();
     envm.put("UNIVEC_TEST_MODEL_ENTID", new LinkedHashMap<>());
     envm.put("UNIVEC_TEST_LIVE", "FALSE");
-    envm.put("UNIVEC_APIKEY", "NONE");
+    envm.put("UNIVEC_APIKEY", "");
     Map<String, Object> env = RunnerSupport.envOverride(envm);
 
     boolean live = "TRUE".equals(env.get("UNIVEC_TEST_LIVE"));
@@ -95,7 +95,10 @@ public class ModelDirectTest {
     setup.calls = calls;
 
     if (live) {
-      Map<String, Object> mergedOpts = new LinkedHashMap<>();
+      // sdk-test-control.json's test.client.options seeds the live
+      // client; the generated fields below overwrite anything they name.
+      Map<String, Object> mergedOpts =
+          new LinkedHashMap<>(RunnerSupport.liveClientOptions());
       mergedOpts.put("apikey", env.get("UNIVEC_APIKEY"));
       setup.client = new UnivecSDK(mergedOpts);
       setup.live = true;

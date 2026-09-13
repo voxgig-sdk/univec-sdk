@@ -33,7 +33,7 @@ pub const NetsimFeature = struct {
     pub fn make() Feature {
         const self = h.A().create(NetsimFeature) catch unreachable;
         const track = h.A().create(NetsimTrack) catch unreachable;
-        track.* = .{ .applied = std.ArrayList(Value).init(h.A()) };
+        track.* = .{ .applied = .empty };
         self.* = .{ .track = track };
         return .{ .ptr = @ptrCast(self), .vtable = &vtable };
     }
@@ -110,7 +110,7 @@ fn pick_latency(track: *NetsimTrack, options: Value) i64 {
 }
 
 fn track_applied(track: *NetsimTrack, ctx: *Context, applied: Value) void {
-    track.applied.append(applied) catch {};
+    track.applied.append(h.A(), applied) catch {};
     const calls = track.calls;
     const applied_list = h.olist();
     for (track.applied.items) |a| applied_list.array.append(a) catch {};

@@ -4,6 +4,9 @@ import * as Path from 'node:path'
 import {
   cmp, each, names,
   File, Content, Copy, Folder, Fragment,
+  pluginExcludes,
+  targetFeatures,
+  TEST_CONTROL_EXCLUDE
 } from '@voxgig/sdkgen'
 
 
@@ -36,7 +39,14 @@ const Main = cmp(async function Main(props: any) {
   const { model } = props.ctx$
 
   const entity: ModelEntity = getModelPath(model, `main.${KIT}.entity`)
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  // Gated by the applicability tags, so this target never imports or
+  // registers a feature it has no source for. One rule, one place:
+  // helpers/applicability.
+  const feature = targetFeatures(model, target)
+
+  // Does the secrets feature apply here and is it switched on? Both, since
+  // targetFeatures already dropped it for a target with no sekreto port.
+  const secrets = null != (feature as any).secrets
 
   Package({ target })
 
@@ -45,7 +55,14 @@ const Main = cmp(async function Main(props: any) {
   // Copy tm/perl files with replacements
   Copy({
     from: 'tm/' + target.name,
-    exclude: [/src\//],
+    // An ACTIVE feature's INACTIVE plugins do not ship. perl has no
+    // src/feature layout (srcfeature: false), so this blanket copy is the
+    // one place the generate-time plugin trim can act; the model's
+    // `plugin.<group>.path` entries name their files relative to THIS
+    // copy's root ('feature/secrets/plugins/Voxgig/Sekreto/Plugins/
+    // <Kind>.pm'). See helpers/featureSource.pluginExcludes, and
+    // Main_go.ts / Main_py.ts, which do the same.
+    exclude: [/src\//, TEST_CONTROL_EXCLUDE, ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
     }
@@ -67,6 +84,34 @@ const Main = cmp(async function Main(props: any) {
             '/(?<indent>[ \\t]*)#[ \\t]*#(?<name>[A-Za-z0-9]+)-Hook[ \\t]*\\n?/':
               ({ name, indent }: any) =>
                 `${indent}$utility->{feature_hook}->($ctx, "${name}");\n`,
+
+            // SECRETS. The accessor is emitted only when the secrets
+            // feature applies to this target AND the model activates it -
+            // with the feature off the marker line is REMOVED, so the
+            // inactive output is byte-identical to pre-migration.
+            //
+            // The LIVE Sekreto, not a clone: sekreto holds provider and
+            // cache state, so a clone would resolve into a copy nothing
+            // else can see.
+            //
+            // There is deliberately NO resolve seam here. Unlike ts and
+            // py, this port resolves at the TRANSPORT (see
+            // feature/secrets_feature.pm), which every wire path -
+            // entity ops, direct() and graphql() - already crosses.
+            '/(?<indent>[ \\t]*)#[ \\t]*#SecretsAccessor[ \\t]*\\n?/':
+              ({ indent }: any) => !secrets ? '' :
+                `${indent}# The LIVE Sekreto instance: for arbitrary secrets and redaction.\n` +
+                `${indent}#\n` +
+                `${indent}#   $sdk->secrets->get('db.password')\n` +
+                `${indent}#   $sdk->secrets->redactall($logline)\n` +
+                `${indent}#\n` +
+                `${indent}# Never a clone: sekreto holds provider state (caches, vault\n` +
+                `${indent}# leases) that has to stay live to be worth anything.\n` +
+                `${indent}sub secrets {\n` +
+                `${indent}  my ($self) = @_;\n` +
+                `${indent}  my $f = $self->{_secrets};\n` +
+                `${indent}  return defined $f ? $f->sekreto : undef;\n` +
+                `${indent}}\n\n`,
           }
         },
 

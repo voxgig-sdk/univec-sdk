@@ -1,5 +1,5 @@
 "use strict";
-// VERSION: @voxgig/struct 0.0.10
+// VERSION: @voxgig/struct 0.3.2 (vendored via omni compat; see ../omni.ts)
 // RUN: npm test
 // RUN-SOME: npm run test-some --pattern=getpath
 var __importDefault = (this && this.__importDefault) || function (mod) {
@@ -8,7 +8,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_test_1 = require("node:test");
 const node_assert_1 = __importDefault(require("node:assert"));
-const runner_1 = require("../runner");
+const omni_1 = require("../omni");
 const index_1 = require("./index");
 const { equal, deepEqual } = node_assert_1.default;
 // NOTE: tests are (mostly) in order of increasing dependence.
@@ -19,7 +19,7 @@ const { equal, deepEqual } = node_assert_1.default;
     let client;
     let struct;
     (0, node_test_1.before)(async () => {
-        const runner = await (0, runner_1.makeRunner)(index_1.TEST_JSON_FILE, await index_1.SDK.test());
+        const runner = await (0, omni_1.makeRunner)(index_1.TEST_JSON_FILE, await index_1.SDK.test());
         const runner_struct = await runner('struct');
         spec = runner_struct.spec;
         runset = runner_struct.runset;
@@ -130,7 +130,7 @@ const { equal, deepEqual } = node_assert_1.default;
         await runset(spec.minor.escurl, struct.escurl);
     });
     (0, node_test_1.test)('minor-stringify', async () => {
-        await runset(spec.minor.stringify, (vin) => struct.stringify((runner_1.NULLMARK === vin.val ? "null" : vin.val), vin.max));
+        await runset(spec.minor.stringify, (vin) => struct.stringify((omni_1.NULLMARK === vin.val ? "null" : vin.val), vin.max));
     });
     (0, node_test_1.test)('minor-edge-stringify', async () => {
         const { stringify } = struct;
@@ -149,9 +149,9 @@ const { equal, deepEqual } = node_assert_1.default;
     });
     (0, node_test_1.test)('minor-pathify', async () => {
         await runsetflags(spec.minor.pathify, { null: true }, (vin) => {
-            let path = runner_1.NULLMARK == vin.path ? undefined : vin.path;
+            let path = omni_1.NULLMARK == vin.path ? undefined : vin.path;
             let pathstr = struct.pathify(path, vin.from).replace('__NULL__.', '');
-            pathstr = runner_1.NULLMARK === vin.path ? pathstr.replace('>', ':null>') : pathstr;
+            pathstr = omni_1.NULLMARK === vin.path ? pathstr.replace('>', ':null>') : pathstr;
             return pathstr;
         });
     });
@@ -212,6 +212,25 @@ const { equal, deepEqual } = node_assert_1.default;
         let intarr1 = [2, 3, 5, 7, 11];
         deepEqual(delprop(intarr0, 2), [2, 3, 7, 11]);
         deepEqual(delprop(intarr1, '2'), [2, 3, 7, 11]);
+    });
+    // The struct.nullsem section: does a PRESENT key holding a JSON null
+    // read as "no value"? Opt-in per target (create-sdkgen ships it; an
+    // older project corpus may predate it - the skip below says so OUT
+    // LOUD rather than passing vacuously). All lanes run {null: false}:
+    // without the flag the runner rewrites every null to '__NULL__' and
+    // the section asserts nothing about null at all.
+    (0, node_test_1.test)('nullsem', async (t) => {
+        const nullsem = spec.nullsem;
+        if (null == nullsem) {
+            t.skip('corpus predates struct.nullsem - refresh .sdk/test/struct from create-sdkgen');
+            return;
+        }
+        const { getprop, getelem, getpath, haskey, keysof } = struct;
+        await runsetflags(nullsem.getprop, { null: false }, (vin) => undefined === vin.alt ? getprop(vin.val, vin.key) : getprop(vin.val, vin.key, vin.alt));
+        await runsetflags(nullsem.getelem, { null: false }, (vin) => undefined === vin.alt ? getelem(vin.val, vin.key) : getelem(vin.val, vin.key, vin.alt));
+        await runsetflags(nullsem.getpath, { null: false }, (vin) => undefined === vin.alt ? getpath(vin.store, vin.path) : getpath(vin.store, vin.path, vin.alt));
+        await runsetflags(nullsem.haskey, { null: false }, (vin) => haskey(vin.src, vin.key));
+        await runsetflags(nullsem.keysof, { null: false }, (vin) => keysof(vin));
     });
     (0, node_test_1.test)('minor-haskey', async () => {
         await runsetflags(spec.minor.haskey, { null: false }, (vin) => struct.haskey(vin.src, vin.key));
@@ -421,7 +440,7 @@ const { equal, deepEqual } = node_assert_1.default;
         deepEqual(inject(test.in.val, test.in.store), test.out);
     });
     (0, node_test_1.test)('inject-string', async () => {
-        await runset(spec.inject.string, (vin) => struct.inject(vin.val, vin.store, { modify: runner_1.nullModifier }));
+        await runset(spec.inject.string, (vin) => struct.inject(vin.val, vin.store, { modify: omni_1.nullModifier }));
     });
     (0, node_test_1.test)('inject-deep', async () => {
         await runset(spec.inject.deep, (vin) => struct.inject(vin.val, vin.store));

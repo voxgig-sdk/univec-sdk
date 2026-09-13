@@ -2,6 +2,7 @@
 import {
   cmp, each,
   File, Content, Copy, Folder,
+  pluginExcludes,
 } from '@voxgig/sdkgen'
 
 
@@ -16,10 +17,19 @@ import {
 } from '@voxgig/apidef'
 
 
+import { extraFeatures } from './featureextra_clojure'
 import { Package } from './Package_clojure'
 import { Config } from './Config_clojure'
 import { Gitignore } from './Gitignore_clojure'
 import { MainEntity } from './MainEntity_clojure'
+
+
+// Features that ship a top-level `feature/<name>/` container in
+// tm/clojure. Listed rather than discovered: a component cannot walk the
+// template tree, and the list is short and changes with the templates it
+// describes. Anything named here is EXCLUDED from the verbatim copy unless
+// the model selects it (see the Copy below).
+const CONTAINED = ['secrets']
 
 
 const Main = cmp(async function Main(props: any) {
@@ -36,9 +46,41 @@ const Main = cmp(async function Main(props: any) {
   // Copy tm/clojure verbatim (runtime under src/, the test suite under test/,
   // Makefile/LICENSE/VERSION). The feature-add scaffolding under src/feature
   // is excluded — the clojure target does not use per-feature custom source.
+  //
+  // THE TOP-LEVEL feature/ CONTAINER IS GATED HERE, at generate time.
+  //
+  // clojure declares `feature: trim: false` (model/target/clojure.aon)
+  // because every ordinary feature lives in the single generated module
+  // src/sdk/features.clj, so `target add` copies the whole template tree.
+  // That was harmless while nothing per-feature existed. It stopped being
+  // harmless with `secrets`: its container holds a vendored
+  // @voxgig/sekreto port and the voxgig/plugin runtime, and an SDK that
+  // never asked for secrets would otherwise ship ~35 files of key-store,
+  // request-signing and child-process code. So the container is excluded
+  // unless the model SELECTS the feature — the top-level-container peer of
+  // the `srcFeatureExcludes` gate ts and js apply to src/feature/<name>/.
+  //
+  // pluginExcludes: one level deeper, the generate-time plugin trim. An
+  // INACTIVE plugin group's declared files stay out of the tree; the
+  // model's `path` entries are target-root-relative, which is this Copy's
+  // root. It runs independently of `feature.trim`, so the group trim works
+  // while that decision stands.
+  //
+  // The gated feature's own TEST suite goes with it, and is named
+  // separately: it lives at test/sdk/test/feature/<name>.clj (a file, so
+  // the container pattern's trailing slash does not reach it) because
+  // Clojure resolves `sdk.test.feature.<name>` to that exact path.
+  const featureGate = extraFeatures(model, target).map((f: any) => f.name)
+  const containerExcludes = CONTAINED
+    .filter((name: string) => !featureGate.includes(name))
+    .flatMap((name: string) => [
+      new RegExp('(^|/)feature/' + name + '/'),
+      new RegExp('(^|/)test/sdk/test/feature/' + name + '\\.clj$'),
+    ])
+
   Copy({
     from: 'tm/' + target.name,
-    exclude: [/src\/feature\//],
+    exclude: [/src\/feature\//, ...containerExcludes, ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
     }

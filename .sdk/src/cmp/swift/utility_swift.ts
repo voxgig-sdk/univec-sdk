@@ -3,6 +3,7 @@ import * as Path from 'node:path'
 
 import {
   camelify,
+  targetFeatures,
 } from '@voxgig/sdkgen'
 
 import {
@@ -146,10 +147,31 @@ function swiftTestDir(model: any): string {
 }
 
 
+// Is the `secrets` feature ACTIVE for this target - i.e. do the three
+// vendored trees under Sources/ProjectNameSDK/feature/secrets/ ship, and
+// does Package.swift declare them?
+//
+// ONE RULE, ONE PLACE: Package_swift (the manifest's three extra targets
+// plus the SDK target's `exclude:`) and Main_swift (the Copy that ships or
+// withholds the trees) both read this, so the manifest and the tree cannot
+// disagree - a manifest naming a path that is not there fails the WHOLE
+// SwiftPM package, not just the feature, and a tree without its manifest
+// entries folds three modules' worth of colliding `Value`/`Point`/`Json`
+// declarations into the SDK module.
+//
+// `targetFeatures` is the applicability gate (helpers/applicability): the
+// feature counts only when the model activates it AND this target
+// `provides: { sekreto: true }`.
+function swiftSecretsActive(model: any, target: any): boolean {
+  return null != targetFeatures(model, target)['secrets']
+}
+
+
 export {
   clean,
   projectPath,
   swiftPascalName,
+  swiftSecretsActive,
   swiftTargetDir,
   swiftTestDir,
   swiftVarName,

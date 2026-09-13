@@ -1,19 +1,55 @@
 package KOTLINPACKAGE.sdktest
 
-// Drives the shared struct corpus (../.sdk/test/test.json, root key "struct")
-// against the vendored Kotlin struct utility. Any failing entry fails the
-// build. Categories absent from this SDK's test.json are skipped.
+// Drives the shared struct corpus (../.sdk/test/test.json, root key
+// "struct") against the vendored Kotlin struct utility THROUGH the vendored
+// omni runner (OmniResolver over test/vendor/omni) - the engine half of the
+// retired StructRunner. Mirrors tm/java/test/StructCorpusTest.java and the
+// go target's struct_utility_test.go coverage. A missing category or
+// section FAILS (the old runner skipped it silently - a renamed fixture
+// reported PASS while running zero assertions); a failing entry throws
+// OmniError with the entry named.
 
-import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.DynamicTest
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
-import java.util.TreeMap
+
 import java.util.function.Function
 
+import voxgig.omni.Flags
+
+import KOTLINPACKAGE.core.Helpers
+import KOTLINPACKAGE.core.UnivecSDK
 import KOTLINPACKAGE.utility.struct.Struct
 
 @Suppress("UNCHECKED_CAST")
 class StructCorpusTest {
+
+  companion object {
+    const val TEST_JSON_FILE = "../.sdk/test/test.json"
+
+    private var RUN: OmniResolver.Run? = null
+
+    @Synchronized
+    fun structRun(): OmniResolver.Run {
+      var r = RUN
+      if (null == r) {
+        r = OmniResolver
+          .makeRunner(TEST_JSON_FILE, UnivecSDK.testSDK())
+          .runner("struct", linkedMapOf<String, Any?>())
+        assertNotNull(r.spec, "struct section not found in test.json")
+        RUN = r
+      }
+      return r
+    }
+  }
+
+  /** A subject in the struct-corpus shape: one argument in, one value out. */
+  fun interface StructSubject {
+    fun apply(input: Any?): Any?
+  }
 
   private fun getp(input: Any?, key: String): Any? =
     if (input is Map<*, *>) (input as Map<String, Any?>)[key] else null
@@ -199,9 +235,12 @@ class StructCorpusTest {
     }
 
     // ===== inject =====
+    // inject.string passes the null modifier so a resolved JSON null
+    // (encoded by the runner as "__NULL__") renders as a real null / the
+    // literal text "null" (was StructRunner.NULL_MODIFIER).
     add(tests, "inject", "string", true) {
       val inj = Struct.Injection(null, null)
-      inj.modify = StructRunner.NULL_MODIFIER
+      inj.modify = NULL_MODIFIER
       Struct.inject(getp(it, "val"), getp(it, "store"), inj)
     }
     add(tests, "inject", "deep", true) { Struct.inject(getp(it, "val"), getp(it, "store")) }
@@ -252,46 +291,96 @@ class StructCorpusTest {
     return tests
   }
 
+  // The struct.nullsem section: does a PRESENT key holding a JSON null read
+  // as "no value"? Opt-in per target (create-sdkgen ships it; an older
+  // project corpus may predate it - the abort below says so OUT LOUD, as a
+  // skipped test, rather than passing vacuously). The vendored kotlin
+  // struct answers the canonical way on every question, list form included
+  // (measured; see docs/design/vendor-tag-rollout.md). All lanes run
+  // {null: false}: without the flag the runner rewrites every null to
+  // '__NULL__' and the section asserts nothing about null at all.
+  @Test
+  fun nullsem() {
+    val run = structRun()
+    val nullsem = Helpers.toMapAny(run.spec["nullsem"])
+    if (nullsem == null) {
+      Assumptions.abort<Any>(
+        "corpus predates struct.nullsem - refresh .sdk/test/struct from create-sdkgen",
+      )
+      return
+    }
+    val flags = Flags(nulls = false)
+
+    run.runsetflags(nullsem["getprop"], flags) { args ->
+      val input = args.getOrNull(0)
+      val alt = getpDef(input, "alt", Struct.UNDEF)
+      if (alt === Struct.UNDEF) {
+        Struct.getprop(getp(input, "val"), getp(input, "key"))
+      } else {
+        Struct.getprop(getp(input, "val"), getp(input, "key"), alt)
+      }
+    }
+
+    run.runsetflags(nullsem["getelem"], flags) { args ->
+      val input = args.getOrNull(0)
+      val alt = getpDef(input, "alt", Struct.UNDEF)
+      if (alt === Struct.UNDEF) {
+        Struct.getelem(getp(input, "val"), getp(input, "key"))
+      } else {
+        Struct.getelem(getp(input, "val"), getp(input, "key"), alt)
+      }
+    }
+
+    run.runsetflags(nullsem["getpath"], flags) { args ->
+      Struct.getpath(getp(args.getOrNull(0), "store"), getp(args.getOrNull(0), "path"))
+    }
+
+    run.runsetflags(nullsem["haskey"], flags) { args ->
+      Struct.haskey(getp(args.getOrNull(0), "src"), getp(args.getOrNull(0), "key"))
+    }
+
+    run.runsetflags(nullsem["keysof"], flags) { args ->
+      Struct.keysof(args.getOrNull(0))
+    }
+  }
+
   private fun add(
     tests: MutableList<DynamicTest>,
     category: String,
     name: String,
     nullFlag: Boolean,
-    subject: StructRunner.Subject,
+    subject: StructSubject,
   ) {
     tests.add(
       DynamicTest.dynamicTest("$category-$name") {
-        val spec = StructRunner.getSpec(category, name) ?: return@dynamicTest
-        val r = StructRunner.runsetflags("$category.$name", spec, nullFlag, subject)
-        SCOREBOARD["$category.$name"] = r
-        if (r.failures.isNotEmpty()) {
-          throw AssertionError(
-            "$category.$name: ${r.passed}/${r.total} passed; failures:\n  " +
-              r.failures.joinToString("\n  "),
-          )
+        val run = structRun()
+        val cat = Helpers.toMapAny(run.spec[category])
+        assertNotNull(cat, "struct corpus category missing: $category - check .sdk/test/struct/")
+        val spec = Helpers.toMapAny(cat!![name])
+        assertNotNull(spec, "struct corpus section missing: $category.$name - check .sdk/test/struct/")
+        val set = spec!!["set"]
+        assertTrue(
+          set is List<*> && set.isNotEmpty(),
+          "struct corpus section is EMPTY: $category.$name - zero cases would run",
+        )
+        run.runsetflags(spec, Flags(nulls = nullFlag, name = "$category.$name")) { args ->
+          subject.apply(if (args.isNotEmpty()) args[0] else Struct.UNDEF)
         }
       },
     )
   }
 
-  companion object {
-    private val SCOREBOARD: MutableMap<String, StructRunner.Result> = TreeMap()
-
-    @JvmStatic
-    @AfterAll
-    fun printScoreboard() {
-      var totalP = 0
-      var totalT = 0
-      val banner = StringBuilder()
-      banner.append("\n========= STRUCT CORPUS SCOREBOARD =========\n")
-      for ((key, r) in SCOREBOARD) {
-        banner.append(String.format("  %-30s %4d / %4d%n", key, r.passed, r.total))
-        totalP += r.passed
-        totalT += r.total
+  private val NULL_MODIFIER = Struct.Modify { value, key, parent, _, _ ->
+    if (value is String) {
+      val repl: Any? = when {
+        value == OmniResolver.NULLMARK -> null
+        value.contains(OmniResolver.NULLMARK) -> value.replace(OmniResolver.NULLMARK, "null")
+        else -> return@Modify
       }
-      banner.append(String.format("  %-30s %4d / %4d%n", "TOTAL", totalP, totalT))
-      banner.append("============================================\n")
-      println(banner)
+      when {
+        parent is MutableMap<*, *> && key != null -> (parent as MutableMap<String, Any?>)[key.toString()] = repl
+        parent is MutableList<*> && key is Number -> (parent as MutableList<Any?>)[key.toInt()] = repl
+      }
     }
   }
 }

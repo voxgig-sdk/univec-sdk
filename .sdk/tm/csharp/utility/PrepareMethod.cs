@@ -28,6 +28,11 @@ public static partial class SdkUtility
             return pm.ToUpperInvariant();
         }
 
-        return MethodMap.TryGetValue(opname, out var m) ? m : "GET";
+        // No default: an op name outside the convention resolves to NO
+        // method, exactly as the ts reference (`methodMap[key]` is
+        // undefined there). The silent-pass engine hid a stray "GET"
+        // fallback here; the shared corpus (prepareMethod, opname "bad"
+        // -> null) pins it now.
+        return MethodMap.TryGetValue(opname, out var m) ? m : null!;
     }
 }

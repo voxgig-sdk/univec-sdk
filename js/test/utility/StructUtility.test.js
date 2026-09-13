@@ -1,4 +1,4 @@
-// VERSION: @voxgig/struct 0.0.10
+// VERSION: @voxgig/struct-js 0.1.4 (vendored via omni; see ../omni.js)
 // RUN: npm test
 // RUN-SOME: npm run test-some --pattern=getpath
 
@@ -9,7 +9,7 @@ const {
   makeRunner,
   nullModifier,
   NULLMARK,
-} = require('../runner')
+} = require('../omni')
 
 
 const {
@@ -257,6 +257,31 @@ describe('struct', async () => {
     const { getprop } = struct
     await runsetflags(spec.minor.getprop, { null: false }, (vin) =>
       undefined === vin.alt ? getprop(vin.val, vin.key) : getprop(vin.val, vin.key, vin.alt))
+  })
+
+
+  // The struct.nullsem section: does a PRESENT key holding a JSON null
+  // read as "no value"? Opt-in per target (create-sdkgen ships it; an
+  // older project corpus may predate it - the skip below says so OUT
+  // LOUD rather than passing vacuously). All lanes run {null: false}.
+  test('nullsem', async (t) => {
+    const nullsem = spec.nullsem
+    if (null == nullsem) {
+      t.skip('corpus predates struct.nullsem - refresh .sdk/test/struct from create-sdkgen')
+      return
+    }
+    const { getprop, getelem, getpath, haskey, keysof } = struct
+
+    await runsetflags(nullsem.getprop, { null: false }, (vin) =>
+      undefined === vin.alt ? getprop(vin.val, vin.key) : getprop(vin.val, vin.key, vin.alt))
+    await runsetflags(nullsem.getelem, { null: false }, (vin) =>
+      undefined === vin.alt ? getelem(vin.val, vin.key) : getelem(vin.val, vin.key, vin.alt))
+    await runsetflags(nullsem.getpath, { null: false }, (vin) =>
+      undefined === vin.alt ? getpath(vin.store, vin.path) : getpath(vin.store, vin.path, vin.alt))
+    await runsetflags(nullsem.haskey, { null: false }, (vin) =>
+      haskey(vin.src, vin.key))
+    await runsetflags(nullsem.keysof, { null: false }, (vin) =>
+      keysof(vin))
   })
 
 

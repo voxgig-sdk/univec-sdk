@@ -9,6 +9,26 @@ main: kit: target: zig: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability (docs/design/feature-tags.md): the `secrets` feature is a
+  # thin layer over a VENDORED sekreto port and declares `needs: { sekreto:
+  # true }`; a target that does not say it carries one never gets the
+  # feature. This target does: tm/zig/feature/secrets/{sekreto,plugin,
+  # plugins} are the zig ports of @voxgig/sekreto and voxgig/plugin at the
+  # shared vendor tag, wired as the named build modules `sekreto`, `plugin`
+  # and `sekretoplugins` by the generated build.zig (Main_zig) - and ONLY
+  # when the feature is active, so an SDK without secrets declares none of
+  # them and compiles nothing of it. Mirrors ts.aon / go.aon / rust.aon.
+  provides: { sekreto: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the hand-written struct runner, whose engine half
+  # AND assertion half are now the vendored omni port driven through
+  # test/omniresolver.zig. `doctor` reports leftovers; `doctor prune`
+  # deletes them.
+  superseded: [
+    'test/struct_runner.zig'
+  ]
+
   # The vendored voxgig struct port is in-tree (utility/voxgigstruct) — Zig
   # has no package registry to depend on, so there are no external deps.
   deps: &: {
@@ -53,10 +73,25 @@ main: kit: target: zig: publish: {
 
 
 # Feature source is NOT trimmed to the model's selection here: root.zig
-# re-exports every feature type with @import("feature/<name>.zig"), and
-# build.zig names test/feature_test.zig explicitly, so a trimmed tree
-# fails to build. Trimming stays off until root.zig's feature exports are
-# driven from the model.
+# re-exports every BUILT-IN feature type with @import("feature/<name>.zig"),
+# and build.zig names test/feature_test.zig explicitly, so a trimmed tree
+# fails to build. Trimming stays off until those static exports are driven
+# from the model too.
+#
+# THE FORCING CASE is `secrets`, the first GATED feature this target
+# carries. With the trim off, its whole tree - feature/secrets.zig, the
+# vendored sekreto and voxgig/plugin cores and the provider plugins - ships
+# in EVERY zig SDK whatever the model says. What keeps that honest is that
+# zig compiles only what a module root reaches, so the generated build.zig
+# and root.zig (Main_zig, from the marker-slotted fragments) name the
+# feature's modules, its root export and its test step ONLY when the
+# feature is active: a secrets-off SDK carries the files as dead weight and
+# compiles none of them, and `make lint` (`zig fmt --check .`) is the one
+# gate that still reads them. Main_zig also drops the provider plugins of
+# an INACTIVE feature and the inactive groups of an active one (the scala
+# shape), so the dead weight is the two cores plus the ungrouped
+# httpjson/sigv4 helpers, never the nine vault clients. When the feature
+# trim lands here, that second exclude list becomes redundant, not wrong.
 main: kit: target: zig: feature: {
   trim: false
 }

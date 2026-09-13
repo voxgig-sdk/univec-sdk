@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName } from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, luaKey } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -65,8 +65,6 @@ local client = ${ctor}
       if ('ARRAY' === k || 'OBJECT' === k) return '{}'
       return `"${placeholder}"`
     }
-    const luaKey = (name: string): string =>
-      /^[A-Za-z_]\w*$/.test(name) ? name : `["${name}"]`
 
     // MODEL-DRIVEN display field: the list example must reference a field
     // the entity actually has, not a hardcoded "name". Pick the entity's

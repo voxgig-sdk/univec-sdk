@@ -5,6 +5,9 @@ import {
   cmp, each,
   File, Content, Copy, Folder, Fragment,
   entityClassName,
+  pluginExcludes,
+  targetFeatures,
+  TEST_CONTROL_EXCLUDE
 } from '@voxgig/sdkgen'
 
 
@@ -35,7 +38,10 @@ const Main = cmp(async function Main(props: any) {
   const { model } = props.ctx$
 
   const entity: ModelEntity = getModelPath(model, `main.${KIT}.entity`)
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  // Gated by the applicability tags, so this target never imports or
+  // registers a feature it has no source for. One rule, one place:
+  // helpers/applicability.
+  const feature = targetFeatures(model, target)
 
   // The rust crate identifier (RUSTCRATE placeholder), e.g. solar_sdk —
   // used in every `use <crate>::...` path in the test templates.
@@ -50,7 +56,11 @@ const Main = cmp(async function Main(props: any) {
   // here exactly like the go target.
   Copy({
     from: 'tm/' + target.name,
-    exclude: [/src\//],
+    // pluginExcludes: the generate-time plugin trim (an INACTIVE plugin
+    // group's declared files stay out of the tree - the model's `path`
+    // entries are target-root-relative, which is this Copy's root). The
+    // FEATURE-level trim for rust stays an add-time concern, as go's does.
+    exclude: [/src\//, TEST_CONTROL_EXCLUDE, ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
       RUSTCRATE: rustcrate,
@@ -103,6 +113,99 @@ pub mod support;
 pub mod base;
 `)
       each(feature, (feat: any) => Content(`pub mod ${feat.name};\n`))
+    })
+
+    // feature/<name>/plugins.rs - a feature's PLUGIN module index.
+    //
+    // GENERATED, and it has no go/py analogue: rust compiles only the
+    // modules a parent DECLARES, and the declared set varies with the
+    // plugin trim, so a static index would either name a file the trim
+    // just deleted or leave an active kind out of the build.
+    //
+    // It sits one level ABOVE the vendored `plugins/` directory on
+    // purpose: the vendoring guard fails any non-vendored file inside a
+    // vendor dir. Nothing is lost by that - an .rs file no module
+    // declares is not compiled at all, so an inactive group's vendored
+    // file left on disk is inert whether or not the trim reached it.
+    //
+    // This is rust's replacement for go's core-emitted FeaturePlugins map
+    // (Config_go), and it is better placed: core/config.rs never has to
+    // name a feature's types.
+    each(feature, (feat: any) => {
+      // `only_active: false`, the same subtlety pluginExcludesFor
+      // documents: the feature object a component is handed has already
+      // been filtered, so a feature whose plugins are ALL inactive would
+      // arrive with nothing here and the index would not be emitted at
+      // all - leaving `pub mod plugins;` in the feature source pointing
+      // at a file that does not exist.
+      const declared = getModelPath(model,
+        `main.${KIT}.feature.${feat.name}.plugin`,
+        { required: false, only_active: false }) || {}
+
+      if (0 === Object.keys(declared).length) {
+        return
+      }
+
+      const mods = new Set<string>()
+      const syms = new Set<string>()
+
+      each(declared, (plugin: any) => {
+        // Filter on `active` HERE (Config_go's note): getting this wrong
+        // declares a module for a file the trim just removed, which is a
+        // compile error rather than a silent one.
+        if (true !== plugin.active) return
+
+        for (const [sym, one] of Object.entries(plugin.def?.rust || {})) {
+          // 'feature/secrets/plugins/aws.rs' -> the module `aws`.
+          mods.add(String(one).replace(/^.*\//, '').replace(/\.rs$/, ''))
+          syms.add(sym)
+        }
+      })
+
+      // The shared HTTP client the vendored vault kinds import
+      // (`use super::httpjson::...`) belongs to NO plugin group - trimming
+      // it with any one group would delete a file the others compile
+      // against - so it ships with the feature core and is DECLARED here
+      // only when something reaches for it. That is what keeps rustls out
+      // of a chain that is [dotenv, env] or [secretspec].
+      const NOHTTP = ['secretspec']
+      const http = Array.from(mods).some((m: string) => !NOHTTP.includes(m))
+
+      Folder({ name: feat.name }, () => {
+        File({ name: 'plugins.' + target.ext }, () => {
+          Content(`// The plugin definitions the model selected for the \`${feat.name}\`
+// feature, and the modules they live in (generated - see Main_rust).
+//
+// Upstream sekreto's contract since its registry was retired: a provider
+// kind not handed to the constructor is unknown to that Sekreto. So this
+// list IS the SDK's provider vocabulary, and a kind nobody selected is
+// neither declared nor compiled.
+
+use crate::feature::${feat.name}::plugin::catalog::Definition;
+
+`)
+          if (http) {
+            Content(`pub mod httpjson;
+`)
+          }
+          for (const m of Array.from(mods).sort()) {
+            Content(`pub mod ${m};
+`)
+          }
+
+          Content(`
+pub fn definitions() -> Vec<Definition> {
+    vec![
+`)
+          for (const sym of Array.from(syms).sort()) {
+            Content(`        ${sym}(),
+`)
+          }
+          Content(`    ]
+}
+`)
+        })
+      })
     })
   })
 

@@ -75,7 +75,17 @@ function clean(o: any, dropDefaults?: boolean): any {
 }
 
 
+// A Perl SINGLE-quoted string literal. Single quotes do not interpolate, so a
+// spec-derived value containing $foo or @foo survives verbatim; only the
+// backslash and the quote itself need escaping. A double-quoted literal (what
+// JSON.stringify emits) would interpolate them.
+function perlStringLiteral(val: string): string {
+  return "'" + String(val).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"
+}
+
+
 export {
+  perlStringLiteral,
   clean,
   projectPath,
 }

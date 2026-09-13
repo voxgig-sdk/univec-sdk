@@ -1,7 +1,13 @@
-/* Copyright (c) 2025-2026 Voxgig Ltd. MIT LICENSE. */
-
-// RUN: cd cs/tests && dotnet test
-// RUN-SOME: cd cs/tests && dotnet test --filter "DisplayName~minor-isnode"
+// Drives the shared struct corpus (../../.sdk/test/test.json, root key
+// "struct") against the vendored struct utility THROUGH the vendored omni
+// runner (OmniResolver over test/vendor/omni) - the engine half of the
+// retired StructRunner. Mirrors tm/go/test/struct_utility_test.go.
+// A missing category or section FAILS (the old runner skipped it silently
+// - a renamed fixture reported PASS while running zero assertions); a
+// failing entry throws OmniError with the entry named.
+//
+// RUN: cd test && dotnet test
+// RUN-SOME: dotnet test --filter "DisplayName~MinorIsNode"
 
 using Voxgig.Struct;
 using Xunit;
@@ -11,14 +17,104 @@ namespace UnivecSdk.Test;
 
 public class StructUtilityTest
 {
-    private readonly Dictionary<string, object?> _spec;
-    private readonly Dictionary<string, object?> _minor;
+    private static OmniResolver.Run? RUN;
+    private static readonly object RunLock = new();
 
-    public StructUtilityTest()
+    private static OmniResolver.Run StructRun()
     {
-        _spec  = StructRunner.LoadSpec();
-        _minor = _spec["minor"] as Dictionary<string, object?> ?? [];
+        lock (RunLock)
+        {
+            if (RUN == null)
+            {
+                RUN = OmniResolver.MakeRunner(StructRunner.TestJsonPath(),
+                    UnivecSDK.TestSDK(null, null))("struct");
+                Assert.True(0 < RUN.Spec.Count,
+                    "struct section not found in test.json");
+            }
+            return RUN;
+        }
     }
+
+    /// <summary>A subject in the struct-corpus shape: one argument in, one value out.</summary>
+    private delegate object? StructSubject(object? input);
+
+    private static object? Getp(object? input, string key)
+    {
+        return input is Dictionary<string, object?> m && m.TryGetValue(key, out var v)
+            ? v : null;
+    }
+
+    private static object? GetpDef(object? input, string key, object? def)
+    {
+        return input is Dictionary<string, object?> m && m.ContainsKey(key)
+            ? m[key] : def;
+    }
+
+    private static int? IntArg(object? val)
+        => val == null ? null : (int?)Convert.ToInt32(val);
+
+    // Run one corpus section, failing loudly when a category or section is
+    // missing or EMPTY - a renamed fixture must not report PASS while
+    // running zero assertions.
+    private static void RunStruct(string category, string name, bool nullFlag,
+        StructSubject subject)
+    {
+        var run = StructRun();
+        var cat = run.Spec.TryGetValue(category, out var c)
+            ? c as Dictionary<string, object?> : null;
+        Assert.True(null != cat, "struct corpus category missing: " + category +
+            " - check .sdk/test/struct/");
+        var spec = cat!.TryGetValue(name, out var s)
+            ? s as Dictionary<string, object?> : null;
+        Assert.True(null != spec, "struct corpus section missing: " + category +
+            "." + name + " - check .sdk/test/struct/");
+        var set = spec!.TryGetValue("set", out var sv) ? sv as List<object?> : null;
+        Assert.True(set != null && 0 < set.Count,
+            "struct corpus section is EMPTY: " + category + "." + name +
+            " - zero cases would run");
+        run.RunSetFlags(spec, new Dictionary<string, bool> { ["null"] = nullFlag },
+            args => subject(0 < args.Length ? args[0] : StructUtils.NONE));
+    }
+
+    private static Dictionary<string, object?> Section(string category, string name)
+    {
+        var run = StructRun();
+        var cat = run.Spec.TryGetValue(category, out var c)
+            ? c as Dictionary<string, object?> : null;
+        Assert.True(null != cat, "struct corpus category missing: " + category);
+        var spec = cat!.TryGetValue(name, out var s)
+            ? s as Dictionary<string, object?> : null;
+        Assert.True(null != spec,
+            "struct corpus section missing: " + category + "." + name);
+        return spec!;
+    }
+
+    // The struct-corpus nullModifier (was the old runner's ad-hoc handling):
+    // a bare "__NULL__" becomes a real null, and an embedded "__NULL__"
+    // inside a larger string is rewritten to the literal text "null".
+    // Mirrors omni's NullModifier for struct's own Modify callback shape.
+    private static readonly Modify NullModifier = (val, key, parent, inj, store) =>
+    {
+        if (val is not string text)
+        {
+            return val;
+        }
+        object? repl;
+        if (OmniResolver.NULLMARK == text)
+        {
+            repl = null;
+        }
+        else if (text.Contains(OmniResolver.NULLMARK))
+        {
+            repl = text.Replace(OmniResolver.NULLMARK, "null");
+        }
+        else
+        {
+            return val;
+        }
+        StructUtils.SetProp(parent, key, repl);
+        return repl;
+    };
 
 
     // ========================================================================
@@ -59,59 +155,49 @@ public class StructUtilityTest
 
 
     // ========================================================================
-    // Minor utility tests (driven from test.json)
+    // Minor utility tests (driven from test.json through the resolver)
     // ========================================================================
 
     [Fact]
     public void MinorIsNode()
     {
-        StructRunner.RunSet(_minor["isnode"], input =>
-            StructUtils.IsNode(input));
+        RunStruct("minor", "isnode", true, input => StructUtils.IsNode(input));
     }
 
     [Fact]
     public void MinorIsMap()
     {
-        StructRunner.RunSet(_minor["ismap"], input =>
-            StructUtils.IsMap(input));
+        RunStruct("minor", "ismap", true, input => StructUtils.IsMap(input));
     }
 
     [Fact]
     public void MinorIsList()
     {
-        StructRunner.RunSet(_minor["islist"], input =>
-            StructUtils.IsList(input));
+        RunStruct("minor", "islist", true, input => StructUtils.IsList(input));
     }
 
     [Fact]
     public void MinorIsKey()
     {
-        StructRunner.RunSet(_minor["iskey"],
-            input => StructUtils.IsKey(input),
-            flags: new() { ["null"] = false });
+        RunStruct("minor", "iskey", false, input => StructUtils.IsKey(input));
     }
 
     [Fact]
     public void MinorStrKey()
     {
-        StructRunner.RunSet(_minor["strkey"],
-            input => StructUtils.StrKey(input),
-            flags: new() { ["null"] = false });
+        RunStruct("minor", "strkey", false, input => StructUtils.StrKey(input));
     }
 
     [Fact]
     public void MinorIsEmpty()
     {
-        StructRunner.RunSet(_minor["isempty"],
-            input => StructUtils.IsEmpty(input),
-            flags: new() { ["null"] = false });
+        RunStruct("minor", "isempty", false, input => StructUtils.IsEmpty(input));
     }
 
     [Fact]
     public void MinorIsFunc()
     {
-        StructRunner.RunSet(_minor["isfunc"],
-            input => StructUtils.IsFunc(input));
+        RunStruct("minor", "isfunc", true, input => StructUtils.IsFunc(input));
 
         // Edge: actual delegates should be recognised.
         Func<object?> f0 = () => null;
@@ -122,9 +208,7 @@ public class StructUtilityTest
     [Fact]
     public void MinorClone()
     {
-        StructRunner.RunSet(_minor["clone"],
-            input => StructUtils.Clone(input),
-            flags: new() { ["null"] = false });
+        RunStruct("minor", "clone", false, input => StructUtils.Clone(input));
 
         // Edge: functions should be shallow-copied, not cloned.
         Func<object?> f0 = () => null;
@@ -137,83 +221,92 @@ public class StructUtilityTest
     [Fact]
     public void MinorEscRe()
     {
-        StructRunner.RunSet(_minor["escre"],
-            input => StructUtils.EscRe(input as string));
+        RunStruct("minor", "escre", true, input => StructUtils.EscRe(input as string));
     }
 
     [Fact]
     public void MinorEscUrl()
     {
-        StructRunner.RunSet(_minor["escurl"],
-            input => StructUtils.EscUrl(input as string));
+        RunStruct("minor", "escurl", true, input => StructUtils.EscUrl(input as string));
     }
 
     [Fact]
     public void MinorStringify()
     {
-        StructRunner.RunSet(_minor["stringify"], input =>
+        RunStruct("minor", "stringify", false, input =>
         {
-            var m = input as Dictionary<string, object?>;
-            if (m == null) return StructUtils.Stringify(input);
+            // null:false keeps a JSON-null val as a real null (rendered
+            // "null"); an absent val is NONE (rendered ""). Mirrors the
+            // canonical harness.
+            var val = GetpDef(input, "val", StructUtils.NONE);
+            var max = Getp(input, "max");
+            return StructUtils.Stringify(val, IntArg(max));
+        });
+    }
 
-            // Absent "val" key -> NONE (TS undefined) so Stringify returns "".
-            // Present-but-null -> JSON null (Stringify returns "null").
-            object? val = m.ContainsKey("val") ? m["val"] : StructUtils.NONE;
-            if (val is string s && s == StructRunner.NULLMARK) val = null;
-
-            if (m.TryGetValue("max", out object? maxObj) && maxObj != null)
-                return StructUtils.Stringify(val, (int)Convert.ToInt64(maxObj));
-
-            return StructUtils.Stringify(val);
+    [Fact]
+    public void MinorJsonify()
+    {
+        RunStruct("minor", "jsonify", false, input =>
+        {
+            var val = Getp(input, "val");
+            if (Getp(input, "flags") is Dictionary<string, object?> flags)
+            {
+                var indent = flags.TryGetValue("indent", out var iv) && iv != null
+                    ? Convert.ToInt32(iv) : 2;
+                var offset = flags.TryGetValue("offset", out var ov) && ov != null
+                    ? Convert.ToInt32(ov) : 0;
+                return StructUtils.Jsonify(val, indent, offset);
+            }
+            return StructUtils.Jsonify(val);
         });
     }
 
     [Fact]
     public void MinorPathify()
     {
-        StructRunner.RunSet(_minor["pathify"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return StructUtils.Pathify(input);
-
-                // If the "path" key is absent entirely, pass NONE (not null) so
-                // Pathify can distinguish "not provided" from "explicitly null".
-                bool hasPath = m.ContainsKey("path");
-                object? path = hasPath ? m["path"] : StructUtils.NONE;
-                if (path is string ps && ps == StructRunner.NULLMARK) path = null;
-
-                int from = 0;
-                if (m.TryGetValue("from", out object? fv) && fv != null)
-                    from = (int)Convert.ToInt64(fv);
-
-                return StructUtils.Pathify(path, from);
-            },
-            flags: new() { ["null"] = true });
+        RunStruct("minor", "pathify", false, input =>
+        {
+            // null:false keeps a JSON-null path as a real null
+            // ("<unknown-path:null>") and an absent path as NONE
+            // ("<unknown-path>"); null parts are dropped.
+            var path = GetpDef(input, "path", StructUtils.NONE);
+            var from = IntArg(Getp(input, "from"));
+            var to = IntArg(Getp(input, "to"));
+            return null == to
+                ? (null == from
+                    ? StructUtils.Pathify(path)
+                    : StructUtils.Pathify(path, from.Value))
+                : StructUtils.Pathify(path, from ?? 0, to.Value);
+        });
     }
 
     [Fact]
     public void MinorItems()
     {
-        StructRunner.RunSet(_minor["items"],
-            input => StructUtils.Items(input));
+        RunStruct("minor", "items", true, input => StructUtils.Items(input));
     }
 
     [Fact]
     public void MinorGetProp()
     {
-        StructRunner.RunSet(_minor["getprop"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? val = m.TryGetValue("val", out object? v) ? v : null;
-                object? key = m.TryGetValue("key", out object? k) ? k : null;
-                if (m.TryGetValue("alt", out object? alt) && alt != null)
-                    return StructUtils.GetProp(val, key, alt);
-                return StructUtils.GetProp(val, key);
-            },
-            flags: new() { ["null"] = false });
+        RunStruct("minor", "getprop", false, input =>
+        {
+            var val = Getp(input, "val");
+            var key = Getp(input, "key");
+            // Canonical's default alt is `undefined`, so the no-alt call has
+            // to ask for NONE explicitly: `GetProp(val, key)` defaults `alt`
+            // to null, which answers "null" where canonical answers
+            // "undefined", and under `null: false` the corpus tells them
+            // apart. It also omits `alt` only when the KEY is missing
+            // (`undefined === vin.alt`), so an explicit `alt: null` is
+            // passed through - unlike getelem below, which omits a null alt
+            // too (`null == vin.alt`). (The struct repo's own C# suite binds
+            // it the same way.)
+            if (input is Dictionary<string, object?> m && m.ContainsKey("alt"))
+                return StructUtils.GetProp(val, key, m["alt"]);
+            return StructUtils.GetProp(val, key, StructUtils.NONE);
+        });
     }
 
     [Fact]
@@ -228,34 +321,28 @@ public class StructUtilityTest
     [Fact]
     public void MinorGetElem()
     {
-        StructRunner.RunSet(_minor["getelem"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? val = m.TryGetValue("val", out object? v) ? v : null;
-                object? key = m.TryGetValue("key", out object? k) ? k : null;
-                if (m.TryGetValue("alt", out object? alt) && alt != null)
-                    return StructUtils.GetElem(val, key, alt);
-                return StructUtils.GetElem(val, key);
-            },
-            flags: new() { ["null"] = false });
+        RunStruct("minor", "getelem", false, input =>
+        {
+            var val = Getp(input, "val");
+            var key = Getp(input, "key");
+            // Canonical's default alt is `undefined`; see MinorGetProp.
+            var alt = Getp(input, "alt");
+            return null != alt
+                ? StructUtils.GetElem(val, key, alt)
+                : StructUtils.GetElem(val, key, StructUtils.NONE);
+        });
     }
 
     [Fact]
     public void MinorSetProp()
     {
-        StructRunner.RunSet(_minor["setprop"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? parent = m.TryGetValue("parent", out object? pv) ? pv : null;
-                object? key    = m.TryGetValue("key",    out object? kv) ? kv : null;
-                object? val    = m.TryGetValue("val",    out object? vv) ? vv : null;
-                return StructUtils.SetProp(parent, key, val);
-            },
-            flags: new() { ["null"] = true });
+        RunStruct("minor", "setprop", true, input =>
+        {
+            var parent = Getp(input, "parent");
+            var key = Getp(input, "key");
+            var val = Getp(input, "val");
+            return StructUtils.SetProp(parent, key, val);
+        });
     }
 
     [Fact]
@@ -274,121 +361,25 @@ public class StructUtilityTest
     [Fact]
     public void MinorDelProp()
     {
-        StructRunner.RunSet(_minor["delprop"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? parent = m.TryGetValue("parent", out object? pv) ? pv : null;
-                object? key    = m.TryGetValue("key",    out object? kv) ? kv : null;
-                return StructUtils.DelProp(parent, key);
-            },
-            flags: new() { ["null"] = true });
+        RunStruct("minor", "delprop", true, input =>
+        {
+            var parent = Getp(input, "parent");
+            var key = Getp(input, "key");
+            return StructUtils.DelProp(parent, key);
+        });
     }
 
     [Fact]
     public void MinorKeysOf()
     {
-        StructRunner.RunSet(_minor["keysof"],
-            input => StructUtils.KeysOf(input));
+        RunStruct("minor", "keysof", true, input => StructUtils.KeysOf(input));
     }
 
     [Fact]
     public void MinorHasKey()
     {
-        StructRunner.RunSet(_minor["haskey"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return false;
-                object? val = m.TryGetValue("src", out object? v) ? v : null;
-                object? key = m.TryGetValue("key", out object? k) ? k : null;
-                return StructUtils.HasKey(val, key);
-            });
-    }
-
-
-    // ========================================================================
-    // Sentinels — null / undefined unification across the readers.
-    // (Group A: a stored JSON null counts as "no value".)
-    // ========================================================================
-
-    // The sdk-vendored corpus (.sdk/test/test.json) may predate the
-    // sentinels section; the tests below no-op when it is absent
-    // (StructRunner.RunSet returns on a null spec).
-    private Dictionary<string, object?> Sentinels =>
-        (_spec.TryGetValue("sentinels", out var s) ? s : null)
-            as Dictionary<string, object?> ?? [];
-
-    [Fact]
-    public void SentinelsGetPropUnify()
-    {
-        StructRunner.RunSet(Sentinels.GetValueOrDefault("getprop_unify"),
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? val = m.TryGetValue("val", out object? v) ? v : null;
-                object? key = m.TryGetValue("key", out object? k) ? k : null;
-                object? alt = m.TryGetValue("alt", out object? a) ? a : null;
-                return StructUtils.GetProp(val, key, alt);
-            },
-            flags: new() { ["null"] = true });
-    }
-
-    [Fact]
-    public void SentinelsGetElemAbsent()
-    {
-        StructRunner.RunSet(Sentinels.GetValueOrDefault("getelem_absent"),
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? val = m.TryGetValue("val", out object? v) ? v : null;
-                object? key = m.TryGetValue("key", out object? k) ? k : null;
-                object? alt = m.TryGetValue("alt", out object? a) ? a : null;
-                return StructUtils.GetElem(val, key, alt);
-            },
-            flags: new() { ["null"] = true });
-    }
-
-    [Fact]
-    public void SentinelsHasKeyUnify()
-    {
-        StructRunner.RunSet(Sentinels.GetValueOrDefault("haskey_unify"),
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return false;
-                object? val = m.TryGetValue("val", out object? v) ? v : null;
-                object? key = m.TryGetValue("key", out object? k) ? k : null;
-                return StructUtils.HasKey(val, key);
-            },
-            flags: new() { ["null"] = true });
-    }
-
-    [Fact]
-    public void SentinelsIsEmptyUnify()
-    {
-        StructRunner.RunSet(Sentinels.GetValueOrDefault("isempty_unify"),
-            input => StructUtils.IsEmpty(input),
-            flags: new() { ["null"] = true });
-    }
-
-    [Fact]
-    public void SentinelsIsNodeUnify()
-    {
-        StructRunner.RunSet(Sentinels.GetValueOrDefault("isnode_unify"),
-            input => StructUtils.IsNode(input),
-            flags: new() { ["null"] = true });
-    }
-
-    [Fact]
-    public void SentinelsStringifyNull()
-    {
-        StructRunner.RunSet(Sentinels.GetValueOrDefault("stringify_null"),
-            input => StructUtils.Stringify(input),
-            flags: new() { ["null"] = true });
+        RunStruct("minor", "haskey", false, input =>
+            StructUtils.HasKey(Getp(input, "src"), Getp(input, "key")));
     }
 
     [Fact]
@@ -399,64 +390,50 @@ public class StructUtilityTest
         Assert.Equal("true",   StructUtils.Stringify(true));
         Assert.Equal("hello",  StructUtils.Stringify("hello"));
         // Match TS: NONE (undefined) -> ""; JSON null -> "null".
-        Assert.Equal(S_MT,     StructUtils.Stringify(StructUtils.NONE));
+        Assert.Equal("",       StructUtils.Stringify(StructUtils.NONE));
         Assert.Equal("null",   StructUtils.Stringify(null));
     }
-
-    private const string S_MT = "";
 
     [Fact]
     public void MinorTypify()
     {
-        StructRunner.RunSet(_minor["typify"],
-            input => StructUtils.Typify(input));
+        RunStruct("minor", "typify", false, input => StructUtils.Typify(input));
     }
 
     [Fact]
     public void MinorTypeName()
     {
-        StructRunner.RunSet(_minor["typename"],
-            input => StructUtils.TypeName((int)Convert.ToInt64(input)));
+        RunStruct("minor", "typename", true, input =>
+            StructUtils.TypeName(Convert.ToInt32(input)));
     }
 
     [Fact]
     public void MinorSize()
     {
-        StructRunner.RunSet(_minor["size"],
-            input => StructUtils.Size(input));
+        RunStruct("minor", "size", false, input => StructUtils.Size(input));
     }
 
     [Fact]
     public void MinorSlice()
     {
-        StructRunner.RunSet(_minor["slice"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return StructUtils.Slice(input);
-
-                object? val   = m.TryGetValue("val",   out object? v) ? v : null;
-                int? start = m.TryGetValue("start", out object? sv) && sv != null
-                    ? (int?)Convert.ToInt32(sv) : null;
-                int? end   = m.TryGetValue("end",   out object? ev) && ev != null
-                    ? (int?)Convert.ToInt32(ev) : null;
-                return StructUtils.Slice(val, start, end);
-            });
+        RunStruct("minor", "slice", false, input =>
+        {
+            var val = Getp(input, "val");
+            var start = IntArg(Getp(input, "start"));
+            var end = IntArg(Getp(input, "end"));
+            return StructUtils.Slice(val, start, end);
+        });
     }
 
     [Fact]
     public void MinorFlatten()
     {
-        StructRunner.RunSet(_minor["flatten"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return StructUtils.Flatten(input as List<object?> ?? []);
-                var val   = m.TryGetValue("val",   out object? v) ? v as List<object?> : null;
-                int depth = m.TryGetValue("depth", out object? d) && d != null
-                    ? (int)Convert.ToInt64(d) : 1;
-                return StructUtils.Flatten(val ?? [], depth);
-            });
+        RunStruct("minor", "flatten", true, input =>
+        {
+            var val = Getp(input, "val") as List<object?>;
+            var depth = IntArg(Getp(input, "depth"));
+            return StructUtils.Flatten(val ?? [], depth ?? 1);
+        });
     }
 
     // Named filter predicates used in test.json.
@@ -469,53 +446,122 @@ public class StructUtilityTest
     [Fact]
     public void MinorFilter()
     {
-        StructRunner.RunSet(_minor["filter"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? val  = m.TryGetValue("val",   out object? v) ? v : null;
-                string? chk  = m.TryGetValue("check", out object? c) ? c as string : null;
-                if (chk != null && FilterChecks.TryGetValue(chk, out var check))
-                    return StructUtils.Filter(val, check);
-                return StructUtils.Filter(val, n => n[1] is string s && s.Length > 0);
-            });
+        RunStruct("minor", "filter", true, input =>
+        {
+            var val = Getp(input, "val");
+            var chk = Getp(input, "check") as string;
+            if (chk != null && FilterChecks.TryGetValue(chk, out var check))
+                return StructUtils.Filter(val, check);
+            return StructUtils.Filter(val, n => n[1] is string s && s.Length > 0);
+        });
     }
 
     [Fact]
     public void MinorPad()
     {
-        StructRunner.RunSet(_minor["pad"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return StructUtils.Pad(input);
-                object? str     = m.TryGetValue("val",    out object? sv) ? sv : null;
-                object? padding = m.TryGetValue("pad",    out object? pv) ? pv : null;
-                // spec uses "char" as key for the pad character
-                object? padchar = m.TryGetValue("char",   out object? cv) ? cv
-                    : m.TryGetValue("padchar", out object? cv2) ? cv2 : null;
+        RunStruct("minor", "pad", false, input =>
+        {
+            var str = Getp(input, "val");
+            var padding = Getp(input, "pad");
+            // spec uses "char" as key for the pad character
+            var padchar = Getp(input, "char") ?? Getp(input, "padchar");
 
-                int pad = padding != null ? (int)Convert.ToInt64(padding) : 44;
-                string? pc = padchar as string;
-                return StructUtils.Pad(str, pad, pc);
-            });
+            var pad = padding != null ? Convert.ToInt32(padding) : 44;
+            return StructUtils.Pad(str, pad, padchar as string);
+        });
     }
 
     [Fact]
     public void MinorJoin()
     {
-        StructRunner.RunSet(_minor["join"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return StructUtils.Join([input]);
-                object? arr = m.TryGetValue("val", out object? av) ? av : null;
-                object? sep = m.TryGetValue("sep", out object? sv) ? sv : null;
-                bool url = m.TryGetValue("url", out object? uv) && uv is bool b && b;
-                return StructUtils.Join(arr as List<object?> ?? [], sep as string, url);
-            });
+        RunStruct("minor", "join", false, input =>
+        {
+            if (input is not Dictionary<string, object?>)
+                return StructUtils.Join([input]);
+            var arr = Getp(input, "val");
+            var sep = Getp(input, "sep");
+            var url = Getp(input, "url") is bool b && b;
+            return StructUtils.Join(arr as List<object?> ?? [], sep as string, url);
+        });
     }
+
+    [Fact]
+    public void MinorSetPath()
+    {
+        RunStruct("minor", "setpath", false, input =>
+        {
+            var store = Getp(input, "store");
+            var path = Getp(input, "path");
+            var val = Getp(input, "val");
+            return StructUtils.SetPath(store, path, val);
+        });
+    }
+
+
+    // ========================================================================
+    // The struct.nullsem section: does a PRESENT key holding a JSON null
+    // read as "no value"? Opt-in per target (create-sdkgen ships it; an
+    // older project corpus may predate it - the skip below says so OUT
+    // LOUD rather than passing vacuously). All lanes run {null: false}:
+    // without the flag the runner rewrites every null to '__NULL__' and
+    // the section asserts nothing about null at all.
+    // ========================================================================
+
+    [Fact]
+    public void Nullsem()
+    {
+        var run = StructRun();
+        var nullsem = run.Spec.TryGetValue("nullsem", out var ns)
+            ? ns as Dictionary<string, object?> : null;
+        if (nullsem == null)
+        {
+            // xUnit has no runtime skip without extra packages; say it loudly.
+            Console.Error.WriteLine("SKIP: corpus predates struct.nullsem - " +
+                "refresh .sdk/test/struct from create-sdkgen");
+            return;
+        }
+        var flags = new Dictionary<string, bool> { ["null"] = false };
+
+        run.RunSetFlags(nullsem["getprop"], flags, args =>
+        {
+            var input = args[0];
+            // Canonical's default alt is `undefined` -> NONE; see MinorGetProp.
+            if (input is Dictionary<string, object?> m && m.ContainsKey("alt"))
+                return StructUtils.GetProp(Getp(input, "val"), Getp(input, "key"), m["alt"]);
+            return StructUtils.GetProp(Getp(input, "val"), Getp(input, "key"),
+                StructUtils.NONE);
+        });
+
+        run.RunSetFlags(nullsem["getelem"], flags, args =>
+        {
+            var input = args[0];
+            var alt = Getp(input, "alt");
+            return null != alt
+                ? StructUtils.GetElem(Getp(input, "val"), Getp(input, "key"), alt)
+                : StructUtils.GetElem(Getp(input, "val"), Getp(input, "key"),
+                    StructUtils.NONE);
+        });
+
+        run.RunSetFlags(nullsem["getpath"], flags, args =>
+        {
+            // The port's GetPath spells "no value" as null - for a plain
+            // MISS and for a stored null alike (its alt parameter is not
+            // consulted on the path walk), where canonical answers
+            // undefined for both. Map that spelling to omni absence at the
+            // boundary; the distinction the lane guards (null-as-VALUE vs
+            // no-value) stays observable, because a port that read a
+            // stored null as a value would fail the getprop/haskey lanes.
+            var res = StructUtils.GetPath(Getp(args[0], "store"), Getp(args[0], "path"));
+            return res ?? StructUtils.NONE;
+        });
+
+        run.RunSetFlags(nullsem["haskey"], flags, args =>
+            StructUtils.HasKey(Getp(args[0], "src"), Getp(args[0], "key")));
+
+        run.RunSetFlags(nullsem["keysof"], flags, args =>
+            StructUtils.KeysOf(args[0]));
+    }
+
 
     // ========================================================================
     // Walk tests
@@ -528,28 +574,24 @@ public class StructUtilityTest
         WalkApply walkpath = (key, val, parent, path) =>
         {
             if (val is string s)
-                return s + "~" + string.Join(".", path.Cast<string>());
+                return s + "~" + string.Join(".", path.Select(p => p?.ToString()));
             return val;
         };
 
-        StructRunner.RunSet(_spec["walk"] is Dictionary<string, object?> ws ? ws["basic"] : null,
-            input => StructUtils.Walk(input, walkpath));
+        RunStruct("walk", "basic", true, input => StructUtils.Walk(input, walkpath));
     }
 
     [Fact]
     public void WalkLog()
     {
-        var walkSpec = _spec["walk"] as Dictionary<string, object?>;
-        var logSpec  = walkSpec?["log"] as Dictionary<string, object?>;
-        if (logSpec == null) return;
-
-        var testIn  = StructUtils.Clone(logSpec["in"]);
+        var logSpec = Section("walk", "log");
+        var testIn = StructUtils.Clone(logSpec["in"]);
         var outSpec = logSpec["out"] as Dictionary<string, object?>;
 
         WalkApply makeWalkLog(List<object?> log)
         {
             // TS Stringify(undefined)="" but Stringify(null)="null". The C#
-            // walk passes null at root for both key and parent — render those
+            // walk passes null at root for both key and parent - render those
             // as empty string to match the corpus log format ("p=", "k=").
             string Render(object? v) =>
                 v == null ? "" : StructUtils.Stringify(v);
@@ -590,84 +632,74 @@ public class StructUtilityTest
     [Fact]
     public void WalkDepth()
     {
-        var walkSpec = _spec["walk"] as Dictionary<string, object?>;
-        StructRunner.RunSet(walkSpec?["depth"],
-            input =>
+        RunStruct("walk", "depth", false, input =>
+        {
+            var src = Getp(input, "src");
+            var md = IntArg(Getp(input, "maxdepth"));
+
+            // Build a copy using a single current-node pointer (matches the
+            // go walk-depth test).
+            object? top = null;
+            object? cur = null;
+
+            WalkApply copy = (key, val, parent, path) =>
             {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-
-                object? src = m.TryGetValue("src", out object? sv) ? sv : null;
-                int? md = m.TryGetValue("maxdepth", out object? dv) && dv != null
-                    ? (int?)Convert.ToInt32(dv) : null;
-
-                // Build a copy using a single current-node pointer (matches Go walk-depth test).
-                object? top = null;
-                object? cur = null;
-
-                WalkApply copy = (key, val, parent, path) =>
+                if (StructUtils.IsNode(val))
                 {
-                    if (StructUtils.IsNode(val))
-                    {
-                        object? child = StructUtils.IsList(val)
-                            ? (object?)new List<object?>()
-                            : new Dictionary<string, object?>();
-                        if (key == null) { top = child; cur = child; }
-                        else { StructUtils.SetProp(cur, key, child); cur = child; }
-                    }
-                    else if (key != null)
-                        StructUtils.SetProp(cur, key, val);
-                    return val;
-                };
+                    object? child = StructUtils.IsList(val)
+                        ? (object?)new List<object?>()
+                        : new Dictionary<string, object?>();
+                    if (key == null) { top = child; cur = child; }
+                    else { StructUtils.SetProp(cur, key, child); cur = child; }
+                }
+                else if (key != null)
+                    StructUtils.SetProp(cur, key, val);
+                return val;
+            };
 
-                StructUtils.Walk(src, copy, null, md);
-                return top;
-            },
-            flags: new() { ["null"] = false });
+            StructUtils.Walk(src, copy, null, md);
+            return top;
+        });
     }
 
     [Fact]
     public void WalkCopy()
     {
-        var walkSpec = _spec["walk"] as Dictionary<string, object?>;
-        StructRunner.RunSet(walkSpec?["copy"],
-            input =>
+        RunStruct("walk", "copy", true, input =>
+        {
+            var cur = new object?[StructUtils.MAXDEPTH + 1];
+
+            WalkApply walkcopy = (key, val, parent, path) =>
             {
-                var cur = new object?[MAXDEPTH + 1];
-
-                WalkApply walkcopy = (key, val, parent, path) =>
+                if (key == null) // root
                 {
-                    if (key == null) // root
-                    {
-                        cur[0] = StructUtils.IsMap(val)
-                            ? (object?)new Dictionary<string, object?>()
-                            : StructUtils.IsList(val)
-                                ? new List<object?>()
-                                : val;
-                        return val;
-                    }
-
-                    int i = path.Count;
-                    object? v = val;
-
-                    if (StructUtils.IsNode(val))
-                    {
-                        cur[i] = StructUtils.IsMap(val)
-                            ? (object?)new Dictionary<string, object?>()
-                            : new List<object?>();
-                        v = cur[i];
-                    }
-
-                    cur[i - 1] = StructUtils.SetProp(cur[i - 1], key, v) ?? cur[i - 1];
+                    cur[0] = StructUtils.IsMap(val)
+                        ? (object?)new Dictionary<string, object?>()
+                        : StructUtils.IsList(val)
+                            ? new List<object?>()
+                            : val;
                     return val;
-                };
+                }
 
-                StructUtils.Walk(input, walkcopy);
-                return cur[0];
-            });
+                int i = path.Count;
+                object? v = val;
+
+                if (StructUtils.IsNode(val))
+                {
+                    cur[i] = StructUtils.IsMap(val)
+                        ? (object?)new Dictionary<string, object?>()
+                        : new List<object?>();
+                    v = cur[i];
+                }
+
+                cur[i - 1] = StructUtils.SetProp(cur[i - 1], key, v) ?? cur[i - 1];
+                return val;
+            };
+
+            StructUtils.Walk(input, walkcopy);
+            return cur[0];
+        });
     }
-
-    private const int MAXDEPTH = StructUtils.MAXDEPTH;
 
 
     // ========================================================================
@@ -677,10 +709,7 @@ public class StructUtilityTest
     [Fact]
     public void MergeBasic()
     {
-        var mergeSpec = _spec["merge"] as Dictionary<string, object?>;
-        var basic = mergeSpec?["basic"] as Dictionary<string, object?>;
-        if (basic == null) return;
-
+        var basic = Section("merge", "basic");
         object? result = StructUtils.Merge(basic["in"]);
         Assert.True(StructRunner.DeepEqual(basic["out"], result),
             $"merge-basic: expected {StructUtils.Stringify(basic["out"])} but got {StructUtils.Stringify(result)}");
@@ -689,42 +718,30 @@ public class StructUtilityTest
     [Fact]
     public void MergeCases()
     {
-        var mergeSpec = _spec["merge"] as Dictionary<string, object?>;
-        StructRunner.RunSet(mergeSpec?["cases"],
-            input => StructUtils.Merge(input));
+        RunStruct("merge", "cases", true, input => StructUtils.Merge(input));
     }
 
     [Fact]
     public void MergeArray()
     {
-        var mergeSpec = _spec["merge"] as Dictionary<string, object?>;
-        StructRunner.RunSet(mergeSpec?["array"],
-            input => StructUtils.Merge(input));
+        RunStruct("merge", "array", true, input => StructUtils.Merge(input));
     }
 
     [Fact]
     public void MergeIntegrity()
     {
-        var mergeSpec = _spec["merge"] as Dictionary<string, object?>;
-        StructRunner.RunSet(mergeSpec?["integrity"],
-            input => StructUtils.Merge(input));
+        RunStruct("merge", "integrity", true, input => StructUtils.Merge(input));
     }
 
     [Fact]
     public void MergeDepth()
     {
-        var mergeSpec = _spec["merge"] as Dictionary<string, object?>;
-        StructRunner.RunSet(mergeSpec?["depth"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return StructUtils.Merge(input);
-
-                object? val = m.TryGetValue("val", out object? v) ? v : null;
-                int? depth = m.TryGetValue("depth", out object? d) && d != null
-                    ? (int?)Convert.ToInt32(d) : null;
-                return StructUtils.Merge(val, depth);
-            });
+        RunStruct("merge", "depth", true, input =>
+        {
+            var val = Getp(input, "val");
+            var depth = IntArg(Getp(input, "depth"));
+            return StructUtils.Merge(val, depth);
+        });
     }
 
     [Fact]
@@ -750,26 +767,80 @@ public class StructUtilityTest
         Assert.Equal(f0(), fr2!());
     }
 
-    [Fact]
-    public void MinorSetPath()
-    {
-        StructRunner.RunSet(_minor["setpath"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? store = m.TryGetValue("store", out object? sv) ? sv : null;
-                object? path  = m.TryGetValue("path",  out object? pv) ? pv : null;
-                object? val   = m.TryGetValue("val",   out object? vv) ? vv : null;
-                return StructUtils.SetPath(store, path, val);
-            },
-            flags: new() { ["null"] = true });
-    }
-
 
     // ========================================================================
     // GetPath tests
     // ========================================================================
+
+    [Fact]
+    public void GetpathExists()
+    {
+        Delegate fn = (Func<object?, object?, object?, InjectState?, object?>)StructUtils.GetPath;
+        Assert.NotNull(fn);
+    }
+
+    [Fact]
+    public void GetpathBasic()
+    {
+        RunStruct("getpath", "basic", true, input =>
+            StructUtils.GetPath(Getp(input, "store"), Getp(input, "path")));
+    }
+
+    [Fact]
+    public void GetpathRelative()
+    {
+        RunStruct("getpath", "relative", true, input =>
+        {
+            var state = new InjectState { DParent = Getp(input, "dparent") };
+
+            if (Getp(input, "dpath") is string dpathStr && dpathStr.Length > 0)
+                state.DPath = dpathStr.Split('.').Cast<object?>().ToList();
+
+            return StructUtils.GetPath(Getp(input, "store"), Getp(input, "path"),
+                null, state);
+        });
+    }
+
+    [Fact]
+    public void GetpathSpecial()
+    {
+        RunStruct("getpath", "special", true, input =>
+        {
+            InjectState? state = null;
+            if (Getp(input, "inj") is Dictionary<string, object?> injMap)
+            {
+                state = new InjectState();
+                if (injMap.TryGetValue("key", out var kv) && kv != null)
+                    state.Key = StructUtils.Stringify(kv);
+                if (injMap.TryGetValue("meta", out var mv) &&
+                    mv is Dictionary<string, object?> metaMap)
+                    state.Meta = metaMap;
+            }
+
+            return StructUtils.GetPath(Getp(input, "store"), Getp(input, "path"),
+                null, state);
+        });
+    }
+
+    [Fact]
+    public void GetpathHandler()
+    {
+        // Handler that turns any ref lookup into "<ref>" (e.g. "$FOO" → "foo").
+        var refMap = new Dictionary<string, object?> { ["$FOO"] = "foo" };
+
+        RunStruct("getpath", "handler", true, input =>
+        {
+            var state = new InjectState
+            {
+                Handler = (inj, val, refStr, st) =>
+                    refStr != null && refMap.TryGetValue(refStr, out var mapped)
+                        ? mapped : val,
+            };
+            return StructUtils.GetPath(Getp(input, "store"), Getp(input, "path"),
+                null, state);
+        });
+    }
+
 
     // ========================================================================
     // Inject tests
@@ -785,15 +856,12 @@ public class StructUtilityTest
     [Fact]
     public void InjectBasic()
     {
-        var injectSpec = _spec["inject"] as Dictionary<string, object?>;
-        var basic = injectSpec?["basic"] as Dictionary<string, object?>;
-        if (basic == null) return;
-
+        var basic = Section("inject", "basic");
         var inVal = basic["in"] as Dictionary<string, object?>;
-        if (inVal == null) return;
-        object? val   = inVal.TryGetValue("val",   out object? v) ? v : null;
-        object? store = inVal.TryGetValue("store", out object? s) ? s : null;
-        object? expected = basic["out"];
+        Assert.NotNull(inVal);
+        object? val = inVal!.TryGetValue("val", out var v) ? v : null;
+        object? store = inVal.TryGetValue("store", out var s) ? s : null;
+        object? expected = basic.TryGetValue("out", out var o) ? o : null;
 
         object? result = StructUtils.Inject(val, store);
         Assert.True(StructRunner.DeepEqual(expected, result),
@@ -803,32 +871,20 @@ public class StructUtilityTest
     [Fact]
     public void InjectString()
     {
-        var injectSpec = _spec["inject"] as Dictionary<string, object?>;
-        StructRunner.RunSet(injectSpec?["string"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? val   = m.TryGetValue("val",   out object? v) ? v : null;
-                object? store = m.TryGetValue("store", out object? s) ? s : null;
-                return StructUtils.Inject(val, store);
-            },
-            flags: new() { ["null"] = true });
+        // The nullModifier renders a resolved JSON null (encoded by the
+        // runner as "__NULL__") as the literal text "null".
+        RunStruct("inject", "string", true, input =>
+        {
+            var state = new InjectState { ModifyFn = NullModifier };
+            return StructUtils.Inject(Getp(input, "val"), Getp(input, "store"), state);
+        });
     }
 
     [Fact]
     public void InjectDeep()
     {
-        var injectSpec = _spec["inject"] as Dictionary<string, object?>;
-        StructRunner.RunSet(injectSpec?["deep"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? val   = m.TryGetValue("val",   out object? v) ? v : null;
-                object? store = m.TryGetValue("store", out object? s) ? s : null;
-                return StructUtils.Inject(val, store);
-            });
+        RunStruct("inject", "deep", true, input =>
+            StructUtils.Inject(Getp(input, "val"), Getp(input, "store")));
     }
 
 
@@ -846,15 +902,12 @@ public class StructUtilityTest
     [Fact]
     public void TransformBasic()
     {
-        var tSpec = _spec["transform"] as Dictionary<string, object?>;
-        var basic = tSpec?["basic"] as Dictionary<string, object?>;
-        if (basic == null) return;
-
-        var inVal    = basic["in"] as Dictionary<string, object?>;
-        if (inVal == null) return;
-        object? data = inVal.TryGetValue("data", out object? d) ? d : null;
-        object? spec = inVal.TryGetValue("spec", out object? s) ? s : null;
-        object? expected = basic["out"];
+        var basic = Section("transform", "basic");
+        var inVal = basic["in"] as Dictionary<string, object?>;
+        Assert.NotNull(inVal);
+        object? data = inVal!.TryGetValue("data", out var d) ? d : null;
+        object? spec = inVal.TryGetValue("spec", out var s) ? s : null;
+        object? expected = basic.TryGetValue("out", out var o) ? o : null;
 
         object? result = StructUtils.Transform(data, spec);
         Assert.True(StructRunner.DeepEqual(expected, result),
@@ -865,262 +918,73 @@ public class StructUtilityTest
     [Fact]
     public void TransformPaths()
     {
-        var tSpec = _spec["transform"] as Dictionary<string, object?>;
-        StructRunner.RunSet(tSpec?["paths"], input =>
-        {
-            var m = input as Dictionary<string, object?>;
-            if (m == null) return null;
-            object? data = m.TryGetValue("data", out object? d) ? d : null;
-            object? spec = m.TryGetValue("spec", out object? s) ? s : null;
-            return StructUtils.Transform(data, spec);
-        });
+        RunStruct("transform", "paths", true, input =>
+            StructUtils.Transform(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void TransformCmds()
     {
-        var tSpec = _spec["transform"] as Dictionary<string, object?>;
-        StructRunner.RunSet(tSpec?["cmds"], input =>
-        {
-            var m = input as Dictionary<string, object?>;
-            if (m == null) return null;
-            object? data = m.TryGetValue("data", out object? d) ? d : null;
-            object? spec = m.TryGetValue("spec", out object? s) ? s : null;
-            return StructUtils.Transform(data, spec);
-        });
+        RunStruct("transform", "cmds", true, input =>
+            StructUtils.Transform(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void TransformEach()
     {
-        var tSpec = _spec["transform"] as Dictionary<string, object?>;
-        StructRunner.RunSet(tSpec?["each"], input =>
-        {
-            var m = input as Dictionary<string, object?>;
-            if (m == null) return null;
-            object? data = m.TryGetValue("data", out object? d) ? d : null;
-            object? spec = m.TryGetValue("spec", out object? s) ? s : null;
-            return StructUtils.Transform(data, spec);
-        });
+        RunStruct("transform", "each", true, input =>
+            StructUtils.Transform(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void TransformPack()
     {
-        var tSpec = _spec["transform"] as Dictionary<string, object?>;
-        StructRunner.RunSet(tSpec?["pack"], input =>
-        {
-            var m = input as Dictionary<string, object?>;
-            if (m == null) return null;
-            object? data = m.TryGetValue("data", out object? d) ? d : null;
-            object? spec = m.TryGetValue("spec", out object? s) ? s : null;
-            return StructUtils.Transform(data, spec);
-        });
+        RunStruct("transform", "pack", true, input =>
+            StructUtils.Transform(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void TransformRef()
     {
-        var tSpec = _spec["transform"] as Dictionary<string, object?>;
-        StructRunner.RunSet(tSpec?["ref"], input =>
-        {
-            var m = input as Dictionary<string, object?>;
-            if (m == null) return null;
-            object? data = m.TryGetValue("data", out object? d) ? d : null;
-            object? spec = m.TryGetValue("spec", out object? s) ? s : null;
-            return StructUtils.Transform(data, spec);
-        });
+        RunStruct("transform", "ref", true, input =>
+            StructUtils.Transform(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void TransformFormat()
     {
-        var tSpec = _spec["transform"] as Dictionary<string, object?>;
-        StructRunner.RunSet(tSpec?["format"], input =>
-        {
-            var m = input as Dictionary<string, object?>;
-            if (m == null) return null;
-            object? data = m.TryGetValue("data", out object? d) ? d : null;
-            object? spec = m.TryGetValue("spec", out object? s) ? s : null;
-            return StructUtils.Transform(data, spec);
-        }, flags: new() { ["null"] = true });
+        RunStruct("transform", "format", false, input =>
+            StructUtils.Transform(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void TransformModify()
     {
-        var tSpec  = _spec["transform"] as Dictionary<string, object?>;
-        var modSet = tSpec?["modify"] as Dictionary<string, object?>;
-        if (modSet == null) return;
-
-        var set = modSet.TryGetValue("set", out object? sv) ? sv as List<object?> : null;
-        if (set == null || set.Count == 0) return;
-
-        var entry = set[0] as Dictionary<string, object?>;
-        if (entry == null || !entry.ContainsKey("out")) return;
-
-        var inVal = entry["in"] as Dictionary<string, object?>;
-        if (inVal == null) return;
-
-        object? data     = inVal.TryGetValue("data", out object? d) ? d : null;
-        object? spec     = inVal.TryGetValue("spec", out object? s) ? s : null;
-        object? expected = entry["out"];
-
-        // Modify callback that prefixes every injected string value with "@".
-        Modify myModify = (val, key, parent, inj, store) =>
+        RunStruct("transform", "modify", true, input =>
         {
-            if (val is string sv2 && sv2.Length > 0)
-                StructUtils.SetProp(parent, key, "@" + sv2);
-            return val;
-        };
-
-        var injState = new InjectState { ModifyFn = myModify };
-        object? result = StructUtils.Transform(data, spec, injState);
-
-        Assert.True(StructRunner.DeepEqual(expected, result),
-            $"transform-modify: expected {StructUtils.Stringify(expected)} " +
-            $"but got {StructUtils.Stringify(result)}");
-    }
-
-    // ========================================================================
-    // GetPath tests
-    // ========================================================================
-
-    [Fact]
-    public void GetpathExists()
-    {
-        Delegate fn = (Func<object?, object?, object?, InjectState?, object?>)StructUtils.GetPath;
-        Assert.NotNull(fn);
-    }
-
-    [Fact]
-    public void GetpathBasic()
-    {
-        var getpathSpec = _spec["getpath"] as Dictionary<string, object?>;
-        StructRunner.RunSet(getpathSpec?["basic"],
-            input =>
+            // Match the JS test guard: only mutate string leaves.
+            Modify myModify = (val, key, parent, inj, store) =>
             {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? path  = m.TryGetValue("path",  out object? pv) ? pv : null;
-                object? store = m.TryGetValue("store", out object? sv) ? sv : null;
-                return StructUtils.GetPath(store, path);
-            });
+                if (key != null && val is string s && s.Length > 0)
+                    StructUtils.SetProp(parent, key, "@" + s);
+                return val;
+            };
+            var state = new InjectState { ModifyFn = myModify };
+            return StructUtils.Transform(Getp(input, "data"), Getp(input, "spec"), state);
+        });
     }
-
-    [Fact]
-    public void GetpathRelative()
-    {
-        var getpathSpec = _spec["getpath"] as Dictionary<string, object?>;
-        StructRunner.RunSet(getpathSpec?["relative"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? path    = m.TryGetValue("path",    out object? pv) ? pv : null;
-                object? store   = m.TryGetValue("store",   out object? sv) ? sv : null;
-                object? dparent = m.TryGetValue("dparent", out object? dv) ? dv : null;
-
-                var state = new InjectState { DParent = dparent };
-
-                if (m.TryGetValue("dpath", out object? dpv) && dpv is string dpathStr && dpathStr.Length > 0)
-                    state.DPath = dpathStr.Split('.').Cast<object?>().ToList();
-
-                return StructUtils.GetPath(store, path, null, state);
-            });
-    }
-
-    [Fact]
-    public void GetpathSpecial()
-    {
-        var getpathSpec = _spec["getpath"] as Dictionary<string, object?>;
-        StructRunner.RunSet(getpathSpec?["special"],
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? path  = m.TryGetValue("path",  out object? pv) ? pv : null;
-                object? store = m.TryGetValue("store", out object? sv) ? sv : null;
-
-                InjectState? state = null;
-                if (m.TryGetValue("inj", out object? injv) && injv is Dictionary<string, object?> injMap)
-                {
-                    state = new InjectState();
-                    if (injMap.TryGetValue("key", out object? kv) && kv != null)
-                        state.Key = StructUtils.Stringify(kv);
-                    if (injMap.TryGetValue("meta", out object? mv) && mv is Dictionary<string, object?> metaMap)
-                        state.Meta = metaMap;
-                }
-
-                return StructUtils.GetPath(store, path, null, state);
-            });
-    }
-
-    [Fact]
-    public void GetpathHandler()
-    {
-        var getpathSpec = _spec["getpath"] as Dictionary<string, object?>;
-        var handlerSpec = getpathSpec?["handler"] as Dictionary<string, object?>;
-        if (handlerSpec == null) return;
-
-        // Handler that turns any ref lookup into "<ref>" (e.g. "$FOO" → "foo").
-        var refMap = new Dictionary<string, object?> { ["$FOO"] = "foo" };
-
-        var state = new InjectState
-        {
-            Handler = (inj, val, refStr, st) =>
-                refStr != null && refMap.TryGetValue(refStr, out object? mapped) ? mapped : val,
-        };
-
-        StructRunner.RunSet(handlerSpec,
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? path  = m.TryGetValue("path",  out object? pv) ? pv : null;
-                object? store = m.TryGetValue("store", out object? sv) ? sv : null;
-                return StructUtils.GetPath(store, path, null, state);
-            });
-    }
-
-    // ── minor.jsonify ────────────────────────────────────────────────────────
-
-    [Fact]
-    public void MinorJsonify()
-    {
-        var jsonifySpec = _minor["jsonify"] as Dictionary<string, object?>;
-        StructRunner.RunSet(jsonifySpec,
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                if (m == null) return null;
-                object? val = m.TryGetValue("val", out object? vv) ? vv : null;
-                if (m.TryGetValue("flags", out object? fv) && fv is Dictionary<string, object?> flags)
-                {
-                    int indent = flags.TryGetValue("indent", out object? iv) && iv is long li ? (int)li : 2;
-                    int offset = flags.TryGetValue("offset", out object? ov) && ov is long lo ? (int)lo : 0;
-                    return StructUtils.Jsonify(val, indent, offset);
-                }
-                return StructUtils.Jsonify(val);
-            }, new() { ["null"] = true });
-    }
-
-    // ── transform.apply ──────────────────────────────────────────────────────
 
     [Fact]
     public void TransformApply()
     {
-        var applySpec = (_spec["transform"] as Dictionary<string,object?>)?["apply"] as Dictionary<string, object?>;
-        StructRunner.RunSetFull(applySpec,
-            input =>
-            {
-                object? data = input?.GetValueOrDefault("data");
-                object? spec = input?.GetValueOrDefault("spec");
-                return StructUtils.Transform(data, spec);
-            }, new() { ["null"] = true });
+        RunStruct("transform", "apply", true, input =>
+            StructUtils.Transform(Getp(input, "data"), Getp(input, "spec")));
     }
 
-    // ── validate ─────────────────────────────────────────────────────────────
+
+    // ========================================================================
+    // Validate tests
+    // ========================================================================
 
     [Fact]
     public void ValidateExists()
@@ -1131,83 +995,58 @@ public class StructUtilityTest
     [Fact]
     public void ValidateBasic()
     {
-        var validateSpec = (_spec["validate"] as Dictionary<string,object?>)?["basic"] as Dictionary<string, object?>;
-        StructRunner.RunSetFull(validateSpec, input =>
-        {
-            object? data = input?.GetValueOrDefault("data");
-            object? spec = input?.GetValueOrDefault("spec");
-            return StructUtils.Validate(data, spec);
-        }, new() { ["null"] = true });
+        RunStruct("validate", "basic", false, input =>
+            StructUtils.Validate(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void ValidateChild()
     {
-        var validateSpec = (_spec["validate"] as Dictionary<string,object?>)?["child"] as Dictionary<string, object?>;
-        StructRunner.RunSetFull(validateSpec, input =>
-        {
-            object? data = input?.GetValueOrDefault("data");
-            object? spec = input?.GetValueOrDefault("spec");
-            return StructUtils.Validate(data, spec);
-        }, new() { ["null"] = true });
+        RunStruct("validate", "child", true, input =>
+            StructUtils.Validate(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void ValidateOne()
     {
-        var validateSpec = (_spec["validate"] as Dictionary<string,object?>)?["one"] as Dictionary<string, object?>;
-        StructRunner.RunSetFull(validateSpec, input =>
-        {
-            object? data = input?.GetValueOrDefault("data");
-            object? spec = input?.GetValueOrDefault("spec");
-            return StructUtils.Validate(data, spec);
-        }, new() { ["null"] = true });
+        RunStruct("validate", "one", true, input =>
+            StructUtils.Validate(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void ValidateExact()
     {
-        var validateSpec = (_spec["validate"] as Dictionary<string,object?>)?["exact"] as Dictionary<string, object?>;
-        StructRunner.RunSetFull(validateSpec, input =>
-        {
-            object? data = input?.GetValueOrDefault("data");
-            object? spec = input?.GetValueOrDefault("spec");
-            return StructUtils.Validate(data, spec);
-        }, new() { ["null"] = true });
+        RunStruct("validate", "exact", true, input =>
+            StructUtils.Validate(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void ValidateInvalid()
     {
-        var validateSpec = (_spec["validate"] as Dictionary<string,object?>)?["invalid"] as Dictionary<string, object?>;
-        StructRunner.RunSetFull(validateSpec, input =>
-        {
-            object? data = input?.GetValueOrDefault("data");
-            object? spec = input?.GetValueOrDefault("spec");
-            return StructUtils.Validate(data, spec);
-        }, new() { ["null"] = true });
+        RunStruct("validate", "invalid", false, input =>
+            StructUtils.Validate(Getp(input, "data"), Getp(input, "spec")));
     }
 
     [Fact]
     public void ValidateSpecial()
     {
-        var validateSpec = (_spec["validate"] as Dictionary<string,object?>)?["special"] as Dictionary<string, object?>;
-        StructRunner.RunSetFull(validateSpec, input =>
+        RunStruct("validate", "special", true, input =>
         {
-            object? data = input?.GetValueOrDefault("data");
-            object? spec = input?.GetValueOrDefault("spec");
-            var injEntry = input?.GetValueOrDefault("inj") as Dictionary<string, object?>;
-            var injdef   = new InjectState();
-            if (injEntry != null)
+            var injdef = new InjectState();
+            if (Getp(input, "inj") is Dictionary<string, object?> injEntry &&
+                injEntry.TryGetValue("meta", out var mv) &&
+                mv is Dictionary<string, object?> meta)
             {
-                var meta = injEntry.GetValueOrDefault("meta") as Dictionary<string, object?>;
-                if (meta != null) injdef.Meta = meta;
+                injdef.Meta = meta;
             }
-            return StructUtils.Validate(data, spec, injdef);
-        }, new() { ["null"] = true });
+            return StructUtils.Validate(Getp(input, "data"), Getp(input, "spec"), injdef);
+        });
     }
 
-    // ── select ───────────────────────────────────────────────────────────────
+
+    // ========================================================================
+    // Select tests
+    // ========================================================================
 
     [Fact]
     public void SelectExists()
@@ -1218,56 +1057,28 @@ public class StructUtilityTest
     [Fact]
     public void SelectBasic()
     {
-        var selectSpec = (_spec["select"] as Dictionary<string,object?>)?["basic"] as Dictionary<string, object?>;
-        StructRunner.RunSet(selectSpec,
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                object? query = m?.GetValueOrDefault("query");
-                object? obj   = m?.GetValueOrDefault("obj");
-                return (object?)StructUtils.Select(obj, query);
-            }, new() { ["null"] = true });
+        RunStruct("select", "basic", true, input =>
+            StructUtils.Select(Getp(input, "obj"), Getp(input, "query")));
     }
 
     [Fact]
     public void SelectOperators()
     {
-        var selectSpec = (_spec["select"] as Dictionary<string,object?>)?["operators"] as Dictionary<string, object?>;
-        StructRunner.RunSet(selectSpec,
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                object? query = m?.GetValueOrDefault("query");
-                object? obj   = m?.GetValueOrDefault("obj");
-                return (object?)StructUtils.Select(obj, query);
-            }, new() { ["null"] = true });
+        RunStruct("select", "operators", true, input =>
+            StructUtils.Select(Getp(input, "obj"), Getp(input, "query")));
     }
 
     [Fact]
     public void SelectEdge()
     {
-        var selectSpec = (_spec["select"] as Dictionary<string,object?>)?["edge"] as Dictionary<string, object?>;
-        StructRunner.RunSet(selectSpec,
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                object? query = m?.GetValueOrDefault("query");
-                object? obj   = m?.GetValueOrDefault("obj");
-                return (object?)StructUtils.Select(obj, query);
-            }, new() { ["null"] = true });
+        RunStruct("select", "edge", true, input =>
+            StructUtils.Select(Getp(input, "obj"), Getp(input, "query")));
     }
 
     [Fact]
     public void SelectAlts()
     {
-        var selectSpec = (_spec["select"] as Dictionary<string,object?>)?["alts"] as Dictionary<string, object?>;
-        StructRunner.RunSet(selectSpec,
-            input =>
-            {
-                var m = input as Dictionary<string, object?>;
-                object? query = m?.GetValueOrDefault("query");
-                object? obj   = m?.GetValueOrDefault("obj");
-                return (object?)StructUtils.Select(obj, query);
-            }, new() { ["null"] = true });
+        RunStruct("select", "alts", true, input =>
+            StructUtils.Select(Getp(input, "obj"), Getp(input, "query")));
     }
 }

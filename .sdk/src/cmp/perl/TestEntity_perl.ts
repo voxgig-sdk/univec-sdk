@@ -17,8 +17,12 @@ import {
   each,
   buildIdNames,
   getMatchEntries,
-  isAuthActive, envName, envToken
+  isAuthActive, envName, envToken,
+  serverVarEnv,
+  serverVariables
 } from '@voxgig/sdkgen'
+
+import { perlStringLiteral } from './utility_perl'
 
 
 // See TestEntity_ts.ts for the GenCtx/OpGen contract. Flow-step variables
@@ -54,11 +58,24 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const authActive = isAuthActive(model)
   const apikeyEnvEntry = authActive
-    ? `\n    '${PROJUPPER}_APIKEY' => 'NONE',`
+    ? `\n    '${PROJUPPER}_APIKEY' => '',`
     : ''
   const apikeyLiveField = authActive
     ? `\n        'apikey' => $env->{'${PROJUPPER}_APIKEY'},`
     : ''
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: makeOptions raises rather than
+  // request a URL with a literal `{account_id}` in it. So the live suite
+  // takes them from the environment the same way it takes the apikey.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `\n    '${serverVarEnv(PROJUPPER, v.name)}' => ${perlStringLiteral(v.dflt)},`).join('')
+  const serverLiveField = 0 === svars.length ? '' : `
+        'server' => {${svars
+      .map((v: any) => `
+          '${v.name}' => $env->{'${serverVarEnv(PROJUPPER, v.name)}'},`).join('')}
+        },`
 
   const idnames = buildIdNames(entity, basicflow)
   const idnamesStr = idnames.map(n => `'${n}'`).join(', ')
@@ -193,7 +210,7 @@ BASIC_FLOW: {
   my $env = ${N}TestRunner::env_override({
     '${ENTIDVAR}' => $idmap,
     '${PROJUPPER}_TEST_LIVE' => 'FALSE',
-    '${PROJUPPER}_TEST_EXPLAIN' => 'FALSE',${apikeyEnvEntry}
+    '${PROJUPPER}_TEST_EXPLAIN' => 'FALSE',${apikeyEnvEntry}${serverEnvEntry}
   });
 
   my $idmap_resolved = ${N}Helpers::to_map($env->{'${ENTIDVAR}'});
@@ -213,7 +230,10 @@ BASIC_FLOW: {
     Content(`
   if ((($env->{'${PROJUPPER}_TEST_LIVE'}) || '') eq 'TRUE') {
     my $merged_opts = Voxgig::Struct::merge([
-      {${apikeyLiveField}
+      # FIRST, so the generated fields below win: sdk-test-control.json's
+      # test.client.options adds to the live client, it does not redirect it.
+      ${N}TestRunner::live_client_options(),
+      {${apikeyLiveField}${serverLiveField}
       },
       (Voxgig::Struct::ismap($extra) ? $extra : {}),
     ]);

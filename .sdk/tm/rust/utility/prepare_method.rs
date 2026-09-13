@@ -24,7 +24,11 @@ pub fn prepare_method_util(ctx: &Rc<Context>) -> String {
         "list" => "GET",
         "remove" => "DELETE",
         "patch" => "PATCH",
-        _ => "GET",
+        // An op the API does not define resolves NO method - ts answers
+        // undefined here, and "" is rust's spelling of the same "no value"
+        // (the corpus pins this via primary.prepareMethod). A `GET`
+        // catch-all here silently gave every unknown op a method.
+        _ => "",
     }
     .to_string()
 }

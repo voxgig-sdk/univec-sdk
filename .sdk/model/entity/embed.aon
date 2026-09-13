@@ -33,9 +33,13 @@ main: kit: entity: embed: {
         {
           method: "POST"
           orig: "/v1/embed"
-          parts: [
-            "v1"
-            "embed"
+          segments: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "embed"
+            }
           ]
           transform: {
             req: "`reqdata`"
@@ -45,10 +49,16 @@ main: kit: entity: embed: {
         {
           method: "POST"
           orig: "/v1/ephemeral/embed"
-          parts: [
-            "v1"
-            "ephemeral"
-            "embed"
+          segments: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "ephemeral"
+            }
+            {
+              lit: "embed"
+            }
           ]
           transform: {
             req: "`reqdata`"

@@ -10,8 +10,18 @@
 ;; hooks. All features are inactive by default and self-gate on
 ;; options["active"].
 
+;; EXTENSION FEATURES. A feature whose source lives OUTSIDE this module -
+;; today only `secrets`, whose implementation sits in the gated feature
+;; container alongside its vendored library - is reached through the
+;; GENERATED sdk.config's `feature-extra` map. Static, not a dynamic
+;; resolve: a namespace that fails to load must be a hard error at load
+;; time, because the alternative is make-feature quietly answering with the
+;; base feature and an SDK sending unauthenticated requests. sdk.config
+;; always defines the map (empty when the model selected nothing), and it
+;; requires nothing from here, so there is no cycle.
 (ns sdk.features
   (:require [sdk.core :as core]
+            [sdk.config :as config]
             [voxgig.struct :as vs]
             [clojure.string :as str]))
 
@@ -1283,4 +1293,6 @@
     "rbac" (rbac-feature)
     "netsim" (netsim-feature)
     "cost" (cost-feature)
-    (base-feature)))
+    (if-let [ctor (get config/feature-extra name)]
+      (ctor)
+      (base-feature))))

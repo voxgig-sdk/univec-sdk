@@ -16,18 +16,18 @@ pub fn list(self: *EntyClass, reqmatch: Value, ctrl: Value) EntListResult {
     // `list` resolves to one ENTITY per record. make_result cannot build them
     // here — it works in Value, which has no slot for an entity — so the op
     // does, mirroring what the dynamic targets get from make_result.
-    var items = std.ArrayList(*EntyClass).init(h.A());
+    var items: std.ArrayList(*EntyClass) = .empty;
     if (out == .array) {
         for (out.array.data.items) |entry| {
             const ent = EntyClass.new(self.client, h.clone(self.entopts));
             if (entry == .object) {
                 _ = ent.data_impl(entry);
             }
-            items.append(ent) catch {};
+            items.append(h.A(), ent) catch {};
         }
     }
 
-    return EntListResult{ .ok = items.toOwnedSlice() catch &[_]*EntyClass{} };
+    return EntListResult{ .ok = items.toOwnedSlice(h.A()) catch &[_]*EntyClass{} };
 }
 
 fn list_post_done(self: *EntyClass, ctx: *Context) void {

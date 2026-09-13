@@ -8,6 +8,20 @@ main: kit: target: csharp: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability (docs/design/feature-tags.md). A vendored sekreto port
+  # lives in this target's feature container (tm/csharp/feature/secrets/),
+  # so a feature that resolves secrets through sekreto can apply here.
+  provides: { sekreto: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the struct corpus engine. Runner.cs (class
+  # TestRunner) is support-only and RETAINED, name unchanged so emitted
+  # call sites need no churn; the StructRunner support members live on
+  # inside it. `doctor` reports leftovers; `doctor prune` deletes them.
+  superseded: [
+    'test/StructRunner.cs'
+  ]
+
   deps: &: {
     kind: *'prod' | string
   }

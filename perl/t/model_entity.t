@@ -96,7 +96,7 @@ sub model_basic_setup {
     'UNIVEC_TEST_MODEL_ENTID' => $idmap,
     'UNIVEC_TEST_LIVE' => 'FALSE',
     'UNIVEC_TEST_EXPLAIN' => 'FALSE',
-    'UNIVEC_APIKEY' => 'NONE',
+    'UNIVEC_APIKEY' => '',
   });
 
   my $idmap_resolved = UnivecHelpers::to_map($env->{'UNIVEC_TEST_MODEL_ENTID'});
@@ -106,6 +106,9 @@ sub model_basic_setup {
 
   if ((($env->{'UNIVEC_TEST_LIVE'}) || '') eq 'TRUE') {
     my $merged_opts = Voxgig::Struct::merge([
+      # FIRST, so the generated fields below win: sdk-test-control.json's
+      # test.client.options adds to the live client, it does not redirect it.
+      UnivecTestRunner::live_client_options(),
       {
         'apikey' => $env->{'UNIVEC_APIKEY'},
       },

@@ -4,6 +4,8 @@ import * as Path from 'node:path'
 import {
   cmp, each,
   File, Folder, Content, Copy, Fragment,
+  pluginExcludes,
+  targetFeatures,
 } from '@voxgig/sdkgen'
 
 
@@ -38,7 +40,10 @@ const Main = cmp(async function Main(props: any) {
 
   const Name = model.const.Name
   const entity = getModelPath(model, `main.${KIT}.entity`)
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  // Gated by the applicability tags, so this target never imports or
+  // registers a feature it has no source for. One rule, one place:
+  // helpers/applicability.
+  const feature = targetFeatures(model, target)
 
   const ff = Path.normalize(__dirname + '/../../../src/cmp/elixir/fragment/')
 
@@ -70,6 +75,21 @@ const Main = cmp(async function Main(props: any) {
     Copy({
       from: 'tm/' + target.name + '/lib/projectname',
       to: model.const.name,
+      // pluginExcludes: the generate-time plugin trim (an INACTIVE plugin
+      // group's vendored files, declared per-target in the feature model).
+      // Rooted HERE, on lib/projectname, because that is this Copy's root
+      // and jostraca matches a candidate against the path relative to it -
+      // which is why the model's elixir plugin paths read
+      // `feature/secrets/sekreto/plugins/<kind>.ex` and not the full
+      // `lib/projectname/...`.
+      //
+      // AND THE TRIM IS INVISIBLE TO THE COMPILER HERE, unlike everywhere
+      // else. mix compiles everything under lib/ and Elixir needs no
+      // import, so a plugin file this exclude failed to remove compiles
+      // silently and SHIPS - where go fails on an unused import, py on a
+      // missing module and ts on an unresolved one. Only the parity and
+      // vendored guards can catch a broken trim in this target.
+      exclude: [...pluginExcludes(model)],
       replace: {
         ...stdrep,
       }

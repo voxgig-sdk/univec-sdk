@@ -2,7 +2,7 @@
 const envlocal = __dirname + '/../../../.env.local'
 require('dotenv').config({ quiet: true, path: [envlocal] })
 
-const { test, describe } = require('node:test')
+const { test, describe, afterEach } = require('node:test')
 const assert = require('node:assert')
 
 
@@ -10,10 +10,16 @@ const { ProjectNameSDK } = require('../../..')
 
 const {
   envOverride,
+  liveClientOptions,
+  liveDelay,
 } = require('../../utility')
 
 
 describe('EntityNameDirect', async () => {
+
+  // Per-test live pacing. Delay is read from sdk-test-control.json's
+  // `test.live.delayMs`; only sleeps when PROJECTENV_TEST_LIVE=TRUE.
+  afterEach(liveDelay('PROJECTENV_TEST_LIVE'))
 
   test('direct-exists', async () => {
     const sdk = new ProjectNameSDK({

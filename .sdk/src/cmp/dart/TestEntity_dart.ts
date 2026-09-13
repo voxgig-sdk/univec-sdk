@@ -23,13 +23,14 @@ import {
   Slot,
   cmp,
   each,
-  isAuthActive, envName, envToken
+  isAuthActive, envName, envToken,
+  serverVarEnv,
+  serverVariables
 } from '@voxgig/sdkgen'
 
 
 import {
-  projectPath
-} from './utility_dart'
+  projectPath, dartStringLiteral} from './utility_dart'
 
 
 // GenCtx is the per-language generation context passed to every OpGen.
@@ -54,12 +55,25 @@ const TestEntity = cmp(function TestEntity(props: any) {
   const ENTENVNAME = envToken(entity.name)
   const authActive = isAuthActive(model)
   const apikeyEnvEntry = authActive
-    ? `\n    '${PROJENVNAME}_APIKEY': 'NONE',`
+    ? `\n    '${PROJENVNAME}_APIKEY': '',`
     : ''
   const apikeyLiveField = authActive
     ? `
         'apikey': env['${PROJENVNAME}_APIKEY'],`
     : ''
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: makeOptions raises rather than
+  // request a URL with a literal `{account_id}` in it. So the live suite
+  // takes them from the environment the same way it takes the apikey.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `\n    '${serverVarEnv(PROJENVNAME, v.name)}': ${dartStringLiteral(v.dflt)},`).join('')
+  const serverLiveField = 0 === svars.length ? '' : `
+        'server': <String, dynamic>{${svars
+      .map((v: any) => `
+          '${v.name}': env['${serverVarEnv(PROJENVNAME, v.name)}'],`).join('')}
+        },`
 
   const ff = projectPath('src/cmp/dart/fragment/')
 
@@ -191,7 +205,7 @@ Map<String, dynamic> basicSetup([dynamic extra]) {
   final env = envOverride({
     '${PROJENVNAME}_TEST_${ENTENVNAME}_ENTID': idmap,
     '${PROJENVNAME}_TEST_LIVE': 'FALSE',
-    '${PROJENVNAME}_TEST_EXPLAIN': 'FALSE',${apikeyEnvEntry}
+    '${PROJENVNAME}_TEST_EXPLAIN': 'FALSE',${apikeyEnvEntry}${serverEnvEntry}
   });
 
   idmap = env['${PROJENVNAME}_TEST_${ENTENVNAME}_ENTID'];
@@ -200,9 +214,16 @@ Map<String, dynamic> basicSetup([dynamic extra]) {
 
   if (live) {
     client = ${model.Name}SDK(merge([
-      <String, dynamic>{${apikeyLiveField}
+      // FIRST, so the generated fields below win: sdk-test-control.json's
+      // test.client.options adds to the live client, it does not redirect it.
+      liveClientOptions(),
+      <String, dynamic>{${apikeyLiveField}${serverLiveField}
       },
-      extra
+      // 'extra ?? {}', not a bare 'extra': merge returns null when the last
+      // entry is null, and basicSetup is normally called with no argument at
+      // all - so a bare 'extra' silently discarded the apikey and server
+      // values above and handed the SDK null.
+      extra ?? <String, dynamic>{}
     ]));
   }
 

@@ -8,9 +8,18 @@ const std = @import("std");
 // exposed as the "voxgig-struct" module so the corpus runner can import it,
 // and the whole SDK is exposed as the "sdk" module (root: root.zig).
 //
+// TOOLCHAIN: zig 0.16. A test artifact takes a `root_module` rather than a
+// `root_source_file`, so each test file gets its own module built here with
+// the struct and sdk modules already imported.
+//
 // The Zig test framework can crash with signal 11 during cleanup *after* all
 // tests pass, due to *MapRef/*ListRef cross-references in arena teardown. The
 // Makefile filters the output: "N/N tests passed" with N==total is success.
+//
+// GENERATED from src/cmp/zig/fragment/Build.fragment.zig (Main_zig): the
+// `// #...` marker lines there are slots the generator fills from the model -
+// a GATED feature's build modules and its test step appear only when the
+// feature is active, so an SDK without that feature declares none of them.
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -18,6 +27,17 @@ pub fn build(b: *std.Build) void {
     // Vendored struct port module (its JsonValue is the SDK data model).
     const struct_mod = b.addModule("voxgig-struct", .{
         .root_source_file = b.path("utility/voxgigstruct/struct.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // The vendored @voxgig/omni port: the corpus test ENGINE, driven by
+    // test/omniresolver.zig. A MODULE, not a path import, for two reasons:
+    // omni.zig reaches its own regex.zig by path, so the pair must belong to
+    // exactly one module; and `@import("omni")` cannot then be confused with
+    // the resolver that adapts it.
+    const omni_mod = b.addModule("omni", .{
+        .root_source_file = b.path("test/vendor/omni/omni.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -32,7 +52,7 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run all tests");
 
-    // Every test file: gets both the struct and sdk modules.
+    // Every test file: gets the struct, sdk and omni modules.
     const test_files = [_][]const u8{
         "test/struct_corpus.zig",
         "test/generated_test.zig",
@@ -40,17 +60,20 @@ pub fn build(b: *std.Build) void {
         "test/feature_test.zig",
         "test/primary_utility_test.zig",
         "test/gotcha_test.zig",
+        "test/omnismoke_test.zig",
     };
 
     for (test_files) |tf| {
-        // Skip test files that do not exist yet (during template dev).
-        const t = b.addTest(.{
+        const test_mod = b.createModule(.{
             .root_source_file = b.path(tf),
             .target = target,
             .optimize = optimize,
         });
-        t.root_module.addImport("voxgig-struct", struct_mod);
-        t.root_module.addImport("sdk", sdk_mod);
+        test_mod.addImport("voxgig-struct", struct_mod);
+        test_mod.addImport("sdk", sdk_mod);
+        test_mod.addImport("omni", omni_mod);
+
+        const t = b.addTest(.{ .root_module = test_mod });
         const run_t = b.addRunArtifact(t);
         run_t.has_side_effects = true;
         test_step.dependOn(&run_t.step);

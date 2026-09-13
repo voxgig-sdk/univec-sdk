@@ -104,6 +104,10 @@ Harness makeClient({
   String? mode,
   String? base,
   Map<String, dynamic>? headers,
+  // Extra client options, written OVER the defaults below - a null value
+  // overwrites too, which is how `auth: null` (the documented credential
+  // suppression) is expressed here.
+  Map<String, dynamic>? options,
 }) {
   final b = base ?? 'http://api.test';
   final srv = server ?? defaultServer();
@@ -118,7 +122,16 @@ Harness makeClient({
     'base': b,
     'headers': headers ?? {},
     'feature': {},
+    // The real makeOptions always produces an `auth` map unless the caller
+    // suppressed it with `auth: null`, and a feature that writes the
+    // Authorization header reads its prefix from here. Without it the
+    // harness said "auth suppressed" for every client it built.
+    'auth': <String, dynamic>{'prefix': ''},
   };
+
+  if (null != options) {
+    options.forEach((k, v) => client.opts[k] = v);
+  }
 
   var idseq = 0;
   final rootShared = {};
@@ -128,6 +141,11 @@ Harness makeClient({
     final ctx = utility.makeContext({
       'client': client,
       'utility': utility,
+      // The LIVE options map, as the generated constructor puts on its own
+      // root context (`rootctx.options = _options`). A feature that reads
+      // ctx.options - the seam the secrets feature uses for `auth`,
+      // `apikey`, `base` and `system.fetch` - saw null without it.
+      'options': client.opts,
       'ctrl': over['ctrl'] ?? {},
       'entity': over['entity'],
       'shared': rootShared,

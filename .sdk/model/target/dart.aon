@@ -4,9 +4,24 @@ main: kit: target: dart: {
   ext: dart
   comment: line: "//"
   module: name: 'univec'
-  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
-  package: '@voxgig/sdkgen'
+  base: 'node_modules/@voxgig/sdkgen-langpack/.sdk'
+  package: '@voxgig/sdkgen-langpack'
   srcfeature: false
+
+  # Applicability (docs/design/feature-tags.md). A vendored sekreto port
+  # lives in this target's feature container (tm/dart/lib/feature/secrets/),
+  # so a feature that resolves secrets through sekreto can apply here.
+  provides: { sekreto: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the fused corpus runner and the second, independent
+  # struct-corpus engine, both replaced by test/omni.dart over the vendored
+  # @voxgig/omni port. `doctor` reports leftovers; `doctor prune` deletes
+  # them (jostraca only ever writes, it cannot delete).
+  superseded: [
+    'test/runner.dart'
+    'test/struct_corpus.dart'
+  ]
 
   deps: &: {
     kind: *'prod' | string

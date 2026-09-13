@@ -45,9 +45,13 @@ main: kit: entity: convert: {
         {
           method: "POST"
           orig: "/v1/convert"
-          parts: [
-            "v1"
-            "convert"
+          segments: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "convert"
+            }
           ]
           transform: {
             req: "`reqdata`"
@@ -57,9 +61,13 @@ main: kit: entity: convert: {
         {
           method: "POST"
           orig: "/v1/embed-bridge"
-          parts: [
-            "v1"
-            "embed-bridge"
+          segments: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "embed-bridge"
+            }
           ]
           transform: {
             req: "`reqdata`"
@@ -69,10 +77,16 @@ main: kit: entity: convert: {
         {
           method: "POST"
           orig: "/v1/ephemeral/convert"
-          parts: [
-            "v1"
-            "ephemeral"
-            "convert"
+          segments: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "ephemeral"
+            }
+            {
+              lit: "convert"
+            }
           ]
           transform: {
             req: "`reqdata`"
@@ -82,10 +96,16 @@ main: kit: entity: convert: {
         {
           method: "POST"
           orig: "/v1/ephemeral/embed-bridge"
-          parts: [
-            "v1"
-            "ephemeral"
-            "embed-bridge"
+          segments: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "ephemeral"
+            }
+            {
+              lit: "embed-bridge"
+            }
           ]
           transform: {
             req: "`reqdata`"

@@ -10,6 +10,7 @@ import {
   isAuthActive,
   isConfigData,
   resolveAuthPrefix,
+  targetFeatures,
 } from '@voxgig/sdkgen'
 
 
@@ -21,7 +22,6 @@ import {
 
 
 import {
-  clean,
   formatElixir,
   elixirString,
 } from './utility_elixir'
@@ -35,7 +35,10 @@ const Config = cmp(async function Config(props: any) {
   const Name = model.const.Name
 
   const entity = getModelPath(model, `main.${KIT}.entity`)
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  // Gated by the applicability tags, so this target never imports or
+  // registers a feature it has no source for. One rule, one place:
+  // helpers/applicability.
+  const feature = targetFeatures(model, target)
 
   const headers = getModelPath(model, `main.${KIT}.config.headers`) || {}
 
@@ -49,12 +52,71 @@ const Config = cmp(async function Config(props: any) {
     ? `        "auth" => %{"prefix" => ${elixirString(authPrefix)}},\n`
     : ''
 
-  const entityClean = Object.values(entity).reduce((a: any, n: any) => (a[n.name] = clean({
-    fields: n.fields,
-    name: n.name,
-    op: n.op,
-    relations: n.relations,
-  }, true), a), {})
+  // THE PLUGIN DEFINITIONS PER FEATURE (the elixir peer of Config_go's
+  // FeaturePlugins and Config_ts's pluginDefs).
+  //
+  // Upstream sekreto replaced its self-registration registry with
+  // voxgig/plugin definitions: a provider kind the caller did not pass in
+  // via `plugins: [...]` is unknown to that Sekreto, so the model's choice
+  // of plugin groups IS the SDK's provider vocabulary. Each active plugin's
+  // `def` key is a fully-qualified elixir CALL (`Sekreto.Plugins.Hashicorp
+  // .hashicorp`), emitted here as `...()` and handed to the feature.
+  //
+  // The smallest of the four emitters: Elixir resolves modules globally, by
+  // their `defmodule`, so there is no import block to keep in step with the
+  // trim - naming the call is the whole of it.
+  //
+  // Filter on `active` HERE rather than trusting the feature object to
+  // arrive filtered (the trap Config_ts and Config_go both carry a warning
+  // about): emitting a call into a module the plugin trim just deleted is
+  // an `UndefinedFunctionError` at the first client construction.
+  const featurePlugins: Record<string, string[]> = {}
+
+  // DECLARED at all, active or not - the emit gate. An SDK that selects no
+  // plugin-bearing feature gets no function, so config.ex is byte-identical
+  // to what it was before this feature existed: inactive costs nothing.
+  // (`only_active: false` for the same reason pluginExcludes needs it - the
+  // feature object a component is handed has ALREADY been filtered, so its
+  // `plugin` map holds only the ACTIVE groups and a project with the feature
+  // on but every group off would read as "no plugins declared" and lose the
+  // function the feature calls.)
+  let declared = false
+
+  each(feature, (f: any) => {
+    const all = getModelPath(model, `main.${KIT}.feature.${f.name}.plugin`,
+      { required: false, only_active: false }) || {}
+    if (0 < Object.keys(all).length) {
+      declared = true
+    }
+
+    const syms: string[] = []
+    each(f.plugin, (plugin: any) => {
+      if (false === plugin.active || null == plugin.active) return
+      for (const sym of Object.keys(plugin.def?.elixir || {})) {
+        syms.push(sym)
+      }
+    })
+    if (0 < syms.length) {
+      featurePlugins[f.name] = syms.sort()
+    }
+  })
+
+  const featurePluginNames = Object.keys(featurePlugins).sort()
+
+  const featurePluginsBlock = !declared ? '' :
+    `
+  # The plugin definitions the model selected per feature. Empty when no
+  # active feature declares active plugin groups for this target.
+  def feature_plugins(name) do
+    case name do
+` +
+    featurePluginNames.map((fname: string) =>
+      `      ${elixirString(fname)} -> [${featurePlugins[fname]
+        .map((s: string) => s + '()').join(', ')}]\n`).join('') +
+    `      _ -> []
+    end
+  end
+`
 
   Folder({ name: 'lib' }, () => {
     // The same config as an OBJECT, built by the shared helper so this
@@ -67,6 +129,15 @@ const Config = cmp(async function Config(props: any) {
     // fields up together.
     const { def: configDef, json: configJson } = configDefinition(model, target.name)
     const asData = isConfigData(configJson, configReprSetting(model))
+
+    // configDefinition's `def.entity` verbatim, NOT rebuilt here. The reduce
+    // this replaces was one of fourteen copies of that function's entityDefs
+    // loop, and when configDefinition started reconstructing a point's
+    // `parts` from apidef's segment vector (its ADR-003), only the copies
+    // that read `configDef` got it — this target's literal config emitted
+    // paths with no parts at all while its data config had them. One rule,
+    // one place.
+    const entityClean = configDef.entity
 
     File({ name: 'config.ex' }, () => {
 
@@ -151,7 +222,7 @@ defmodule ${Name}.Config do
   rescue
     ArgumentError -> false
   end
-end
+${featurePluginsBlock}end
 `)
         return
       }
@@ -217,7 +288,7 @@ defmodule ${Name}.Config do
   rescue
     ArgumentError -> false
   end
-end
+${featurePluginsBlock}end
 `)
     })
   })

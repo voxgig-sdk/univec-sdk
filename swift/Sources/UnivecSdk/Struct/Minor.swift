@@ -596,6 +596,9 @@ extension JSON {
     if d == d.rounded() && abs(d) < 1e16 {
       return String(Int64(d))
     }
-    return String(format: "%.17g", d)
+    // Shortest round-trip, which is what canonical's `String(n)` gives.
+    // "%.17g" rendered 4.4 as "4.4000000000000004"; the corpus pins the
+    // canonical spelling through validate.basic's decimal type error.
+    return String(d)
   }
 }

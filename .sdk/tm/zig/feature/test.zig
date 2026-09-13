@@ -153,11 +153,16 @@ fn build_args(ctx: *Context, args: Value) Value {
 
     const params_path = h.getpath(&.{ "args", "params" }, point);
     const reqd_params = vs.select(h.A(), params_path, h.jo(&.{.{ "reqd", h.vbool(true) }})) catch h.olist();
-    const reqd = vs.transform(h.A(), reqd_params, h.ja(&.{
-        h.vstr("`$EACH`"),
-        h.vstr(""),
-        h.vstr("`$KEY.name`"),
-    })) catch h.olist();
+    const reqd = blk: {
+        // transform now reports collected injection errors beside the value;
+        // .out is what it used to return on its own, errors or not.
+        const tres = vs.transform(h.A(), reqd_params, h.ja(&.{
+            h.vstr("`$EACH`"),
+            h.vstr(""),
+            h.vstr("`$KEY.name`"),
+        })) catch break :blk h.olist();
+        break :blk tres.out;
+    };
 
     const qand = h.olist();
     const q = h.jo(&.{.{ "`$AND`", qand }});

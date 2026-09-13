@@ -76,13 +76,16 @@ Map<String, dynamic> directSetup([dynamic mockres]) {
   final env = envOverride({
     'UNIVEC_TEST_MODEL_ENTID': <String, dynamic>{},
     'UNIVEC_TEST_LIVE': 'FALSE',
-    'UNIVEC_APIKEY': 'NONE',
+    'UNIVEC_APIKEY': '',
   });
 
   final live = 'TRUE' == env['UNIVEC_TEST_LIVE'];
 
   if (live) {
-    final client = UnivecSDK({
+    // Spread FIRST, so the generated fields below win: sdk-test-control.json's
+    // test.client.options adds to the live client, it does not redirect it.
+    final client = UnivecSDK(<String, dynamic>{
+      ...liveClientOptions(),
       'apikey': env['UNIVEC_APIKEY'],
     });
 

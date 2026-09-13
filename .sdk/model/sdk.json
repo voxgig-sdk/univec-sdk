@@ -80,9 +80,13 @@
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/convert",
-                  "parts": [
-                    "v1",
-                    "convert"
+                  "segments": [
+                    {
+                      "lit": "v1"
+                    },
+                    {
+                      "lit": "convert"
+                    }
                   ],
                   "select": {},
                   "transform": {
@@ -96,9 +100,13 @@
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/embed-bridge",
-                  "parts": [
-                    "v1",
-                    "embed-bridge"
+                  "segments": [
+                    {
+                      "lit": "v1"
+                    },
+                    {
+                      "lit": "embed-bridge"
+                    }
                   ],
                   "select": {},
                   "transform": {
@@ -112,10 +120,16 @@
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/convert",
-                  "parts": [
-                    "v1",
-                    "ephemeral",
-                    "convert"
+                  "segments": [
+                    {
+                      "lit": "v1"
+                    },
+                    {
+                      "lit": "ephemeral"
+                    },
+                    {
+                      "lit": "convert"
+                    }
                   ],
                   "select": {},
                   "transform": {
@@ -129,10 +143,16 @@
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/embed-bridge",
-                  "parts": [
-                    "v1",
-                    "ephemeral",
-                    "embed-bridge"
+                  "segments": [
+                    {
+                      "lit": "v1"
+                    },
+                    {
+                      "lit": "ephemeral"
+                    },
+                    {
+                      "lit": "embed-bridge"
+                    }
                   ],
                   "select": {},
                   "transform": {
@@ -187,9 +207,13 @@
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/embed",
-                  "parts": [
-                    "v1",
-                    "embed"
+                  "segments": [
+                    {
+                      "lit": "v1"
+                    },
+                    {
+                      "lit": "embed"
+                    }
                   ],
                   "select": {},
                   "transform": {
@@ -203,10 +227,16 @@
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/embed",
-                  "parts": [
-                    "v1",
-                    "ephemeral",
-                    "embed"
+                  "segments": [
+                    {
+                      "lit": "v1"
+                    },
+                    {
+                      "lit": "ephemeral"
+                    },
+                    {
+                      "lit": "embed"
+                    }
                   ],
                   "select": {},
                   "transform": {
@@ -250,6 +280,7 @@
             },
             {
               "active": true,
+              "format": "date-time",
               "name": "resetsAt",
               "req": true,
               "short": "When the daily allowance resets.",
@@ -268,10 +299,16 @@
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/key",
-                  "parts": [
-                    "v1",
-                    "ephemeral",
-                    "key"
+                  "segments": [
+                    {
+                      "lit": "v1"
+                    },
+                    {
+                      "lit": "ephemeral"
+                    },
+                    {
+                      "lit": "key"
+                    }
                   ],
                   "select": {},
                   "transform": {
@@ -375,9 +412,13 @@
                   "kind": "http",
                   "method": "GET",
                   "orig": "/v1/models",
-                  "parts": [
-                    "v1",
-                    "models"
+                  "segments": [
+                    {
+                      "lit": "v1"
+                    },
+                    {
+                      "lit": "models"
+                    }
                   ],
                   "select": {},
                   "transform": {
@@ -459,8 +500,11 @@
             }
           },
           "name": "audit",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -487,6 +531,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -602,8 +649,11 @@
             }
           },
           "name": "cache",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -630,6 +680,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -741,8 +794,11 @@
             }
           },
           "name": "clienttrack",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -769,6 +825,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -899,8 +958,11 @@
             }
           },
           "name": "cost",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -927,6 +989,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -1055,8 +1120,11 @@
             }
           },
           "name": "debug",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -1083,6 +1151,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -1205,8 +1276,11 @@
             }
           },
           "name": "idempotency",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -1233,6 +1307,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -1377,8 +1454,11 @@
             }
           },
           "name": "log",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -1405,6 +1485,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -1527,8 +1610,11 @@
             }
           },
           "name": "metrics",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -1555,6 +1641,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -1675,8 +1764,11 @@
             }
           },
           "name": "netsim",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -1703,6 +1795,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -1819,8 +1914,11 @@
             }
           },
           "name": "paging",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -1847,6 +1945,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -1960,8 +2061,11 @@
             }
           },
           "name": "proxy",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -1988,6 +2092,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -2100,8 +2207,11 @@
             }
           },
           "name": "ratelimit",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -2128,6 +2238,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -2245,8 +2358,11 @@
             }
           },
           "name": "rbac",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -2273,6 +2389,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -2396,8 +2515,11 @@
             }
           },
           "name": "retry",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -2424,6 +2546,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -2536,8 +2661,11 @@
             }
           },
           "name": "streaming",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -2564,6 +2692,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -2686,8 +2817,11 @@
             }
           },
           "name": "telemetry",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -2714,6 +2848,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -2832,8 +2969,11 @@
             }
           },
           "name": "test",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -2860,6 +3000,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -2971,8 +3114,11 @@
             }
           },
           "name": "timeout",
+          "needs": {},
           "origname": "",
           "package": "@voxgig/sdkgen",
+          "plugin": {},
+          "spec": {},
           "target": {
             "c": {
               "deps": {}
@@ -2999,6 +3145,9 @@
               "deps": {}
             },
             "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
               "deps": {}
             },
             "java": {
@@ -3211,6 +3360,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3236,6 +3388,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "tests/runner.h"
+          ],
           "title": "C"
         },
         "clojure": {
@@ -3270,6 +3425,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3295,6 +3453,7 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [],
           "title": "Clojure"
         },
         "cpp": {
@@ -3331,6 +3490,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3356,6 +3518,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/struct_runner.hpp"
+          ],
           "title": "C++"
         },
         "csharp": {
@@ -3392,6 +3557,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3417,6 +3585,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/StructRunner.cs"
+          ],
           "title": "C#"
         },
         "dart": {
@@ -3425,7 +3596,7 @@
             "name": "",
             "url": ""
           },
-          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
+          "base": "node_modules/@voxgig/sdkgen-langpack/.sdk",
           "comment": {
             "line": "//"
           },
@@ -3450,7 +3621,10 @@
             "repo": "",
             "sdkrel": ""
           },
-          "package": "@voxgig/sdkgen",
+          "package": "@voxgig/sdkgen-langpack",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3476,6 +3650,10 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/runner.dart",
+            "test/struct_corpus.dart"
+          ],
           "title": "Dart"
         },
         "elixir": {
@@ -3510,6 +3688,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3535,6 +3716,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/support/struct_corpus.ex"
+          ],
           "title": "Elixir"
         },
         "go": {
@@ -3571,6 +3755,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3596,6 +3783,10 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/runner_test.go",
+            "test/struct_runner_test.go"
+          ],
           "title": "Golang"
         },
         "go-cli": {
@@ -3647,6 +3838,7 @@
               "active": false
             }
           },
+          "provides": {},
           "publish": {
             "registry": {
               "active": false,
@@ -3671,6 +3863,7 @@
             },
             "version": "0.1.1"
           },
+          "superseded": [],
           "title": "Go CLI"
         },
         "go-mcp": {
@@ -3722,6 +3915,7 @@
               "active": false
             }
           },
+          "provides": {},
           "publish": {
             "registry": {
               "active": false,
@@ -3746,7 +3940,86 @@
             },
             "version": "0.1.1"
           },
+          "superseded": [],
           "title": "Go MCP server"
+        },
+        "haskell": {
+          "active": true,
+          "author": {
+            "name": "",
+            "url": ""
+          },
+          "base": "node_modules/@voxgig/sdkgen-langpack/.sdk",
+          "comment": {
+            "line": "--"
+          },
+          "deps": {},
+          "ext": "hs",
+          "feature": {
+            "fullset": [],
+            "trim": false
+          },
+          "module": {
+            "goversion": "",
+            "name": "univec",
+            "package": "",
+            "path": ""
+          },
+          "name": "haskell",
+          "origname": "",
+          "output": {
+            "adopt": false,
+            "create": true,
+            "path": "",
+            "repo": "",
+            "sdkrel": ""
+          },
+          "package": "@voxgig/sdkgen-langpack",
+          "phase": {
+            "agentguide": {
+              "active": true
+            },
+            "entity": {
+              "active": false
+            },
+            "feature": {
+              "active": false
+            },
+            "readme": {
+              "active": true
+            },
+            "test": {
+              "active": true
+            }
+          },
+          "provides": {},
+          "publish": {
+            "registry": {
+              "active": false,
+              "name": "hackage",
+              "package": "",
+              "state": "pending",
+              "url": "https://hackage.haskell.org",
+              "vault": {
+                "alias": "hackage",
+                "env": "HACKAGE_TOKEN",
+                "recipe": ""
+              }
+            },
+            "tag": {
+              "active": true,
+              "prefix": "",
+              "vault": {
+                "alias": "github",
+                "recipe": "github"
+              },
+              "via": "port"
+            },
+            "version": "0.0.1"
+          },
+          "srcfeature": false,
+          "superseded": [],
+          "title": "Haskell"
         },
         "java": {
           "active": true,
@@ -3782,6 +4055,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3807,6 +4083,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/StructRunner.java"
+          ],
           "title": "Java"
         },
         "js": {
@@ -3847,6 +4126,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3871,6 +4153,9 @@
             },
             "version": "0.1.1"
           },
+          "superseded": [
+            "test/runner.js"
+          ],
           "title": "JavaScript"
         },
         "kotlin": {
@@ -3907,6 +4192,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -3932,6 +4220,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/StructRunner.kt"
+          ],
           "title": "Kotlin"
         },
         "lean": {
@@ -3940,7 +4231,7 @@
             "name": "",
             "url": ""
           },
-          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
+          "base": "node_modules/@voxgig/sdkgen-langpack/.sdk",
           "comment": {
             "line": "--"
           },
@@ -3965,7 +4256,7 @@
             "repo": "",
             "sdkrel": ""
           },
-          "package": "@voxgig/sdkgen",
+          "package": "@voxgig/sdkgen-langpack",
           "phase": {
             "agentguide": {
               "active": true
@@ -3983,6 +4274,7 @@
               "active": true
             }
           },
+          "provides": {},
           "publish": {
             "registry": {
               "active": false,
@@ -4008,6 +4300,7 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [],
           "title": "Lean"
         },
         "lua": {
@@ -4048,6 +4341,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4073,6 +4369,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/struct_runner.lua"
+          ],
           "title": "Lua"
         },
         "ocaml": {
@@ -4089,7 +4388,7 @@
           "ext": "ml",
           "feature": {
             "fullset": [],
-            "trim": false
+            "trim": true
           },
           "module": {
             "goversion": "",
@@ -4107,6 +4406,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4132,6 +4434,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/corpus_runner.ml"
+          ],
           "title": "OCaml"
         },
         "perl": {
@@ -4166,6 +4471,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4191,6 +4499,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "t/struct_runner.pm"
+          ],
           "title": "Perl"
         },
         "php": {
@@ -4225,6 +4536,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4250,6 +4564,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/StructRunner.php"
+          ],
           "title": "PHP"
         },
         "py": {
@@ -4290,6 +4607,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4315,6 +4635,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/struct_runner.py"
+          ],
           "title": "Python"
         },
         "py-data": {
@@ -4372,6 +4695,7 @@
               "active": false
             }
           },
+          "provides": {},
           "publish": {
             "registry": {
               "active": false,
@@ -4397,6 +4721,7 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [],
           "title": "Python Data"
         },
         "rb": {
@@ -4442,6 +4767,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4467,6 +4795,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/struct_runner.rb"
+          ],
           "title": "Ruby"
         },
         "rust": {
@@ -4509,6 +4840,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4534,6 +4868,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "tests/struct_runner/mod.rs"
+          ],
           "title": "Rust"
         },
         "scala": {
@@ -4568,6 +4905,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4593,6 +4933,7 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [],
           "title": "Scala"
         },
         "swift": {
@@ -4629,6 +4970,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4654,6 +4998,7 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [],
           "title": "Swift"
         },
         "ts": {
@@ -4671,11 +5016,6 @@
               "active": true,
               "kind": "dev",
               "version": "^25.6.0"
-            },
-            "dotenv": {
-              "active": true,
-              "kind": "dev",
-              "version": "^17.4.2"
             },
             "typescript": {
               "active": true,
@@ -4704,6 +5044,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4728,6 +5071,14 @@
             },
             "version": "0.1.1"
           },
+          "superseded": [
+            "test/runner.ts",
+            "test/vendor/omni/compat.ts",
+            "src/feature/secrets/sekreto/Providers.ts",
+            "src/feature/secrets/sekreto/Sigv4.ts",
+            "src/feature/secrets/sekreto/provider/Registry.ts",
+            "src/feature/secrets/sekreto/provider/http.ts"
+          ],
           "title": "TypeScript"
         },
         "zig": {
@@ -4762,6 +5113,9 @@
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -4787,6 +5141,9 @@
             "version": "0.1.1"
           },
           "srcfeature": false,
+          "superseded": [
+            "test/struct_runner.zig"
+          ],
           "title": "Zig"
         }
       },

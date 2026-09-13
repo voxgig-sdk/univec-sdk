@@ -86,7 +86,12 @@ public class CustomUtilityTest {
     // transport: 'base' - it REPLACES the transport by design - so a client in
     // test mode would shadow the scripted fetcher and this would assert
     // nothing.
+    // "test" is the OPTION, not the `test` FEATURE: it says "this client is
+    // not live", so a REQUIRED OpenAPI server variable resolves to a
+    // deterministic test-<name> instead of failing construction. It installs
+    // no transport, so the scripted fetcher still stands.
     UnivecSDK client = new UnivecSDK(fhMap(
+        "test", fhMap("active", true),
         "utility", fhMap("fetcher", scripted)));
 
     Utility u = client.getUtility();
@@ -106,7 +111,12 @@ public class CustomUtilityTest {
   // halves cannot be satisfied by a switch that also swallows extras.
   @Test
   public void anUnknownKeyIsStillAttached() {
+    // "test" is the OPTION, not the `test` FEATURE: it says "this client is
+    // not live", so a REQUIRED OpenAPI server variable resolves to a
+    // deterministic test-<name> instead of failing construction. It installs
+    // no transport, so the scripted fetcher still stands.
     UnivecSDK client = new UnivecSDK(fhMap(
+        "test", fhMap("active", true),
         "utility", fhMap("notAUtilityMember", (Supplier<String>) () -> "EXTRA")));
     assertTrue(client.getUtility().custom.containsKey("notAUtilityMember"),
         "an unknown utility key was dropped instead of kept in custom");

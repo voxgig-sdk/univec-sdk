@@ -1,11 +1,12 @@
 
 import * as Path from 'node:path'
 
-import { swiftTargetDir, swiftTestDir } from './utility_swift'
+import { swiftSecretsActive, swiftTargetDir, swiftTestDir } from './utility_swift'
 
 import {
   cmp, each,
   File, Content, Copy, Folder, Fragment,
+  pluginExcludes,
 } from '@voxgig/sdkgen'
 
 
@@ -35,6 +36,28 @@ const Main = cmp(async function Main(props: any) {
   const { model } = props.ctx$
 
   const entity: ModelEntity = getModelPath(model, `main.${KIT}.entity`)
+
+  // THE SECRETS TRIM, at generate time, and swift NEEDS it where go, py and
+  // dart leave the feature-level trim to `target add` (vendor-tag rollout,
+  // Decision 5). DELIBERATE DIVERGENCE, and the reason is the build: the
+  // feature's three vendored trees are separate SwiftPM MODULES that
+  // Package_swift declares only when the feature is active (see the note
+  // there). With the feature off, a tree still in Sources/<Name>Sdk/ would
+  // be folded into the SDK target and fail it on five redeclarations, and
+  // feature/SecretsFeature.swift would fail on `import Sekreto` naming a
+  // module the manifest never declared. Every other swift feature is a
+  // single file the SDK module compiles regardless, so it needs no such
+  // exclude. Keyed on the SAME predicate the manifest uses, so the two
+  // cannot disagree. The gated suite under Tests/.../feature/secrets/ goes
+  // with it: it imports Sekreto too.
+  const secrets = swiftSecretsActive(model, target)
+  const secretsSourceExcludes: RegExp[] = secrets ? [] : [
+    /(^|\/)feature\/SecretsFeature\.swift$/,
+    /(^|\/)feature\/secrets\//,
+  ]
+  const secretsTestExcludes: RegExp[] = secrets ? [] : [
+    /(^|\/)feature\/secrets\//,
+  ]
 
   Package({ target })
 
@@ -66,6 +89,16 @@ const Main = cmp(async function Main(props: any) {
     Copy({
       from: 'tm/' + target.name + '/Sources/ProjectNameSDK',
       to: swiftTargetDir(model),
+      // pluginExcludes: the generate-time plugin trim (an ACTIVE feature's
+      // INACTIVE plugin group's declared files stay out of the tree). The
+      // model's swift `path` entries are relative to THIS Copy's root
+      // (`feature/secrets/plugins/Aws.swift`, not `Sources/ProjectNameSDK/
+      // ...`), as py's are to its pkg copy - helpers/featureSource documents
+      // that getting the root wrong makes the trim a silent no-op. No
+      // verbatim carve-out is needed for the vendored trees: none of the
+      // upstream swift files carries a ProjectName/PROJECTENV token, so the
+      // blanket replace is inert over them.
+      exclude: [...secretsSourceExcludes, ...pluginExcludes(model)],
       replace: {
         ...props.ctx$.stdrep,
         ProjectName: model.const.Name,
@@ -77,10 +110,21 @@ const Main = cmp(async function Main(props: any) {
     Copy({
       from: 'tm/' + target.name + '/Tests/ProjectNameSDKTests',
       to: swiftTestDir(model),
+      exclude: secretsTestExcludes,
       replace: {
         ...props.ctx$.stdrep,
         ProjectName: model.const.Name,
       }
+    })
+
+    // The vendored @voxgig/omni corpus engine. Its path is FIXED (Package
+    // .swift declares an `Omni` target over Tests/vendor/omni, and the port
+    // calls `Omni.errify` by module name), and its files are vendored
+    // verbatim - no ProjectName substitution, which would rewrite an
+    // upstream file.
+    Copy({
+      from: 'tm/' + target.name + '/Tests/vendor',
+      to: 'vendor',
     })
   })
 

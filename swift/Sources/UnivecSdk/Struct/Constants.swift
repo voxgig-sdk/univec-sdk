@@ -15,6 +15,16 @@ public let MODENAME: [Int: String] = [
   M_VAL: "val",
 ]
 
+// The names a PLACEMENT error uses. Distinct from MODENAME: canonical
+// (typescript/src/StructUtility.ts PLACEMENT) calls M_VAL "value" and BOTH
+// key modes just "key", and the corpus pins that wording through
+// transform.apply.
+public let PLACEMENT: [Int: String] = [
+  M_KEYPRE: "key",
+  M_KEYPOST: "key",
+  M_VAL: "value",
+]
+
 // MARK: - Backtick-quoted command names
 
 public let S_BKEY = "`$KEY`"

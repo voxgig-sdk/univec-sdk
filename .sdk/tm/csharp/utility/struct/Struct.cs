@@ -1,7 +1,7 @@
+// VENDORED: @voxgig/struct 0.1.1 (csharp/Struct.cs)
+// Source: https://github.com/voxgig/struct @ abd93227e3295151f8dcd18597c3f3f2577af8b7  [tag: sdk-20260911-2013-0]
+// License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* Copyright (c) 2025-2026 Voxgig Ltd. MIT LICENSE. */
-
-// Vendored from github.com/voxgig/struct csharp/Struct.cs — do not edit here;
-// upstream is the canonical source.
 
 // VERSION: @voxgig/struct 0.0.10
 
@@ -2890,6 +2890,9 @@ namespace Voxgig.Struct
                     return inj.DParent;
                 }
 
+                // Clone children and reset inj key index.
+                // The inject child loop will now iterate over the cloned children,
+                // validating them against the current list values.
                 var dpList = (List<object?>)inj.DParent;
                 foreach (var item in Items(inj.DParent))
                 {
@@ -2897,9 +2900,22 @@ namespace Voxgig.Struct
                 }
 
                 Slice(inj.Parent, 0, dpList.Count, true);
-                inj.KeyI = 0;
 
-                return GetProp(inj.DParent, 0);
+                // NOTE: modifying inj! This extends the child value loop in inject
+                // to cover every cloned child.
+                for (int ckeyI = Size(inj.Keys); ckeyI < Size(inj.Parent); ckeyI++)
+                {
+                    inj.Keys.Add(StrKey(ckeyI));
+                }
+
+                // Restart the child value loop at the first element (the loop
+                // increments keyI on resume) so that the first element is also
+                // validated against the child template.
+                inj.KeyI = -1;
+
+                // SKIP leaves the cloned child template in place at the first
+                // element so the resumed loop can validate it.
+                return SKIP;
             }
 
             return NONE;

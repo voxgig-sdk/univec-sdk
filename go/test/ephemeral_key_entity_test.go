@@ -52,7 +52,7 @@ func TestEphemeralKeyEntity(t *testing.T) {
 		// CREATE
 		ephemeralKeyRef01Ent := client.EphemeralKey(nil)
 		ephemeralKeyRef01Data := core.ToMapAny(vs.GetProp(
-			vs.GetPath([]any{"new", "ephemeral_key"}, setup.data), "ephemeral_key_ref01"))
+			vs.GetPath(setup.data, []any{"new", "ephemeral_key"}), "ephemeral_key_ref01"))
 
 		ephemeralKeyRef01DataResult, err := ephemeralKeyRef01Ent.Create(ephemeralKeyRef01Data, nil)
 		if err != nil {
@@ -90,7 +90,7 @@ func ephemeral_keyBasicSetup(extra map[string]any) *entityTestSetup {
 	client := sdk.TestSDK(options, extra)
 
 	// Generate idmap via transform, matching TS pattern.
-	idmap := vs.Transform(
+	idmap, _ := vs.Transform(
 		[]any{"ephemeral_key01", "ephemeral_key02", "ephemeral_key03"},
 		map[string]any{
 			"`$PACK`": []any{"", map[string]any{
@@ -110,7 +110,7 @@ func ephemeral_keyBasicSetup(extra map[string]any) *entityTestSetup {
 		"UNIVEC_TEST_EPHEMERAL_KEY_ENTID": idmap,
 		"UNIVEC_TEST_LIVE":      "FALSE",
 		"UNIVEC_TEST_EXPLAIN":   "FALSE",
-		"UNIVEC_APIKEY":         "NONE",
+		"UNIVEC_APIKEY":         "",
 	})
 
 	idmapResolved := core.ToMapAny(env["UNIVEC_TEST_EPHEMERAL_KEY_ENTID"])
@@ -119,11 +119,23 @@ func ephemeral_keyBasicSetup(extra map[string]any) *entityTestSetup {
 	}
 
 	if env["UNIVEC_TEST_LIVE"] == "TRUE" {
+		// An empty map, not a nil one: Merge returns nil when its last entry
+		// is nil, and BasicSetup is normally called with no extras - so a
+		// bare nil silently discarded the apikey and server values below.
+		extraOpts := extra
+		if extraOpts == nil {
+			extraOpts = map[string]any{}
+		}
+
 		mergedOpts := vs.Merge([]any{
+			// liveClientOptions() FIRST, so the generated fields below win:
+			// sdk-test-control.json's test.client.options adds to the live
+			// client, it does not redirect it.
+			liveClientOptions(),
 			map[string]any{
 				"apikey": env["UNIVEC_APIKEY"],
 			},
-			extra,
+			extraOpts,
 		})
 		client = sdk.NewUnivecSDK(core.ToMapAny(mergedOpts))
 	}

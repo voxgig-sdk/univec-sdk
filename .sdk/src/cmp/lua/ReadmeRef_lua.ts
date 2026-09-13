@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape, safeVarName, exampleVarName } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape, safeVarName, exampleVarName, luaKey } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -21,9 +21,6 @@ function luaLit(type: any, placeholder: string = 'example'): string {
 }
 
 // Non-identifier table keys use bracket syntax.
-function luaKey(name: string): string {
-  return /^[A-Za-z_]\w*$/.test(name) ? name : `["${name}"]`
-}
 
 
 const OP_SIGNATURES: Record<string, { sig: string, returns: string, desc: string }> = {

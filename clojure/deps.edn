@@ -3,8 +3,8 @@
  :deps {org.clojure/clojure {:mvn/version "1.12.5"}}
  :aliases
  {:test
-  {:extra-paths ["test"]
+  {:extra-paths ["test" "test/vendor/omni"]
    :main-opts ["-m" "sdk.test-runner"]}
   :test-compile
-  {:extra-paths ["test"]
+  {:extra-paths ["test" "test/vendor/omni"]
    :main-opts ["-e" "(require 'sdk.test-runner)(println :ok)"]}}}

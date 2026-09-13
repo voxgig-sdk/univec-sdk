@@ -17,6 +17,7 @@
 #   go       tag-only
 #   go-cli   tag-only
 #   go-mcp   tag-only
+#   haskell  hackage (publish pending: deploy publishes the git tag only) https://hackage.haskell.org
 #   java     maven-central (publish pending: deploy publishes the git tag only) https://central.sonatype.com
 #   js       npm (publish pending: deploy publishes the git tag only) https://registry.npmjs.org
 #   kotlin   maven-central (publish pending: deploy publishes the git tag only) https://central.sonatype.com
@@ -54,6 +55,7 @@ CLOJARS_ALIAS ?= clojars
 NUGET_ALIAS ?= nuget
 PUB_DEV_ALIAS ?= pubdev
 HEX_ALIAS ?= hex
+HACKAGE_ALIAS ?= hackage
 MAVEN_CENTRAL_ALIAS ?= central
 NPM_ALIAS ?= npm
 RESERVOIR_ALIAS ?= reservoir
@@ -70,7 +72,7 @@ SWIFTPM_ALIAS ?= swiftpm
 VERSION := $(shell node -p "require('./ts/package.json').version" 2>/dev/null || echo 0.0.0)
 BORU_DRY_RUN_FILLER := BORU-DRY-RUN-FILLER-NOT-A-REAL-SECRET
 
-TARGETS := c clojure cpp csharp dart elixir go go-cli go-mcp java js kotlin lean lua ocaml perl php py py-data rb rust scala swift ts zig
+TARGETS := c clojure cpp csharp dart elixir go go-cli go-mcp haskell java js kotlin lean lua ocaml perl php py py-data rb rust scala swift ts zig
 
 .PHONY: deploy deploy-dry \
   $(addprefix deploy-,$(TARGETS)) $(addprefix deploy-dry-,$(TARGETS)) \
@@ -89,6 +91,7 @@ deploy:
 	@echo "  deploy-go       tag-only"
 	@echo "  deploy-go-cli   tag-only"
 	@echo "  deploy-go-mcp   tag-only"
+	@echo "  deploy-haskell  hackage publish pending (deploy = git tag only)"
 	@echo "  deploy-java     maven-central publish pending (deploy = git tag only)"
 	@echo "  deploy-js       npm publish pending (deploy = git tag only)"
 	@echo "  deploy-kotlin   maven-central publish pending (deploy = git tag only)"
@@ -283,6 +286,27 @@ tag-push-go-mcp:
 	hdr="AUTHORIZATION: basic $$(printf 'x-access-token:%s' "$$token" | base64 | tr -d '\n')"; \
 	git -c http.extraheader="$$hdr" push "$$url" "$$tag"; \
 	echo "pushed $$tag (tag-only port)"
+
+deploy-haskell:
+	@echo "deploy-haskell: hackage publication is pending — publishing the git tag only."
+	boru vault exec --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-haskell
+
+deploy-dry-haskell:
+	boru vault exec --dry-run --for=github=$(GITHUB_ALIAS) -- $(MAKE) tag-push-haskell
+
+tag-push-haskell:
+	@set -e; tag="haskell/v$(VERSION)"; \
+	token="$${GITHUB_TOKEN:-$$GH_TOKEN}"; \
+	if [ "$$token" = "$(BORU_DRY_RUN_FILLER)" ]; then \
+	  echo "[dry-run] boru filler token detected: would create (if missing) and push tag $$tag; nothing pushed."; exit 0; fi; \
+	if [ -z "$$token" ]; then echo "tag-push-haskell: no GITHUB_TOKEN in env — run via make deploy-haskell (boru vault exec)"; exit 1; fi; \
+	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then \
+	  echo "tag $$tag already exists — pushing existing tag"; \
+	else git tag -a "$$tag" -m "Release $$tag"; fi; \
+	url=$$(git remote get-url origin | sed -E 's#^git@github.com:#https://github.com/#'); \
+	hdr="AUTHORIZATION: basic $$(printf 'x-access-token:%s' "$$token" | base64 | tr -d '\n')"; \
+	git -c http.extraheader="$$hdr" push "$$url" "$$tag"; \
+	echo "pushed $$tag (hackage publication pending — tag-only deploy)"
 
 deploy-java:
 	@echo "deploy-java: maven-central publication is pending — publishing the git tag only."

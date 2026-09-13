@@ -1,3 +1,6 @@
+// VENDORED: @voxgig/struct sdk-20260908-1556-0 (zig/src/struct.zig)
+// Source: https://github.com/voxgig/struct @ abd93227e3295151f8dcd18597c3f3f2577af8b7  [tag: sdk-20260911-2013-0]
+// License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 // Copyright (c) 2025-2026 Voxgig Ltd. MIT LICENSE.
 
 // Voxgig Struct
@@ -17,18 +20,24 @@ pub const StdJsonValue = std.json.Value;
 // All holders of the same *MapRef / *ListRef see mutations.
 // ============================================================================
 
-pub const MapData = std.StringArrayHashMap(JsonValue);
-pub const ListData = std.ArrayList(JsonValue);
+pub const MapData = std.array_hash_map.String(JsonValue);
+pub const ListData = std.array_list.Managed(JsonValue);
 
 pub const MapRef = struct {
     data: MapData,
+    // 0.16 has no managed array hash map - only the unmanaged
+    // std.array_hash_map.String - so the allocator that used to live inside
+    // MapData lives here instead. Holding it on the ref rather than
+    // threading it through every caller keeps this type's API, and so every
+    // call site of it, exactly as it was.
+    allocator: Allocator,
 
     pub fn get(self: *const MapRef, key: []const u8) ?JsonValue {
         return self.data.get(key);
     }
 
     pub fn put(self: *MapRef, key: []const u8, val: JsonValue) !void {
-        try self.data.put(key, val);
+        try self.data.put(self.allocator, key, val);
     }
 
     pub fn count(self: *const MapRef) usize {
@@ -61,14 +70,7 @@ pub const ListRef = struct {
 };
 
 // Function signature for values stored in the JSON tree.
-// Extended for the SDK: a callable carries a captured context pointer so
-// custom utilities, injected clocks/keygens and mock transports can hold
-// state. Stored by pointer so it survives `clone` (shallow) unchanged.
-pub const Callable = struct {
-    ctx: *anyopaque,
-    call: *const fn (ctx: *anyopaque, allocator: Allocator, arg: JsonValue) anyerror!JsonValue,
-};
-pub const JsonFunc = *const Callable;
+pub const JsonFunc = *const fn (allocator: Allocator) anyerror!JsonValue;
 
 // Custom value type with pointer-stable containers.
 pub const JsonValue = union(enum) {
@@ -84,7 +86,7 @@ pub const JsonValue = union(enum) {
 
     pub fn makeMap(allocator: Allocator) !JsonValue {
         const mr = try allocator.create(MapRef);
-        mr.* = .{ .data = MapData.init(allocator) };
+        mr.* = .{ .data = .empty, .allocator = allocator };
         return JsonValue{ .object = mr };
     }
 
@@ -106,10 +108,10 @@ pub fn fromStdJson(allocator: Allocator, jv: StdJsonValue) anyerror!JsonValue {
         .number_string => |s| JsonValue{ .number_string = s },
         .object => |obj| {
             const mr = try allocator.create(MapRef);
-            mr.* = .{ .data = MapData.init(allocator) };
+            mr.* = .{ .data = .empty, .allocator = allocator };
             var it = obj.iterator();
             while (it.next()) |kv| {
-                try mr.data.put(kv.key_ptr.*, try fromStdJson(allocator, kv.value_ptr.*));
+                try mr.data.put(allocator, kv.key_ptr.*, try fromStdJson(allocator, kv.value_ptr.*));
             }
             return JsonValue{ .object = mr };
         },
@@ -134,10 +136,10 @@ pub fn toStdJson(allocator: Allocator, v: JsonValue) anyerror!StdJsonValue {
         .string => |s| StdJsonValue{ .string = s },
         .number_string => |s| StdJsonValue{ .number_string = s },
         .object => |mr| {
-            var obj = std.json.ObjectMap.init(allocator);
+            var obj: std.json.ObjectMap = .empty;
             var it = mr.data.iterator();
             while (it.next()) |kv| {
-                try obj.put(kv.key_ptr.*, try toStdJson(allocator, kv.value_ptr.*));
+                try obj.put(allocator, kv.key_ptr.*, try toStdJson(allocator, kv.value_ptr.*));
             }
             return StdJsonValue{ .object = obj };
         },
@@ -227,7 +229,7 @@ pub const T_node: i32 = 1 << 6;
 // TYPENAME maps bit position (via leading zeros count) to type name string.
 pub const TYPENAME = [_][]const u8{
     S_any,
-    S_noval,
+    S_nil,
     S_boolean,
     S_decimal,
     S_integer,
@@ -407,7 +409,7 @@ pub fn getelem(allocator: Allocator, val: JsonValue, key: JsonValue, alt: JsonVa
 
 // If alt is a function, call it to get the default value.
 fn resolveAlt(allocator: Allocator, alt: JsonValue) !JsonValue {
-    if (alt == .function) return try alt.function.call(alt.function.ctx, allocator, JsonValue{ .null = {} });
+    if (alt == .function) return try alt.function(allocator);
     return alt;
 }
 
@@ -454,7 +456,7 @@ pub fn getprop(allocator: Allocator, val: JsonValue, key: JsonValue, alt: JsonVa
 pub fn keysof(allocator: Allocator, val: JsonValue) !JsonValue {
     if (val == .object) {
         const obj = val.object;
-        var key_strs = try std.ArrayList([]const u8).initCapacity(allocator, obj.count());
+        var key_strs = try std.array_list.Managed([]const u8).initCapacity(allocator, obj.count());
         defer key_strs.deinit();
         var it = obj.iterator();
         while (it.next()) |kv| {
@@ -501,7 +503,7 @@ pub fn items(allocator: Allocator, val: JsonValue) !JsonValue {
     if (val == .object) {
         const obj = val.object;
         // Get sorted keys
-        var key_strs = try std.ArrayList([]const u8).initCapacity(allocator, obj.count());
+        var key_strs = try std.array_list.Managed([]const u8).initCapacity(allocator, obj.count());
         defer key_strs.deinit();
         var it = obj.iterator();
         while (it.next()) |kv| {
@@ -594,8 +596,8 @@ pub fn clone(allocator: Allocator, val: JsonValue) !JsonValue {
     return switch (val) {
         .object => |obj| {
             const new_obj = try allocator.create(MapRef);
-            new_obj.* = .{ .data = MapData.init(allocator) };
-            try new_obj.data.ensureTotalCapacity(@intCast(obj.count()));
+            new_obj.* = .{ .data = .empty, .allocator = allocator };
+            try new_obj.data.ensureTotalCapacity(allocator, @intCast(obj.count()));
             var it = obj.iterator();
             while (it.next()) |kv| {
                 const cloned_val = try clone(allocator, kv.value_ptr.*);
@@ -746,7 +748,7 @@ fn keyStr(buf: *[20]u8, key: JsonValue) []const u8 {
 // Escape regex special characters.
 pub fn escre(allocator: Allocator, s: []const u8) ![]const u8 {
     if (s.len == 0) return S_MT;
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     for (s) |c| {
         if (isReSpecial(c)) {
             try result.append('\\');
@@ -817,7 +819,7 @@ pub fn re_find(allocator: Allocator, pattern: []const u8, input: []const u8) ?[]
 pub fn re_find_all(allocator: Allocator, pattern: []const u8, input: []const u8) ?[][][]const u8 {
     var re = _re_engine.compile(std.heap.page_allocator, pattern) orelse return null;
     defer re.deinit();
-    var rows = std.ArrayList([][]const u8).init(allocator);
+    var rows = std.array_list.Managed([][]const u8).init(allocator);
     defer rows.deinit();
     var pos: usize = 0;
     while (pos <= input.len) {
@@ -848,8 +850,8 @@ pub fn re_find_all(allocator: Allocator, pattern: []const u8, input: []const u8)
 }
 
 /// re_replace — replace every match in `input` with `replacement`. The
-/// replacement string is taken literally; $& / $1.. substitution is not
-/// expanded in this minimal wrapper (matches the engine's current shape).
+/// replacement string supports JS-style refs: $& (whole match), $1..$9
+/// (captures) and $$ (a literal $); anything else is copied verbatim.
 /// On zero-width match the current rune is emitted and we advance by one
 /// byte, mirroring the ECMAScript convention used by other ports.
 pub fn re_replace(allocator: Allocator, pattern: []const u8, input: []const u8, replacement: []const u8) ![]u8 {
@@ -857,7 +859,7 @@ pub fn re_replace(allocator: Allocator, pattern: []const u8, input: []const u8, 
         return allocator.dupe(u8, input);
     };
     defer re.deinit();
-    var out = std.ArrayList(u8).init(allocator);
+    var out = std.array_list.Managed(u8).init(allocator);
     defer out.deinit();
     var pos: usize = 0;
     while (pos <= input.len) {
@@ -869,7 +871,31 @@ pub fn re_replace(allocator: Allocator, pattern: []const u8, input: []const u8, 
         const mstart = @as(usize, @intCast(slots[0]));
         const mend = @as(usize, @intCast(slots[1]));
         try out.appendSlice(input[pos..mstart]);
-        try out.appendSlice(replacement);
+        var ri: usize = 0;
+        while (ri < replacement.len) {
+            const ch = replacement[ri];
+            if (ch == '$' and ri + 1 < replacement.len) {
+                const nc = replacement[ri + 1];
+                if (nc == '$') {
+                    try out.append('$');
+                    ri += 2;
+                    continue;
+                } else if (nc == '&' or (nc >= '0' and nc <= '9')) {
+                    const gi: usize = if (nc == '&') 0 else @as(usize, nc - '0');
+                    if (gi < re.ngroups) {
+                        const gs = slots[2 * gi];
+                        const ge = slots[2 * gi + 1];
+                        if (gs >= 0 and ge >= gs) {
+                            try out.appendSlice(input[@as(usize, @intCast(gs))..@as(usize, @intCast(ge))]);
+                        }
+                    }
+                    ri += 2;
+                    continue;
+                }
+            }
+            try out.append(ch);
+            ri += 1;
+        }
         if (mend == mstart) {
             if (mstart < input.len) {
                 try out.append(input[mstart]);
@@ -891,7 +917,7 @@ pub fn re_escape(allocator: Allocator, s: []const u8) ![]const u8 {
 // URL-encode a string.
 pub fn escurl(allocator: Allocator, s: []const u8) ![]const u8 {
     if (s.len == 0) return S_MT;
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     for (s) |c| {
         if (isUrlSafe(c)) {
             try result.append(c);
@@ -918,8 +944,8 @@ pub fn join(allocator: Allocator, arr: JsonValue, sep: []const u8, urlMode: bool
     const sarr: usize = items_list.len;
 
     // Filter to non-empty strings
-    var filtered = std.ArrayList([]const u8).init(allocator);
-    var indices = std.ArrayList(usize).init(allocator);
+    var filtered = std.array_list.Managed([]const u8).init(allocator);
+    var indices = std.array_list.Managed(usize).init(allocator);
     for (items_list, 0..) |item, orig_idx| {
         if (item == .string and item.string.len > 0) {
             try filtered.append(item.string);
@@ -930,7 +956,7 @@ pub fn join(allocator: Allocator, arr: JsonValue, sep: []const u8, urlMode: bool
     if (filtered.items.len == 0) return S_MT;
 
     // Process separator handling
-    var parts = std.ArrayList([]const u8).init(allocator);
+    var parts = std.array_list.Managed([]const u8).init(allocator);
 
     for (filtered.items, 0..) |s, fi| {
         var processed = s;
@@ -967,7 +993,7 @@ pub fn join(allocator: Allocator, arr: JsonValue, sep: []const u8, urlMode: bool
     for (parts.items) |p| total_len += p.len;
     total_len += sep.len * (parts.items.len - 1);
 
-    var result = try std.ArrayList(u8).initCapacity(allocator, total_len);
+    var result = try std.array_list.Managed(u8).initCapacity(allocator, total_len);
     for (parts.items, 0..) |p, i| {
         try result.appendSlice(p);
         if (i < parts.items.len - 1) {
@@ -993,7 +1019,7 @@ fn trimRight(s: []const u8, c: u8) []const u8 {
 // E.g. "c//d" → "c/d" but "//a" stays "//a".
 fn collapseInternal(allocator: Allocator, s: []const u8, sep: u8) ![]const u8 {
     if (s.len < 3) return s;
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     var i: usize = 0;
     while (i < s.len) {
         try result.append(s[i]);
@@ -1021,9 +1047,9 @@ pub fn jsonify(allocator: Allocator, val: JsonValue, indent_size: usize, offset:
     if (val == .null) return "null";
 
     // Use the standard JSON stringify
-    var result = std.ArrayList(u8).init(allocator);
-    try jsonifyWrite(val, result.writer(), indent_size, offset, 0);
-    return result.items;
+    var result: std.Io.Writer.Allocating = .init(allocator);
+    try jsonifyWrite(val, &result.writer, indent_size, offset, 0);
+    return result.written();
 }
 
 fn jsonifyWrite(val: JsonValue, writer: anytype, indent_size: usize, offset: usize, depth: usize) !void {
@@ -1110,9 +1136,9 @@ fn writeIndent(writer: anytype, count: usize) !void {
 
 // Compact JSON serialization (no whitespace) for partial injection stringification.
 pub fn jsonifyCompact(allocator: Allocator, val: JsonValue) ![]const u8 {
-    var result = std.ArrayList(u8).init(allocator);
-    try jsonifyCompactWrite(val, result.writer());
-    return result.items;
+    var result: std.Io.Writer.Allocating = .init(allocator);
+    try jsonifyCompactWrite(val, &result.writer);
+    return result.written();
 }
 
 fn jsonifyCompactWrite(val: JsonValue, writer: anytype) !void {
@@ -1214,7 +1240,7 @@ fn stringifyColorInner(allocator: Allocator, val: JsonValue, depth: usize) ![]co
             break :blk try std.fmt.allocPrint(allocator, "{d}", .{f});
         },
         .array => |arr| blk: {
-            var result = std.ArrayList(u8).init(allocator);
+            var result = std.array_list.Managed(u8).init(allocator);
             try result.appendSlice(open_color);
             try result.append('[');
             try result.appendSlice(reset);
@@ -1229,12 +1255,12 @@ fn stringifyColorInner(allocator: Allocator, val: JsonValue, depth: usize) ![]co
             break :blk result.items;
         },
         .object => |obj| blk: {
-            var key_list = std.ArrayList([]const u8).init(allocator);
+            var key_list = std.array_list.Managed([]const u8).init(allocator);
             var it = obj.iterator();
             while (it.next()) |kv| try key_list.append(kv.key_ptr.*);
             std.mem.sort([]const u8, key_list.items, {}, stringLessThan);
 
-            var result = std.ArrayList(u8).init(allocator);
+            var result = std.array_list.Managed(u8).init(allocator);
             try result.appendSlice(open_color);
             try result.append('{');
             try result.appendSlice(reset);
@@ -1269,7 +1295,7 @@ fn stringifyInner(allocator: Allocator, val: JsonValue) ![]const u8 {
             return try std.fmt.allocPrint(allocator, "{d}", .{f});
         },
         .array => |arr| {
-            var result = std.ArrayList(u8).init(allocator);
+            var result = std.array_list.Managed(u8).init(allocator);
             try result.append('[');
             for (arr.data.items, 0..) |item, i| {
                 const s = try stringifyInner(allocator, item);
@@ -1283,7 +1309,7 @@ fn stringifyInner(allocator: Allocator, val: JsonValue) ![]const u8 {
         },
         .object => |obj| {
             // Sort keys
-            var key_list = std.ArrayList([]const u8).init(allocator);
+            var key_list = std.array_list.Managed([]const u8).init(allocator);
             defer key_list.deinit();
             var it = obj.iterator();
             while (it.next()) |kv| {
@@ -1291,7 +1317,7 @@ fn stringifyInner(allocator: Allocator, val: JsonValue) ![]const u8 {
             }
             std.mem.sort([]const u8, key_list.items, {}, stringLessThan);
 
-            var result = std.ArrayList(u8).init(allocator);
+            var result = std.array_list.Managed(u8).init(allocator);
             try result.append('{');
             for (key_list.items, 0..) |k, i| {
                 const v = obj.get(k).?;
@@ -1313,10 +1339,10 @@ fn stringifyInner(allocator: Allocator, val: JsonValue) ![]const u8 {
 
 // Build a human-friendly path string.
 pub fn pathify(allocator: Allocator, val: JsonValue, from: usize, end: usize) ![]const u8 {
-    var path: ?std.ArrayList([]const u8) = null;
+    var path: ?std.array_list.Managed([]const u8) = null;
 
     if (val == .array) {
-        path = std.ArrayList([]const u8).init(allocator);
+        path = std.array_list.Managed([]const u8).init(allocator);
         for (val.array.data.items) |item| {
             switch (item) {
                 .string => |s| try path.?.append(s),
@@ -1326,10 +1352,10 @@ pub fn pathify(allocator: Allocator, val: JsonValue, from: usize, end: usize) ![
             }
         }
     } else if (val == .string) {
-        path = std.ArrayList([]const u8).init(allocator);
+        path = std.array_list.Managed([]const u8).init(allocator);
         try path.?.append(val.string);
     } else if (val == .integer or val == .float) {
-        path = std.ArrayList([]const u8).init(allocator);
+        path = std.array_list.Managed([]const u8).init(allocator);
         const num: i64 = if (val == .integer) val.integer else @intFromFloat(@floor(val.float));
         try path.?.append(try std.fmt.allocPrint(allocator, "{d}", .{num}));
     }
@@ -1345,9 +1371,9 @@ pub fn pathify(allocator: Allocator, val: JsonValue, from: usize, end: usize) ![
         }
 
         // Map: replace dots in string parts
-        var mapped = std.ArrayList([]const u8).init(allocator);
+        var mapped = std.array_list.Managed([]const u8).init(allocator);
         for (sliced) |part| {
-            var replaced = std.ArrayList(u8).init(allocator);
+            var replaced = std.array_list.Managed(u8).init(allocator);
             for (part) |c| {
                 if (c != '.') try replaced.append(c);
             }
@@ -1355,7 +1381,7 @@ pub fn pathify(allocator: Allocator, val: JsonValue, from: usize, end: usize) ![
         }
 
         // Join with dots
-        var result = std.ArrayList(u8).init(allocator);
+        var result = std.array_list.Managed(u8).init(allocator);
         for (mapped.items, 0..) |part, i| {
             try result.appendSlice(part);
             if (i < mapped.items.len - 1) {
@@ -1366,7 +1392,7 @@ pub fn pathify(allocator: Allocator, val: JsonValue, from: usize, end: usize) ![
     }
 
     // Unknown path — always include colon and stringified value
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     try result.appendSlice("<unknown-path:");
     const s = try stringify(allocator, val, 47);
     try result.appendSlice(s);
@@ -1492,19 +1518,19 @@ pub fn pad(allocator: Allocator, s: []const u8, padding: i64, padchar: u8) ![]co
 // Walk — depth-first tree traversal with before/after callbacks.
 // ============================================================================
 
-// Pool of path buffers — one std.ArrayList([]const u8) per depth. Allocated
+// Pool of path buffers — one std.array_list.Managed([]const u8) per depth. Allocated
 // once per top-level walk() call, grown on demand, and mutated in place as
 // siblings are visited. Avoids allocating a fresh path slice per recursive
 // call. Buffers are heap-allocated so that growing the outer list (on
 // deeper recursion) does not invalidate pointers held by shallower frames.
 const WalkPool = struct {
     allocator: Allocator,
-    buffers: std.ArrayList(*std.ArrayList([]const u8)),
+    buffers: std.array_list.Managed(*std.array_list.Managed([]const u8)),
 
     fn init(allocator: Allocator) WalkPool {
         return .{
             .allocator = allocator,
-            .buffers = std.ArrayList(*std.ArrayList([]const u8)).init(allocator),
+            .buffers = std.array_list.Managed(*std.array_list.Managed([]const u8)).init(allocator),
         };
     }
 
@@ -1517,10 +1543,10 @@ const WalkPool = struct {
     }
 
     // Return the path buffer for the given depth, growing the pool if needed.
-    fn at(self: *WalkPool, depth: usize) !*std.ArrayList([]const u8) {
+    fn at(self: *WalkPool, depth: usize) !*std.array_list.Managed([]const u8) {
         while (self.buffers.items.len <= depth) {
-            const buf = try self.allocator.create(std.ArrayList([]const u8));
-            buf.* = std.ArrayList([]const u8).init(self.allocator);
+            const buf = try self.allocator.create(std.array_list.Managed([]const u8));
+            buf.* = std.array_list.Managed([]const u8).init(self.allocator);
             try self.buffers.append(buf);
         }
         return self.buffers.items[depth];
@@ -1654,7 +1680,7 @@ pub fn merge(allocator: Allocator, val: JsonValue, maxdepth: i32) !JsonValue {
         if (islist(last)) return try JsonValue.makeList(allocator);
         if (ismap(last)) {
             const obj = try allocator.create(MapRef);
-            obj.* = .{ .data = MapData.init(allocator) };
+            obj.* = .{ .data = .empty, .allocator = allocator };
             _ = &obj;
             return JsonValue{ .object = obj };
         }
@@ -1820,7 +1846,7 @@ pub fn getpathInj(allocator: Allocator, path_val: JsonValue, store: JsonValue, i
         if (store == .object) {
             if (store.object.get(parts[0])) |v| {
                 // If the value is a function, call it.
-                if (v == .function) return try v.function.call(v.function.ctx, allocator, JsonValue{ .null = {} });
+                if (v == .function) return try v.function(allocator);
                 return v;
             }
         }
@@ -1908,7 +1934,7 @@ pub fn getpathInj(allocator: Allocator, path_val: JsonValue, store: JsonValue, i
                     // Build full path from dpath minus ascends, plus remaining parts.
                     const dpath = ij.dpath;
                     const cutLen = if (ascends > dpath.len) 0 else dpath.len - ascends;
-                    var fullpath = std.ArrayList([]const u8).init(allocator);
+                    var fullpath = std.array_list.Managed([]const u8).init(allocator);
                     for (dpath[0..cutLen]) |dp| try fullpath.append(dp);
                     if (pI + 1 < numparts) {
                         for (parts[pI + 1 .. numparts]) |rp| try fullpath.append(rp);
@@ -1966,7 +1992,7 @@ fn resolvePart(allocator: Allocator, val: JsonValue, part_in: []const u8, inj: ?
     // Handle $$ escape → $.
     var part = part_in;
     if (std.mem.indexOf(u8, part, "$$")) |_| {
-        var buf = std.ArrayList(u8).init(allocator);
+        var buf = std.array_list.Managed(u8).init(allocator);
         var i: usize = 0;
         while (i < part.len) {
             if (i + 1 < part.len and part[i] == '$' and part[i + 1] == '$') {
@@ -2121,7 +2147,7 @@ pub const Injection = struct {
     modify: ?ModifyFn = null,
 
     // Shared error collector (pointer so all children share it).
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
 
     // Create a child injection for processing key at keys[key_i].
     pub fn child(self: *Injection, key_i: usize, keys: []const []const u8) !*Injection {
@@ -2248,16 +2274,16 @@ pub fn inject(allocator: Allocator, val: JsonValue, store: JsonValue, inj_opt: ?
     if (inj_opt == null or (inj_opt != null and inj_opt.?.mode == 0)) {
         // Root injection: wrap val in a virtual parent.
         const parent_obj = try allocator.create(MapRef);
-        parent_obj.* = .{ .data = MapData.init(allocator) };
+        parent_obj.* = .{ .data = .empty, .allocator = allocator };
         try parent_obj.put(S_DTOP, val);
         const parent_val = JsonValue{ .object = parent_obj };
 
-        var errs: *std.ArrayList([]const u8) = undefined;
+        var errs: *std.array_list.Managed([]const u8) = undefined;
         if (inj_opt) |existing| {
             errs = existing.errs;
         } else {
-            errs = try allocator.create(std.ArrayList([]const u8));
-            errs.* = std.ArrayList([]const u8).init(allocator);
+            errs = try allocator.create(std.array_list.Managed([]const u8));
+            errs.* = std.array_list.Managed([]const u8).init(allocator);
         }
 
         var init_keys = try allocator.alloc([]const u8, 1);
@@ -2303,8 +2329,8 @@ pub fn inject(allocator: Allocator, val: JsonValue, store: JsonValue, inj_opt: ?
 
     if (isnode(val)) {
         // Get sorted keys: normal first, then $ transform keys.
-        var normal_keys = std.ArrayList([]const u8).init(allocator);
-        var transform_keys = std.ArrayList([]const u8).init(allocator);
+        var normal_keys = std.array_list.Managed([]const u8).init(allocator);
+        var transform_keys = std.array_list.Managed([]const u8).init(allocator);
 
         const all_keys = try keysof(allocator, current);
         if (all_keys == .array) {
@@ -2319,7 +2345,7 @@ pub fn inject(allocator: Allocator, val: JsonValue, store: JsonValue, inj_opt: ?
             }
         }
 
-        var node_keys = std.ArrayList([]const u8).init(allocator);
+        var node_keys = std.array_list.Managed([]const u8).init(allocator);
         for (normal_keys.items) |k| try node_keys.append(k);
         for (transform_keys.items) |k| try node_keys.append(k);
 
@@ -2340,7 +2366,7 @@ pub fn inject(allocator: Allocator, val: JsonValue, store: JsonValue, inj_opt: ?
             // Injection may modify child processing state.
             nkI = @as(isize, @bitCast(childinj.key_i));
             node_keys = blk: {
-                var nk = std.ArrayList([]const u8).init(allocator);
+                var nk = std.array_list.Managed([]const u8).init(allocator);
                 for (childinj.keys) |k| try nk.append(k);
                 break :blk nk;
             };
@@ -2357,7 +2383,7 @@ pub fn inject(allocator: Allocator, val: JsonValue, store: JsonValue, inj_opt: ?
 
                 nkI = @as(isize, @bitCast(childinj.key_i));
                 node_keys = blk: {
-                    var nk = std.ArrayList([]const u8).init(allocator);
+                    var nk = std.array_list.Managed([]const u8).init(allocator);
                     for (childinj.keys) |k| try nk.append(k);
                     break :blk nk;
                 };
@@ -2369,7 +2395,7 @@ pub fn inject(allocator: Allocator, val: JsonValue, store: JsonValue, inj_opt: ?
 
                 nkI = @as(isize, @bitCast(childinj.key_i));
                 node_keys = blk: {
-                    var nk = std.ArrayList([]const u8).init(allocator);
+                    var nk = std.array_list.Managed([]const u8).init(allocator);
                     for (childinj.keys) |k| try nk.append(k);
                     break :blk nk;
                 };
@@ -2385,19 +2411,21 @@ pub fn inject(allocator: Allocator, val: JsonValue, store: JsonValue, inj_opt: ?
         if (!inj.skip and (result != .null or val != .null)) {
             _ = try inj.setval(result, 0);
         }
-        inj.skip = false;
         current = result;
     }
 
     inj.val = current;
 
-    // Call modify callback if set (skip suppresses modify too).
+    // Call modify callback if set (skip suppresses modify too — the zig
+    // spelling of the canonical `SKIP !== val` guard around both setval
+    // and modify). Reset skip only after both checks have seen it.
     if (!inj.skip) {
         if (inj.modify) |modify_fn| {
             const mval = getprop(allocator, inj.parent, JsonValue{ .string = inj.key }, .null) catch .null;
             modify_fn(allocator, mval, inj.key, inj.parent, inj, store);
         }
     }
+    inj.skip = false;
 
     // Return value is the top-level result.
     return try getprop(allocator, inj.parent, JsonValue{ .string = S_DTOP }, .null);
@@ -2432,7 +2460,7 @@ fn injectStr(allocator: Allocator, val: []const u8, store: JsonValue, inj: *Inje
 
     // Partial injection: replace each `ref` segment.
     inj.full = false;
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     var i: usize = 0;
     while (i < val.len) {
         if (val[i] == '`') {
@@ -2492,7 +2520,27 @@ fn resolvePathOrCmd(allocator: Allocator, pathref: []const u8, store: JsonValue,
         return try getpathInj(allocator, JsonValue{ .string = pathref }, store, inj);
     }
 
-    // Absolute path from store.
+    // Validation metadata references carry an operator: `$~` injects the
+    // resolved value, while `$=` rewrites the slot as an $EXACT validator
+    // and revisits it. Other absolute paths retain ordinary getpath
+    // semantics (notably the empty path resolves to $TOP, not the store).
+    if (inj.validate_mode and
+        (std.mem.indexOf(u8, pathref, "$~") != null or std.mem.indexOf(u8, pathref, "$=") != null))
+    {
+        const found = try getpathInj(allocator, JsonValue{ .string = pathref }, store, inj);
+        if (std.mem.indexOf(u8, pathref, "$=") != null) {
+            const exact = try allocator.create(ListRef);
+            exact.* = .{ .data = ListData.init(allocator) };
+            try exact.append(JsonValue{ .string = S_BEXACT });
+            try exact.append(found);
+            _ = try inj.setval(JsonValue{ .array = exact }, 0);
+            inj.key_i = std.math.maxInt(usize);
+            inj.skip = true;
+            return .null;
+        }
+        return found;
+    }
+
     return try getpath(allocator, JsonValue{ .string = pathref }, store);
 }
 
@@ -2548,6 +2596,7 @@ fn dispatchCmd(allocator: Allocator, cmd: []const u8, store: JsonValue, inj: *In
         if (std.mem.eql(u8, cmd, "$DECIMAL")) return try cmdValidateType(allocator, inj, S_decimal, T_decimal);
         if (std.mem.eql(u8, cmd, "$BOOLEAN")) return try cmdValidateType(allocator, inj, S_boolean, T_boolean);
         if (std.mem.eql(u8, cmd, "$NULL")) return try cmdValidateType(allocator, inj, S_null, T_null);
+        if (std.mem.eql(u8, cmd, "$NIL")) return try cmdValidateNil(allocator, inj);
         if (std.mem.eql(u8, cmd, "$OBJECT") or std.mem.eql(u8, cmd, "$MAP"))
             return try cmdValidateType(allocator, inj, S_map, T_map);
         if (std.mem.eql(u8, cmd, "$ARRAY") or std.mem.eql(u8, cmd, "$LIST"))
@@ -2562,7 +2611,7 @@ fn dispatchCmd(allocator: Allocator, cmd: []const u8, store: JsonValue, inj: *In
     if (store == .object) {
         if (store.object.get(cmd)) |val| {
             if (val == .function) {
-                return try val.function.call(val.function.ctx, allocator, JsonValue{ .null = {} });
+                return try val.function(allocator);
             }
             return val;
         }
@@ -2701,12 +2750,23 @@ fn cmdValidateAny(inj: *Injection) JsonValue {
     return out;
 }
 
+fn cmdValidateNil(allocator: Allocator, inj: *Injection) anyerror!JsonValue {
+    if (inj.mode != M_VAL) return .null;
+    const out = getprop(allocator, inj.dparent, JsonValue{ .string = inj.key }, .null) catch .null;
+    if (out != .null) {
+        try inj.errs.append(try invalidTypeMsg(allocator, inj.path, S_nil, out));
+    }
+    _ = try inj.setval(out, 0);
+    return out;
+}
+
 fn cmdValidateOne(allocator: Allocator, inj: *Injection, _: JsonValue) anyerror!JsonValue {
     if (inj.mode != M_VAL) return .null;
     if (inj.parent != .array) return .null;
 
     // Skip remaining keys in the list.
     inj.key_i = inj.keys.len;
+    inj.skip = true;
 
     const parent_items = inj.parent.array.data.items;
     if (parent_items.len < 2) return .null;
@@ -2721,22 +2781,53 @@ fn cmdValidateOne(allocator: Allocator, inj: *Injection, _: JsonValue) anyerror!
     // Try each alternative.
     const alts = parent_items[1..];
     for (alts) |alt| {
-        const terrs = std.ArrayList([]const u8).init(allocator);
-        const terrs_ptr = try allocator.create(std.ArrayList([]const u8));
+        const terrs = std.array_list.Managed([]const u8).init(allocator);
+        const terrs_ptr = try allocator.create(std.array_list.Managed([]const u8));
         terrs_ptr.* = terrs;
         _ = try validateWalk(allocator, alt, data_val, terrs_ptr, if (inj.path.len > 1) inj.path[1..] else inj.path);
         if (terrs_ptr.items.len == 0) return .null;
     }
 
     // No match — build error message.
-    var desc = std.ArrayList(u8).init(allocator);
+    var desc = std.array_list.Managed(u8).init(allocator);
     for (alts, 0..) |alt, i| {
         if (i > 0) try desc.appendSlice(", ");
         try desc.appendSlice(try stringify(allocator, alt, null));
     }
     const prefix = if (alts.len > 1) "one of " else "";
-    try inj.errs.append(try invalidTypeMsg(allocator, inj.path, try std.fmt.allocPrint(allocator, "{s}{s}", .{ prefix, desc.items }), data_val));
+    // Canonical does `inj.path = slice(inj.path, -1)`: $ONE wraps the value
+    // in its parent, so the error belongs to the parent's path, not to the
+    // list slot the command happens to occupy. Without this every message
+    // carried a trailing `.0`.
+    const reportpath = if (0 < inj.path.len) inj.path[0 .. inj.path.len - 1] else inj.path;
+    const named = try transformNames(allocator, desc.items);
+    try inj.errs.append(try invalidTypeMsg(allocator, reportpath, try std.fmt.allocPrint(allocator, "{s}{s}", .{ prefix, named }), data_val));
     return .null;
+}
+
+/// Canonical renders a validator description through R_TRANSFORM_NAME
+/// (/`\$([A-Z]+)`/g), lowercasing the captured name: the alternatives of
+/// `["`$ONE`","`$STRING`","`$NUMBER`"]` read back as "string, number", not
+/// as the spec literals. Applied to the joined description, so every
+/// command name inside it is rewritten.
+fn transformNames(allocator: Allocator, src: []const u8) ![]const u8 {
+    var out = std.array_list.Managed(u8).init(allocator);
+    var i: usize = 0;
+    while (i < src.len) {
+        // `$NAME` - backtick, dollar, one or more A-Z, backtick.
+        if (src[i] == '`' and i + 2 < src.len and src[i + 1] == '$') {
+            var j = i + 2;
+            while (j < src.len and src[j] >= 'A' and src[j] <= 'Z') : (j += 1) {}
+            if (j > i + 2 and j < src.len and src[j] == '`') {
+                for (src[i + 2 .. j]) |c| try out.append(c - 'A' + 'a');
+                i = j + 1;
+                continue;
+            }
+        }
+        try out.append(src[i]);
+        i += 1;
+    }
+    return out.items;
 }
 
 fn cmdValidateExactCmd(allocator: Allocator, inj: *Injection) anyerror!JsonValue {
@@ -2744,6 +2835,7 @@ fn cmdValidateExactCmd(allocator: Allocator, inj: *Injection) anyerror!JsonValue
     if (inj.parent != .array) return .null;
 
     inj.key_i = inj.keys.len;
+    inj.skip = true;
 
     const parent_items = inj.parent.array.data.items;
     if (parent_items.len < 2) return .null;
@@ -2764,13 +2856,16 @@ fn cmdValidateExactCmd(allocator: Allocator, inj: *Injection) anyerror!JsonValue
         if (std.mem.eql(u8, sa, sb)) return .null;
     }
 
-    var desc = std.ArrayList(u8).init(allocator);
+    var desc = std.array_list.Managed(u8).init(allocator);
     for (alts, 0..) |alt, i| {
         if (i > 0) try desc.appendSlice(", ");
         try desc.appendSlice(try stringify(allocator, alt, null));
     }
     const prefix = if (alts.len > 1) "one of " else "";
-    try inj.errs.append(try invalidTypeMsg(allocator, inj.path, try std.fmt.allocPrint(allocator, "exactly equal to {s}{s}", .{ prefix, desc.items }), data_val));
+    // Same parent-path rule as $ONE above.
+    const reportpath = if (0 < inj.path.len) inj.path[0 .. inj.path.len - 1] else inj.path;
+    const root_prefix = if (1 < reportpath.len) "" else "value ";
+    try inj.errs.append(try invalidTypeMsg(allocator, reportpath, try std.fmt.allocPrint(allocator, "{s}exactly equal to {s}{s}", .{ root_prefix, prefix, desc.items }), data_val));
     return .null;
 }
 
@@ -2825,8 +2920,27 @@ fn cmdValidateChildCmd(allocator: Allocator, inj: *Injection, store: JsonValue) 
         while (li < dlen) : (li += 1) {
             try inj.parent.array.append(try clone(allocator, child));
         }
-        inj.key_i = 0;
-        return if (dlen > 0) dparent_val.array.data.items[0] else .null;
+
+        // NOTE: modifying inj! This extends the child value loop in inject
+        // to cover every cloned child.
+        var ckey_i: usize = inj.keys.len;
+        while (ckey_i < inj.parent.array.data.items.len) : (ckey_i += 1) {
+            const ckey = try strkey(allocator, JsonValue{ .integer = @intCast(ckey_i) });
+            inj.keys = appendSlice(allocator, []const u8, inj.keys, ckey) catch inj.keys;
+        }
+
+        // Restart the child value loop at the first element (the loop
+        // increments its signed nkI counter on resume) so that the first
+        // element is also validated against the child template. key_i is
+        // usize: max-usize bit-casts to -1 in inject's nkI — the same wrap
+        // idiom cmdRef already relies on.
+        inj.key_i = std.math.maxInt(usize);
+
+        // Suppress setval (and modify) so the cloned child template stays
+        // in place at the first element for the resumed loop to validate.
+        // This is the zig spelling of the canonical `return SKIP`.
+        inj.skip = true;
+        return .null;
     }
 
     return .null;
@@ -2870,7 +2984,7 @@ fn cmdFormat(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue
     return out;
 }
 
-fn applyFormat(allocator: Allocator, name: []const u8, val: JsonValue, errs: *std.ArrayList([]const u8)) !JsonValue {
+fn applyFormat(allocator: Allocator, name: []const u8, val: JsonValue, errs: *std.array_list.Managed([]const u8)) !JsonValue {
     if (std.mem.eql(u8, name, "upper")) return try walkFormat(allocator, val, fmtUpper);
     if (std.mem.eql(u8, name, "lower")) return try walkFormat(allocator, val, fmtLower);
     if (std.mem.eql(u8, name, "string")) return try walkFormat(allocator, val, fmtString);
@@ -2879,7 +2993,7 @@ fn applyFormat(allocator: Allocator, name: []const u8, val: JsonValue, errs: *st
     if (std.mem.eql(u8, name, "identity")) return val;
     if (std.mem.eql(u8, name, "concat")) {
         if (val == .array) {
-            var buf = std.ArrayList(u8).init(allocator);
+            var buf = std.array_list.Managed(u8).init(allocator);
             for (val.array.data.items) |item| {
                 if (isnode(item)) continue;
                 try buf.appendSlice(try fmtStr(allocator, item));
@@ -2898,7 +3012,7 @@ const FormatFn = *const fn (Allocator, JsonValue) anyerror!JsonValue;
 fn walkFormat(allocator: Allocator, val: JsonValue, fmt_fn: FormatFn) !JsonValue {
     if (val == .object) {
         const new_obj = try allocator.create(MapRef);
-        new_obj.* = .{ .data = MapData.init(allocator) };
+        new_obj.* = .{ .data = .empty, .allocator = allocator };
         var it = val.object.iterator();
         while (it.next()) |kv| {
             try new_obj.put(kv.key_ptr.*, try walkFormat(allocator, kv.value_ptr.*, fmt_fn));
@@ -3009,9 +3123,9 @@ fn cmdEach(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
         JsonValue{ .null = {} };
 
     // Build source value list and key list.
-    var src_vals = std.ArrayList(JsonValue).init(allocator);
-    var src_keys = std.ArrayList([]const u8).init(allocator);
-    var tval_items = std.ArrayList(JsonValue).init(allocator);
+    var src_vals = std.array_list.Managed(JsonValue).init(allocator);
+    var src_keys = std.array_list.Managed([]const u8).init(allocator);
+    var tval_items = std.array_list.Managed(JsonValue).init(allocator);
 
     if (islist(src)) {
         for (src.array.data.items, 0..) |src_item, idx| {
@@ -3031,7 +3145,7 @@ fn cmdEach(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
                 // Add $ANNO with $KEY for map sources.
                 if (cclone == .object) {
                     const anno = try allocator.create(MapRef);
-                    anno.* = .{ .data = MapData.init(allocator) };
+                    anno.* = .{ .data = .empty, .allocator = allocator };
                     try anno.put(S_KEY, pair.array.data.items[0]);
                     _ = try setprop(allocator, cclone, JsonValue{ .string = S_BANNO }, JsonValue{ .object = anno });
                 }
@@ -3050,7 +3164,7 @@ fn cmdEach(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
         // Build per-item store: original store + $TOP = src_item.
         // Also merge root data keys for ancestor path access.
         const each_store = try allocator.create(MapRef);
-        each_store.* = .{ .data = MapData.init(allocator) };
+        each_store.* = .{ .data = .empty, .allocator = allocator };
         if (store == .object) {
             var sit = store.object.iterator();
             while (sit.next()) |kv| try each_store.put(kv.key_ptr.*, kv.value_ptr.*);
@@ -3100,8 +3214,8 @@ fn cmdPack(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
         try getpath(allocator, JsonValue{ .string = srcpath }, store);
 
     // Normalize source to list.
-    var src_list = std.ArrayList(JsonValue).init(allocator);
-    var src_keys = std.ArrayList([]const u8).init(allocator);
+    var src_list = std.array_list.Managed(JsonValue).init(allocator);
+    var src_keys = std.array_list.Managed([]const u8).init(allocator);
     var src_is_map = false;
 
     if (islist(src_raw)) {
@@ -3149,7 +3263,7 @@ fn cmdPack(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
 
     // Build the output map.
     const result_obj = try allocator.create(MapRef);
-    result_obj.* = .{ .data = MapData.init(allocator) };
+    result_obj.* = .{ .data = .empty, .allocator = allocator };
     for (src_list.items, 0..) |src_item, idx| {
         // Resolve the key for this item.
         var item_key: []const u8 = "";
@@ -3158,7 +3272,7 @@ fn cmdPack(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
             if (std.mem.startsWith(u8, kp, "`")) {
                 // Backtick path: inject to resolve.
                 const key_store = try allocator.create(MapRef);
-                key_store.* = .{ .data = MapData.init(allocator) };
+                key_store.* = .{ .data = .empty, .allocator = allocator };
                 if (store == .object) {
                     var sit = store.object.iterator();
                     while (sit.next()) |kv| try key_store.put(kv.key_ptr.*, kv.value_ptr.*);
@@ -3181,7 +3295,7 @@ fn cmdPack(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
 
         // Build per-item store.
         const item_store = try allocator.create(MapRef);
-        item_store.* = .{ .data = MapData.init(allocator) };
+        item_store.* = .{ .data = .empty, .allocator = allocator };
         if (store == .object) {
             var sit = store.object.iterator();
             while (sit.next()) |kv| try item_store.put(kv.key_ptr.*, kv.value_ptr.*);
@@ -3193,7 +3307,7 @@ fn cmdPack(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
         // use the resolved item_key (supports $KEY=$COPY → "a" not "0").
         if (child_clone == .object) {
             const anno = try allocator.create(MapRef);
-            anno.* = .{ .data = MapData.init(allocator) };
+            anno.* = .{ .data = .empty, .allocator = allocator };
             const anno_val = if (src_is_map)
                 JsonValue{ .string = src_keys.items[idx] }
             else
@@ -3204,7 +3318,7 @@ fn cmdPack(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
 
         // Build dpath for ancestor path resolution using the ORIGINAL store,
         // so `...v100` can resolve back to the root data.
-        var dpath_list = std.ArrayList([]const u8).init(allocator);
+        var dpath_list = std.array_list.Managed([]const u8).init(allocator);
         try dpath_list.append(S_DTOP);
         if (srcpath.len > 0) {
             var spit = std.mem.splitScalar(u8, srcpath, '.');
@@ -3218,17 +3332,17 @@ fn cmdPack(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
 
         // Wrap: {tkey: {src_key: src_item}} so dparent descent works.
         const inner_wrap = try allocator.create(MapRef);
-        inner_wrap.* = .{ .data = MapData.init(allocator) };
+        inner_wrap.* = .{ .data = .empty, .allocator = allocator };
         try inner_wrap.put(src_keys.items[idx], src_item);
         const outer_wrap = try allocator.create(MapRef);
-        outer_wrap.* = .{ .data = MapData.init(allocator) };
+        outer_wrap.* = .{ .data = .empty, .allocator = allocator };
         try outer_wrap.put(tkey, JsonValue{ .object = inner_wrap });
 
         // Build per-item store: merge original root data keys into the
         // store alongside $TOP = src_item. This way `$COPY` gets the item
         // (via $TOP) and `...v100` can find v100 as a direct store key.
         const pack_store = try allocator.create(MapRef);
-        pack_store.* = .{ .data = MapData.init(allocator) };
+        pack_store.* = .{ .data = .empty, .allocator = allocator };
         if (store == .object) {
             var sit = store.object.iterator();
             while (sit.next()) |kv| try pack_store.put(kv.key_ptr.*, kv.value_ptr.*);
@@ -3333,7 +3447,7 @@ fn cmdRef(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
 
     // Resolve data at these paths.
     const tcur = if (cpath.len > 0) blk: {
-        var joined = std.ArrayList(u8).init(allocator);
+        var joined = std.array_list.Managed(u8).init(allocator);
         for (cpath, 0..) |p, pi| {
             if (pi > 0) try joined.append('.');
             try joined.appendSlice(p);
@@ -3379,7 +3493,7 @@ fn cmdRef(allocator: Allocator, inj: *Injection, store: JsonValue) !JsonValue {
         tpath;
     const tval_at: JsonValue = blk2: {
         if (tpath_strip.len == 0) break :blk2 store;
-        var joined = std.ArrayList(u8).init(allocator);
+        var joined = std.array_list.Managed(u8).init(allocator);
         for (tpath_strip, 0..) |p, pi| {
             if (pi > 0) joined.append('.') catch break :blk2 .null;
             joined.appendSlice(p) catch break :blk2 .null;
@@ -3475,7 +3589,7 @@ pub fn checkPlacement(
     inj: *Injection,
 ) !bool {
     if ((modes & inj.mode) == 0) {
-        var expected = std.ArrayList(u8).init(allocator);
+        var expected = std.array_list.Managed(u8).init(allocator);
         var first = true;
         for ([_]i32{ M_KEYPRE, M_KEYPOST, M_VAL }) |m| {
             if ((modes & m) != 0) {
@@ -3530,7 +3644,7 @@ fn injectChild(allocator: Allocator, child_raw: JsonValue, store: JsonValue, inj
 
     // Build store with correct data context.
     const child_store = try allocator.create(MapRef);
-    child_store.* = .{ .data = MapData.init(allocator) };
+    child_store.* = .{ .data = .empty, .allocator = allocator };
     if (store == .object) {
         var sit = store.object.iterator();
         while (sit.next()) |kv| try child_store.put(kv.key_ptr.*, kv.value_ptr.*);
@@ -3546,8 +3660,15 @@ fn injectChild(allocator: Allocator, child_raw: JsonValue, store: JsonValue, inj
 // Transform — public API. Builds store and calls Inject.
 // ============================================================================
 
-pub fn transform(allocator: Allocator, data: JsonValue, spec: JsonValue) !JsonValue {
-    if (spec == .null) return spec;
+/// Canonical `transform` collects injection errors and throws
+/// `join(errs, ' | ')` when any were collected. This port passed `null` for
+/// the injection, so no `errs` list existed, nothing was ever collected and
+/// nothing could be reported - `transform/apply` and `transform/format` had
+/// no way to produce the messages the corpus asserts. The error channel is
+/// the same one `validate` already uses: a message beside the value, since
+/// a Zig error carries no payload.
+pub fn transform(allocator: Allocator, data: JsonValue, spec: JsonValue) anyerror!struct { out: JsonValue, err: ?[]const u8 } {
+    if (spec == .null) return .{ .out = spec, .err = null };
 
     const spec_clone = try clone(allocator, spec);
     const data_clone = if (data == .null) JsonValue{ .null = {} } else try clone(allocator, data);
@@ -3556,12 +3677,38 @@ pub fn transform(allocator: Allocator, data: JsonValue, spec: JsonValue) !JsonVa
     const orig_spec = try clone(allocator, spec);
 
     const store = try allocator.create(MapRef);
-    store.* = .{ .data = MapData.init(allocator) };
+    store.* = .{ .data = .empty, .allocator = allocator };
     try store.put(S_DTOP, data_clone);
     try store.put(S_DSPEC, orig_spec);
+
+    const errs = try allocator.create(std.array_list.Managed([]const u8));
+    errs.* = std.array_list.Managed([]const u8).init(allocator);
+    try store.put(S_DERRS, JsonValue{ .null = {} });
+
     const store_val = JsonValue{ .object = store };
 
-    return try inject(allocator, spec_clone, store_val, null);
+    const inj_init = try allocator.create(Injection);
+    inj_init.* = Injection{
+        .allocator = allocator,
+        .mode = 0, // triggers root init
+        .keys = try allocator.alloc([]const u8, 0),
+        .path = try allocator.alloc([]const u8, 0),
+        .nodes = try allocator.alloc(JsonValue, 0),
+        .dpath = try allocator.alloc([]const u8, 0),
+        .errs = errs,
+    };
+
+    const result = try inject(allocator, spec_clone, store_val, inj_init);
+
+    if (0 < errs.items.len) {
+        var msg = std.array_list.Managed(u8).init(allocator);
+        for (errs.items, 0..) |e, i| {
+            if (0 < i) try msg.appendSlice(" | ");
+            try msg.appendSlice(e);
+        }
+        return .{ .out = result, .err = msg.items };
+    }
+    return .{ .out = result, .err = null };
 }
 
 // Transform with a modify callback applied after each injection step.
@@ -3573,7 +3720,7 @@ pub fn transformModify(allocator: Allocator, data: JsonValue, spec: JsonValue, m
     const orig_spec = try clone(allocator, spec);
 
     const store = try allocator.create(MapRef);
-    store.* = .{ .data = MapData.init(allocator) };
+    store.* = .{ .data = .empty, .allocator = allocator };
     try store.put(S_DTOP, data_clone);
     try store.put(S_DSPEC, orig_spec);
     const store_val = JsonValue{ .object = store };
@@ -3584,8 +3731,8 @@ pub fn transformModify(allocator: Allocator, data: JsonValue, spec: JsonValue, m
     const empty_path = try allocator.alloc([]const u8, 0);
     const empty_nodes = try allocator.alloc(JsonValue, 0);
     const empty_dpath = try allocator.alloc([]const u8, 0);
-    const errs = try allocator.create(std.ArrayList([]const u8));
-    errs.* = std.ArrayList([]const u8).init(allocator);
+    const errs = try allocator.create(std.array_list.Managed([]const u8));
+    errs.* = std.array_list.Managed([]const u8).init(allocator);
     inj_init.* = Injection{
         .allocator = allocator,
         .mode = 0, // triggers root initialization in inject
@@ -3615,7 +3762,7 @@ fn resolveSpecialEscapes(allocator: Allocator, pathref: []const u8) []const u8 {
     if (pathref.len <= 3) return pathref;
     if (std.mem.indexOf(u8, pathref, "$BT") == null and
         std.mem.indexOf(u8, pathref, "$DS") == null) return pathref;
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.array_list.Managed(u8).init(allocator);
     var i: usize = 0;
     while (i < pathref.len) {
         if (i + 3 <= pathref.len and std.mem.eql(u8, pathref[i .. i + 3], "$BT")) {
@@ -3639,22 +3786,34 @@ fn resolveSpecialEscapes(allocator: Allocator, pathref: []const u8) []const u8 {
 // Uses the transform/inject infrastructure with type-checking commands.
 // ============================================================================
 
-pub fn validate(allocator: Allocator, data: JsonValue, spec: JsonValue) anyerror!struct { out: JsonValue, err: ?[]const u8 } {
+// NAMED, not anonymous. Two `struct { ... }` written out separately are two
+// DISTINCT types in Zig even when their fields match, so while `validate` and
+// `validateWith` each declared their own, `validate`'s one-line delegation
+// could not compile: "error union payload cannot cast into error union
+// payload". Zig analyses lazily, so nothing noticed until a caller appeared -
+// the SDK's zig target was the first. Fails identically on 0.13 and 0.16.
+pub const ValidateResult = struct { out: JsonValue, err: ?[]const u8 };
+
+pub fn validate(allocator: Allocator, data: JsonValue, spec: JsonValue) anyerror!ValidateResult {
+    return validateWith(allocator, data, spec, .null);
+}
+
+pub fn validateWith(allocator: Allocator, data: JsonValue, spec: JsonValue, injdef: JsonValue) anyerror!ValidateResult {
     const spec_clone = try clone(allocator, spec);
     const data_clone = if (data == .null) JsonValue{ .null = {} } else try clone(allocator, data);
     const orig_spec = try clone(allocator, spec);
 
     // Build store with data and spec.
     const store = try allocator.create(MapRef);
-    store.* = .{ .data = MapData.init(allocator) };
+    store.* = .{ .data = .empty, .allocator = allocator };
     try store.put(S_DTOP, data_clone);
     try store.put(S_DSPEC, orig_spec);
     const store_val = JsonValue{ .object = store };
 
     // Create root injection with validate_mode enabled.
     // This causes dispatchCmd to handle $STRING, $NUMBER, etc.
-    const errs = try allocator.create(std.ArrayList([]const u8));
-    errs.* = std.ArrayList([]const u8).init(allocator);
+    const errs = try allocator.create(std.array_list.Managed([]const u8));
+    errs.* = std.array_list.Managed([]const u8).init(allocator);
 
     const inj_init = try allocator.create(Injection);
     inj_init.* = Injection{
@@ -3668,12 +3827,23 @@ pub fn validate(allocator: Allocator, data: JsonValue, spec: JsonValue) anyerror
         .dpath = try allocator.alloc([]const u8, 0),
         .errs = errs,
     };
+    if (injdef == .object) {
+        inj_init.meta = injdef.object.get("meta") orelse .null;
+        if (inj_init.meta == .object) {
+            if (inj_init.meta.object.get(S_BEXACT)) |exact| {
+                inj_init.exact_mode = exact == .bool and exact.bool;
+            }
+        }
+    }
 
     const result = try inject(allocator, spec_clone, store_val, inj_init);
 
     if (errs.items.len > 0) {
-        var msg = std.ArrayList(u8).init(allocator);
-        try msg.appendSlice("Invalid data: ");
+        // Canonical is `throw new Error(join(errs, ' | '))` - the collected
+        // messages and nothing else. This port prefixed "Invalid data: ",
+        // which no other port emits and which the corpus's validate/invalid
+        // entries do not expect.
+        var msg = std.array_list.Managed(u8).init(allocator);
         for (errs.items, 0..) |e, i| {
             if (i > 0) try msg.appendSlice(" | ");
             try msg.appendSlice(e);
@@ -3728,17 +3898,22 @@ fn validationModify(allocator: Allocator, _: JsonValue, key: []const u8, parent:
             // Closed: report unexpected keys.
             const ckeys = keysof(allocator, cval) catch return;
             if (ckeys == .array) {
-                var bad = std.ArrayList([]const u8).init(allocator);
+                var bad = std.array_list.Managed([]const u8).init(allocator);
                 for (ckeys.array.data.items) |ck| {
                     if (ck != .string) continue;
-                    if (!((pval == .object) and (pval.object.get(ck.string) != null))) {
+                    // Literal presence: the shape DECLARES ck even when its value
+                    // is JSON null. Canonical uses `NONE === _lookup`; haskey is
+                    // Group A (value-based) and would drop records with a null
+                    // field from an open ($AND) select. Test object key presence.
+                    const present = (pval == .object) and (pval.object.get(ck.string) != null);
+                    if (!present) {
                         bad.append(ck.string) catch {};
                     }
                 }
                 if (bad.items.len > 0) {
-                    var badmsg = std.ArrayList(u8).init(allocator);
+                    var badmsg = std.array_list.Managed(u8).init(allocator);
                     badmsg.appendSlice("Unexpected keys at field ") catch {};
-                    badmsg.appendSlice(pathifySlice(allocator, if (inj.path.len > 1) inj.path[1..] else inj.path) catch "<root>") catch {};
+                    badmsg.appendSlice(pathifySlice(allocator, inj.path[1..]) catch "<root>") catch {};
                     badmsg.appendSlice(": ") catch {};
                     for (bad.items, 0..) |bk, bi| {
                         if (bi > 0) badmsg.appendSlice(", ") catch {};
@@ -3759,8 +3934,11 @@ fn validationModify(allocator: Allocator, _: JsonValue, key: []const u8, parent:
             const a = toStdJson(allocator, cval) catch return;
             const b = toStdJson(allocator, pval) catch return;
             if (!stdJsonEqual(a, b)) {
-                const p = pathifySlice(allocator, if (inj.path.len > 1) inj.path[1..] else inj.path) catch "<root>";
-                inj.errs.append(std.fmt.allocPrint(allocator, "Value at {s}: {s} should equal {s}.", .{ p, stringify(allocator, cval, null) catch "?", stringify(allocator, pval, null) catch "?" }) catch "exact match error") catch {};
+                const pathmsg = if (1 < inj.path.len)
+                    std.fmt.allocPrint(allocator, "at field {s}: ", .{pathifySlice(allocator, inj.path[1..]) catch "<root>"}) catch ""
+                else
+                    "";
+                inj.errs.append(std.fmt.allocPrint(allocator, "Value {s}{s} should equal {s}.", .{ pathmsg, stringify(allocator, cval, null) catch "?", stringify(allocator, pval, null) catch "?" }) catch "exact match error") catch {};
             }
         } else {
             // Non-exact: copy data value into spec result.
@@ -3773,7 +3951,7 @@ fn validateWalk(
     allocator: Allocator,
     spec_val: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     // Type command strings: `$STRING`, `$NUMBER` etc resolve to type checks.
@@ -3869,7 +4047,7 @@ fn validateTypeCheck(
     allocator: Allocator,
     cmd: []const u8,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     const t = typify(data_val);
@@ -3939,12 +4117,12 @@ fn validateOne(
     allocator: Allocator,
     spec_val: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     const alts = spec_val.array.data.items[1..];
     for (alts) |alt| {
-        var terrs = std.ArrayList([]const u8).init(allocator);
+        var terrs = std.array_list.Managed([]const u8).init(allocator);
         _ = try validateWalk(allocator, alt, data_val, &terrs, path);
         if (terrs.items.len == 0) return data_val;
     }
@@ -3958,7 +4136,7 @@ fn validateExact(
     allocator: Allocator,
     spec_val: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     const alts = spec_val.array.data.items[1..];
@@ -3981,7 +4159,7 @@ fn validateChild(
     allocator: Allocator,
     spec_val: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     // [$CHILD, template] — validate each element of data array.
@@ -4006,7 +4184,7 @@ fn validateChildMap(
     allocator: Allocator,
     child_spec: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     if (data_val != .object) {
@@ -4023,22 +4201,43 @@ fn validateChildMap(
     return data_val;
 }
 
+/// Canonical `_invalidTypeMsg`:
+///
+///   'Expected ' +
+///   (1 < size(path) ? 'field ' + pathify(path, 1) + ' to be ' : '') +
+///   needtype + ', but found ' +
+///   (null != v ? typename(vt) + S_VIZ : '') + vs + '.'
+///
+/// Three things this port had wrong, all of them invisible while the driver
+/// discarded validate's message: the needtype was emitted TWICE (once before
+/// the field clause and once inside it); the path was rendered whole, so
+/// every message carried the `$TOP` root element canonical drops with
+/// `pathify(path, 1)`; and a null value was reported as `null: null` rather
+/// than `no value`, and only at the root.
 fn invalidTypeMsg(allocator: Allocator, path: []const []const u8, expected: []const u8, val: JsonValue) anyerror![]const u8 {
-    const p = try pathifySlice(allocator, path);
-    const actual = typename(typify(val));
-    const val_str = try stringify(allocator, val, 33);
-    if (path.len == 0) {
-        if (val == .null) {
-            return try std.fmt.allocPrint(allocator, "Expected {s}, but found no value.", .{expected});
-        }
-        return try std.fmt.allocPrint(allocator, "Expected {s}, but found {s}: {s}.", .{ expected, actual, val_str });
+    var buf = std.array_list.Managed(u8).init(allocator);
+    try buf.appendSlice("Expected ");
+    if (1 < path.len) {
+        try buf.appendSlice("field ");
+        try buf.appendSlice(try pathifySlice(allocator, path[1..]));
+        try buf.appendSlice(" to be ");
     }
-    return try std.fmt.allocPrint(allocator, "Expected {s}, field {s} to be {s}, but found {s}: {s}.", .{ expected, p, expected, actual, val_str });
+    try buf.appendSlice(expected);
+    try buf.appendSlice(", but found ");
+    if (val == .null) {
+        try buf.appendSlice("no value");
+    } else {
+        try buf.appendSlice(typename(typify(val)));
+        try buf.appendSlice(S_VIZ);
+        try buf.appendSlice(try stringify(allocator, val, 33));
+    }
+    try buf.append('.');
+    return buf.items;
 }
 
 fn pathifySlice(allocator: Allocator, path: []const []const u8) anyerror![]const u8 {
     if (path.len == 0) return "<root>";
-    var buf = std.ArrayList(u8).init(allocator);
+    var buf = std.array_list.Managed(u8).init(allocator);
     for (path, 0..) |p, i| {
         if (i > 0) try buf.append('.');
         try buf.appendSlice(p);
@@ -4094,7 +4293,7 @@ pub fn select(allocator: Allocator, children: JsonValue, query: JsonValue) anyer
     if (!isnode(children)) return try JsonValue.makeList(allocator);
 
     // Normalize children: add $KEY for map/list items.
-    var child_list = std.ArrayList(JsonValue).init(allocator);
+    var child_list = std.array_list.Managed(JsonValue).init(allocator);
 
     if (ismap(children)) {
         const pairs = try items(allocator, children);
@@ -4124,7 +4323,7 @@ pub fn select(allocator: Allocator, children: JsonValue, query: JsonValue) anyer
     result_lr.* = .{ .data = ListData.init(allocator) };
 
     for (child_list.items) |child| {
-        var terrs = std.ArrayList([]const u8).init(allocator);
+        var terrs = std.array_list.Managed([]const u8).init(allocator);
         const q = try clone(allocator, query);
 
         // Mark all maps in query as open.
@@ -4152,7 +4351,7 @@ fn validateExactMatch(
     allocator: Allocator,
     spec_val: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     // Operator handling for select queries. Operators ($AND/$OR/$NOT/$CMP)
@@ -4303,12 +4502,12 @@ fn selectAnd(
     allocator: Allocator,
     terms: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     if (terms != .array) return data_val;
     for (terms.array.data.items) |term| {
-        var terrs = std.ArrayList([]const u8).init(allocator);
+        var terrs = std.array_list.Managed([]const u8).init(allocator);
         _ = try validateExactMatch(allocator, term, data_val, &terrs, path);
         if (terrs.items.len > 0) {
             try errs.append("AND condition failed");
@@ -4322,12 +4521,12 @@ fn selectOr(
     allocator: Allocator,
     terms: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     if (terms != .array) return data_val;
     for (terms.array.data.items) |term| {
-        var terrs = std.ArrayList([]const u8).init(allocator);
+        var terrs = std.array_list.Managed([]const u8).init(allocator);
         _ = try validateExactMatch(allocator, term, data_val, &terrs, path);
         if (terrs.items.len == 0) return data_val;
     }
@@ -4339,10 +4538,10 @@ fn selectNot(
     allocator: Allocator,
     term: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
-    var terrs = std.ArrayList([]const u8).init(allocator);
+    var terrs = std.array_list.Managed([]const u8).init(allocator);
     _ = try validateExactMatch(allocator, term, data_val, &terrs, path);
     if (terrs.items.len == 0) {
         try errs.append("NOT: condition should not have matched");
@@ -4355,7 +4554,7 @@ fn selectCmp(
     op: []const u8,
     term: JsonValue,
     data_val: JsonValue,
-    errs: *std.ArrayList([]const u8),
+    errs: *std.array_list.Managed([]const u8),
     path: []const []const u8,
 ) anyerror!JsonValue {
     _ = path;

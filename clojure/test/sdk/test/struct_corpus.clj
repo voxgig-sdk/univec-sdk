@@ -1,155 +1,124 @@
-;; Univec SDK — vendored voxgig/struct corpus runner.
-;; Runs the shared JSON corpus (.sdk/test/test.json "struct" section) through
-;; the vendored voxgig.struct port exposed by the SDK utility. Adapted from the
-;; canonical clojure struct test runner.
+;; Univec SDK - the shared struct corpus, driven by the VENDORED
+;; @voxgig/omni engine.
+;;
+;; The corpus wiring (`run-all` and the walk subjects below) is unchanged: it
+;; names each section of .sdk/test/test.json "struct" and hands omni the
+;; subject that drives it through this SDK's own vendored voxgig.struct. What
+;; changed is the ENGINE underneath - the hand-written entry loop, matcher and
+;; error handling that used to live in this file are gone, replaced by the
+;; vendored runner reached through sdk.test.omni. A hand-written matcher can
+;; only ever check what its author thought of; the shared one is the same code
+;; every other port is held to.
+;;
+;; Counting: omni raises on the first failing entry in a set rather than
+;; recording per-entry results, so a green section counts its whole set and a
+;; red one counts one failure and names the entry omni rejected.
+;;
+;; The count is what the ENGINE RAN, never the section's declared `set` size.
+;; sdk.test.omni increments a counter inside the subject wrapper - the one
+;; place only the engine reaches - and its `runsetflags` returns the delta
+;; across the set; `run-set` records that many passes, and fails the section
+;; outright when the delta does not match the set it handed over. A count
+;; taken from the spec instead would print the same number for a working
+;; engine and for one that was never called, which is worse than no number:
+;; it reads as evidence. So an all-green run reports exactly the corpus's own
+;; entry count BECAUSE the engine executed exactly those entries - if the
+;; number falls, the corpus stopped running, which is the one thing this
+;; suite exists to notice.
 (ns sdk.test.struct-corpus
   (:require [voxgig.struct :as s]
-            [sdk.core :as core]
+            [sdk.test.omni :as omni]
             [clojure.string :as str])
   (:import [java.util LinkedHashMap ArrayList List Map]))
 
-(def NULLMARK "__NULL__")
-(def UNDEFMARK "__UNDEF__")
-(def EXISTSMARK "__EXISTS__")
-
-(defn fix-json [v flag-null]
-  (cond
-    (nil? v) (if flag-null NULLMARK nil)
-    (s/ismap v) (let [o (LinkedHashMap.)]
-                  (doseq [k (.keySet ^Map v)] (.put o (str k) (fix-json (.get ^Map v k) flag-null)))
-                  o)
-    (s/islist v) (let [a (ArrayList.)]
-                   (doseq [x v] (.add a (fix-json x flag-null)))
-                   a)
-    :else v))
-
-(defn canon [v]
-  (cond
-    (s/ismap v) (into (sorted-map) (map (fn [k] [(str k) (canon (.get ^Map v k))]) (.keySet ^Map v)))
-    (s/islist v) (mapv canon (vec v))
-    :else v))
-
-(defn eqv [a b] (= (canon a) (canon b)))
-
-(defn matchval [check base]
-  (let [check (if (or (= check UNDEFMARK) (= check NULLMARK)) nil check)]
-    (cond
-      (eqv check base) true
-      (string? check)
-      (let [basestr (s/stringify base)
-            m (re-matches #"^/(.+)/$" check)]
-        (if m
-          (boolean (re-find (re-pattern (second m)) basestr))
-          (str/includes? (str/lower-case basestr) (str/lower-case (s/stringify check)))))
-      (s/isfunc check) true
-      :else false)))
-
-(defn- omap [& kvs]
-  (let [m (LinkedHashMap.)]
-    (doseq [[k v] (partition 2 kvs)] (.put m k v))
-    m))
-
-(defn do-match [check base]
-  (let [base (s/clone base)]
-    (s/walk check
-            (fn [_k val _p path]
-              (when-not (s/isnode val)
-                (let [baseval (s/getpath base path)]
-                  (cond
-                    (eqv baseval val) nil
-                    (and (= val UNDEFMARK) (nil? baseval)) nil
-                    (and (= val EXISTSMARK) (some? baseval)) nil
-                    (not (matchval val baseval))
-                    (throw (AssertionError.
-                            (str "MATCH: " (str/join "." (vec path)) ": ["
-                                 (s/stringify val) "] <=> [" (s/stringify baseval) "]"))))))
-              val))))
-
-(defn- resolve-args [^Map entry subject]
-  (cond
-    (.containsKey entry "ctx") [(.get entry "ctx")]
-    (.containsKey entry "args")
-    (let [args (vec (.get entry "args"))]
-      ;; ts's resolveArgs writes the live first arg back as entry.ctx, so a
-      ;; `match: {ctx: ...}` resolves for args-style entries too. Without it
-      ;; every such assertion reads null and silently passes nothing.
-      (when (and (seq args) (s/ismap (first args)))
-        (.put entry "ctx" (first args)))
-      args)
-    (.containsKey entry "in") [(s/clone (.get entry "in"))]
-    :else []))
-
-(defn- safe-call [subject args]
-  (if (empty? args)
-    (try (subject) (catch clojure.lang.ArityException _ (subject nil)))
-    (apply subject args)))
-
-(defn check-result [^Map entry args res]
-  (let [matched (atom false)]
-    (when (.containsKey entry "match")
-      (do-match (.get entry "match")
-                (omap "in" (.get entry "in") "args" (s/clone (ArrayList. ^java.util.Collection args))
-                      "out" (.get entry "res") "ctx" (.get entry "ctx")))
-      (reset! matched true))
-    (let [out (.get entry "out")]
-      (cond
-        (eqv out res) nil
-        (and @matched (or (= out NULLMARK) (nil? out))) nil
-        :else (throw (AssertionError. (str "Expected: " (s/stringify out) ", got: " (s/stringify res))))))))
-
-(defn handle-error [^Map entry err]
-  (let [entry-err (when (.containsKey entry "err") (.get entry "err"))
-        msg (or (.getMessage ^Throwable err) (str err))]
-    (if (.containsKey entry "err")
-      (if (or (= entry-err true) (matchval entry-err msg))
-        (when (.containsKey entry "match")
-          (do-match (.get entry "match")
-                    (omap "in" (.get entry "in") "out" (.get entry "res")
-                          ;; The ts runner hands do-match the ERROR OBJECT, so a
-                          ;; corpus `match: {err: {message: ...}}` resolves. This
-                          ;; port passed the bare message string, where err.message
-                          ;; walks into a string and reads null.
-                          "ctx" (.get entry "ctx") "err" (omap "message" msg))))
-        (throw (AssertionError. (str "ERROR MATCH: [" (s/stringify entry-err) "] <=> [" msg "]"))))
-      (throw (if (instance? AssertionError err) err (AssertionError. (str err)))))))
+(def NULLMARK omni/NULLMARK)
+(def UNDEFMARK omni/UNDEFMARK)
+(def EXISTSMARK omni/EXISTSMARK)
 
 (def ^:dynamic *results* nil)
+
+;; The omni runpack for the section being driven, bound by run-corpus (and by
+;; the primary suite, which shares this recording shape).
+(def ^:dynamic *runner* nil)
 
 (defn- record! [group name ok? msg]
   (swap! *results* update (if ok? :pass :fail) (fnil conj []) {:group group :name name :msg msg}))
 
+(defn- setsize [node]
+  (let [testset (when (s/ismap node) (.get ^Map node "set"))]
+    (if (s/islist testset) (.size ^List testset) 0)))
+
+;; A section whose `set` is PRESENT but empty runs nothing and raises nothing:
+;; it would record no passes and leave the suite green, which is the same
+;; silent stoppage wearing corpus clothes. omni's own strict mode refuses it
+;; (`checkset`), with an `empty: true` opt-out for a section that means it;
+;; the shared corpus declares no OMNI version, so it is lenient v0 and that
+;; check never fires - the rule is applied here instead. A section with no
+;; `set` at all is left to omni, whose message for it is the better one.
+(defn- empty-set? [node]
+  (let [testset (when (s/ismap node) (.get ^Map node "set"))]
+    (boolean (and (s/islist testset)
+                  (zero? (.size ^List testset))
+                  (not (true? (.get ^Map node "empty")))))))
+
+;; Drive one corpus section through the vendored engine.
+;;
+;; `flags` is the corpus-facing spelling ({"null" false}); omni's own is
+;; keyword-keyed, and it takes the section label there too, so a failure names
+;; the section rather than the runner.
 (defn run-set
   ([group node subject] (run-set group node {} subject))
   ([group node flags subject]
-   (when (s/ismap node)
-     (let [flag-null (get flags "null" true)
-           fixed (fix-json node flag-null)
-           testset (.get ^Map fixed "set")]
-       (doseq [^Map entry testset]
-         (try
-           (when (and (not (.containsKey entry "out")) flag-null)
-             (.put entry "out" NULLMARK))
-           (let [args (resolve-args entry subject)
-                 res (fix-json (safe-call subject args) flag-null)]
-             (.put entry "res" res)
-             (check-result entry args res))
-           (record! group (str (.get entry "name")) true nil)
-           (catch Throwable err
-             (try
-               (handle-error entry err)
-               (record! group (str (.get entry "name")) true nil)
-               (catch Throwable e2
-                 (record! group (str (.get entry "name")) false (.getMessage e2)))))))))))
+   (cond
+     (nil? *runner*)
+     (record! group "section" false "no omni runner bound")
 
+     (not (s/ismap node))
+     ;; A missing section used to be skipped in silence, which is how a
+     ;; renamed corpus section becomes a suite that tests nothing.
+     (record! group "section" false "corpus section missing")
+
+     (empty-set? node)
+     (record! group "entries" false "corpus section has an empty set")
+
+     :else
+     (let [omniflags (cond-> {:name group}
+                       (contains? flags "null") (assoc :null (boolean (get flags "null"))))
+           n (setsize node)]
+       (try
+         ;; `ran` is the engine's own execution count for this set, not the
+         ;; corpus's declared size: a section that reports fewer (or, with a
+         ;; disconnected engine, none) fails here instead of counting the
+         ;; entries nobody ran.
+         (let [ran (long (or ((:runsetflags *runner*) node omniflags subject) 0))]
+           (if (not= ran n)
+             (record! group "entries" false
+                      (str "the engine ran " ran " of the section's " n " entries"))
+             (dotimes [_ ran] (record! group "entry" true nil))))
+         (catch Throwable err
+           (record! group "entry" false (or (ex-message err) (str err)))))))))
+
+;; A section that is one case rather than a `set`: `in` in, `out` expected.
+;; omni has no entry point for these, so the comparison is its own
+;; `deepequal`, on values converted back into its model.
 (defn run-single [group node actual-fn]
-  (when (s/ismap node)
+  (if-not (s/ismap node)
+    (record! group "single" false "corpus section missing")
     (try
       (let [expected (.get ^Map node "out")
-            actual (actual-fn (.get ^Map node "in"))]
-        (if (eqv expected actual)
+            actual (omni/->omni (actual-fn (omni/->struct (.get ^Map node "in"))))]
+        (if (omni/deep-equal? expected actual)
           (record! group "single" true nil)
-          (record! group "single" false (str "Expected: " (s/stringify expected) ", got: " (s/stringify actual)))))
-      (catch Throwable e (record! group "single" false (.getMessage e))))))
+          (record! group "single" false
+                   (str "Expected: " (omni/stringify expected) ", got: " (omni/stringify actual)))))
+      (catch Throwable e (record! group "single" false (or (ex-message e) (str e)))))))
+
+;; A struct-model map literal, for the inject/transform sections that build a
+;; store or an injection descriptor by hand.
+(defn- omap [& kvs]
+  (let [m (LinkedHashMap.)]
+    (doseq [[k v] (partition 2 kvs)] (.put m k v))
+    m))
 
 (defn- gp [^Map m & ks] (reduce (fn [acc k] (when (s/ismap acc) (.get ^Map acc k))) m ks))
 (defn- vget [vin k] (when (s/ismap vin) (.get ^Map vin k)))
@@ -157,10 +126,7 @@
 
 (declare run-walk-log walk-copy-subject walk-depth-subject)
 
-(defn null-modifier [val key parent & _]
-  (cond
-    (= val NULLMARK) (s/setprop parent key nil)
-    (string? val) (s/setprop parent key (str/replace val NULLMARK "null"))))
+(def null-modifier omni/null-modifier)
 
 (defn run-all [spec]
   (let [minor (gp spec "minor") walk (gp spec "walk") mergeS (gp spec "merge")
@@ -285,23 +251,30 @@
       (run-set (str "select." g) (gp selectS g)
                (fn [vin] (s/select (vget vin "obj") (vget vin "query")))))))
 
+
+;; `walk.log` is a single case whose expectation is the log the walk emits.
+;; The node arrives in omni's model, so it is converted before the vendored
+;; struct walks it, and the log converted back before omni compares.
 (defn run-walk-log [group node]
-  (when (s/ismap node)
+  (if-not (s/ismap node)
+    (record! group "log" false "corpus section missing")
     (try
-      (let [test-data (s/clone node)
+      (let [test-data (omni/->struct node)
             log (ArrayList.)
             walklog (fn [key val parent path]
                       (.add log (str "k=" (if (nil? key) (s/stringify) (s/stringify key))
                                      ", v=" (s/stringify val)
                                      ", p=" (if (nil? parent) (s/stringify) (s/stringify parent))
                                      ", t=" (s/pathify path)))
-                      val)]
+                      val)
+            expected (gp node "out" "after")]
         (s/walk (.get ^Map test-data "in") walklog)
-        (if (eqv (s/getprop (.get ^Map test-data "out") "after") log)
+        (if (omni/deep-equal? expected (omni/->omni log))
           (record! group "log" true nil)
-          (record! group "log" false (str "Expected: " (s/stringify (s/getprop (.get ^Map test-data "out") "after"))
-                                          ", got: " (s/stringify log)))))
-      (catch Throwable e (record! group "log" false (.getMessage e))))))
+          (record! group "log" false
+                   (str "Expected: " (omni/stringify expected)
+                        ", got: " (omni/stringify (omni/->omni log))))))
+      (catch Throwable e (record! group "log" false (or (ex-message e) (str e)))))))
 
 (defn walk-copy-subject [vin]
   (let [cur (atom (doto (ArrayList.) (.add nil)))]
@@ -336,13 +309,13 @@
       (s/walk (vget vin "src") {:before copy :maxdepth (vget vin "maxdepth")})
       (:top @state))))
 
+
 ;; Returns [pass fail failures]. Prints each failure.
 (defn run-corpus [testfile]
-  (let [raw (slurp testfile)
-        alltests (core/json-parse raw)
-        spec (.get ^Map alltests "struct")]
-    (binding [*results* (atom {:pass [] :fail []})]
-      (run-all spec)
+  (let [runpack ((omni/make-runner testfile) "struct")]
+    (binding [*results* (atom {:pass [] :fail []})
+              *runner* runpack]
+      (run-all (:spec runpack))
       (let [r @*results* np (count (:pass r)) nf (count (:fail r))]
         (doseq [f (:fail r)] (println "STRUCT-FAIL" (:group f) (:name f) "-" (:msg f)))
         [np nf (:fail r)]))))

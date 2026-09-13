@@ -1,6 +1,7 @@
 .{
-    .name = "univec_sdk",
+    .name = .univec_sdk,
     .version = "0.1.1",
+    .fingerprint = 0xbfd46ee7853d8123,
     .dependencies = .{},
     .paths = .{
         "src",

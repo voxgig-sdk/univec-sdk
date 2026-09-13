@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityOps , serverVariables} from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -32,6 +32,18 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
 
   const authActive = isAuthActive(model)
 
+  // Server variables (a templated server URL) are REQUIRED at construction
+  // - the SDK throws rather than request a URL with a literal
+  // {account_id} in it - so a quickstart that omits them is a quickstart
+  // that fails on its first line.
+  const svars = serverVariables(model)
+  const javaServerLines = 0 === svars.length ? '' :
+    'Map<String, Object> server = new java.util.LinkedHashMap<>();\n' +
+    svars.map((v: any) =>
+      `server.put("${v.name}", "<${v.name}>");\n`).join('') +
+    'options.put("server", server);\n'
+
+
   // A type-correct Java literal for a param — the loose object model means
   // all values live in a Map<String, Object>.
   const javaLit = (type: any, placeholder: string = 'example'): string => {
@@ -52,7 +64,7 @@ import ${javaPackage(model)}.core.${SDK};
 
 Map<String, Object> options = new java.util.LinkedHashMap<>();
 options.put("apikey", System.getenv("${envName(model)}_APIKEY"));
-${SDK} client = new ${SDK}(options);
+${javaServerLines}${SDK} client = new ${SDK}(options);
 \`\`\`
 
 `)
@@ -63,7 +75,9 @@ ${SDK} client = new ${SDK}(options);
 \`\`\`java
 import ${javaPackage(model)}.core.${SDK};
 
-${SDK} client = new ${SDK}();
+${'' === javaServerLines
+      ? `${SDK} client = new ${SDK}();`
+      : `Map<String, Object> options = new java.util.LinkedHashMap<>();\n${javaServerLines}${SDK} client = new ${SDK}(options);`}
 \`\`\`
 
 `)

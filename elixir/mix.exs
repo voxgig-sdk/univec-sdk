@@ -18,7 +18,10 @@ defmodule Univec.MixProject do
 
   defp deps, do: []
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  # test/vendor carries the vendored @voxgig/omni engine the corpus suites
+  # run through; it is a .ex tree, so mix has to be told to compile it, and
+  # only under :test - a consumer's library build never sees the runner.
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/vendor"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp package do

@@ -231,9 +231,9 @@ pub const EntyClass = struct {
         if (data == .array) {
             return data.array.data.items;
         } else if (!h.is_noval(data)) {
-            var out = std.ArrayList(Value).init(h.A());
-            out.append(data) catch {};
-            return out.toOwnedSlice() catch &.{};
+            var out: std.ArrayList(Value) = .empty;
+            out.append(h.A(), data) catch {};
+            return out.toOwnedSlice(h.A()) catch &.{};
         }
         return &.{};
     }

@@ -139,7 +139,7 @@ Map<String, dynamic> basicSetup([dynamic extra]) {
     'UNIVEC_TEST_MODEL_ENTID': idmap,
     'UNIVEC_TEST_LIVE': 'FALSE',
     'UNIVEC_TEST_EXPLAIN': 'FALSE',
-    'UNIVEC_APIKEY': 'NONE',
+    'UNIVEC_APIKEY': '',
   });
 
   idmap = env['UNIVEC_TEST_MODEL_ENTID'];
@@ -148,10 +148,17 @@ Map<String, dynamic> basicSetup([dynamic extra]) {
 
   if (live) {
     client = UnivecSDK(merge([
+      // FIRST, so the generated fields below win: sdk-test-control.json's
+      // test.client.options adds to the live client, it does not redirect it.
+      liveClientOptions(),
       <String, dynamic>{
         'apikey': env['UNIVEC_APIKEY'],
       },
-      extra
+      // 'extra ?? {}', not a bare 'extra': merge returns null when the last
+      // entry is null, and basicSetup is normally called with no argument at
+      // all - so a bare 'extra' silently discarded the apikey and server
+      // values above and handed the SDK null.
+      extra ?? <String, dynamic>{}
     ]));
   }
 

@@ -84,17 +84,25 @@ public class ModelDirectTest
         {
             ["UNIVEC_TEST_MODEL_ENTID"] = new Dictionary<string, object?>(),
             ["UNIVEC_TEST_LIVE"] = "FALSE",
-            ["UNIVEC_APIKEY"] = "NONE",
+            ["UNIVEC_APIKEY"] = "",
         });
 
         var live = Equals(env["UNIVEC_TEST_LIVE"], "TRUE");
 
         if (live)
         {
-            var liveClient = new UnivecSDK(new Dictionary<string, object?>
+            // sdk-test-control.json's test.client.options goes UNDER the
+            // generated fields: it adds to the live client, it does not
+            // redirect it, so the generated entries overwrite it here.
+            var liveOpts = TestRunner.LiveClientOptions();
+            foreach (var _kv in new Dictionary<string, object?>
             {
                 ["apikey"] = env["UNIVEC_APIKEY"],
-            });
+            })
+            {
+                liveOpts[_kv.Key] = _kv.Value;
+            }
+            var liveClient = new UnivecSDK(liveOpts);
 
             var idmap = new Dictionary<string, object?>();
             var entidRaw = env["UNIVEC_TEST_MODEL_ENTID"];

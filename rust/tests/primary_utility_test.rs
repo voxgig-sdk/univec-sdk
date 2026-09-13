@@ -1,29 +1,81 @@
 // Primary utility tests — run the shared `primary` subtree of
 // ../.sdk/test/test.json against the SDK pipeline utilities (mirrors
 // tm/go/test/primary_utility_test.go).
+//
+// The corpus is driven by the VENDORED omni runner through the adapter in
+// tests/omni_resolver/mod.rs. Subjects receive omni's native argument list:
+// a `ctx` entry arrives as args[0], a MAP — `make_ctx_from_map` builds the
+// typed context a generated utility takes, and the subject writes the
+// observable ctx state back into that same map, which is what a
+// `match: {ctx: ...}` assertion reads (see the resolver's decision 3).
 
 mod common;
+mod omni_resolver;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use common::*;
+use omni_resolver::{entrycount, jpath, tostruct, Run};
 
 use univec_sdk::core::helpers::{get_str, getp, ja, jo, setp, to_map, vfn};
 use univec_sdk::utility::voxgigstruct as vs;
 use univec_sdk::{
     new as new_sdk, test_sdk, BaseFeature, Context, CtxSpec, Feature, FeatureRef, Operation,
-    UnivecSDK, SdkResult, Spec, Utility, Value,
+    UnivecError, UnivecSDK, SdkResult, Spec, Utility, Value,
 };
 
-fn primary() -> Value {
-    let spec = load_test_spec();
-    let primary = get_spec(&spec, &["primary"]);
+// Sections deliberately left empty in the shared corpus
+// (.sdk/test/primary/<name>.aon carries a PENDING header). Everything else
+// MUST contribute cases.
+const PENDING_SECTIONS: &[&str] = &[
+    "fetcher", "makeFetchDef", "makeResult", "featureAdd",
+    "featureHook", "featureInit",
+];
+
+fn primary_run() -> Run {
+    let run = Run::section("primary");
     assert!(
-        matches!(primary, Value::Map(_)),
+        run.spec.ismap(),
         "primary section not found in test.json"
     );
-    primary
+    run
+}
+
+/// Run one corpus section, failing loudly when it would run ZERO cases.
+///
+/// A renamed section, a fixture that failed to compile, or an empty set used
+/// to report PASS while running zero assertions — the whole point of a shared
+/// oracle lost without a single red test. The guard lives here rather than in
+/// the runner, which is vendored verbatim; the shared corpus is a v0 spec,
+/// and v0 tolerates an empty set.
+fn runsection<F>(run: &mut Run, name: &str, subject: F)
+where
+    F: FnMut(&mut Vec<Value>) -> Result<Value, UnivecError> + 'static,
+{
+    let basic = run.set(&[name, "basic"]);
+    assert!(
+        basic.ismap(),
+        "test corpus section {:?} missing — check the name against .sdk/test/primary/",
+        name
+    );
+    assert!(
+        basic.get("set").islist(),
+        "test corpus section {:?} has no basic.set list — zero cases would run",
+        name
+    );
+    assert!(
+        0 < entrycount(&basic) || PENDING_SECTIONS.contains(&name),
+        "test corpus section {:?} is EMPTY — zero cases would run; add cases, \
+         or mark the fixture PENDING in .sdk/test/primary/",
+        name
+    );
+
+    let before = run.failures.len();
+    run.run_set_args(&basic, true, name, subject);
+    if before < run.failures.len() {
+        panic!("{}", run.failures[before..].join("\n"));
+    }
 }
 
 fn base_client() -> (Rc<UnivecSDK>, Rc<Utility>) {
@@ -100,9 +152,9 @@ fn primary_clean_basic() {
 #[test]
 fn primary_done_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(&get_spec(&primary, &["done", "basic"]), &mut |entry| {
-        let ctx = make_ctx_from_map(&getp(entry, "ctx"), &client, &utility);
+    let mut run = primary_run();
+    runsection(&mut run, "done", move |args| {
+        let ctx = make_ctx_from_map(&args[0], &client, &utility);
         fixctx(&ctx, &client);
         utility.done(&ctx)
     });
@@ -111,17 +163,14 @@ fn primary_done_basic() {
 #[test]
 fn primary_make_error_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(&get_spec(&primary, &["makeError", "basic"]), &mut |entry| {
-        let args = match getp(entry, "args") {
-            Value::List(l) => Value::List(l),
-            _ => ja(vec![Value::empty_map()]),
-        };
-        let ctxmap = vs::get_elem(&args, &Value::Num(0.0), Value::empty_map());
+    let mut run = primary_run();
+    runsection(&mut run, "makeError", move |args| {
+        let arglist = Value::list(args.clone());
+        let ctxmap = vs::get_elem(&arglist, &Value::Num(0.0), Value::empty_map());
         let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
         fixctx(&ctx, &client);
 
-        let err = match vs::get_elem(&args, &Value::Num(1.0), Value::Noval) {
+        let err = match vs::get_elem(&arglist, &Value::Num(1.0), Value::Noval) {
             Value::Map(m) => err_from_map(&Value::Map(m)),
             _ => None,
         };
@@ -349,28 +398,25 @@ fn primary_fetcher_blocked_test_mode() {
 #[test]
 fn primary_make_context_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["makeContext", "basic"]),
-        &mut |entry| {
-            let vin = getp(entry, "in");
-            if let Value::Map(_) = vin {
-                let ctx = make_ctx_from_map(&vin, &client, &utility);
-                let out = jo(vec![("id", Value::str(ctx.id.clone()))]);
-                let op = ctx.op.borrow().clone();
-                setp(
-                    &out,
-                    "op",
-                    jo(vec![
-                        ("name", Value::str(op.name.clone())),
-                        ("input", Value::str(op.input.clone())),
-                    ]),
-                );
-                return Ok(out);
-            }
-            Ok(Value::Noval)
-        },
-    );
+    let mut run = primary_run();
+    runsection(&mut run, "makeContext", move |args| {
+        let vin = args[0].clone();
+        if let Value::Map(_) = vin {
+            let ctx = make_ctx_from_map(&vin, &client, &utility);
+            let out = jo(vec![("id", Value::str(ctx.id.clone()))]);
+            let op = ctx.op.borrow().clone();
+            setp(
+                &out,
+                "op",
+                jo(vec![
+                    ("name", Value::str(op.name.clone())),
+                    ("input", Value::str(op.input.clone())),
+                ]),
+            );
+            return Ok(out);
+        }
+        Ok(Value::Noval)
+    });
 }
 
 #[test]
@@ -443,92 +489,83 @@ fn primary_make_fetch_def_with_body() {
 #[test]
 fn primary_make_options_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["makeOptions", "basic"]),
-        &mut |entry| {
-            let vin = getp(entry, "in");
-            let ctx = utility.make_context(
-                CtxSpec {
-                    options: match getp(&vin, "options") {
-                        Value::Map(m) => Some(Value::Map(m)),
-                        _ => None,
-                    },
-                    config: match getp(&vin, "config") {
-                        Value::Map(m) => Some(Value::Map(m)),
-                        _ => None,
-                    },
-                    ..Default::default()
+    let mut run = primary_run();
+    runsection(&mut run, "makeOptions", move |args| {
+        let vin = args[0].clone();
+        let ctx = utility.make_context(
+            CtxSpec {
+                options: match getp(&vin, "options") {
+                    Value::Map(m) => Some(Value::Map(m)),
+                    _ => None,
                 },
-                None,
-            );
-            *ctx.client.borrow_mut() = Some(client.clone());
-            *ctx.utility.borrow_mut() = Some(utility.clone());
-            Ok(utility.make_options(&ctx))
-        },
-    );
+                config: match getp(&vin, "config") {
+                    Value::Map(m) => Some(Value::Map(m)),
+                    _ => None,
+                },
+                ..Default::default()
+            },
+            None,
+        );
+        *ctx.client.borrow_mut() = Some(client.clone());
+        *ctx.utility.borrow_mut() = Some(utility.clone());
+        Ok(utility.make_options(&ctx))
+    });
 }
 
 #[test]
 fn primary_make_request_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["makeRequest", "basic"]),
-        &mut |entry| {
-            let ctxmap = getp(entry, "ctx");
-            let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
-            *ctx.options.borrow_mut() = client.options_map();
+    let mut run = primary_run();
+    runsection(&mut run, "makeRequest", move |args| {
+        let ctxmap = args[0].clone();
+        let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
+        *ctx.options.borrow_mut() = client.options_map();
 
-            utility.make_request(&ctx)?;
+        utility.make_request(&ctx)?;
 
-            // Update entry ctx for match checking.
-            if let Value::Map(_) = &ctxmap {
-                if ctx.response.borrow().is_some() {
-                    setp(&ctxmap, "response", Value::str("exists"));
-                }
-                if ctx.result.borrow().is_some() {
-                    setp(&ctxmap, "result", Value::str("exists"));
-                }
+        // Write the observable ctx state back into args[0] for the match.
+        if let Value::Map(_) = &ctxmap {
+            if ctx.response.borrow().is_some() {
+                setp(&ctxmap, "response", Value::str("exists"));
             }
+            if ctx.result.borrow().is_some() {
+                setp(&ctxmap, "result", Value::str("exists"));
+            }
+        }
 
-            Ok(Value::Noval)
-        },
-    );
+        Ok(Value::Noval)
+    });
 }
 
 #[test]
 fn primary_make_response_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["makeResponse", "basic"]),
-        &mut |entry| {
-            let ctxmap = getp(entry, "ctx");
-            let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
-            fixctx(&ctx, &client);
+    let mut run = primary_run();
+    runsection(&mut run, "makeResponse", move |args| {
+        let ctxmap = args[0].clone();
+        let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
+        fixctx(&ctx, &client);
 
-            utility.make_response(&ctx)?;
+        utility.make_response(&ctx)?;
 
-            // Update entry ctx for match checking with result data.
-            if let (Value::Map(_), Some(result)) = (&ctxmap, ctx.result.borrow().clone()) {
-                let r = result.borrow();
-                setp(
-                    &ctxmap,
-                    "result",
-                    jo(vec![
-                        ("ok", Value::Bool(r.ok)),
-                        ("status", Value::Num(r.status as f64)),
-                        ("statusText", Value::str(r.status_text.clone())),
-                        ("headers", r.headers.clone()),
-                        ("body", r.body.clone()),
-                    ]),
-                );
-            }
+        // Update entry ctx for match checking with result data.
+        if let (Value::Map(_), Some(result)) = (&ctxmap, ctx.result.borrow().clone()) {
+            let r = result.borrow();
+            setp(
+                &ctxmap,
+                "result",
+                jo(vec![
+                    ("ok", Value::Bool(r.ok)),
+                    ("status", Value::Num(r.status as f64)),
+                    ("statusText", Value::str(r.status_text.clone())),
+                    ("headers", r.headers.clone()),
+                    ("body", r.body.clone()),
+                ]),
+            );
+        }
 
-            Ok(Value::Noval)
-        },
-    );
+        Ok(Value::Noval)
+    });
 }
 
 #[test]
@@ -595,13 +632,13 @@ fn primary_make_result_no_result() {
 
 #[test]
 fn primary_make_spec_basic() {
-    let primary = primary();
-    let setup_opts = get_spec(&primary, &["makeSpec", "DEF", "setup", "a"]);
+    let mut run = primary_run();
+    let setup_opts = tostruct(&jpath(&run.spec, &["makeSpec", "DEF", "setup", "a"]));
     let spec_client = test_sdk(Value::Noval, setup_opts);
     let spec_utility = spec_client.get_utility();
 
-    runset(&get_spec(&primary, &["makeSpec", "basic"]), &mut |entry| {
-        let ctxmap = getp(entry, "ctx");
+    runsection(&mut run, "makeSpec", move |args| {
+        let ctxmap = args[0].clone();
         let ctx = make_ctx_from_map(&ctxmap, &spec_client, &spec_utility);
         *ctx.options.borrow_mut() = spec_client.options_map();
 
@@ -659,9 +696,9 @@ fn primary_make_point_basic() {
 #[test]
 fn primary_make_url_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(&get_spec(&primary, &["makeUrl", "basic"]), &mut |entry| {
-        let ctxmap = getp(entry, "ctx");
+    let mut run = primary_run();
+    runsection(&mut run, "makeUrl", move |args| {
+        let ctxmap = args[0].clone();
         let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
         if ctx.result.borrow().is_none() {
             *ctx.result.borrow_mut() = Some(Rc::new(RefCell::new(SdkResult::new(
@@ -675,9 +712,9 @@ fn primary_make_url_basic() {
 #[test]
 fn primary_operator_basic() {
     let (_client, _utility) = base_client();
-    let primary = primary();
-    runset(&get_spec(&primary, &["operator", "basic"]), &mut |entry| {
-        let vin = getp(entry, "in");
+    let mut run = primary_run();
+    runsection(&mut run, "operator", move |args| {
+        let vin = args[0].clone();
         let op = Operation::new(&vin);
         Ok(jo(vec![
             ("entity", Value::str(op.entity.clone())),
@@ -691,36 +728,34 @@ fn primary_operator_basic() {
 #[test]
 fn primary_param_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(&get_spec(&primary, &["param", "basic"]), &mut |entry| {
-        let args = getp(entry, "args");
-        if vs::size(&args) < 2 {
+    let mut run = primary_run();
+    runsection(&mut run, "param", move |args| {
+        if args.len() < 2 {
             return Ok(Value::Noval);
         }
 
-        let ctxmap = vs::get_elem(&args, &Value::Num(0.0), Value::empty_map());
+        let ctxmap = match &args[0] {
+            Value::Map(m) => Value::Map(m.clone()),
+            _ => {
+                let fresh = Value::empty_map();
+                args[0] = fresh.clone();
+                fresh
+            }
+        };
         let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
-        let paramdef = vs::get_elem(&args, &Value::Num(1.0), Value::Noval);
+        let paramdef = args[1].clone();
 
         let result = utility.param(&ctx, &paramdef);
 
-        // Copy spec alias back to entry ctx for matching.
-        if let Value::Map(_) = getp(&getp(&getp(entry, "match"), "ctx"), "spec") {
-            let entry_ctx = match getp(entry, "ctx") {
-                Value::Map(m) => Value::Map(m),
-                _ => {
-                    let e = Value::empty_map();
-                    setp(entry, "ctx", e.clone());
-                    e
-                }
-            };
-            if let Some(spec) = ctx.spec.borrow().clone() {
-                setp(
-                    &entry_ctx,
-                    "spec",
-                    jo(vec![("alias", spec.borrow().alias.clone())]),
-                );
-            }
+        // Write the resolved spec alias back into args[0] — the map a
+        // `match: {ctx: {spec: {alias: ...}}}` assertion reads (resolver
+        // decision 3 retargets it onto `args.0`).
+        if let Some(spec) = ctx.spec.borrow().clone() {
+            setp(
+                &ctxmap,
+                "spec",
+                jo(vec![("alias", spec.borrow().alias.clone())]),
+            );
         }
 
         Ok(result)
@@ -729,85 +764,77 @@ fn primary_param_basic() {
 
 #[test]
 fn primary_prepare_auth_basic() {
-    let primary = primary();
-    let setup_opts = get_spec(&primary, &["prepareAuth", "DEF", "setup", "a"]);
+    let mut run = primary_run();
+    let setup_opts = tostruct(&jpath(&run.spec, &["prepareAuth", "DEF", "setup", "a"]));
     let auth_client = test_sdk(Value::Noval, setup_opts);
     let auth_utility = auth_client.get_utility();
 
-    runset(
-        &get_spec(&primary, &["prepareAuth", "basic"]),
-        &mut |entry| {
-            let ctxmap = getp(entry, "ctx");
-            let ctx = make_ctx_from_map(&ctxmap, &auth_client, &auth_utility);
-            fixctx(&ctx, &auth_client);
+    runsection(&mut run, "prepareAuth", move |args| {
+        let ctxmap = args[0].clone();
+        let ctx = make_ctx_from_map(&ctxmap, &auth_client, &auth_utility);
+        fixctx(&ctx, &auth_client);
 
-            auth_utility.prepare_auth(&ctx)?;
+        auth_utility.prepare_auth(&ctx)?;
 
-            // Update entry ctx for match.
-            if let (Value::Map(_), Some(spec)) = (&ctxmap, ctx.spec.borrow().clone()) {
-                setp(
-                    &ctxmap,
-                    "spec",
-                    jo(vec![("headers", spec.borrow().headers.clone())]),
-                );
-            }
+        // Update entry ctx for match.
+        if let (Value::Map(_), Some(spec)) = (&ctxmap, ctx.spec.borrow().clone()) {
+            setp(
+                &ctxmap,
+                "spec",
+                jo(vec![("headers", spec.borrow().headers.clone())]),
+            );
+        }
 
-            Ok(Value::Noval)
-        },
-    );
+        Ok(Value::Noval)
+    });
 }
 
 #[test]
 fn primary_prepare_body_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["prepareBody", "basic"]),
-        &mut |entry| {
-            let ctx = make_ctx_from_map(&getp(entry, "ctx"), &client, &utility);
-            fixctx(&ctx, &client);
-            Ok(utility.prepare_body(&ctx))
-        },
-    );
+    let mut run = primary_run();
+    runsection(&mut run, "prepareBody", move |args| {
+        let ctx = make_ctx_from_map(&args[0].clone(), &client, &utility);
+        fixctx(&ctx, &client);
+        Ok(utility.prepare_body(&ctx))
+    });
 }
 
 #[test]
 fn primary_prepare_headers_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["prepareHeaders", "basic"]),
-        &mut |entry| {
-            let ctx = make_ctx_from_map(&getp(entry, "ctx"), &client, &utility);
-            Ok(utility.prepare_headers(&ctx))
-        },
-    );
+    let mut run = primary_run();
+    runsection(&mut run, "prepareHeaders", move |args| {
+        let ctx = make_ctx_from_map(&args[0].clone(), &client, &utility);
+        Ok(utility.prepare_headers(&ctx))
+    });
 }
 
 #[test]
 fn primary_prepare_method_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["prepareMethod", "basic"]),
-        &mut |entry| {
-            let ctx = make_ctx_from_map(&getp(entry, "ctx"), &client, &utility);
-            Ok(Value::str(utility.prepare_method(&ctx)))
-        },
-    );
+    let mut run = primary_run();
+    runsection(&mut run, "prepareMethod", move |args| {
+        let ctx = make_ctx_from_map(&args[0].clone(), &client, &utility);
+        // An op the API does not define resolves NO method: ts answers
+        // undefined and rust answers "" — both are "no value" to the
+        // corpus, which pins it with an entry that declares no `out`.
+        let method = utility.prepare_method(&ctx);
+        if method.is_empty() {
+            return Ok(Value::Noval);
+        }
+        Ok(Value::str(method))
+    });
 }
 
 #[test]
 fn primary_prepare_params_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["prepareParams", "basic"]),
-        &mut |entry| {
-            let ctx = make_ctx_from_map(&getp(entry, "ctx"), &client, &utility);
-            Ok(utility.prepare_params(&ctx))
-        },
-    );
+    let mut run = primary_run();
+    runsection(&mut run, "prepareParams", move |args| {
+        let ctx = make_ctx_from_map(&args[0].clone(), &client, &utility);
+        Ok(utility.prepare_params(&ctx))
+    });
 }
 
 // Was two hand-written cases that had drifted out of the shared corpus (the
@@ -817,163 +844,142 @@ fn primary_prepare_params_basic() {
 #[test]
 fn primary_prepare_path_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["preparePath", "basic"]),
-        &mut |entry| {
-            let ctx = make_ctx_from_map(&getp(entry, "ctx"), &client, &utility);
-            Ok(Value::str(utility.prepare_path(&ctx)))
-        },
-    );
+    let mut run = primary_run();
+    runsection(&mut run, "preparePath", move |args| {
+        let ctx = make_ctx_from_map(&args[0].clone(), &client, &utility);
+        Ok(Value::str(utility.prepare_path(&ctx)))
+    });
 }
 
 #[test]
 fn primary_prepare_query_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["prepareQuery", "basic"]),
-        &mut |entry| {
-            let ctx = make_ctx_from_map(&getp(entry, "ctx"), &client, &utility);
-            Ok(utility.prepare_query(&ctx))
-        },
-    );
+    let mut run = primary_run();
+    runsection(&mut run, "prepareQuery", move |args| {
+        let ctx = make_ctx_from_map(&args[0].clone(), &client, &utility);
+        Ok(utility.prepare_query(&ctx))
+    });
 }
 
 #[test]
 fn primary_result_basic_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["resultBasic", "basic"]),
-        &mut |entry| {
-            let ctx = make_ctx_from_map(&getp(entry, "ctx"), &client, &utility);
-            fixctx(&ctx, &client);
+    let mut run = primary_run();
+    runsection(&mut run, "resultBasic", move |args| {
+        let ctx = make_ctx_from_map(&args[0].clone(), &client, &utility);
+        fixctx(&ctx, &client);
 
-            let result = utility.result_basic(&ctx);
+        let result = utility.result_basic(&ctx);
 
-            let out = Value::empty_map();
-            if let Some(result) = result {
-                let r = result.borrow();
-                setp(&out, "status", Value::Num(r.status as f64));
-                setp(&out, "statusText", Value::str(r.status_text.clone()));
-                if let Some(err) = &r.err {
-                    setp(
-                        &out,
-                        "err",
-                        jo(vec![("message", Value::str(err.msg.clone()))]),
-                    );
-                }
+        let out = Value::empty_map();
+        if let Some(result) = result {
+            let r = result.borrow();
+            setp(&out, "status", Value::Num(r.status as f64));
+            setp(&out, "statusText", Value::str(r.status_text.clone()));
+            if let Some(err) = &r.err {
+                setp(
+                    &out,
+                    "err",
+                    jo(vec![("message", Value::str(err.msg.clone()))]),
+                );
             }
+        }
 
-            Ok(out)
-        },
-    );
+        Ok(out)
+    });
 }
 
 #[test]
 fn primary_result_body_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["resultBody", "basic"]),
-        &mut |entry| {
-            let ctxmap = getp(entry, "ctx");
-            let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
+    let mut run = primary_run();
+    runsection(&mut run, "resultBody", move |args| {
+        let ctxmap = args[0].clone();
+        let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
 
-            utility.result_body(&ctx);
+        utility.result_body(&ctx);
 
-            if let (Value::Map(_), Some(result)) = (&ctxmap, ctx.result.borrow().clone()) {
-                setp(
-                    &ctxmap,
-                    "result",
-                    jo(vec![("body", result.borrow().body.clone())]),
-                );
-            }
+        if let (Value::Map(_), Some(result)) = (&ctxmap, ctx.result.borrow().clone()) {
+            setp(
+                &ctxmap,
+                "result",
+                jo(vec![("body", result.borrow().body.clone())]),
+            );
+        }
 
-            Ok(Value::Noval)
-        },
-    );
+        Ok(Value::Noval)
+    });
 }
 
 #[test]
 fn primary_result_headers_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["resultHeaders", "basic"]),
-        &mut |entry| {
-            let ctxmap = getp(entry, "ctx");
-            let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
+    let mut run = primary_run();
+    runsection(&mut run, "resultHeaders", move |args| {
+        let ctxmap = args[0].clone();
+        let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
 
-            utility.result_headers(&ctx);
+        utility.result_headers(&ctx);
 
-            if let (Value::Map(_), Some(result)) = (&ctxmap, ctx.result.borrow().clone()) {
-                setp(
-                    &ctxmap,
-                    "result",
-                    jo(vec![("headers", result.borrow().headers.clone())]),
-                );
-            }
+        if let (Value::Map(_), Some(result)) = (&ctxmap, ctx.result.borrow().clone()) {
+            setp(
+                &ctxmap,
+                "result",
+                jo(vec![("headers", result.borrow().headers.clone())]),
+            );
+        }
 
-            Ok(Value::Noval)
-        },
-    );
+        Ok(Value::Noval)
+    });
 }
 
 #[test]
 fn primary_transform_request_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["transformRequest", "basic"]),
-        &mut |entry| {
-            let ctxmap = getp(entry, "ctx");
-            let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
+    let mut run = primary_run();
+    runsection(&mut run, "transformRequest", move |args| {
+        let ctxmap = args[0].clone();
+        let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
 
-            let result = utility.transform_request(&ctx);
+        let result = utility.transform_request(&ctx);
 
-            // Update entry ctx for match (step changed).
-            if let Some(spec) = ctx.spec.borrow().clone() {
-                if let Value::Map(_) = getp(&ctxmap, "spec") {
-                    setp(
-                        &getp(&ctxmap, "spec"),
-                        "step",
-                        Value::str(spec.borrow().step.clone()),
-                    );
-                }
+        // Update entry ctx for match (step changed).
+        if let Some(spec) = ctx.spec.borrow().clone() {
+            if let Value::Map(_) = getp(&ctxmap, "spec") {
+                setp(
+                    &getp(&ctxmap, "spec"),
+                    "step",
+                    Value::str(spec.borrow().step.clone()),
+                );
             }
+        }
 
-            Ok(result)
-        },
-    );
+        Ok(result)
+    });
 }
 
 #[test]
 fn primary_transform_response_basic() {
     let (client, utility) = base_client();
-    let primary = primary();
-    runset(
-        &get_spec(&primary, &["transformResponse", "basic"]),
-        &mut |entry| {
-            let ctxmap = getp(entry, "ctx");
-            let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
+    let mut run = primary_run();
+    runsection(&mut run, "transformResponse", move |args| {
+        let ctxmap = args[0].clone();
+        let ctx = make_ctx_from_map(&ctxmap, &client, &utility);
 
-            let result = utility.transform_response(&ctx);
+        let result = utility.transform_response(&ctx);
 
-            if let Some(spec) = ctx.spec.borrow().clone() {
-                if let Value::Map(_) = getp(&ctxmap, "spec") {
-                    setp(
-                        &getp(&ctxmap, "spec"),
-                        "step",
-                        Value::str(spec.borrow().step.clone()),
-                    );
-                }
+        if let Some(spec) = ctx.spec.borrow().clone() {
+            if let Value::Map(_) = getp(&ctxmap, "spec") {
+                setp(
+                    &getp(&ctxmap, "spec"),
+                    "step",
+                    Value::str(spec.borrow().step.clone()),
+                );
             }
+        }
 
-            Ok(result)
-        },
-    );
+        Ok(result)
+    });
 }
 
 // keep new_sdk / to_map referenced (parity helpers).

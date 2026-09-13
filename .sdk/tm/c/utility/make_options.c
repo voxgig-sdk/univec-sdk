@@ -22,6 +22,23 @@ voxgig_value* make_options_util(Context* ctx) {
     }
   }
 
+  /* `auth: null` is the documented way to disable auth outright, and
+   * prepare_auth honours it before it ever reads the apikey. validate would
+   * erase it: this port follows the Group A rule, so a stored null reads as
+   * "no value" and the optspec's `auth` default fires instead - transmitting
+   * the credential the caller withheld. Put the null back afterwards.
+   *
+   * Unlike js, no delete-before-validate is needed here: Group A means
+   * validate DEFAULTS rather than rejecting, so the key can travel through.
+   *
+   * Read the map DIRECTLY rather than through getp, which applies that same
+   * rule and so cannot tell an absent auth from a suppressed one. */
+  bool auth_suppressed = false;
+  if (voxgig_is_map(options)) {
+    voxgig_value* authval = voxgig_map_get(voxgig_as_map(options), "auth");
+    auth_suppressed = (NULL != authval && voxgig_is_null(authval));
+  }
+
   voxgig_value* opts = voxgig_clone(options);
 
   // Feature add-order. options.feature may be an ordered list of
@@ -91,6 +108,11 @@ voxgig_value* make_options_util(Context* ctx) {
   voxgig_value* validated = voxgig_validate(merged, optspec, NULL);
   if (voxgig_is_map(validated)) {
     opts = validated;
+  }
+
+  /* Restore the suppression the optspec default would otherwise erase. */
+  if (auth_suppressed) {
+    setp(opts, "auth", voxgig_new_null());
   }
 
   // Restore system.fetch.

@@ -1,0 +1,73 @@
+
+main: kit: target: haskell: {
+
+  title: Haskell
+  ext: hs
+  comment: line: "--"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen-langpack/.sdk'
+  package: '@voxgig/sdkgen-langpack'
+  srcfeature: false
+
+  # Entities are generic (config-driven F.makeEntity), so no per-entity or
+  # per-feature generated modules. The readme + agentguide phases are
+  # model-driven (they read the API model directly, not per-entity generated
+  # code), so they are active and produce the docs; entity/feature generation
+  # stays off.
+  phase: {
+    entity:     { active: false }
+    feature:    { active: false }
+    readme:     { active: true }
+    agentguide: { active: true }
+    test:       { active: true }
+  }
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct is vendored under src/ (VoxgigStruct.hs + Vregex.hs) — the runtime
+  # is dependency-free: it compiles with the stock ghc (base + containers, the
+  # GHC boot libraries), no cabal packages, no stack. So there are no manifest
+  # dependencies.
+  deps: {}
+}
+
+
+main: kit: feature: &: target: haskell: deps: &: {
+  kind: *'prod' | string
+}
+
+
+# Publication: Hackage registry (declared, publish pending — git-tag only).
+#
+# `target add <t>` OVERWRITES this file, so a project must never set its
+# publication values here — voxgig-solardemo-sdk lost its pinned npm package
+# name exactly that way. Set them in the project's own model
+# (`model/sdk.aontu`), where they survive a resync.
+#
+# For that to work this file must LEAVE THOSE KEYS UNSET: in aontu a concrete
+# value does not yield to another concrete value, it CONFLICTS, and two
+# defaults conflict too. The schema (@voxgig/sdkgen/model/sdkgen.aontu)
+# already defaults `tag.active`, `registry.state`, `registry.active` and
+# `registry.package`, so a project's concrete value wins over the default and
+# repeating them here would only take that away.
+#
+# What remains below is per-target registry IDENTITY, which is not a project
+# choice and stays concrete.
+main: kit: target: haskell: publish: {
+  registry: {
+    name: 'hackage'
+    url: 'https://hackage.haskell.org'
+    vault: { alias: 'hackage', env: 'HACKAGE_TOKEN' }
+  }
+}
+
+
+# Feature source is NOT trimmed to the model's selection here: every
+# feature lives inside a single generated module (src/SdkFeatures.hs), not
+# in per-feature source files, so there is nothing per-feature to leave
+# out. Trimming waits on that module becoming model-driven.
+main: kit: target: haskell: feature: {
+  trim: false
+}

@@ -116,6 +116,7 @@ sub get_root_ctx {
   return $self->{_rootctx};
 }
 
+# #SecretsAccessor
 sub prepare {
   my ($self, $fetchargs) = @_;
   my $utility = $self->{_utility};

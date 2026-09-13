@@ -23,7 +23,27 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         }
     }
 
+    // `auth: null` is the documented way to disable auth outright, and
+    // prepare_auth honours it before it ever reads the apikey. It cannot
+    // survive validate: depending on the struct port a stored null is either
+    // REPLACED by the optspec default - transmitting the credential the
+    // caller withheld - or REJECTED outright. Withhold the key for validate,
+    // then put the null back. Same fix as ts/js/go make_options.
+    //
+    // Read the map DIRECTLY rather than through get_prop: get_prop applies
+    // the Group A rule and returns the alt for a stored null, so it cannot
+    // tell an absent auth from a suppressed one - and only the latter is a
+    // suppression.
+    let auth_suppressed = match &options {
+        Value::Map(m) => matches!(m.borrow().get("auth"), Some(Value::Null)),
+        _ => false,
+    };
+
     let mut opts = vs::clone(&options);
+
+    if auth_suppressed {
+        opts = vs::del_prop(opts, &Value::str("auth"));
+    }
 
     // Feature add-order. `options.feature` may be an ordered List of
     // { name, active, ...opts } entries (the List position IS the order in
@@ -58,7 +78,7 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         ("base", Value::str("http://localhost:8000")),
         ("prefix", Value::str("")),
         ("suffix", Value::str("")),
-        ("auth", jo(vec![("prefix", Value::str(""))])),
+        ("auth", jo(vec![("prefix", Value::str("")), ("basic", Value::Bool(false))])),
         ("headers", jo(vec![("`$CHILD`", Value::str("`$STRING`"))])),
         (
             "allow",
@@ -118,6 +138,11 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         if let Value::Map(_) = validated {
             opts = validated;
         }
+    }
+
+    // Restore the suppression the optspec default would otherwise erase.
+    if auth_suppressed {
+        setp(&opts, "auth", Value::Null);
     }
 
     // Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).

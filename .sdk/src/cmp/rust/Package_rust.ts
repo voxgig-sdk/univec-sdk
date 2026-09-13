@@ -5,6 +5,7 @@ import {
   cmp,
   collectDeps,
   packageVersion,
+  targetFeatures,
 } from '@voxgig/sdkgen'
 
 
@@ -49,17 +50,17 @@ path = "lib.rs"
       // deps require an explicit version.
       const version = d.source === 'target' ? (d.version || '*') : d.version
       if ('dev' === (d.raw as any)?.kind) {
-        dev[d.name] = version
+        dev[d.name] = depValue(version, d.raw)
       }
       else {
-        prod[d.name] = version
+        prod[d.name] = depValue(version, d.raw)
       }
     }
 
     Content(`[dependencies]
 `)
-    for (const [name, version] of Object.entries(prod)) {
-      Content(`${name} = "${version}"
+    for (const [name, value] of Object.entries(prod)) {
+      Content(`${name} = ${value}
 `)
     }
 
@@ -67,13 +68,78 @@ path = "lib.rs"
       Content(`
 [dev-dependencies]
 `)
-      for (const [name, version] of Object.entries(dev)) {
-        Content(`${name} = "${version}"
+      for (const [name, value] of Object.entries(dev)) {
+        Content(`${name} = ${value}
 `)
       }
     }
+
+    // [[test]] stanzas for the feature suites.
+    //
+    // cargo auto-discovers `tests/*.rs` and `tests/<dir>/main.rs`, but NOT
+    // `tests/<dir>/<dir>/main.rs` - and the two-level path is not
+    // negotiable: a feature's tests must live inside a `feature/`
+    // container so `target add` trims them WITH the feature
+    // (helpers/featureSource), exactly as go's tm/go/test/feature/secrets/
+    // and py's tm/py/test/feature/secrets/ do. A one-level
+    // tests/secrets/main.rs would auto-discover and then be left behind in
+    // a project that does not select the feature, carrying a suite that
+    // cannot compile.
+    //
+    // So the suite is DECLARED, and only for a feature that both applies
+    // to this target and is active in the model - which is also exactly
+    // when `target add` kept its directory.
+    const suites = Object.keys(targetFeatures(model, target))
+      .filter((name: string) => null != FEATURE_TESTS[name])
+      .sort()
+
+    for (const name of suites) {
+      Content(`
+[[test]]
+name = "${name}_feature"
+path = "${FEATURE_TESTS[name]}"
+`)
+    }
   })
 })
+
+
+// Which features ship a rust integration-test suite, and where its crate
+// root is. A map rather than a convention because the file has to EXIST:
+// cargo fails the whole manifest on a `[[test]]` path it cannot find, so
+// this may only name suites the templates actually carry.
+const FEATURE_TESTS: Record<string, string> = {
+  secrets: 'tests/feature/secrets/main.rs',
+}
+
+
+// One Cargo dependency's value: the bare version string, or the TABLE form
+// when the model asks for anything more.
+//
+// `default: false` and `features: [...]` are not decoration. The secrets
+// feature's vendored HTTP helper speaks rustls, and `rustls = "0.23"` with
+// DEFAULT features pulls aws-lc-rs/aws-lc-sys and a cmake C build, while
+// the ring feature set is what the target's existing `ureq` dep already
+// compiles. Without the table form, turning on one feature would add a
+// native toolchain requirement to every SDK that selected it.
+function depValue(version: string, raw: any): string {
+  const features: string[] = Array.isArray(raw?.features) ? raw.features : []
+  const nodefault = false === raw?.default
+
+  if (0 === features.length && !nodefault) {
+    return `"${version}"`
+  }
+
+  const parts = [`version = "${version}"`]
+  if (nodefault) {
+    parts.push('default-features = false')
+  }
+  if (0 < features.length) {
+    parts.push('features = [' + features.map((f) => `"${f}"`).join(', ') + ']')
+  }
+
+  return '{ ' + parts.join(', ') + ' }'
+}
 
 
 export {

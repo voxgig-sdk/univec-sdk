@@ -1,17 +1,35 @@
-/* Primary-utility corpus driver — C port.
+/* Primary-utility corpus driver — C port, on the VENDORED @voxgig/omni
+ * runner (tests/vendor/omni, driven through tests/omni_resolver.h).
  *
- * Drives every `primary` section of the shared corpus (.sdk/test/test.json)
- * through this SDK's utilities, the way the ts reference harness does. The
- * hand-written primary_utility_test.c beside this file covers the same
- * utilities with directly-constructed contexts; that suite can drift from the
- * contract, this one cannot — the cases ARE the contract.
+ * Drives the `primary` sections of the shared corpus (.sdk/test/test.json)
+ * through this SDK's utilities. The hand-written primary_utility_test.c
+ * beside this file covers the same utilities with directly-constructed
+ * contexts; that suite can drift from the contract, this one cannot — the
+ * cases ARE the contract.
  *
- * The corpus entry shapes are ctx+out, ctx+match, ctx+mark+out, args+mark+out,
- * args+err and in+match. `mark` is a case label, not an assertion.
+ * The corpus entry shapes are ctx+out, ctx+match, ctx+mark+out,
+ * args+mark+out, args+err and in+match. `mark` is a case label, not an
+ * assertion. omni resolves the arguments, calls the subject, and checks
+ * `out` / `match` / `err`; the second inline copy of the match engine this
+ * file used to carry (matchval + do_match) is retired along with
+ * tests/runner.h.
+ *
+ * CONTEXTS STAY MAPS ACROSS THE RUNNER (java's decision 1, omni#56). omni
+ * sets `entry.ctx` to the args[0] map and a `match: {ctx: ...}` assertion
+ * reads THROUGH it with omni's own getpath, which walks JSON values only.
+ * A typed Context there would make every ctx assertion read "absent". So
+ * the subject receives the MAP, builds the typed Context with corpus_ctx()
+ * at the call site, runs the utility, and writes the observable ctx state
+ * back into the very same omni map with publish_ctx() — which is what
+ * makes `match: {ctx: {spec: {step: "reqform"}}}` resolve.
+ *
+ * NOT YET DRIVEN (the corpus carries them; no subject here yet): check,
+ * clean, featureAdd, featureHook, featureInit, fetcher, makeFetchDef,
+ * makePoint, makeResult.
  */
 
 #include "feature_harness.h" /* test_sdk + Fetcher helpers + ctest.h */
-#include "runner.h"       /* normalize + deep_equal, shared with the struct corpus */
+#include "omni_resolver.h"   /* vendored omni + the voxgig<->omni bridge */
 #include "voxgig_struct.h"
 
 #include <ctype.h>
@@ -19,9 +37,36 @@
 #include <stdlib.h>
 #include <string.h>
 
-static voxgig_value* CORPUS = NULL;
-static int NPASS = 0;
-static int NFAIL = 0;
+/* The shared corpus, compiled by the project build. Relative to the target
+ * root, which is where the Makefile runs each test binary from. */
+#define TEST_JSON_FILE "../.sdk/test/test.json"
+
+static omni_pool* POOL = NULL;
+static omni_runner* RUNNER = NULL;
+
+/* Section scoreboard. omni stops a set at its FIRST failing entry, so a
+ * row is pass/fail plus the number of cases the section HOLDS — the count
+ * that proves the corpus still runs. */
+typedef struct prow {
+  char* name;
+  size_t cases;
+  int failed;
+  char* err;
+} prow;
+
+static prow ROWS[64];
+static size_t NROWS = 0;
+
+static void row_add(const char* name, size_t cases, int failed, const char* err) {
+  if (NROWS >= sizeof(ROWS) / sizeof(ROWS[0])) {
+    return;
+  }
+  ROWS[NROWS].name = strdup(name);
+  ROWS[NROWS].cases = cases;
+  ROWS[NROWS].failed = failed;
+  ROWS[NROWS].err = err ? strdup(err) : NULL;
+  NROWS++;
+}
 
 /* ---- corpus access ------------------------------------------------------ */
 
@@ -30,122 +75,16 @@ static voxgig_value* mget(voxgig_value* m, const char* k) {
   return voxgig_map_get(voxgig_as_map(m), k);
 }
 
-static voxgig_value* primary_root(void) {
-  if (!CORPUS) CORPUS = voxgig_parse_json_file("../.sdk/test/test.json");
-  voxgig_value* p = mget(CORPUS, "primary");
-  return p ? p : v_map();
-}
-
-/* section(name) -> the `basic` node, which carries `set`. */
-static voxgig_value* section_basic(const char* name) {
-  voxgig_value* sec = mget(primary_root(), name);
-  voxgig_value* basic = mget(sec, "basic");
-  return basic ? basic : v_map();
-}
-
-/* A section may carry its own client setup at DEF.setup.a — makeSpec and
- * prepareAuth read defaults off the CLIENT, not off ctx.options, so those two
- * cannot be driven with the shared client. */
-static voxgig_value* section_setup(const char* name) {
-  voxgig_value* sec = mget(primary_root(), name);
-  voxgig_value* def = mget(sec, "DEF");
-  voxgig_value* setup = mget(def, "setup");
-  voxgig_value* a = mget(setup, "a");
-  return a;
-}
-
-/* ---- match machinery ---------------------------------------------------- */
-
-static char* vstr(voxgig_value* v) {
-  if (!v) return strdup("");
-  char* s = voxgig_stringify(v, -1);
-  return s ? s : strdup("");
-}
-
 static char* lower_dup(const char* s) {
   char* o = strdup(s ? s : "");
   for (char* p = o; *p; p++) *p = (char)tolower((unsigned char)*p);
   return o;
 }
 
-static bool is_nullish(voxgig_value* v) {
-  return v == NULL || voxgig_is_undef(v) || voxgig_is_null(v);
-}
-
-static bool matchval(voxgig_value* check, voxgig_value* base) {
-  voxgig_value* nc = normalize(check);
-  voxgig_value* nb = normalize(base);
-  bool eq = deep_equal(nc, nb);
-  voxgig_release(nc);
-  voxgig_release(nb);
-  if (eq) return true;
-
-  if (!check || !v_is_str(check)) return false;
-  const char* c = voxgig_as_string(check);
-  if (strcmp(c, "__UNDEF__") == 0) return is_nullish(base);
-  if (strcmp(c, "__EXISTS__") == 0) return !is_nullish(base);
-
-  char* bs = vstr(base);
-  size_t cl = strlen(c);
-
-  /* A /pattern/ is a regex over the stringified base. */
-  if (2 <= cl && c[0] == '/' && c[cl - 1] == '/') {
-    char* pat = (char*)malloc(cl - 1);
-    memcpy(pat, c + 1, cl - 2);
-    pat[cl - 2] = '\0';
-    bool ok = voxgig_re_test(pat, bs);
-    free(pat);
-    free(bs);
-    return ok;
-  }
-
-  /* Otherwise a case-insensitive substring, as the reference does. */
-  char* lb = lower_dup(bs);
-  char* lc = lower_dup(c);
-  bool ok = strstr(lb, lc) != NULL;
-  free(lb);
-  free(lc);
-  free(bs);
-  return ok;
-}
-
-/* Walk the CHECK structure; every leaf must matchval at the same path in
- * base. A missing path in base reads as null, which only __UNDEF__ matches. */
-static bool do_match(voxgig_value* check, voxgig_value* base,
-                     const char* path, char** fail) {
-  if (voxgig_is_map(check)) {
-    voxgig_map* m = voxgig_as_map(check);
-    for (size_t i = 0; i < m->len; i++) {
-      const char* k = m->entries[i].key;
-      char sub[512];
-      snprintf(sub, sizeof(sub), "%s%s%s", path, path[0] ? "." : "", k);
-      if (!do_match(m->entries[i].value, mget(base, k), sub, fail)) return false;
-    }
-    return true;
-  }
-  if (voxgig_is_list(check)) {
-    voxgig_list* l = voxgig_as_list(check);
-    for (size_t i = 0; i < l->len; i++) {
-      char sub[512];
-      snprintf(sub, sizeof(sub), "%s.%zu", path, i);
-      voxgig_value* be = NULL;
-      if (voxgig_is_list(base) && i < voxgig_as_list(base)->len) {
-        be = voxgig_as_list(base)->items[i];
-      }
-      if (!do_match(l->items[i], be, sub, fail)) return false;
-    }
-    return true;
-  }
-  if (matchval(check, base)) return true;
-
-  char* cs = vstr(check);
-  char* bs = vstr(base);
-  char buf[1024];
-  snprintf(buf, sizeof(buf), "MATCH: %s: [%s] <=> [%s]", path, cs, bs);
-  free(cs);
-  free(bs);
-  *fail = strdup(buf);
-  return false;
+static voxgig_value* arg_at(voxgig_value* args, size_t i) {
+  if (!voxgig_is_list(args)) return NULL;
+  voxgig_list* l = voxgig_as_list(args);
+  return i < l->len ? l->items[i] : NULL;
 }
 
 /* ---- live context from a corpus map ------------------------------------- */
@@ -223,13 +162,15 @@ static Context* corpus_ctx(UnivecSDK* cl, voxgig_value* ctxmap) {
   return ctx;
 }
 
-/* The match reads the corpus map while the utilities mutate the live objects
- * hanging off the context, so without this every ctx.* assertion reads null. */
-static void publish_ctx(voxgig_value* ctxmap, Context* ctx) {
-  if (!voxgig_is_map(ctxmap)) return;
-  if (ctx->spec) setp(ctxmap, "spec", spec_to_value(ctx->spec));
-  if (ctx->result) setp(ctxmap, "result", result_to_value(ctx->result));
-  if (ctx->response) setp(ctxmap, "response", v_str("__EXISTS__"));
+/* Write the OBSERVABLE state of the typed context back into the omni ctx
+ * map the entry holds, which is where a `match: {ctx: ...}` assertion
+ * reads. The subject mutated the typed context; the map is what the runner
+ * can walk. */
+static void publish_ctx(omni_pool* pool, omni_json* ctxmap, Context* ctx) {
+  if (NULL == ctx || !omni_ismap(ctxmap)) return;
+  if (ctx->spec) omni_map_set(ctxmap, "spec", omnivx_tomni(pool, spec_to_value(ctx->spec)));
+  if (ctx->result) omni_map_set(ctxmap, "result", omnivx_tomni(pool, result_to_value(ctx->result)));
+  if (ctx->response) omni_map_set(ctxmap, "response", omni_str(pool, OMNI_EXISTSMARK));
 }
 
 /* ---- the section runner ------------------------------------------------- */
@@ -237,138 +178,97 @@ static void publish_ctx(voxgig_value* ctxmap, Context* ctx) {
 typedef voxgig_value* (*ctxfn)(Context* ctx, voxgig_value* args, char** err);
 typedef voxgig_value* (*argfn)(voxgig_value* args, char** err);
 
-static void record(const char* section, bool ok, const char* msg) {
-  if (ok) {
-    NPASS++;
+typedef struct psubj {
+  ctxfn cf;
+  argfn af;
+  UnivecSDK* cl;
+} psubj;
+
+/* The omni subject: omni values in, omni value (or error message) out. */
+static omni_result primary_call(omni_pool* pool, omni_json** args, size_t nargs, void* ud) {
+  psubj* p = (psubj*)ud;
+  omni_result out;
+  voxgig_value* vargs = v_list();
+  voxgig_value* got = NULL;
+  char* err = NULL;
+  size_t i;
+
+  out.val = NULL;
+  out.err = NULL;
+
+  for (i = 0; i < nargs; i++) {
+    voxgig_list_push(voxgig_as_list(vargs), omnivx_tovx(args[i]));
+  }
+
+  if (p->cf) {
+    voxgig_value* first = arg_at(vargs, 0);
+    Context* ctx = corpus_ctx(p->cl, first);
+    got = p->cf(ctx, vargs, &err);
+    if (0 < nargs) publish_ctx(pool, args[0], ctx);
   } else {
-    NFAIL++;
-    printf("PRIMARY-FAIL %s - %s\n", section, msg ? msg : "?");
+    got = p->af(vargs, &err);
   }
+
+  if (NULL != err) {
+    out.err = omni_pool_strdup(pool, err);
+    free(err);
+    return out;
+  }
+
+  out.val = omnivx_tomni(pool, got);
+  return out;
 }
 
-static voxgig_value* arg_at(voxgig_value* args, size_t i) {
-  if (!voxgig_is_list(args)) return NULL;
-  voxgig_list* l = voxgig_as_list(args);
-  return i < l->len ? l->items[i] : NULL;
+/* A section may carry its own client setup at DEF.setup.a — makeSpec and
+ * prepareAuth read defaults off the CLIENT, not off ctx.options, so those
+ * two cannot be driven with the shared client. */
+static UnivecSDK* SHARED = NULL;
+
+static UnivecSDK* client_for(omni_json* spec) {
+  omni_json* setup = omni_map_get(omni_map_get(omni_map_get(spec, "DEF"), "setup"), "a");
+  if (omni_ismap(setup)) {
+    return test_sdk(v_undef(), omnivx_tovx(setup));
+  }
+  return SHARED;
 }
 
-static void runset(const char* name, UnivecSDK* cl,
-                        ctxfn cf, argfn af) {
-  voxgig_value* basic = section_basic(name);
-  voxgig_value* set = mget(basic, "set");
-  if (!voxgig_is_list(set)) return;
-  voxgig_list* sl = voxgig_as_list(set);
+/* Resolve `primary.<name>.basic` and run it. An ABSENT section, or one
+ * with no entries, is a FAILURE: a section that runs no case proves
+ * nothing. */
+static void runset(const char* name, ctxfn cf, argfn af) {
+  omni_runpack* pack;
+  omni_json* basic;
+  size_t cases;
+  char* err = NULL;
+  int failed;
+  psubj* p;
 
-  for (size_t i = 0; i < sl->len; i++) {
-    voxgig_value* entry = sl->items[i];
-    if (!voxgig_is_map(entry)) continue;
-
-    /* resolve_args, mirroring the ts runner. */
-    voxgig_value* args = v_list();
-    voxgig_value* ectx = mget(entry, "ctx");
-    voxgig_value* eargs = mget(entry, "args");
-    voxgig_value* ein = mget(entry, "in");
-    if (ectx) {
-      voxgig_list_push(voxgig_as_list(args), voxgig_clone(ectx));
-    } else if (voxgig_is_list(eargs)) {
-      voxgig_list* al = voxgig_as_list(eargs);
-      for (size_t k = 0; k < al->len; k++) {
-        voxgig_list_push(voxgig_as_list(args), voxgig_retain(al->items[k]));
-      }
-    } else if (ein) {
-      voxgig_list_push(voxgig_as_list(args), voxgig_clone(ein));
-    }
-
-    /* ts's resolveArgs writes the live first arg back as entry.ctx so a
-     * `match: {ctx: ...}` resolves for args-style entries too. */
-    voxgig_value* first = arg_at(args, 0);
-    if (voxgig_is_map(first)) setp(entry, "ctx", voxgig_retain(first));
-
-    char* err = NULL;
-    voxgig_value* got = NULL;
-    if (cf) {
-      Context* ctx = corpus_ctx(cl, first);
-      got = cf(ctx, args, &err);
-      publish_ctx(first, ctx);
-    } else {
-      got = af(args, &err);
-    }
-
-    voxgig_value* eerr = mget(entry, "err");
-    if (eerr && !v_is_noval(eerr)) {
-      /* The case expects a failure. */
-      if (!err) {
-        record(name, false, "expected an error, got none");
-        continue;
-      }
-      voxgig_value* errv = v_str(err);
-      bool ok = (voxgig_is_bool(eerr) && voxgig_as_bool(eerr)) || matchval(eerr, errv);
-      if (!ok) {
-        char* es = vstr(eerr);
-        char buf[1024];
-        snprintf(buf, sizeof(buf), "ERROR MATCH: [%s] <=> [%s]", es, err);
-        free(es);
-        record(name, false, buf);
-        continue;
-      }
-      voxgig_value* emat = mget(entry, "match");
-      if (voxgig_is_map(emat)) {
-        /* ts hands do_match the ERROR OBJECT, so `match: {err: {message}}`
-         * resolves; a bare string leaves err.message reading null. */
-        voxgig_value* base = cmap(4, "in", ein ? voxgig_retain(ein) : v_undef(),
-                                  "out", got ? voxgig_retain(got) : v_undef(),
-                                  "ctx", voxgig_retain(mget(entry, "ctx")),
-                                  "err", cmap(1, "message", v_str(err)));
-        char* fail = NULL;
-        if (!do_match(emat, base, "", &fail)) {
-          record(name, false, fail);
-          continue;
-        }
-      }
-      record(name, true, NULL);
-      continue;
-    }
-
-    if (err) {
-      record(name, false, err);
-      continue;
-    }
-
-    /* check_result: `match` first, then `out`. */
-    bool matched = false;
-    voxgig_value* emat = mget(entry, "match");
-    if (voxgig_is_map(emat)) {
-      voxgig_value* base = cmap(4, "in", ein ? voxgig_retain(ein) : v_undef(),
-                                "args", voxgig_retain(args),
-                                "out", got ? voxgig_retain(got) : v_undef(),
-                                "ctx", voxgig_retain(mget(entry, "ctx")));
-      char* fail = NULL;
-      if (!do_match(emat, base, "", &fail)) {
-        record(name, false, fail);
-        continue;
-      }
-      matched = true;
-    }
-
-    voxgig_value* eout = mget(entry, "out");
-    voxgig_value* expected = eout ? eout : v_null();
-    voxgig_value* ne = normalize(expected);
-    voxgig_value* ng = normalize(got);
-    bool eq = deep_equal(ne, ng);
-    voxgig_release(ne);
-    voxgig_release(ng);
-    if (!eq && !(matched && !eout)) {
-      char* es = vstr(expected);
-      char* gs = vstr(got);
-      char buf[1024];
-      snprintf(buf, sizeof(buf), "Expected: %s, got: %s", es, gs);
-      free(es);
-      free(gs);
-      record(name, false, buf);
-      continue;
-    }
-    record(name, true, NULL);
+  pack = omni_runner_run(RUNNER, name, NULL, &err);
+  if (NULL == pack || !omni_ismap(omni_spec(pack))) {
+    row_add(name, 0, 1, "corpus section missing - check .sdk/test/primary/");
+    return;
   }
+
+  basic = omni_set(pack, "basic");
+  if (!omni_ismap(basic)) {
+    row_add(name, 0, 1, "corpus section has no `basic` group");
+    return;
+  }
+
+  cases = omnivx_setsize(basic);
+  if (0 == cases) {
+    row_add(name, 0, 1, "corpus section is EMPTY - zero cases would run");
+    return;
+  }
+
+  p = (psubj*)omni_pool_alloc(POOL, sizeof(psubj));
+  p->cf = cf;
+  p->af = af;
+  p->cl = client_for(omni_spec(pack));
+
+  failed = omni_runsetflags(pack, basic, omnivx_flags(1, name),
+                            omnivx_rawsubject(POOL, primary_call, p), &err);
+  row_add(name, cases, failed, err);
 }
 
 /* ---- per-section subjects ----------------------------------------------- */
@@ -488,7 +388,6 @@ static voxgig_value* s_make_error(Context* c, voxgig_value* a, char** e) {
 }
 
 /* Sections that take a bare map rather than a ctx. */
-static UnivecSDK* SHARED = NULL;
 
 static voxgig_value* s_make_context(voxgig_value* a, char** e) {
   (void)e;
@@ -525,41 +424,63 @@ static voxgig_value* s_operator(voxgig_value* a, char** e) {
               "name", nm ? voxgig_retain(nm) : v_str("_"),
               "points", voxgig_is_list(pts) ? voxgig_retain(pts) : v_list());
 }
-
 /* ---- main --------------------------------------------------------------- */
 
-static UnivecSDK* client_for(const char* section) {
-  voxgig_value* setup = section_setup(section);
-  if (voxgig_is_map(setup)) return test_sdk(v_undef(), voxgig_clone(setup));
-  return SHARED;
-}
-
 int main(void) {
+  char* err = NULL;
+  size_t cases = 0;
+  int failed = 0;
+  size_t i;
+
+  POOL = omni_pool_new();
+
+  RUNNER = omni_make_runner(POOL, TEST_JSON_FILE, NULL, NULL, &err);
+  if (NULL == RUNNER) {
+    fprintf(stderr, "primary corpus: %s\n", NULL == err ? "cannot make runner" : err);
+    return 1;
+  }
+
   SHARED = test_sdk(v_undef(), v_undef());
 
-  runset("done", SHARED, s_done, NULL);
-  runset("makeUrl", SHARED, s_make_url, NULL);
-  runset("makeRequest", SHARED, s_make_request, NULL);
-  runset("makeResponse", SHARED, s_make_response, NULL);
-  runset("makeSpec", client_for("makeSpec"), s_make_spec, NULL);
-  runset("prepareAuth", client_for("prepareAuth"), s_prepare_auth, NULL);
-  runset("prepareBody", SHARED, s_prepare_body, NULL);
-  runset("prepareHeaders", SHARED, s_prepare_headers, NULL);
-  runset("prepareMethod", SHARED, s_prepare_method, NULL);
-  runset("prepareParams", SHARED, s_prepare_params, NULL);
-  runset("preparePath", SHARED, s_prepare_path, NULL);
-  runset("prepareQuery", SHARED, s_prepare_query, NULL);
-  runset("resultBasic", SHARED, s_result_basic, NULL);
-  runset("resultBody", SHARED, s_result_body, NULL);
-  runset("resultHeaders", SHARED, s_result_headers, NULL);
-  runset("transformRequest", SHARED, s_transform_request, NULL);
-  runset("transformResponse", SHARED, s_transform_response, NULL);
-  runset("param", SHARED, s_param, NULL);
-  runset("makeError", SHARED, s_make_error, NULL);
-  runset("makeContext", SHARED, NULL, s_make_context);
-  runset("makeOptions", SHARED, NULL, s_make_options);
-  runset("operator", SHARED, NULL, s_operator);
+  runset("done", s_done, NULL);
+  runset("makeUrl", s_make_url, NULL);
+  runset("makeRequest", s_make_request, NULL);
+  runset("makeResponse", s_make_response, NULL);
+  runset("makeSpec", s_make_spec, NULL);
+  runset("prepareAuth", s_prepare_auth, NULL);
+  runset("prepareBody", s_prepare_body, NULL);
+  runset("prepareHeaders", s_prepare_headers, NULL);
+  runset("prepareMethod", s_prepare_method, NULL);
+  runset("prepareParams", s_prepare_params, NULL);
+  runset("preparePath", s_prepare_path, NULL);
+  runset("prepareQuery", s_prepare_query, NULL);
+  runset("resultBasic", s_result_basic, NULL);
+  runset("resultBody", s_result_body, NULL);
+  runset("resultHeaders", s_result_headers, NULL);
+  runset("transformRequest", s_transform_request, NULL);
+  runset("transformResponse", s_transform_response, NULL);
+  runset("param", s_param, NULL);
+  runset("makeError", s_make_error, NULL);
+  runset("makeContext", NULL, s_make_context);
+  runset("makeOptions", NULL, s_make_options);
+  runset("operator", NULL, s_operator);
 
-  printf("\nPRIMARY CORPUS: PASS %d  FAIL %d\n", NPASS, NFAIL);
-  return NFAIL == 0 ? 0 : 1;
+  for (i = 0; i < NROWS; i++) {
+    cases += ROWS[i].cases;
+    failed += ROWS[i].failed ? 1 : 0;
+    if (ROWS[i].failed) {
+      printf("PRIMARY-FAIL %s - %s\n", ROWS[i].name,
+             NULL == ROWS[i].err ? "(no message)" : ROWS[i].err);
+    }
+  }
+
+  printf("\nPRIMARY CORPUS: %zu cases in %zu sections, %d section(s) FAILED\n", cases, NROWS,
+         failed);
+
+  for (i = 0; i < NROWS; i++) {
+    free(ROWS[i].name);
+    free(ROWS[i].err);
+  }
+
+  return 0 == failed ? 0 : 1;
 }

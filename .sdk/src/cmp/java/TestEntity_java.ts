@@ -17,7 +17,9 @@ import {
   each,
   buildIdNames,
   getMatchEntries,
-  isAuthActive, envName, envToken
+  isAuthActive,
+  serverVarEnv,
+  serverVariables, envName, envToken
 } from '@voxgig/sdkgen'
 
 
@@ -66,6 +68,20 @@ const TestEntity = cmp(function TestEntity(props: any) {
   const accessor = javaVarName(entity.name)
 
   const authActive = isAuthActive(model)
+
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: MakeOptions throws rather than
+  // request a URL with a literal `{account_id}` in it. Taken from the
+  // environment, the same way the apikey is.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `    envm.put("${serverVarEnv(PROJUPPER, v.name)}", ${JSON.stringify(v.dflt)});\n`).join('')
+  const serverLiveField = 0 === svars.length ? '' :
+    `      Map<String, Object> serveropt = new LinkedHashMap<>();\n` +
+    svars.map((v: any) =>
+      `      serveropt.put("${v.name}", env.get("${serverVarEnv(PROJUPPER, v.name)}"));\n`).join('') +
+    `      liveOpts.put("server", serveropt);\n`
 
   const idnames = buildIdNames(entity, basicflow)
 
@@ -256,7 +272,7 @@ ${allSteps.length > 0 ? `    ${SDK} client = setup.client;\n\n` : ''}`)
     envm.put("${entidEnvVar}", idmap);
     envm.put("${PROJUPPER}_TEST_LIVE", "FALSE");
     envm.put("${PROJUPPER}_TEST_EXPLAIN", "FALSE");
-${authActive ? `    envm.put("${PROJUPPER}_APIKEY", "NONE");\n` : ''}    Map<String, Object> env = RunnerSupport.envOverride(envm);
+${authActive ? `    envm.put("${PROJUPPER}_APIKEY", "");\n` : ''}${serverEnvEntry}    Map<String, Object> env = RunnerSupport.envOverride(envm);
 
     Map<String, Object> idmapResolved = Helpers.toMapAny(env.get("${entidEnvVar}"));
     if (idmapResolved == null) {
@@ -276,8 +292,17 @@ ${authActive ? `    envm.put("${PROJUPPER}_APIKEY", "NONE");\n` : ''}    Map<Str
     Content(`
     boolean live = "TRUE".equals(env.get("${PROJUPPER}_TEST_LIVE"));
     if (live) {
-      Map<String, Object> liveOpts = new LinkedHashMap<>();
-${authActive ? `      liveOpts.put("apikey", env.get("${PROJUPPER}_APIKEY"));\n` : ''}      Object mergedOpts = Struct.merge(Struct.jt(liveOpts, extra));
+      // sdk-test-control.json's test.client.options seeds the live
+      // client; the generated fields below overwrite anything they name.
+      Map<String, Object> liveOpts =
+          new LinkedHashMap<>(RunnerSupport.liveClientOptions());
+${authActive ? `      liveOpts.put("apikey", env.get("${PROJUPPER}_APIKEY"));\n` : ''}${serverLiveField}      // An empty map, not a null one: merge answers null when its last
+      // entry is null, and basicSetup is normally called with no extras -
+      // so a bare null silently discarded the apikey and server values
+      // above.
+      Map<String, Object> extraOpts =
+          extra == null ? new LinkedHashMap<>() : extra;
+      Object mergedOpts = Struct.merge(Struct.jt(liveOpts, extraOpts));
       client = new ${SDK}(Helpers.toMapAny(mergedOpts));
     }
 

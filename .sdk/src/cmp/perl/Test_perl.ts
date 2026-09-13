@@ -3,7 +3,8 @@ import type {
   ModelEntity
 } from '@voxgig/apidef'
 
-import { cmp, each, Folder, File, Content, entityCollection } from '@voxgig/sdkgen'
+import { cmp, each, Folder, File, Content, entityCollection,
+  TestControl } from '@voxgig/sdkgen'
 
 
 import { TestEntity } from './TestEntity_perl'
@@ -16,6 +17,9 @@ const Test = cmp(function Test(props: any) {
   const { target } = props
 
   Folder({ name: 't' }, () => {
+
+    // Write-once: a project's edited control file survives regeneration.
+    TestControl({ target, dir: 't' })
 
     // Generate exists test
     File({ name: 'exists.t' }, () => {

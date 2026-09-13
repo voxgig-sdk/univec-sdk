@@ -4,7 +4,7 @@
   (:require [sdk.core :as core]
             [sdk.client :as client]
             [sdk.testutil :as t]
-            [sdk.test.struct-corpus :as corpus]
+            [sdk.test.omni :as omni]
             [voxgig.struct :as vs]
             [clojure.string :as str])
   (:import [java.util Map]))
@@ -18,9 +18,6 @@
 ;; corpus case that changed, or one that was added.
 
 (def ^:private CORPUS "../.sdk/test/test.json")
-
-(defn- getspec [root & path]
-  (reduce (fn [acc k] (when acc (.get ^Map acc k))) root path))
 
 (defn- lower-headers [m]
   ;; Header names arrive in any case and the contract is lowercase; the SDK
@@ -143,16 +140,24 @@
                  (t/is-true (str/includes? (str (vs/getprop fetchdef "url")) "/api/items/item01") "url includes")))))
     nil))
 
-
 (defn run-corpus
-  "Drive every primary section of the shared corpus through this SDK."
+  "Drive every primary section of the shared corpus through this SDK.
+
+   The engine is the VENDORED omni runner (sdk.test.omni), not a hand-written
+   entry loop: each section names its corpus node and the subject that drives
+   it, and omni decides whether the result, the match and the error
+   expectations hold. omni raises on the first failing entry of a set, so a
+   green section counts its whole set - counted at the SUBJECT, from
+   sdk.test.omni's execution counter, and failed when it disagrees with the
+   set handed over, so the number cannot survive a stopped engine."
   [rec]
-  (let [sdk (client/test-sdk nil nil)
+  (let [alltests (omni/load-spec CORPUS)
+        primary (get alltests "primary")
+        sdk (client/test-sdk nil nil)
+        mkrunner (omni/make-runner alltests sdk)
         utility (core/get-utility sdk)
         u (fn [k] (get (deref utility) k))
-        alltests (core/json-parse (slurp CORPUS))
-        primary (.get ^Map alltests "primary")
-        setup-of (fn [nm] (getspec primary nm "DEF" "setup" "a"))
+        setup-of (fn [nm] (omni/->struct (get-in primary [nm "DEF" "setup" "a"])))
         client-for (fn [nm] (let [su (setup-of nm)]
                               (if (vs/ismap su) (client/test-sdk nil su) sdk)))
         ;; make-spec and prepare-auth read defaults off the CLIENT, as the ts
@@ -161,62 +166,91 @@
         spec-sdk (client-for "makeSpec")
         auth-sdk (client-for "prepareAuth")
         ran (atom 0)
+        npass (atom 0)
+        fails (atom [])
         ;; One section, driven with a ctx built from the corpus entry.
         runset (fn [nm cl f]
-              (let [node (getspec primary nm "basic")]
-                (when (nil? node)
-                  (throw (ex-info (str "corpus section missing: " nm) {})))
-                (swap! ran inc)
-                ;; run-set APPLIES the resolved args, so an args-style entry
-                ;; calls the subject with more than one — variadic, and the
-                ;; extra arg reaches the section through `more`.
-                (corpus/run-set nm node
-                  (fn [& as]
-                    (let [ctxmap (first as)
-                          more (second as)
-                          ctx (corpus-ctx cl (core/get-utility cl) ctxmap)
-                          out (f ctx ctxmap more)]
-                      (publish-ctx ctxmap ctx)
-                      out)))))
+                 (let [node (get-in primary [nm "basic"])]
+                   (when (nil? node)
+                     (throw (ex-info (str "corpus section missing: " nm) {})))
+                   (swap! ran inc)
+                   (let [rp (mkrunner nm)
+                         testset (get node "set")
+                         n (count testset)]
+                     ;; A section whose `set` is present but empty runs nothing
+                     ;; and raises nothing - no passes, and green. omni refuses
+                     ;; that under a versioned spec (`checkset`, with an
+                     ;; `empty: true` opt-out); the shared corpus is lenient v0,
+                     ;; so it is refused here. A section with no `set` at all is
+                     ;; left to omni, whose message for it is the better one.
+                     (if (and (sequential? testset) (zero? n)
+                              (not (true? (get node "empty"))))
+                       (swap! fails conj [nm "corpus section has an empty set"])
+                       (try
+                       ;; omni APPLIES the resolved args, so an args-style entry
+                       ;; calls the subject with more than one - variadic, and the
+                       ;; extra arg reaches the section through `more`.
+                       ;;
+                         ;; `executed` is the engine's own count for this set
+                         ;; (sdk.test.omni counts inside the subject wrapper),
+                         ;; NOT the section's declared size: a number derived
+                         ;; from the spec prints the same whether the engine ran
+                         ;; or was never called, so it could never show a
+                         ;; stoppage.
+                         (let [executed (long (or ((:runsetflags rp) node {:name nm}
+                                                   (fn [& as]
+                                                     (let [ctxmap (first as)
+                                                           more (second as)
+                                                           ctx (corpus-ctx cl (core/get-utility cl) ctxmap)
+                                                           out (f ctx ctxmap more)]
+                                                       ;; ctxmap is the LIVE map behind omni's
+                                                       ;; ctx view, so this write is what
+                                                       ;; `match: {ctx: ...}` reads.
+                                                       (publish-ctx ctxmap ctx)
+                                                       out)))
+                                                  0))]
+                           (if (not= executed n)
+                             (swap! fails conj
+                                    [nm (str "the engine ran " executed " of the section's "
+                                             n " entries")])
+                             (swap! npass + executed)))
+                         (catch Throwable err
+                           (swap! fails conj [nm (or (ex-message err) (str err))])))))))
         argof (fn [ctxmap k] (vs/getprop ctxmap k))]
 
     (t/run-check rec "primary-corpus"
       (fn []
-        (binding [corpus/*results* (atom {:pass [] :fail []})]
-          (runset "done" sdk              (fn [c _ _2] ((u :done) c)))
-          (runset "makeUrl" sdk           (fn [c _ _2] (first ((u :make-url) c))))
-          (runset "makeRequest" sdk       (fn [c _ _2] (first ((u :make-request) c))))
-          (runset "makeResponse" sdk      (fn [c _ _2] (first ((u :make-response) c))))
-          (runset "makeSpec" spec-sdk     (fn [c _ _2] (first ((u :make-spec) c))))
-          (runset "prepareAuth" auth-sdk  (fn [c _ _2] (first ((u :prepare-auth) c))))
-          (runset "prepareBody" sdk       (fn [c _ _2] ((u :prepare-body) c)))
-          (runset "prepareHeaders" sdk    (fn [c _ _2] ((u :prepare-headers) c)))
-          (runset "prepareMethod" sdk     (fn [c _ _2] ((u :prepare-method) c)))
-          (runset "prepareParams" sdk     (fn [c _ _2] ((u :prepare-params) c)))
-          (runset "preparePath" sdk       (fn [c _ _2] ((u :prepare-path) c)))
-          (runset "prepareQuery" sdk      (fn [c _ _2] ((u :prepare-query) c)))
-          (runset "resultBasic" sdk       (fn [c _ _2] (neutral ((u :result-basic) c))))
-          (runset "resultBody" sdk        (fn [c _ _2] (neutral ((u :result-body) c))))
-          (runset "resultHeaders" sdk     (fn [c _ _2] (neutral ((u :result-headers) c))))
-          (runset "transformRequest" sdk  (fn [c _ _2] ((u :transform-request) c)))
-          (runset "transformResponse" sdk (fn [c _ _2] ((u :transform-response) c)))
-          (runset "makeOptions" sdk       (fn [c m _2]
+        (runset "done" sdk              (fn [c _ _2] ((u :done) c)))
+        (runset "makeUrl" sdk           (fn [c _ _2] (first ((u :make-url) c))))
+        (runset "makeRequest" sdk       (fn [c _ _2] (first ((u :make-request) c))))
+        (runset "makeResponse" sdk      (fn [c _ _2] (first ((u :make-response) c))))
+        (runset "makeSpec" spec-sdk     (fn [c _ _2] (first ((u :make-spec) c))))
+        (runset "prepareAuth" auth-sdk  (fn [c _ _2] (first ((u :prepare-auth) c))))
+        (runset "prepareBody" sdk       (fn [c _ _2] ((u :prepare-body) c)))
+        (runset "prepareHeaders" sdk    (fn [c _ _2] ((u :prepare-headers) c)))
+        (runset "prepareMethod" sdk     (fn [c _ _2] ((u :prepare-method) c)))
+        (runset "prepareParams" sdk     (fn [c _ _2] ((u :prepare-params) c)))
+        (runset "preparePath" sdk       (fn [c _ _2] ((u :prepare-path) c)))
+        (runset "prepareQuery" sdk      (fn [c _ _2] ((u :prepare-query) c)))
+        (runset "resultBasic" sdk       (fn [c _ _2] (neutral ((u :result-basic) c))))
+        (runset "resultBody" sdk        (fn [c _ _2] (neutral ((u :result-body) c))))
+        (runset "resultHeaders" sdk     (fn [c _ _2] (neutral ((u :result-headers) c))))
+        (runset "transformRequest" sdk  (fn [c _ _2] ((u :transform-request) c)))
+        (runset "transformResponse" sdk (fn [c _ _2] ((u :transform-response) c)))
+        (runset "makeOptions" sdk       (fn [c m _2]
                                          (core/oset! c :config (argof m "config"))
                                          (core/oset! c :options (argof m "options"))
                                          ((u :make-options) c)))
-          (runset "makeContext" sdk       (fn [c _ _2]
+        (runset "makeContext" sdk       (fn [c _ _2]
                                          (let [op (core/oget c :op)]
                                            (vs/jm "op" (neutral op)))))
-          (runset "makeError" sdk         (fn [c _ err] (first ((u :make-error) c err))))
-          (runset "operator" sdk          (fn [_ m _2] (neutral (core/make-operation m))))
-          (runset "param" sdk             (fn [c _ pd] ((u :param) c pd)))
+        (runset "makeError" sdk         (fn [c _ err] (first ((u :make-error) c err))))
+        (runset "operator" sdk          (fn [_ m _2] (neutral (core/make-operation m))))
+        (runset "param" sdk             (fn [c _ pd] ((u :param) c pd)))
 
-          (let [r @corpus/*results*
-                np (count (:pass r))
-                nf (count (:fail r))]
-            (doseq [f (:fail r)]
-              (println "PRIMARY-FAIL" (:group f) (:name f) "-" (:msg f)))
-            (println "PRIMARY CORPUS: PASS" np " FAIL" nf)
-            (t/is-true (< 0 @ran) "the primary corpus executed no sections")
-            (t/is-true (< 0 np) "the primary corpus executed no cases")
-            (t/is-true (= 0 nf) (str nf " primary corpus failures"))))))))
+        (let [np @npass nf (count @fails)]
+          (doseq [[nm msg] @fails] (println "PRIMARY-FAIL" nm "-" msg))
+          (println "PRIMARY CORPUS: PASS" np " FAIL" nf)
+          (t/is-true (< 0 @ran) "the primary corpus executed no sections")
+          (t/is-true (< 0 np) "the primary corpus executed no cases")
+          (t/is-true (= 0 nf) (str nf " primary corpus failures")))))))

@@ -12,7 +12,7 @@ import type {
 } from '@voxgig/apidef'
 
 
-import { zigModuleName } from './utility_zig'
+import { zigModuleName, zigPackageFingerprint } from './utility_zig'
 
 
 // build.zig.zon — the Zig package manifest. Zig has no central package
@@ -24,16 +24,19 @@ import { zigModuleName } from './utility_zig'
 //
 // The `.paths` allow-list mirrors the (registry-less) template: it only
 // matters when packaging for a registry, which zig does not do, so it is kept
-// stable. `.name` is a plain string here rather than the newer enum-literal +
-// fingerprint form.
+// stable.
 //
-// TOOLCHAIN PIN: the string form REQUIRES zig <= 0.13. Zig 0.14 rejects it
-// outright — `build.zig.zon:2:13: error: expected enum literal` — so the
-// generated SDK will not build at all on a newer toolchain. The consumer CI
-// job pins 0.13.0 to match (create-sdkgen
-// project/standard/.github/workflows/ci.yml). Moving to a newer zig means
-// changing BOTH: `.name = .${name}` plus a `.fingerprint` here, and the CI
-// pin there.
+// TOOLCHAIN: zig 0.16. `.name` is an ENUM LITERAL (`.solar_sdk`), and a
+// `.fingerprint` is required beside it. That pairing is what a modern zig
+// wants: 0.14 rejects the older plain-string form outright —
+// `build.zig.zon:2:13: error: expected enum literal` — and 0.13 rejects the
+// enum-literal form, so the two cannot both be supported from one generator.
+// A move BACK to 0.13 would mean reverting both fields here and the CI pin in
+// create-sdkgen project/standard/.github/workflows/ci.yml together.
+//
+// The fingerprint is derived from the package name, not random, so
+// regenerating the same model does not rewrite this file — see
+// zigPackageFingerprint for why, and for what zig checks.
 const Package = cmp(async function Package(props: any) {
   const ctx$ = props.ctx$
   const target = props.target
@@ -43,8 +46,9 @@ const Package = cmp(async function Package(props: any) {
 
   File({ name: 'build.zig.zon' }, () => {
     Content(`.{
-    .name = "${name}",
+    .name = .${name},
     .version = "${packageVersion(model, target.name)}",
+    .fingerprint = ${zigPackageFingerprint(name)},
     .dependencies = .{},
     .paths = .{
         "src",

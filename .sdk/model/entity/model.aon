@@ -75,9 +75,13 @@ main: kit: entity: model: {
         {
           method: "GET"
           orig: "/v1/models"
-          parts: [
-            "v1"
-            "models"
+          segments: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "models"
+            }
           ]
           transform: {
             req: "`reqdata`"

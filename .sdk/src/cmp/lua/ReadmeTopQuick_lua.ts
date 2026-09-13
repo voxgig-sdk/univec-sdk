@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, opRequestShape, safeVarName, exampleVarName } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, opRequestShape, safeVarName, exampleVarName, luaKey } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -20,9 +20,6 @@ function luaLit(type: any, placeholder: string = 'example'): string {
 }
 
 // Non-identifier table keys use bracket syntax.
-function luaKey(name: string): string {
-  return /^[A-Za-z_]\w*$/.test(name) ? name : `["${name}"]`
-}
 
 
 const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {

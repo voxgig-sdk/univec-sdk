@@ -72,13 +72,17 @@ sub model_direct_setup {
   my $env = UnivecTestRunner::env_override({
     'UNIVEC_TEST_MODEL_ENTID' => {},
     'UNIVEC_TEST_LIVE' => 'FALSE',
-    'UNIVEC_APIKEY' => 'NONE',
+    'UNIVEC_APIKEY' => '',
   });
 
   my $live = ((($env->{'UNIVEC_TEST_LIVE'}) || '') eq 'TRUE') ? 1 : 0;
 
   if ($live) {
+    # live_client_options() FIRST so the generated fields below win:
+    # sdk-test-control.json's test.client.options adds to the live client,
+    # it does not redirect it (a later key wins in a Perl hash literal).
     my $client = UnivecSDK->new({
+      %{ UnivecTestRunner::live_client_options() },
       'apikey' => $env->{'UNIVEC_APIKEY'},
     });
     return {

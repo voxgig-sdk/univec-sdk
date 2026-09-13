@@ -17,7 +17,11 @@ import {
   cmp,
   snakify,
   isAuthActive,
-  jsProp, envName, envToken
+  serverVarEnv,
+  serverVariables,
+  jsProp, envName, envToken,
+  jsKey,
+  pointParts,
 } from '@voxgig/sdkgen'
 
 
@@ -41,12 +45,31 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   const authActive = isAuthActive(model)
   const apikeyEnvEntry = authActive
-    ? `\n    '${PROJECTNAME}_APIKEY': 'NONE',`
+    ? `\n    '${PROJECTNAME}_APIKEY': '',`
     : ''
   const apikeyLiveField = authActive
     ? `
       apikey: env.${PROJECTNAME}_APIKEY,`
     : ''
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: makeOptions raises rather than
+  // request a URL with a literal `{account_id}` in it. Taken from the
+  // environment, the same way the apikey is.
+  //
+  // Keys are quoted and the env read is bracketed via jsKey/jsProp: a server
+  // variable name is spec-derived and need not be a JS identifier — the URL
+  // grammar admits a leading digit ({2fa}), and a declared-but-unreferenced
+  // variable ({edge-zone}) is not constrained at all. Bare `name:` and
+  // `env.PROJ_SERVER_EDGE-ZONE` are both syntax errors.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `\n    '${serverVarEnv(PROJECTNAME, v.name)}': ${JSON.stringify(v.dflt)},`).join('')
+  const serverLiveField = 0 === svars.length ? '' : `
+      server: {${svars
+      .map((v: any) => `
+        ${jsKey(v.name)}: ${jsProp('env', serverVarEnv(PROJECTNAME, v.name))},`).join('')}
+      },`
 
   const opnames = Object.keys(entity.op || {})
   const hasLoad = opnames.includes('load')
@@ -78,14 +101,17 @@ function directSetup(mockres) {
 
   const env = envOverride({
     '${entidEnvVar}': {},
-    '${PROJECTNAME}_TEST_LIVE': 'FALSE',${apikeyEnvEntry}
+    '${PROJECTNAME}_TEST_LIVE': 'FALSE',${apikeyEnvEntry}${serverEnvEntry}
   })
 
   const live = 'TRUE' === env.${PROJECTNAME}_TEST_LIVE
 
   if (live) {
-    const client = new ${nom(model.const, 'Name')}SDK({${apikeyLiveField}
-    })
+    // Merged so the generated fields win: sdk-test-control.json's
+    // test.client.options adds to the live client, it does not redirect it.
+    const client = new ${nom(model.const, 'Name')}SDK(
+      Object.assign({}, liveClientOptions(), {${apikeyLiveField}${serverLiveField}
+      }))
 
     let idmap = env['${entidEnvVar}']
     if ('string' === typeof idmap && idmap.startsWith('{')) {
@@ -147,13 +173,13 @@ function generateDirectLoad(model: Model, entity: ModelEntity) {
   }
 
   const loadParams = loadPoint.args?.params || []
-  const loadPath = normalizePathParams(loadPoint.parts || [], loadParams, loadPoint.rename?.param)
+  const loadPath = normalizePathParams(pointParts(loadPoint), loadParams, loadPoint.rename?.param)
 
   // Get list info for live mode bootstrapping
   const listOp = entity.op?.list
   const listPoint = listOp?.points?.[0]
   const listParams = listPoint?.args?.params || []
-  const listPath = listPoint ? normalizePathParams(listPoint.parts || [], listParams, listPoint.rename?.param) : ''
+  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listParams, listPoint.rename?.param) : ''
   const hasList = null != listPoint
 
   // Ancestor params (not 'id') for live mode
@@ -249,7 +275,7 @@ function generateDirectList(model: Model, entity: ModelEntity) {
   }
 
   const listParams = listPoint.args?.params || []
-  const listPath = normalizePathParams(listPoint.parts || [], listParams, listPoint.rename?.param)
+  const listPath = normalizePathParams(pointParts(listPoint), listParams, listPoint.rename?.param)
 
   // Build live params
   const liveParams = listParams.map((p: any) => {

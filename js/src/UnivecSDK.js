@@ -16,6 +16,7 @@ const { UnivecEntityBase } = require('./UnivecEntityBase')
 const { BaseFeature } = require('./feature/base/BaseFeature')
 
 
+
 const stdutil = new Utility()
 
 
@@ -25,6 +26,7 @@ class UnivecSDK {
   _utility = new Utility()
   _features
   _rootctx
+  
 
   constructor(options) {
 
@@ -97,6 +99,8 @@ class UnivecSDK {
     return this._utility.struct.clone(this._utility)
   }
 
+  
+
 
   async prepare(fetchargs) {
     const utility = this._utility
@@ -142,6 +146,8 @@ class UnivecSDK {
         spec.headers[key] = uheaders[key]
       }
     }
+
+    
 
     // Apply SDK auth (apikey, auth prefix, etc.)
     const authResult = prepareAuth(ctx)
@@ -375,6 +381,7 @@ const SDK = UnivecSDK
 module.exports = {
   stdutil,
   config,
+  
 
   BaseFeature,
   UnivecEntityBase,

@@ -1,8 +1,25 @@
 #!perl
 # Univec SDK primary utility test
 #
-# Drives the primary utility test corpus (.sdk/test/test.json "primary")
-# through the client's utility view, mirroring the rb primary_utility_test.
+# Corpus sections run through the vendored omni runner, via the resolver
+# in t/omni.pm (struct-runner shape over native Voxgig::Omni). The inline
+# corpus engine this file used to carry is retired: omni resolves
+# arguments, applies the null rules, and enforces out/err/match - the
+# subjects below only adapt each utility's calling convention.
+#
+# Three conventions to know when adding a section:
+#
+# - Subjects receive the contextified entry as a map-face VIEW; unwrap the
+#   live blessed context with UnivecOmni::livectx before calling a
+#   utility (utilities call methods on it - `$ctx->make_error`).
+#
+# - Utilities that answer as a (value, err) PAIR go through _unwrap, which
+#   dies with the err so omni can match it against `err:` expectations.
+#   Utilities that answer bare values (or die) are passed straight in.
+#
+# - `match: {ctx: ...}` assertions read the LIVE context after the subject
+#   ran - the resolver's view presents the context object as the map omni
+#   walks, camelCase keys included.
 
 use strict;
 use warnings;
@@ -15,22 +32,36 @@ use Cwd ();
 
 use UnivecSDK;
 
+require(Cwd::abs_path("$FindBin::Bin/omni.pm"));
+
 my $TEST_JSON = Cwd::abs_path("$FindBin::Bin/../../.sdk/test/test.json");
 
 unless (defined $TEST_JSON && -e $TEST_JSON) {
   plan skip_all => 'test.json corpus not found';
 }
 
-my $SPEC = do {
-  open my $fh, '<:raw', $TEST_JSON or die "Cannot open $TEST_JSON: $!";
-  local $/;
-  Voxgig::Struct::parse_json(<$fh>);
-};
-my $PRIMARY = get_spec($SPEC, 'primary');
-ok(Voxgig::Struct::ismap($PRIMARY), 'primary section found in test.json');
+my $_runner = UnivecOmni::make_runner($TEST_JSON, UnivecSDK->test(undef, undef));
+my $_run = $_runner->('primary');
 
-my $client = UnivecSDK->test(undef, undef);
+my $spec = $_run->{spec};
+my $runset = $_run->{runset};
+my $runsetflags = $_run->{runsetflags};
+
+# Under the old inline runner the suite drove the SDK directly; under omni
+# the runpack's client is the provider wrapping it. This suite treats the
+# client as the SDK - so unwrap the real instance (mirrors ts/py).
+my $client = $_run->{client}{sdk};
 my $utility = $client->get_utility;
+
+ok(Voxgig::Struct::ismap($spec), 'primary section found in test.json');
+
+
+# Sections deliberately left empty in the shared corpus
+# (.sdk/test/primary/<name>.aon carries a PENDING header). Everything else
+# MUST contribute cases.
+my %PENDING = map { $_ => 1 } qw(
+  fetcher makeFetchDef makeResult featureAdd featureHook featureInit
+);
 
 
 # === Helper packages ===
@@ -76,168 +107,55 @@ my $utility = $client->get_utility;
 
 # === Helpers ===
 
-sub get_spec {
-  my ($spec, @keys) = @_;
-  my $cur = $spec;
-  for my $key (@keys) {
-    return undef unless Voxgig::Struct::ismap($cur);
-    $cur = $cur->{$key};
-  }
-  return Voxgig::Struct::ismap($cur) ? $cur : undef;
-}
+# Run one corpus section, failing loudly when it would run ZERO cases. A
+# renamed section or a fixture that compiled to an empty `set` used to
+# pass silently, which defeats the point of a shared oracle. EVERY
+# corpus-backed test goes through here (mirrors ts/py). Each section is
+# one assertion; omni's failure message carries the entry index, the entry
+# and both values.
+sub runsection {
+  my ($name, $subject) = @_;
 
-sub canon {
-  my ($v) = @_;
-  return Voxgig::Struct::_stringify_inner($v, 1);
-}
-
-sub match_string {
-  my ($pattern, $val) = @_;
-  if (length($pattern) >= 2 && '/' eq substr($pattern, 0, 1)
-    && '/' eq substr($pattern, -1)) {
-    my $re = substr($pattern, 1, length($pattern) - 2);
-    return ("$val" =~ /$re/) ? 1 : 0;
-  }
-  return (index(lc "$val", lc $pattern) >= 0) ? 1 : 0;
-}
-
-sub match_deep {
-  my ($label, $check, $base, $path) = @_;
-  return 1 unless defined $check;
-
-  if (Voxgig::Struct::ismap($check)) {
-    for my $key (keys %$check) {
-      my $base_val = Voxgig::Struct::ismap($base) ? $base->{$key} : undef;
-      return 0 unless match_deep($label, $check->{$key}, $base_val, "$path.$key");
-    }
-    return 1;
-  }
-  if (Voxgig::Struct::islist($check)) {
-    for my $ci (0 .. $#$check) {
-      my $base_val = (Voxgig::Struct::islist($base) && $ci < @$base)
-        ? $base->[$ci] : undef;
-      return 0 unless match_deep($label, $check->[$ci], $base_val, "$path\[$ci\]");
-    }
-    return 1;
-  }
-
-  if (defined $check && !ref $check && '__EXISTS__' eq $check) {
-    return 1 if defined $base;
-    fail("$label: match $path: expected value to exist but got undef");
-    return 0;
-  }
-  if (defined $check && !ref $check && '__UNDEF__' eq $check) {
-    return 1 if !defined $base;
-    fail("$label: match $path: expected undef but got " . canon($base));
-    return 0;
-  }
-
-  return 1 if canon($check) eq canon($base);
-
-  if (defined $check && !ref($check) && !Voxgig::Struct::is_jbool($check)
-    && !Voxgig::Struct::is_jnull($check) && '' ne "$check") {
-    my $base_str = defined $base ? "$base" : '';
-    return 1 if match_string("$check", $base_str);
-  }
-
-  fail("$label: match $path: got " . canon($base) . ', want ' . canon($check));
-  return 0;
-}
-
-# Run each entry of a test set through $subject (called with the entry;
-# returns the result and may die). Expected errors are matched by
-# substring / regex; "match" clauses are checked over {in,out,args,ctx}.
-sub runset {
-  my ($label, $testspec, $subject) = @_;
-  unless ($testspec) {
-    pass("$label: no test set");
+  my $section = (ref($spec) eq 'HASH') ? $spec->{$name} : undef;
+  unless (ref($section) eq 'HASH') {
+    fail("corpus section '$name' missing - check the name against .sdk/test/primary/");
     return;
   }
-  my $set = $testspec->{set};
-  unless (Voxgig::Struct::islist($set)) {
-    pass("$label: empty test set");
+  my $basic = $section->{basic};
+  unless (ref($basic) eq 'HASH' && ref($basic->{set}) eq 'ARRAY') {
+    fail("corpus section '$name' has no basic.set list");
+    return;
+  }
+  if (0 == scalar(@{ $basic->{set} }) && !$PENDING{$name}) {
+    fail("corpus section '$name' is EMPTY - zero cases would run; add cases, "
+      . 'or mark the fixture PENDING in .sdk/test/primary/');
     return;
   }
 
-  my $i = -1;
-  for my $entry (@$set) {
-    $i++;
-    next unless Voxgig::Struct::ismap($entry);
-    my $mark = defined $entry->{mark} ? " (mark=$entry->{mark})" : '';
-    my $elabel = "$label entry $i$mark";
-
-    my $result = eval { $subject->($entry) };
+  my $ok = eval { $runset->($basic, $subject); 1 };
+  if ($ok) { pass("$name.basic") }
+  else {
     my $err = $@;
-
-    my $expected_err = $entry->{err};
-
-    if ($err) {
-      if (defined $expected_err) {
-        my $err_msg = "$err";
-        if (!ref $expected_err && !Voxgig::Struct::is_jbool($expected_err)) {
-          unless (match_string("$expected_err", $err_msg)) {
-            fail("$elabel: error mismatch: got [$err_msg], want contains [$expected_err]");
-            next;
-          }
-        }
-        # err: true means any error is acceptable
-        if (Voxgig::Struct::ismap($entry->{match})) {
-          my $result_map = {
-            'in' => $entry->{in},
-            'out' => undef,
-            'err' => { 'message' => "$err" },
-          };
-          $result_map->{ctx} = $entry->{ctx} if defined $entry->{ctx};
-          next unless match_deep($elabel, $entry->{match}, $result_map, '');
-        }
-        pass($elabel);
-        next;
-      }
-      fail("$elabel: unexpected error: $err");
-      next;
-    }
-
-    if (defined $expected_err) {
-      fail("$elabel: expected error containing " . canon($expected_err)
-        . ' but got result: ' . canon($result));
-      next;
-    }
-
-    my $matched = 0;
-    if (Voxgig::Struct::ismap($entry->{match})) {
-      my $result_map = {
-        'in' => $entry->{in},
-        'out' => $result,
-      };
-      if (defined $entry->{args}) {
-        $result_map->{args} = $entry->{args};
-      }
-      elsif (defined $entry->{in}) {
-        $result_map->{args} = [$entry->{in}];
-      }
-      $result_map->{ctx} = $entry->{ctx} if defined $entry->{ctx};
-      next unless match_deep($elabel, $entry->{match}, $result_map, '');
-      $matched = 1;
-    }
-
-    my $has_out = exists $entry->{out}
-      && defined $entry->{out} && !Voxgig::Struct::is_jnull($entry->{out});
-    if (!$has_out && $matched) {
-      pass($elabel);
-      next;
-    }
-
-    if ($has_out) {
-      unless (canon($result) eq canon($entry->{out})) {
-        fail("$elabel: output mismatch:\n  got:  " . canon($result)
-          . "\n  want: " . canon($entry->{out}));
-        next;
-      }
-    }
-
-    pass($elabel);
+    fail("$name.basic");
+    diag("$name.basic: $err");
   }
   return;
+}
+
+# (value, err) pair convention -> value-or-die, omni's shape.
+sub _unwrap {
+  my ($val, $err) = @_;
+  die $err if defined $err;
+  return $val;
+}
+
+sub _err_from_map {
+  my ($m) = @_;
+  return undef unless ref($m) eq 'HASH';
+  my $msg = $m->{message};
+  return undef unless defined $msg && !ref $msg && '' ne $msg;
+  my $code = defined $m->{code} ? $m->{code} : '';
+  return UnivecError->new($code, $msg);
 }
 
 sub make_test_ctx {
@@ -270,68 +188,15 @@ sub make_test_full_ctx {
   return $ctx;
 }
 
-sub make_ctx_from_map {
-  my ($ctxmap, $c, $u) = @_;
-  $ctxmap = {} unless Voxgig::Struct::ismap($ctxmap);
-
-  my $ctx = UnivecContext->new($ctxmap, undef);
-
-  if ($c) {
-    $ctx->{client} = $c;
-    $ctx->{utility} = $u;
-  }
-  if (!defined $ctx->{options} && $c) {
-    $ctx->{options} = $c->options_map;
-  }
-
-  # Handle spec from JSON map
-  if (Voxgig::Struct::ismap($ctxmap->{spec})) {
-    $ctx->{spec} = UnivecSpec->new($ctxmap->{spec});
-  }
-
-  # Handle result from JSON map
-  if (Voxgig::Struct::ismap($ctxmap->{result})) {
-    my $res_map = $ctxmap->{result};
-    $ctx->{result} = UnivecResult->new($res_map);
-    if (Voxgig::Struct::ismap($res_map->{err})
-      && defined $res_map->{err}{message} && !ref $res_map->{err}{message}) {
-      $ctx->{result}{err} = UnivecError->new('', $res_map->{err}{message});
-    }
-  }
-
-  # Handle response from JSON map
-  if (Voxgig::Struct::ismap($ctxmap->{response})) {
-    my $resp_map = $ctxmap->{response};
-    $ctx->{response} = UnivecResponse->new($resp_map);
-    if (UnivecHelpers::rb_truthy($resp_map->{body})) {
-      my $body_copy = $resp_map->{body};
-      $ctx->{response}{json_func} = sub { $body_copy };
-    }
-    if (Voxgig::Struct::ismap($resp_map->{headers})) {
-      my $lower = {};
-      $lower->{lc $_} = $resp_map->{headers}{$_} for keys %{ $resp_map->{headers} };
-      $ctx->{response}{headers} = $lower;
-    }
-  }
-
-  return $ctx;
-}
-
-sub fixctx {
-  my ($ctx, $c) = @_;
-  if ($ctx && $ctx->{client} && !defined $ctx->{options}) {
-    $ctx->{options} = $ctx->{client}->options_map;
-  }
-  return;
-}
-
-sub err_from_map {
-  my ($m) = @_;
-  return undef unless Voxgig::Struct::ismap($m);
-  my $msg = $m->{message};
-  return undef unless defined $msg && !ref $msg && '' ne $msg;
-  my $code = defined $m->{code} ? $m->{code} : '';
-  return UnivecError->new($code, $msg);
+# DEF blocks are read from the LOADED spec, so clone before the in-place
+# model conversion.
+sub _def_setup {
+  my ($name) = @_;
+  my $section = (ref($spec) eq 'HASH') ? $spec->{$name} : undef;
+  my $setup = (ref($section) eq 'HASH' && ref($section->{DEF}) eq 'HASH'
+    && ref($section->{DEF}{setup}) eq 'HASH') ? $section->{DEF}{setup}{a} : undef;
+  return undef unless ref($setup) eq 'HASH';
+  return UnivecOmni::tostruct(Voxgig::Omni::Util::clone($setup));
 }
 
 
@@ -360,30 +225,20 @@ for my $name (qw(
 
 # === done ===
 
-runset('done.basic', get_spec($PRIMARY, 'done', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  fixctx($ctx, $client);
-  return $utility->{done}->($ctx);
+runsection('done', sub {
+  my ($view) = @_;
+  return $utility->{done}->(UnivecOmni::livectx($view));
 });
 
 
 # === makeError ===
 
-runset('makeError.basic', get_spec($PRIMARY, 'makeError', 'basic'), sub {
-  my ($entry) = @_;
-  my $args = $entry->{args} || [{}];
-
-  my $ctxmap = Voxgig::Struct::ismap($args->[0]) ? $args->[0] : {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  fixctx($ctx, $client);
-
-  my $err;
-  if (@$args > 1 && Voxgig::Struct::ismap($args->[1])) {
-    $err = err_from_map($args->[1]);
-  }
-
+runsection('makeError', sub {
+  my ($view, $errmap) = @_;
+  my $ctx = UnivecOmni::livectx($view);
+  my $err = _err_from_map($errmap);
+  # make_error dies with the constructed error on the default (throw)
+  # path; omni matches it against the entry's err.
   return $utility->{make_error}->($ctx, $err);
 });
 
@@ -469,6 +324,10 @@ runset('makeError.basic', get_spec($PRIMARY, 'makeError', 'basic'), sub {
 {
   my $calls = [];
   my $live_client = UnivecSDK->new({
+    # Concrete base: a live construction must satisfy any server variables
+    # a templated base URL declares; a literal base sidesteps the
+    # requirement.
+    'base' => 'http://localhost:8080',
     'system' => {
       'fetch' => sub {
         my ($url, $fetchdef) = @_;
@@ -493,6 +352,7 @@ runset('makeError.basic', get_spec($PRIMARY, 'makeError', 'basic'), sub {
 
 {
   my $blocked_client = UnivecSDK->new({
+    'base' => 'http://localhost:8080',
     'system' => {
       'fetch' => sub { return ({}, undef) },
     },
@@ -515,11 +375,10 @@ runset('makeError.basic', get_spec($PRIMARY, 'makeError', 'basic'), sub {
 
 # === makeContext ===
 
-runset('makeContext.basic', get_spec($PRIMARY, 'makeContext', 'basic'), sub {
-  my ($entry) = @_;
-  my $in_val = $entry->{in};
-  return undef unless Voxgig::Struct::ismap($in_val);
-  my $ctx = $utility->{make_context}->($in_val, undef);
+runsection('makeContext', sub {
+  my ($vin) = @_;
+  return undef unless ref($vin) eq 'HASH';
+  my $ctx = $utility->{make_context}->($vin, undef);
   my $out = { 'id' => $ctx->{id} };
   if ($ctx->{op}) {
     $out->{op} = {
@@ -584,12 +443,12 @@ runset('makeContext.basic', get_spec($PRIMARY, 'makeContext', 'basic'), sub {
 
 # === makeOptions ===
 
-runset('makeOptions.basic', get_spec($PRIMARY, 'makeOptions', 'basic'), sub {
-  my ($entry) = @_;
-  my $in_val = $entry->{in} || {};
+runsection('makeOptions', sub {
+  my ($vin) = @_;
+  $vin = {} unless ref($vin) eq 'HASH';
   my $ctx = $utility->{make_context}->({
-    'options' => $in_val->{options},
-    'config' => $in_val->{config},
+    'options' => $vin->{options},
+    'config' => $vin->{config},
   }, undef);
   $ctx->{client} = $client;
   $ctx->{utility} = $utility;
@@ -599,50 +458,19 @@ runset('makeOptions.basic', get_spec($PRIMARY, 'makeOptions', 'basic'), sub {
 
 # === makeRequest ===
 
-runset('makeRequest.basic', get_spec($PRIMARY, 'makeRequest', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
+runsection('makeRequest', sub {
+  my ($view) = @_;
+  my $ctx = UnivecOmni::livectx($view);
   $ctx->{options} = $client->options_map;
-
-  my (undef, $err) = $utility->{make_request}->($ctx);
-  die $err if $err;
-
-  # Update entry ctx for match checking
-  my $entry_ctx = $entry->{ctx};
-  if (Voxgig::Struct::ismap($entry_ctx)) {
-    $entry_ctx->{response} = 'exists' if $ctx->{response};
-    $entry_ctx->{result} = 'exists' if $ctx->{result};
-  }
-
-  return undef;
+  return _unwrap($utility->{make_request}->($ctx));
 });
 
 
 # === makeResponse ===
 
-runset('makeResponse.basic', get_spec($PRIMARY, 'makeResponse', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  fixctx($ctx, $client);
-
-  my (undef, $err) = $utility->{make_response}->($ctx);
-  die $err if $err;
-
-  # Update entry ctx for match checking with result data
-  my $entry_ctx = $entry->{ctx};
-  if (Voxgig::Struct::ismap($entry_ctx) && $ctx->{result}) {
-    $entry_ctx->{result} = {
-      'ok' => Voxgig::Struct::jbool($ctx->{result}{ok} ? 1 : 0),
-      'status' => $ctx->{result}{status},
-      'statusText' => $ctx->{result}{status_text},
-      'headers' => $ctx->{result}{headers},
-      'body' => $ctx->{result}{body},
-    };
-  }
-
-  return undef;
+runsection('makeResponse', sub {
+  my ($view) = @_;
+  return _unwrap($utility->{make_response}->(UnivecOmni::livectx($view)));
 });
 
 
@@ -696,40 +524,30 @@ runset('makeResponse.basic', get_spec($PRIMARY, 'makeResponse', 'basic'), sub {
 # === makeSpec ===
 
 {
-  my $setup_opts = get_spec($PRIMARY, 'makeSpec', 'DEF', 'setup', 'a');
-  my $spec_client = UnivecSDK->test(undef, $setup_opts);
-  my $spec_utility = $spec_client->get_utility;
+  my $spec_client = UnivecSDK->test(undef, _def_setup('makeSpec'));
 
-  runset('makeSpec.basic', get_spec($PRIMARY, 'makeSpec', 'basic'), sub {
-    my ($entry) = @_;
-    my $ctxmap = $entry->{ctx} || {};
-    my $ctx = make_ctx_from_map($ctxmap, $spec_client, $spec_utility);
+  runsection('makeSpec', sub {
+    my ($view) = @_;
+    my $ctx = UnivecOmni::livectx($view);
+    $ctx->{client} = $spec_client;
     $ctx->{options} = $spec_client->options_map;
-
-    my (undef, $err) = $utility->{make_spec}->($ctx);
-    die $err if $err;
-
-    # Update entry ctx for match
-    my $entry_ctx = $entry->{ctx};
-    if (Voxgig::Struct::ismap($entry_ctx) && $ctx->{spec}) {
-      $entry_ctx->{spec} = {
-        'base' => $ctx->{spec}{base},
-        'prefix' => $ctx->{spec}{prefix},
-        'suffix' => $ctx->{spec}{suffix},
-        'method' => $ctx->{spec}{method},
-        'params' => $ctx->{spec}{params},
-        'query' => $ctx->{spec}{query},
-        'headers' => $ctx->{spec}{headers},
-        'step' => $ctx->{spec}{step},
-      };
-    }
-
-    return undef;
+    return _unwrap($utility->{make_spec}->($ctx));
   });
 }
 
 
 # === makePoint ===
+
+# Driven from the corpus like every other section; the single-point
+# sanity case is kept below.
+runsection('makePoint', sub {
+  my ($view) = @_;
+  my ($point, $err) = $utility->{make_point}->(UnivecOmni::livectx($view));
+  # The corpus asserts refusals by code (`match: {out: {code: ...}}`), so
+  # an error is the RESULT here, flattened to the map the corpus reads.
+  return UnivecOmni::errify($err) if defined $err;
+  return $point;
+});
 
 {
   my $ctx = make_test_ctx($client, $utility, undef);
@@ -752,23 +570,20 @@ runset('makeResponse.basic', get_spec($PRIMARY, 'makeResponse', 'basic'), sub {
 
 # === makeUrl ===
 
-runset('makeUrl.basic', get_spec($PRIMARY, 'makeUrl', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
+runsection('makeUrl', sub {
+  my ($view) = @_;
+  my $ctx = UnivecOmni::livectx($view);
   $ctx->{result} = UnivecResult->new({}) unless $ctx->{result};
-  my ($url, $err) = $utility->{make_url}->($ctx);
-  die $err if $err;
-  return $url;
+  return _unwrap($utility->{make_url}->($ctx));
 });
 
 
 # === operator ===
 
-runset('operator.basic', get_spec($PRIMARY, 'operator', 'basic'), sub {
-  my ($entry) = @_;
-  my $in_val = $entry->{in} || {};
-  my $op = UnivecOperation->new($in_val);
+runsection('operator', sub {
+  my ($vin) = @_;
+  $vin = {} unless ref($vin) eq 'HASH';
+  my $op = UnivecOperation->new($vin);
   return {
     'entity' => $op->{entity},
     'name' => $op->{name},
@@ -780,143 +595,79 @@ runset('operator.basic', get_spec($PRIMARY, 'operator', 'basic'), sub {
 
 # === param ===
 
-runset('param.basic', get_spec($PRIMARY, 'param', 'basic'), sub {
-  my ($entry) = @_;
-  my $args = $entry->{args} || [];
-  return undef if @$args < 2;
-
-  my $ctxmap = Voxgig::Struct::ismap($args->[0]) ? $args->[0] : {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  my $paramdef = $args->[1];
-
-  my $result = $utility->{param}->($ctx, $paramdef);
-
-  # Update entry ctx for match
-  if (Voxgig::Struct::ismap($entry->{match})) {
-    my $ctx_match = $entry->{match}{ctx};
-    if (Voxgig::Struct::ismap($ctx_match)) {
-      my $entry_ctx = $entry->{ctx};
-      if (!defined $entry_ctx) {
-        $entry_ctx = {};
-        $entry->{ctx} = $entry_ctx;
-      }
-      my $spec_match = $ctx_match->{spec};
-      if (Voxgig::Struct::ismap($spec_match) && $ctx->{spec}) {
-        $entry_ctx->{spec} = {} unless $entry_ctx->{spec};
-        if ($spec_match->{alias}) {
-          $entry_ctx->{spec} = {
-            'alias' => $ctx->{spec}{alias},
-          };
-        }
-      }
-    }
-  }
-
-  return $result;
+runsection('param', sub {
+  my ($view, $paramdef) = @_;
+  return $utility->{param}->(UnivecOmni::livectx($view), $paramdef);
 });
 
 
 # === prepareAuth ===
 
 {
-  my $setup_opts = get_spec($PRIMARY, 'prepareAuth', 'DEF', 'setup', 'a');
-  my $auth_client = UnivecSDK->test(undef, $setup_opts);
-  my $auth_utility = $auth_client->get_utility;
+  my $auth_client = UnivecSDK->test(undef, _def_setup('prepareAuth'));
 
-  runset('prepareAuth.basic', get_spec($PRIMARY, 'prepareAuth', 'basic'), sub {
-    my ($entry) = @_;
-    my $ctxmap = $entry->{ctx} || {};
-    my $ctx = make_ctx_from_map($ctxmap, $auth_client, $auth_utility);
-    fixctx($ctx, $auth_client);
-
-    my (undef, $err) = $utility->{prepare_auth}->($ctx);
-    die $err if $err;
-
-    # Update entry ctx for match
-    my $entry_ctx = $entry->{ctx};
-    if (Voxgig::Struct::ismap($entry_ctx) && $ctx->{spec}) {
-      $entry_ctx->{spec} = {
-        'headers' => $ctx->{spec}{headers},
-      };
-    }
-
-    return undef;
+  runsection('prepareAuth', sub {
+    my ($view) = @_;
+    my $ctx = UnivecOmni::livectx($view);
+    $ctx->{client} = $auth_client;
+    return _unwrap($utility->{prepare_auth}->($ctx));
   });
 }
 
 
 # === prepareBody ===
 
-runset('prepareBody.basic', get_spec($PRIMARY, 'prepareBody', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  fixctx($ctx, $client);
-  return $utility->{prepare_body}->($ctx);
+runsection('prepareBody', sub {
+  my ($view) = @_;
+  return $utility->{prepare_body}->(UnivecOmni::livectx($view));
 });
 
 
 # === prepareHeaders ===
 
-runset('prepareHeaders.basic', get_spec($PRIMARY, 'prepareHeaders', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  return $utility->{prepare_headers}->($ctx);
+runsection('prepareHeaders', sub {
+  my ($view) = @_;
+  return $utility->{prepare_headers}->(UnivecOmni::livectx($view));
 });
 
 
 # === prepareMethod ===
 
-runset('prepareMethod.basic', get_spec($PRIMARY, 'prepareMethod', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  return $utility->{prepare_method}->($ctx);
+runsection('prepareMethod', sub {
+  my ($view) = @_;
+  return $utility->{prepare_method}->(UnivecOmni::livectx($view));
 });
 
 
 # === prepareParams ===
 
-runset('prepareParams.basic', get_spec($PRIMARY, 'prepareParams', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  return $utility->{prepare_params}->($ctx);
+runsection('prepareParams', sub {
+  my ($view) = @_;
+  return $utility->{prepare_params}->(UnivecOmni::livectx($view));
 });
 
 
 # === preparePath ===
 
-# Was two hand-written cases that had drifted out of the shared corpus
-# (the preparePath fixture shipped as an empty `set: []`).
-runset('preparePath.basic', get_spec($PRIMARY, 'preparePath', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  return $utility->{prepare_path}->($ctx);
+runsection('preparePath', sub {
+  my ($view) = @_;
+  return $utility->{prepare_path}->(UnivecOmni::livectx($view));
 });
 
 
 # === prepareQuery ===
 
-runset('prepareQuery.basic', get_spec($PRIMARY, 'prepareQuery', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  return $utility->{prepare_query}->($ctx);
+runsection('prepareQuery', sub {
+  my ($view) = @_;
+  return $utility->{prepare_query}->(UnivecOmni::livectx($view));
 });
 
 
 # === resultBasic ===
 
-runset('resultBasic.basic', get_spec($PRIMARY, 'resultBasic', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-  fixctx($ctx, $client);
-
-  my $result = $utility->{result_basic}->($ctx);
+runsection('resultBasic', sub {
+  my ($view) = @_;
+  my $result = $utility->{result_basic}->(UnivecOmni::livectx($view));
 
   my $out = {
     'status' => $result->{status},
@@ -927,88 +678,39 @@ runset('resultBasic.basic', get_spec($PRIMARY, 'resultBasic', 'basic'), sub {
       'message' => '' . $result->{err},
     };
   }
-
   return $out;
 });
 
 
 # === resultBody ===
 
-runset('resultBody.basic', get_spec($PRIMARY, 'resultBody', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-
-  $utility->{result_body}->($ctx);
-
-  my $entry_ctx = $entry->{ctx};
-  if (Voxgig::Struct::ismap($entry_ctx) && $ctx->{result}) {
-    $entry_ctx->{result} = {
-      'body' => $ctx->{result}{body},
-    };
-  }
-
-  return undef;
+runsection('resultBody', sub {
+  my ($view) = @_;
+  return $utility->{result_body}->(UnivecOmni::livectx($view));
 });
 
 
 # === resultHeaders ===
 
-runset('resultHeaders.basic', get_spec($PRIMARY, 'resultHeaders', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-
-  $utility->{result_headers}->($ctx);
-
-  my $entry_ctx = $entry->{ctx};
-  if (Voxgig::Struct::ismap($entry_ctx) && $ctx->{result}) {
-    $entry_ctx->{result} = {
-      'headers' => $ctx->{result}{headers},
-    };
-  }
-
-  return undef;
+runsection('resultHeaders', sub {
+  my ($view) = @_;
+  return $utility->{result_headers}->(UnivecOmni::livectx($view));
 });
 
 
 # === transformRequest ===
 
-runset('transformRequest.basic', get_spec($PRIMARY, 'transformRequest', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-
-  my $result = $utility->{transform_request}->($ctx);
-
-  # Update entry ctx for match (step changed)
-  my $entry_ctx = $entry->{ctx};
-  if (Voxgig::Struct::ismap($entry_ctx) && $ctx->{spec}) {
-    my $spec_map = $entry_ctx->{spec};
-    $spec_map->{step} = $ctx->{spec}{step} if Voxgig::Struct::ismap($spec_map);
-  }
-
-  return $result;
+runsection('transformRequest', sub {
+  my ($view) = @_;
+  return $utility->{transform_request}->(UnivecOmni::livectx($view));
 });
 
 
 # === transformResponse ===
 
-runset('transformResponse.basic', get_spec($PRIMARY, 'transformResponse', 'basic'), sub {
-  my ($entry) = @_;
-  my $ctxmap = $entry->{ctx} || {};
-  my $ctx = make_ctx_from_map($ctxmap, $client, $utility);
-
-  my $result = $utility->{transform_response}->($ctx);
-
-  # Update entry ctx for match (step changed)
-  my $entry_ctx = $entry->{ctx};
-  if (Voxgig::Struct::ismap($entry_ctx) && $ctx->{spec}) {
-    my $spec_map = $entry_ctx->{spec};
-    $spec_map->{step} = $ctx->{spec}{step} if Voxgig::Struct::ismap($spec_map);
-  }
-
-  return $result;
+runsection('transformResponse', sub {
+  my ($view) = @_;
+  return $utility->{transform_response}->(UnivecOmni::livectx($view));
 });
 
 done_testing();

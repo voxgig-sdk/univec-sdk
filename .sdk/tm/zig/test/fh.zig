@@ -150,12 +150,12 @@ pub const Collector = struct {
 
     fn call(p: *anyopaque, _: std.mem.Allocator, arg: Value) anyerror!Value {
         const self: *Collector = @ptrCast(@alignCast(p));
-        self.items.append(arg) catch {};
+        self.items.append(h.A(), arg) catch {};
         return vnull();
     }
     pub fn new() *Collector {
         const s = h.A().create(Collector) catch unreachable;
-        s.* = .{ .items = std.ArrayList(Value).init(h.A()) };
+        s.* = .{ .items = .empty };
         return s;
     }
     pub fn fn_val(self: *Collector) Value {
@@ -205,7 +205,7 @@ pub const Recorder = struct {
 
     fn call(p: *anyopaque, opctx: *Context, url: []const u8, fetchdef: Value) E!Value {
         const self: *Recorder = @ptrCast(@alignCast(p));
-        self.calls.append(h.jo(&.{
+        self.calls.append(h.A(), h.jo(&.{
             .{ "url", h.vstr(url) },
             .{ "fetchdef", fetchdef },
         })) catch {};
@@ -218,7 +218,7 @@ pub const Recorder = struct {
     }
     pub fn new(reply: ?ReplyFn) *Recorder {
         const s = h.A().create(Recorder) catch unreachable;
-        s.* = .{ .calls = std.ArrayList(Value).init(h.A()), .reply = reply };
+        s.* = .{ .calls = .empty, .reply = reply };
         return s;
     }
     pub fn fetcher(self: *Recorder) Fetcher {
@@ -326,19 +326,19 @@ fn strLess(_: void, a: []const u8, b: []const u8) bool {
 fn fhBuildUrl(spec: *sdk.Spec) []const u8 {
     var url = std.fmt.allocPrint(h.A(), "{s}{s}", .{ spec.base, spec.path }) catch spec.path;
     if (spec.query == .object) {
-        var keys = std.ArrayList([]const u8).init(h.A());
+        var keys: std.ArrayList([]const u8) = .empty;
         var it = spec.query.object.iterator();
         while (it.next()) |kv| {
-            if (!h.is_noval(kv.value_ptr.*)) keys.append(kv.key_ptr.*) catch {};
+            if (!h.is_noval(kv.value_ptr.*)) keys.append(h.A(), kv.key_ptr.*) catch {};
         }
         if (keys.items.len != 0) {
             std.mem.sort([]const u8, keys.items, {}, strLess);
-            var qs = std.ArrayList(u8).init(h.A());
+            var qs: std.ArrayList(u8) = .empty;
             for (keys.items) |k| {
-                if (qs.items.len != 0) qs.append('&') catch {};
+                if (qs.items.len != 0) qs.append(h.A(), '&') catch {};
                 const v = h.getp(spec.query, k);
                 const part = std.fmt.allocPrint(h.A(), "{s}={s}", .{ h.esc_url(k), h.esc_url(h.scalar_str(v)) }) catch "";
-                qs.appendSlice(part) catch {};
+                qs.appendSlice(h.A(), part) catch {};
             }
             url = std.fmt.allocPrint(h.A(), "{s}?{s}", .{ url, qs.items }) catch url;
         }
@@ -520,7 +520,7 @@ pub fn fh_make(server: ?Fetcher, feats: []const FeatSpec) *FhHarness {
             while (it.next()) |kv| h.setp(fopts, kv.key_ptr.*, kv.value_ptr.*);
         }
         fs.feat.callInit(rootctx, fopts);
-        client.features.append(fs.feat) catch {};
+        client.features.append(h.A(), fs.feat) catch {};
     }
 
     utility.feature_hook(rootctx, "PostConstruct");

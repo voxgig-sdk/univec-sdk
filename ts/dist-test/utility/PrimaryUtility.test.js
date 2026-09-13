@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_test_1 = require("node:test");
 const node_assert_1 = require("node:assert");
-const runner_1 = require("../runner");
+const omni_1 = require("../omni");
 const index_1 = require("./index");
 (0, node_test_1.describe)('PrimaryUtility', async () => {
     let spec;
@@ -44,12 +44,16 @@ const index_1 = require("./index");
         return runset(section.basic, subject);
     }
     (0, node_test_1.before)(async () => {
-        const runner = await (0, runner_1.makeRunner)(index_1.TEST_JSON_FILE, await index_1.SDK.test());
+        const runner = await (0, omni_1.makeRunner)(index_1.TEST_JSON_FILE, await index_1.SDK.test());
         const run = await runner('primary');
         spec = run.spec;
         runset = run.runset;
         runsetflags = run.runsetflags;
-        client = run.client;
+        // Under the old hand-vendored runner, run.client WAS the SDK; under
+        // omni it is the provider wrapping it. This suite treats the client as
+        // the SDK — including ASSIGNING to client._features, which prototype
+        // delegation cannot forward — so unwrap the real instance.
+        client = run.client.sdk;
         utility = client.utility();
         struct = utility.struct;
     });

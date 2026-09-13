@@ -59,3 +59,12 @@ let ephemeral_key (client : sdk_client) (entopts : value) : entity_obj =
 (* Model entity bound to a client:  model client entopts *)
 let model (client : sdk_client) (entopts : value) : entity_obj =
   Sdk_entity_model.make client entopts
+
+(* Entity by name (None for a name this SDK did not generate). *)
+let entity (client : sdk_client) (name : string) (entopts : value) : entity_obj option =
+  match name with
+  | "convert" -> Some (Sdk_entity_convert.make client entopts)
+  | "embed" -> Some (Sdk_entity_embed.make client entopts)
+  | "ephemeral_key" -> Some (Sdk_entity_ephemeral_key.make client entopts)
+  | "model" -> Some (Sdk_entity_model.make client entopts)
+  | _ -> None

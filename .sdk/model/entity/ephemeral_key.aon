@@ -24,6 +24,7 @@ main: kit: entity: ephemeral_key: {
       type: "`$STRING`"
     }
     {
+      format: "date-time"
       name: "resetsAt"
       req: true
       short: "When the daily allowance resets."
@@ -39,10 +40,16 @@ main: kit: entity: ephemeral_key: {
         {
           method: "POST"
           orig: "/v1/ephemeral/key"
-          parts: [
-            "v1"
-            "ephemeral"
-            "key"
+          segments: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "ephemeral"
+            }
+            {
+              lit: "key"
+            }
           ]
           transform: {
             req: "`reqdata`"

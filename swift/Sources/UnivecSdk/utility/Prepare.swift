@@ -22,7 +22,12 @@ func prepareMethodUtil(_ ctx: Context) -> String {
     return pm.uppercased()
   }
 
-  return methodMap[opname] ?? "GET"
+  // No default: an op name outside the convention resolves to NO method,
+  // exactly as the ts reference (`methodMap[key]` is undefined there) and
+  // go's "" spelling of the same no-value. The silent-pass inline runner
+  // hid a stray "GET" fallback here; the shared corpus (prepareMethod,
+  // opname "bad" -> null) pins it now.
+  return methodMap[opname] ?? ""
 }
 
 func preparePathUtil(_ ctx: Context) -> String {

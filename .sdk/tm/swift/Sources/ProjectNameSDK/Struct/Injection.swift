@@ -89,7 +89,11 @@ public final class Injection: @unchecked Sendable {
   // higher ancestor when |ancestor| >= 2). NONE deletes the slot.
   @discardableResult
   public func setval(_ v: Value, ancestor: Int = 0) -> Value {
-    let absAnc = abs(ancestor)
+    // Canonical is `if (null == ancestor || ancestor < 2)`, so a NEGATIVE
+    // ancestor takes the parent branch. Taking abs() first sent
+    // validate_ONE's `setval(vcurrent, -2)` up two nodes instead, writing
+    // the match back over the wrong slot ($TOP leaked into the result).
+    let absAnc = ancestor
     if absAnc < 2 {
       if v.isNoval {
         parent = delprop(parent, .string(key))

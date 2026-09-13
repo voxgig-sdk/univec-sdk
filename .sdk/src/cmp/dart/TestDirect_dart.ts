@@ -16,14 +16,16 @@ import {
   Slot,
   cmp,
   snakify,
-  isAuthActive, envName, envToken
+  isAuthActive, envName, envToken,
+  serverVarEnv,
+  serverVariables,
+  pointParts,
 } from '@voxgig/sdkgen'
 
 
 import {
   projectPath,
-  dartValue,
-} from './utility_dart'
+  dartValue, dartStringLiteral} from './utility_dart'
 
 
 const TestDirect = cmp(function TestDirect(props: any) {
@@ -40,12 +42,25 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   const authActive = isAuthActive(model)
   const apikeyEnvEntry = authActive
-    ? `\n    '${PROJECTNAME}_APIKEY': 'NONE',`
+    ? `\n    '${PROJECTNAME}_APIKEY': '',`
     : ''
   const apikeyLiveField = authActive
     ? `
       'apikey': env['${PROJECTNAME}_APIKEY'],`
     : ''
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: makeOptions raises rather than
+  // request a URL with a literal `{account_id}` in it. So the live suite
+  // takes them from the environment the same way it takes the apikey.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `\n    '${serverVarEnv(PROJECTNAME, v.name)}': ${dartStringLiteral(v.dflt)},`).join('')
+  const serverLiveField = 0 === svars.length ? '' : `
+      'server': <String, dynamic>{${svars
+      .map((v: any) => `
+        '${v.name}': env['${serverVarEnv(PROJECTNAME, v.name)}'],`).join('')}
+      },`
 
   const opnames = Object.keys(entity.op || {})
   const hasLoad = opnames.includes('load')
@@ -78,13 +93,16 @@ Map<String, dynamic> directSetup([dynamic mockres]) {
 
   final env = envOverride({
     '${entidEnvVar}': <String, dynamic>{},
-    '${PROJECTNAME}_TEST_LIVE': 'FALSE',${apikeyEnvEntry}
+    '${PROJECTNAME}_TEST_LIVE': 'FALSE',${apikeyEnvEntry}${serverEnvEntry}
   });
 
   final live = 'TRUE' == env['${PROJECTNAME}_TEST_LIVE'];
 
   if (live) {
-    final client = ${nom(model.const, 'Name')}SDK({${apikeyLiveField}
+    // Spread FIRST, so the generated fields below win: sdk-test-control.json's
+    // test.client.options adds to the live client, it does not redirect it.
+    final client = ${nom(model.const, 'Name')}SDK(<String, dynamic>{
+      ...liveClientOptions(),${apikeyLiveField}${serverLiveField}
     });
 
     dynamic idmap = env['${entidEnvVar}'];
@@ -165,12 +183,12 @@ function generateDirectLoad(model: Model, entity: ModelEntity) {
   }
 
   const allLoadParams = loadPoint.args?.params || []
-  const loadPath = normalizePathParams(loadPoint.parts || [], allLoadParams, loadPoint.rename?.param)
+  const loadPath = normalizePathParams(pointParts(loadPoint), allLoadParams, loadPoint.rename?.param)
 
   // Only path params that actually appear in the URL template drive the
   // direct-test path-param setup and URL-substitution asserts.
   const pathPlaceholders = new Set<string>()
-  for (const part of (loadPoint.parts || [])) {
+  for (const part of pointParts(loadPoint)) {
     if (typeof part === 'string' && part.startsWith('{') && part.endsWith('}')) {
       pathPlaceholders.add(part.slice(1, -1))
     }
@@ -200,7 +218,7 @@ function generateDirectLoad(model: Model, entity: ModelEntity) {
   const listOp = entity.op?.list
   const listPoint = listOp?.points?.[0]
   const listParams = listPoint?.args?.params || []
-  const listPath = listPoint ? normalizePathParams(listPoint.parts || [], listParams, listPoint.rename?.param) : ''
+  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listParams, listPoint.rename?.param) : ''
   const hasList = null != listPoint
 
   // Ancestor params (not 'id') for live mode
@@ -358,7 +376,7 @@ function generateDirectList(model: Model, entity: ModelEntity) {
   }
 
   const listParams = listPoint.args?.params || []
-  const listPath = normalizePathParams(listPoint.parts || [], listParams, listPoint.rename?.param)
+  const listPath = normalizePathParams(pointParts(listPoint), listParams, listPoint.rename?.param)
 
   const listQuery = listPoint.args?.query || []
   const liveQueryLines = listQuery

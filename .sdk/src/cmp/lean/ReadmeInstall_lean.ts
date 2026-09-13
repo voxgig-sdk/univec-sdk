@@ -28,6 +28,7 @@ Run the offline struct-corpus test (no server needed) and the live entity
 tests (point them at a server with \`SDK_TEST_BASE\`):
 
 \`\`\`bash
+lake exe omnismoke
 lake exe structcorpus
 SDK_TEST_BASE=http://localhost:8901 lake exe runner
 \`\`\`

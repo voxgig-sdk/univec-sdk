@@ -284,8 +284,8 @@ pub const PagingFeature = struct {
         // would send the caller back for a page that does not exist, forever.
         if (!explicit_more and (h.get_bool(paging, "hasMore") orelse false) != true and
             (!h.is_noval(h.getp(paging, "next")) or
-            !h.is_noval(h.getp(paging, "cursor")) or
-            !h.is_noval(h.getp(paging, "nextPage"))))
+                !h.is_noval(h.getp(paging, "cursor")) or
+                !h.is_noval(h.getp(paging, "nextPage"))))
         {
             h.setp(paging, "hasMore", h.vbool(true));
         }

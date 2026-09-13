@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.config = void 0;
+exports.FEATURE_PLUGINS = exports.config = void 0;
 const AuditFeature_1 = require("./feature/audit/AuditFeature");
 const CacheFeature_1 = require("./feature/cache/CacheFeature");
 const ClienttrackFeature_1 = require("./feature/clienttrack/ClienttrackFeature");
@@ -39,6 +39,14 @@ const FEATURE_CLASS = {
     test: TestFeature_1.TestFeature,
     timeout: TimeoutFeature_1.TimeoutFeature,
 };
+// Per-feature plugin DEFINITIONS (voxgig/plugin `Definition` values), from
+// the model's active plugin groups. A feature that takes a `plugins` option
+// (secrets over sekreto) reads its own entry; a feature with no plugins has
+// none. Named imports above make each definition statically reachable, so
+// an SDK carries exactly the plugin modules its model selects — the same
+// leanness the old side-effect registry imports bought, without a registry.
+const FEATURE_PLUGINS = {};
+exports.FEATURE_PLUGINS = FEATURE_PLUGINS;
 class Config {
     makeFeature(fn) {
         const fc = FEATURE_CLASS[fn];
@@ -306,62 +314,100 @@ class Config {
                             "kind": "http",
                             "method": "POST",
                             "orig": "/v1/convert",
-                            "parts": [
-                                "v1",
-                                "convert"
+                            "segments": [
+                                {
+                                    "lit": "v1"
+                                },
+                                {
+                                    "lit": "convert"
+                                }
                             ],
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
-                            }
+                            },
+                            "parts": [
+                                "v1",
+                                "convert"
+                            ]
                         },
                         {
                             "args": {},
                             "kind": "http",
                             "method": "POST",
                             "orig": "/v1/embed-bridge",
-                            "parts": [
-                                "v1",
-                                "embed-bridge"
+                            "segments": [
+                                {
+                                    "lit": "v1"
+                                },
+                                {
+                                    "lit": "embed-bridge"
+                                }
                             ],
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
-                            }
+                            },
+                            "parts": [
+                                "v1",
+                                "embed-bridge"
+                            ]
                         },
                         {
                             "args": {},
                             "kind": "http",
                             "method": "POST",
                             "orig": "/v1/ephemeral/convert",
-                            "parts": [
-                                "v1",
-                                "ephemeral",
-                                "convert"
+                            "segments": [
+                                {
+                                    "lit": "v1"
+                                },
+                                {
+                                    "lit": "ephemeral"
+                                },
+                                {
+                                    "lit": "convert"
+                                }
                             ],
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
-                            }
+                            },
+                            "parts": [
+                                "v1",
+                                "ephemeral",
+                                "convert"
+                            ]
                         },
                         {
                             "args": {},
                             "kind": "http",
                             "method": "POST",
                             "orig": "/v1/ephemeral/embed-bridge",
-                            "parts": [
-                                "v1",
-                                "ephemeral",
-                                "embed-bridge"
+                            "segments": [
+                                {
+                                    "lit": "v1"
+                                },
+                                {
+                                    "lit": "ephemeral"
+                                },
+                                {
+                                    "lit": "embed-bridge"
+                                }
                             ],
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
-                            }
+                            },
+                            "parts": [
+                                "v1",
+                                "ephemeral",
+                                "embed-bridge"
+                            ]
                         }
                     ]
                 }
@@ -402,31 +448,50 @@ class Config {
                             "kind": "http",
                             "method": "POST",
                             "orig": "/v1/embed",
-                            "parts": [
-                                "v1",
-                                "embed"
+                            "segments": [
+                                {
+                                    "lit": "v1"
+                                },
+                                {
+                                    "lit": "embed"
+                                }
                             ],
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
-                            }
+                            },
+                            "parts": [
+                                "v1",
+                                "embed"
+                            ]
                         },
                         {
                             "args": {},
                             "kind": "http",
                             "method": "POST",
                             "orig": "/v1/ephemeral/embed",
-                            "parts": [
-                                "v1",
-                                "ephemeral",
-                                "embed"
+                            "segments": [
+                                {
+                                    "lit": "v1"
+                                },
+                                {
+                                    "lit": "ephemeral"
+                                },
+                                {
+                                    "lit": "embed"
+                                }
                             ],
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
-                            }
+                            },
+                            "parts": [
+                                "v1",
+                                "ephemeral",
+                                "embed"
+                            ]
                         }
                     ]
                 }
@@ -456,6 +521,7 @@ class Config {
                     "type": "`$STRING`"
                 },
                 {
+                    "format": "date-time",
                     "name": "resetsAt",
                     "req": true,
                     "short": "When the daily allowance resets.",
@@ -473,16 +539,27 @@ class Config {
                             "kind": "http",
                             "method": "POST",
                             "orig": "/v1/ephemeral/key",
-                            "parts": [
-                                "v1",
-                                "ephemeral",
-                                "key"
+                            "segments": [
+                                {
+                                    "lit": "v1"
+                                },
+                                {
+                                    "lit": "ephemeral"
+                                },
+                                {
+                                    "lit": "key"
+                                }
                             ],
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
-                            }
+                            },
+                            "parts": [
+                                "v1",
+                                "ephemeral",
+                                "key"
+                            ]
                         }
                     ]
                 }
@@ -559,15 +636,23 @@ class Config {
                             "kind": "http",
                             "method": "GET",
                             "orig": "/v1/models",
-                            "parts": [
-                                "v1",
-                                "models"
+                            "segments": [
+                                {
+                                    "lit": "v1"
+                                },
+                                {
+                                    "lit": "models"
+                                }
                             ],
                             "select": {},
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
-                            }
+                            },
+                            "parts": [
+                                "v1",
+                                "models"
+                            ]
                         }
                     ]
                 }

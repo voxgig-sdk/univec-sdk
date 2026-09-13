@@ -1,3 +1,6 @@
+// VENDORED: @voxgig/struct 0.1.1 (kotlin/src/main/kotlin/voxgig/struct/Struct.kt)
+// Source: https://github.com/voxgig/struct @ abd93227e3295151f8dcd18597c3f3f2577af8b7  [tag: sdk-20260911-2013-0]
+// License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 package voxgig.univecsdk.utility.struct
 
 import java.net.URLEncoder
@@ -2218,8 +2221,21 @@ object Struct {
                     val pl = inj.parent as MutableList<Any?>
                     for (i in dpl.indices) setprop(pl, i, clone(childtm))
                     while (pl.size > dpl.size) pl.removeAt(pl.size - 1)
-                    inj.keyI = 0
-                    getprop(inj.dparent, 0)
+
+                    // NOTE: modifying inj! This extends the child value loop in inject
+                    // to cover every cloned child.
+                    for (ckeyI in size(inj.keys) until size(pl)) {
+                        inj.keys.add(strkey(ckeyI))
+                    }
+
+                    // Restart the child value loop at the first element (the loop
+                    // increments keyI on resume) so that the first element is also
+                    // validated against the child template.
+                    inj.keyI = -1
+
+                    // SKIP leaves the cloned child template in place at the first
+                    // element so the resumed loop can validate it.
+                    SKIP
                 }
                 else -> UNDEF
             }

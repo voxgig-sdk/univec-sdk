@@ -11,7 +11,10 @@ import {
   File,
   cmp,
   snakify,
-  isAuthActive, envName, envToken
+  isAuthActive, envName, envToken,
+  serverVarEnv,
+  serverVariables,
+  pointParts,
 } from '@voxgig/sdkgen'
 
 
@@ -67,11 +70,27 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   const authActive = isAuthActive(model)
   const apikeyEnvEntry = authActive
-    ? `\n        ("${PROJECTNAME}_APIKEY", Value::str("NONE")),`
+    ? `\n        ("${PROJECTNAME}_APIKEY", Value::str("")),`
     : ''
   const apikeyLiveField = authActive
     ? `("apikey", getp(&env, "${PROJECTNAME}_APIKEY"))`
     : ''
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: makeOptions raises rather than
+  // request a URL with a literal `{account_id}` in it. So the live suite
+  // takes them from the environment the same way it takes the apikey.
+  //
+  // Emitted as a jo() tuple entry, so it carries its own leading comma only
+  // when an apikey entry precedes it - otherwise `jo(vec![, ...])`.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `\n        ("${serverVarEnv(PROJECTNAME, v.name)}", Value::str(${JSON.stringify(v.dflt)})),`).join('')
+  const serverLiveEntry = 0 === svars.length ? '' :
+    `("server", jo(vec![${svars
+      .map((v: any) => `("${v.name}", getp(&env, "${serverVarEnv(PROJECTNAME, v.name)}"))`).join(', ')}]))`
+  const serverLiveField = '' === serverLiveEntry ? '' :
+    ('' === apikeyLiveField ? serverLiveEntry : ', ' + serverLiveEntry)
 
   const opnames = Object.keys(entity.op || {})
   const hasLoad = opnames.includes('load')
@@ -86,12 +105,12 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   // Load point info.
   const loadPoint = loadOp?.points?.[0]
-  const loadPath = loadPoint ? normalizePathParams(loadPoint.parts || [], loadPoint?.args?.params || [], loadPoint?.rename?.param) : ''
+  const loadPath = loadPoint ? normalizePathParams(pointParts(loadPoint), loadPoint?.args?.params || [], loadPoint?.rename?.param) : ''
   const allLoadParams = loadPoint?.args?.params || []
   // Only path params that actually appear in the URL template drive the
   // direct-test path-param setup and URL-substitution asserts.
   const _pathPlaceholders = new Set<string>()
-  for (const part of (loadPoint?.parts || [])) {
+  for (const part of pointParts(loadPoint)) {
     if (typeof part === 'string' && part.startsWith('{') && part.endsWith('}')) {
       _pathPlaceholders.add(part.slice(1, -1))
     }
@@ -109,7 +128,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   // List point info.
   const listPoint = listOp?.points?.[0]
-  const listPath = listPoint ? normalizePathParams(listPoint.parts || [], listPoint?.args?.params || [], listPoint?.rename?.param) : ''
+  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listPoint?.args?.params || [], listPoint?.rename?.param) : ''
   const listParams = listPoint?.args?.params || []
 
   const entidEnvVar = `${PROJECTNAME}_TEST_${envToken(entity.name)}_ENTID`
@@ -148,13 +167,22 @@ fn ${evar}_direct_setup(mockres: Value) -> ${entity.Name}DirectSetup {
 
     let env = env_override(jo(vec![
         ("${entidEnvVar}", Value::empty_map()),
-        ("${PROJECTNAME}_TEST_LIVE", Value::str("FALSE")),${apikeyEnvEntry}
+        ("${PROJECTNAME}_TEST_LIVE", Value::str("FALSE")),${apikeyEnvEntry}${serverEnvEntry}
     ]));
 
     let live = getp(&env, "${PROJECTNAME}_TEST_LIVE") == Value::str("TRUE");
 
     if live {
-        let client = ${model.const.Name}SDK::new(jo(vec![${apikeyLiveField}]));
+        // live_client_options() FIRST, so the generated entries below win:
+        // sdk-test-control.json's test.client.options adds to the live
+        // client, it does not redirect it.
+        let client = ${model.const.Name}SDK::new(to_map(&vs::merge(
+            &ja(vec![
+                live_client_options(),
+                jo(vec![${apikeyLiveField}${serverLiveField}]),
+            ]),
+            None,
+        )));
         let idmap = match to_map(&getp(&env, "${entidEnvVar}")) {
             Value::Map(m) => Value::Map(m),
             _ => Value::empty_map(),

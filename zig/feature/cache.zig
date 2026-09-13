@@ -53,7 +53,7 @@ pub const CacheFeature = struct {
         const track = h.A().create(CacheTrack) catch unreachable;
         track.* = .{
             .store = std.StringHashMap(CacheEntry).init(h.A()),
-            .order = std.ArrayList([]const u8).init(h.A()),
+            .order = .empty,
         };
         self.* = .{ .track = track };
         return .{ .ptr = @ptrCast(self), .vtable = &vtable };
@@ -152,7 +152,7 @@ fn through(track: *CacheTrack, options: Value, ctx: *Context, url: []const u8, f
             const ttl = sup.fopt_int(options, "ttl", 5000);
             evict(track, options);
             track.store.put(key, .{ .expiry = now + ttl, .snapshot = snap }) catch {};
-            track.order.append(key) catch {};
+            track.order.append(h.A(), key) catch {};
             track.miss += 1;
             return replay(snap);
         }

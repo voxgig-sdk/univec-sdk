@@ -85,12 +85,12 @@ fn named(name: []const u8, opts: ?Value) sdk.Feature {
     return f;
 }
 fn names(client: *sdk.SDK) []const u8 {
-    var buf = std.ArrayList(u8).init(h.A());
+    var buf: std.ArrayList(u8) = .empty;
     for (client.features.items, 0..) |f, i| {
-        if (i != 0) buf.append(',') catch {};
-        buf.appendSlice(f.name()) catch {};
+        if (i != 0) buf.append(h.A(), ',') catch {};
+        buf.appendSlice(h.A(), f.name()) catch {};
     }
-    return buf.toOwnedSlice() catch "";
+    return buf.toOwnedSlice(h.A()) catch "";
 }
 
 // =====================================================================
@@ -455,14 +455,14 @@ fn makeOptsFeature(feature: Value) Value {
 
 fn orderJoin(opts: Value) []const u8 {
     const order = h.getpath(&.{ "__derived__", "featureorder" }, opts);
-    var out = std.ArrayList(u8).init(h.A());
+    var out: std.ArrayList(u8) = .empty;
     if (order == .array) {
         for (order.array.data.items, 0..) |v, i| {
-            if (i > 0) out.appendSlice(",") catch {};
-            if (v == .string) out.appendSlice(v.string) catch {};
+            if (i > 0) out.appendSlice(h.A(), ",") catch {};
+            if (v == .string) out.appendSlice(h.A(), v.string) catch {};
         }
     }
-    return out.toOwnedSlice() catch "";
+    return out.toOwnedSlice(h.A()) catch "";
 }
 
 test "pipeline feature order: map is test-first" {

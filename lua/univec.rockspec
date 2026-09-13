@@ -24,6 +24,7 @@ build = {
     ["univec_sdk"] = "univec_sdk.lua",
     ["config"] = "config.lua",
     ["config_shared"] = "config_shared.lua",
+    ["config_plugins"] = "config_plugins.lua",
     ["features"] = "features.lua",
     ["feature.base_feature"] = "feature/base_feature.lua",
     ["feature.audit_feature"] = "feature/audit_feature.lua",

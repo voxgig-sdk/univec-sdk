@@ -11,7 +11,8 @@ import {
   File,
   cmp,
   snakify,
-  isAuthActive, envName, envToken
+  isAuthActive, envName, envToken,
+  pointParts,
 } from '@voxgig/sdkgen'
 
 
@@ -84,10 +85,10 @@ const TestDirect = cmp(function TestDirect(props: any) {
   const listOp = entity.op?.list
 
   const loadPoint = loadOp?.points?.[0]
-  const loadPath = loadPoint ? normalizePathParams(loadPoint.parts || [], loadPoint?.args?.params || [], loadPoint?.rename?.param) : ''
+  const loadPath = loadPoint ? normalizePathParams(pointParts(loadPoint), loadPoint?.args?.params || [], loadPoint?.rename?.param) : ''
   const allLoadParams = loadPoint?.args?.params || []
   const _pathPlaceholders = new Set<string>()
-  for (const part of (loadPoint?.parts || [])) {
+  for (const part of pointParts(loadPoint)) {
     if (typeof part === 'string' && part.startsWith('{') && part.endsWith('}')) {
       _pathPlaceholders.add(part.slice(1, -1))
     }
@@ -104,7 +105,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
     _renamedPlaceholders.has(p.name) || _renamedPlaceholders.has(p.orig))
 
   const listPoint = listOp?.points?.[0]
-  const listPath = listPoint ? normalizePathParams(listPoint.parts || [], listPoint?.args?.params || [], listPoint?.rename?.param) : ''
+  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listPoint?.args?.params || [], listPoint?.rename?.param) : ''
   const listParams = listPoint?.args?.params || []
 
   const loadQuery = loadPoint?.args?.query || []

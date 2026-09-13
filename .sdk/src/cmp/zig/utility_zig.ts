@@ -26,8 +26,56 @@ function zigVarName(name: string): string {
 
 // The zig module identifier, e.g. solar_sdk (informational; the build module
 // is named "sdk").
+//
+// It is also the `.name` of build.zig.zon, which zig 0.16 reads as an enum
+// literal and requires to be a BARE identifier — `.@"2fa_sdk"` is rejected as
+// firmly as `.2fa_sdk` is — so a model name starting with a digit is given a
+// leading underscore. Nothing else in the target derives an identifier from
+// this, and the alternative for such a model is a package that does not build.
 function zigModuleName(model: any): string {
-  return `${model.name}_sdk`.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  const name = `${model.name}_sdk`.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  return /^[0-9]/.test(name) ? '_' + name : name
+}
+
+
+// The `.fingerprint` zig 0.14+ requires in build.zig.zon, as a 0x-prefixed
+// 16-digit hex literal.
+//
+// Zig reads the field as a packed struct of two u32s: the LOW half is a free
+// `id`, and the HIGH half is a `checksum` that must equal the CRC-32 (IEEE, as
+// zlib computes it) of the package name. Get the checksum wrong and zig
+// refuses to build, printing the value it wanted; get it right and any id in
+// [1, 0xfffffffe] is accepted.
+//
+// The id exists so a fork can be told apart from what it forked. A generated
+// SDK gets a DERIVED one — FNV-1a over the same name — rather than a random
+// one, because this file is regenerated on every run: a random id would
+// rewrite build.zig.zon each time and churn the consumer's diff, and a package
+// that changes identity between two generations of the same model is worse
+// than one that shares an id with a fork of itself. Distinct names still get
+// distinct ids.
+function zigPackageFingerprint(name: string): string {
+  // CRC-32 (IEEE 802.3, reflected, poly 0xEDB88320) — the one zig's
+  // std.hash.Crc32 and zlib both compute.
+  let crc = 0xffffffff
+  for (let i = 0; i < name.length; i++) {
+    crc ^= name.charCodeAt(i) & 0xff
+    for (let b = 0; b < 8; b++) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1))
+    }
+  }
+  const checksum = (crc ^ 0xffffffff) >>> 0
+
+  // FNV-1a 32-bit, folded into the 1..0xfffffffe zig accepts.
+  let fnv = 0x811c9dc5
+  for (let i = 0; i < name.length; i++) {
+    fnv ^= name.charCodeAt(i) & 0xff
+    fnv = Math.imul(fnv, 0x01000193) >>> 0
+  }
+  const id = (fnv % 0xfffffffd) + 1
+
+  const hex = (n: number) => n.toString(16).padStart(8, '0')
+  return `0x${hex(checksum)}${hex(id)}`
 }
 
 
@@ -142,5 +190,6 @@ export {
   clean,
   formatZigValue,
   zigModuleName,
+  zigPackageFingerprint,
   zigVarName,
 }

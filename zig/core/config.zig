@@ -262,14 +262,22 @@ pub fn make_config() Value {
                                 .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/convert") },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("convert"),
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("convert") },
+                                    }),
                                 }) },
                                 .{ "select", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("convert"),
                                 }) },
                             }),
                             h.jo(&.{
@@ -277,14 +285,22 @@ pub fn make_config() Value {
                                 .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/embed-bridge") },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("embed-bridge"),
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("embed-bridge") },
+                                    }),
                                 }) },
                                 .{ "select", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("embed-bridge"),
                                 }) },
                             }),
                             h.jo(&.{
@@ -292,15 +308,26 @@ pub fn make_config() Value {
                                 .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/convert") },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("ephemeral"),
-                                    h.vstr("convert"),
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("ephemeral") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("convert") },
+                                    }),
                                 }) },
                                 .{ "select", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("ephemeral"),
+                                    h.vstr("convert"),
                                 }) },
                             }),
                             h.jo(&.{
@@ -308,15 +335,26 @@ pub fn make_config() Value {
                                 .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/embed-bridge") },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("ephemeral"),
-                                    h.vstr("embed-bridge"),
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("ephemeral") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("embed-bridge") },
+                                    }),
                                 }) },
                                 .{ "select", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("ephemeral"),
+                                    h.vstr("embed-bridge"),
                                 }) },
                             }),
                         }) },
@@ -358,14 +396,22 @@ pub fn make_config() Value {
                                 .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/embed") },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("embed"),
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("embed") },
+                                    }),
                                 }) },
                                 .{ "select", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("embed"),
                                 }) },
                             }),
                             h.jo(&.{
@@ -373,15 +419,26 @@ pub fn make_config() Value {
                                 .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/embed") },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("ephemeral"),
-                                    h.vstr("embed"),
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("ephemeral") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("embed") },
+                                    }),
                                 }) },
                                 .{ "select", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("ephemeral"),
+                                    h.vstr("embed"),
                                 }) },
                             }),
                         }) },
@@ -412,6 +469,7 @@ pub fn make_config() Value {
                         .{ "type", h.vstr("`$STRING`") },
                     }),
                     h.jo(&.{
+                        .{ "format", h.vstr("date-time") },
                         .{ "name", h.vstr("resetsAt") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("When the daily allowance resets.") },
@@ -429,15 +487,26 @@ pub fn make_config() Value {
                                 .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/key") },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("ephemeral"),
-                                    h.vstr("key"),
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("ephemeral") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("key") },
+                                    }),
                                 }) },
                                 .{ "select", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("ephemeral"),
+                                    h.vstr("key"),
                                 }) },
                             }),
                         }) },
@@ -515,14 +584,22 @@ pub fn make_config() Value {
                                 .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("GET") },
                                 .{ "orig", h.vstr("/v1/models") },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("models"),
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("models") },
+                                    }),
                                 }) },
                                 .{ "select", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("models"),
                                 }) },
                             }),
                         }) },

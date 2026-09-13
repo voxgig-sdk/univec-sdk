@@ -211,51 +211,75 @@ let make_config () : value =
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/convert"));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "convert") ]));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "convert")) ]) ]));
                 ("select", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ])) ]);
+                  ("res", (Str "`body.data`")) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "convert") ])) ]);
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/embed-bridge"));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "embed-bridge") ]));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "embed-bridge")) ]) ]));
                 ("select", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ])) ]);
+                  ("res", (Str "`body.data`")) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "embed-bridge") ])) ]);
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/convert"));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "ephemeral");
-                  (Str "convert") ]));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "ephemeral")) ]);
+                  (jo [
+                    ("lit", (Str "convert")) ]) ]));
                 ("select", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ])) ]);
+                  ("res", (Str "`body.data`")) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "ephemeral");
+                  (Str "convert") ])) ]);
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/embed-bridge"));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "ephemeral");
-                  (Str "embed-bridge") ]));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "ephemeral")) ]);
+                  (jo [
+                    ("lit", (Str "embed-bridge")) ]) ]));
                 ("select", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ])) ]) ])) ])) ]));
+                  ("res", (Str "`body.data`")) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "ephemeral");
+                  (Str "embed-bridge") ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("embed", (jo [
@@ -286,26 +310,38 @@ let make_config () : value =
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/embed"));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "embed") ]));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "embed")) ]) ]));
                 ("select", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ])) ]);
+                  ("res", (Str "`body.data`")) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "embed") ])) ]);
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/embed"));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "ephemeral");
-                  (Str "embed") ]));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "ephemeral")) ]);
+                  (jo [
+                    ("lit", (Str "embed")) ]) ]));
                 ("select", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ])) ]) ])) ])) ]));
+                  ("res", (Str "`body.data`")) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "ephemeral");
+                  (Str "embed") ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("ephemeral_key", (jo [
@@ -326,6 +362,7 @@ let make_config () : value =
             ("short", (Str "The ephemeral API key, prefixed `eph_`."));
             ("type", (Str "`$STRING`")) ]);
           (jo [
+            ("format", (Str "date-time"));
             ("name", (Str "resetsAt"));
             ("req", (Bool true));
             ("short", (Str "When the daily allowance resets."));
@@ -341,14 +378,21 @@ let make_config () : value =
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/key"));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "ephemeral");
-                  (Str "key") ]));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "ephemeral")) ]);
+                  (jo [
+                    ("lit", (Str "key")) ]) ]));
                 ("select", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ])) ]) ])) ])) ]));
+                  ("res", (Str "`body.data`")) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "ephemeral");
+                  (Str "key") ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("model", (jo [
@@ -408,15 +452,24 @@ let make_config () : value =
                 ("kind", (Str "http"));
                 ("method", (Str "GET"));
                 ("orig", (Str "/v1/models"));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "models") ]));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "models")) ]) ]));
                 ("select", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ])) ]) ])) ])) ]));
+                  ("res", (Str "`body.data`")) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "models") ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ])) ])) ])
+
+(* The plugin definitions the model selected, per feature: none - no
+ * plugin-bearing feature is active in this SDK. *)
+let feature_plugins (_name : string) = []
 
 let make_feature (name : string) : feature =
   match name with

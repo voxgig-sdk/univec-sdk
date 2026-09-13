@@ -448,6 +448,16 @@ voxgig_value* make_config(void);
 voxgig_value* shared_config(void);
 Feature* make_feature(const char* name);
 
+// The plugin DEFINITIONS the model selected for one feature's chain - the c
+// peer of go's core.FeaturePlugins(name). Each entry is a `Definition*` from
+// the vendored voxgig/plugin (feature/secrets/plugin/catalog.h), typed void*
+// here because core/ must never name a gated feature's types: the accessor
+// exists in every generated config.c, and answers *n = 0 / NULL for a
+// feature with no plugins or an SDK that never selected the feature. A
+// feature casts the array back at the one place it hands the list to the
+// vendored library.
+void** feature_plugins(const char* name, size_t* n);
+
 // ===========================================================================
 // Utility builder prototypes (utility/*.c). Fallible ones take PNError** err.
 // ===========================================================================

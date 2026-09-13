@@ -56,11 +56,11 @@ pub fn fopt_list(options: Value, key: []const u8) Value {
 pub fn fopt_str_list(options: Value, key: []const u8) ?[][]const u8 {
     const l = h.getp(options, key);
     if (l != .array) return null;
-    var out = std.ArrayList([]const u8).init(h.A());
+    var out: std.ArrayList([]const u8) = .empty;
     for (l.array.data.items) |v| {
-        if (v == .string) out.append(v.string) catch {};
+        if (v == .string) out.append(h.A(), v.string) catch {};
     }
-    return out.toOwnedSlice() catch &.{};
+    return out.toOwnedSlice(h.A()) catch &.{};
 }
 
 // The injectable sleep (option "sleep": a function taking ms), defaulting to

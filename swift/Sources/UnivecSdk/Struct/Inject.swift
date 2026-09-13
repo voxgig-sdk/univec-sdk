@@ -111,6 +111,12 @@ public func inject(_ val: Value, _ store: Value, _ injdef: Injection? = nil) -> 
       if !idef.extra.isNoval { root.extra = idef.extra }
       if !idef.meta.entries.isEmpty { root.meta = idef.meta }
       if !idef.errs.items.isEmpty { root.errs = idef.errs }
+      // The caller's HANDLER, which canonical carries here too
+      // (typescript/src/StructUtility.ts inject). Dropping it made
+      // `validate`'s own `_validatehandler` dead code in every run, so the
+      // meta-path forms `q0$=x1` / `q0$~x1` never became the $EXACT / loose
+      // checks they name - the corpus pins it through validate.special.
+      root.handler = idef.handler
       // Caller-provided meta/errs override above.
     }
     inj = root
@@ -184,21 +190,29 @@ public func inject(_ val: Value, _ store: Value, _ injdef: Injection? = nil) -> 
 public func checkPlacement(_ modes: Int, _ name: String, _ parentTypes: Int, _ inj: Injection)
   -> Bool
 {
+  // The canonical messages, verbatim (typescript/src/StructUtility.ts
+  // checkPlacement): PLACEMENT names, KEYPRE/KEYPOST/VAL order, the type
+  // expected of the parent, and the closing period. The corpus pins all
+  // four through transform.apply, whose err entries the silent-pass inline
+  // runner used to skip.
   if (modes & inj.mode) == 0 {
-    let allowed = [M_KEYPRE, M_VAL, M_KEYPOST]
+    let allowed = [M_KEYPRE, M_KEYPOST, M_VAL]
       .filter { (modes & $0) != 0 }
-      .compactMap { MODENAME[$0] }
+      .compactMap { PLACEMENT[$0] }
       .joined(separator: ",")
     inj.errs.items.append(
       .string(
-        "$\(name): invalid placement as " + (MODENAME[inj.mode] ?? "?") + ", expected: " + allowed))
+        "$\(name): invalid placement as " + (PLACEMENT[inj.mode] ?? "?")
+          + ", expected: " + allowed + "."))
     return false
   }
   if parentTypes != 0 {
     let ptype = typify(inj.parent)
     if (parentTypes & ptype) == 0 {
       inj.errs.items.append(
-        .string("$\(name): invalid placement in parent " + typename(ptype) + "."))
+        .string(
+          "$\(name): invalid placement in parent " + typename(ptype)
+            + ", expected: " + typename(parentTypes) + "."))
       return false
     }
   }
@@ -213,7 +227,16 @@ public func injectorArgs(_ types: [Int], _ args: Value) -> (Value, [Value]) {
     let arg = i < l.items.count ? l.items[i] : Value.noval
     let atype = typify(arg)
     if expected != T_any && (expected & atype) == 0 {
-      return (.string("argument \(i) not of type: " + typename(expected)), l.items)
+      // The canonical message, verbatim (typescript/src/StructUtility.ts
+      // injectorArgs): the offending VALUE, its type, its 1-based position
+      // and the type expected. The corpus pins it through transform.apply,
+      // whose err entries the silent-pass inline runner used to skip.
+      return (
+        .string(
+          "invalid argument: " + stringify(arg, 22) + " (" + typename(atype)
+            + " at position " + String(1 + i) + ") is not of type: "
+            + typename(expected) + "."),
+        l.items)
     }
     out.append(arg)
   }

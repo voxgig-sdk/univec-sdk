@@ -1,9 +1,15 @@
-// Univec SDK test runner - shared infrastructure for the generated
-// test suites (C# twin of tm/go/test/runner_test.go).
+// Univec SDK test-runner SUPPORT (vendor-tag rollout): env overrides,
+// the sdk-test-control.json skip machinery, live pacing, the
+// ../../.sdk/test/test.json spec loader, and ctx/entity conversion
+// helpers. The corpus ENGINE that used to live beside them
+// (RunSet/MatchDeep/MatchString) is retired: both corpora now run on the
+// vendored omni runner through OmniResolver.cs. The class names are
+// unchanged so the emitted TestEntity/TestDirect call sites
+// (TestRunner.IsControlSkipped, StructRunner.ConvertElement, ...) need no
+// churn - the go split's zero-churn rule, class-scoped.
 
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 using Voxgig.Struct;
 using Xunit;
@@ -26,6 +32,101 @@ public class EntityTestSetup
     public bool Live;
     public bool SyntheticOnly;
     public long Now;
+}
+
+// Support-only remnant of the retired struct corpus runner: the shared
+// spec path, the JSON loader and the loose deep-equality the feature and
+// entity tests compare with. The engine half (RunSet/RunSetFull/FixJson)
+// is superseded by OmniResolver over the vendored omni port.
+public static class StructRunner
+{
+    private static string SourceDir([CallerFilePath] string path = "")
+        => Path.GetDirectoryName(path)!;
+
+    // The shared SDK test spec lives at <sdk-project>/.sdk/test/test.json,
+    // i.e. ../../.sdk/test/test.json relative to this test folder.
+    public static string TestJsonPath()
+    {
+        return Path.GetFullPath(
+            Path.Combine(SourceDir(), "..", "..", ".sdk", "test", "test.json"));
+    }
+
+    // Convert a JsonElement tree into native C# types.
+    public static object? ConvertElement(JsonElement el)
+    {
+        return el.ValueKind switch
+        {
+            JsonValueKind.Object => el.EnumerateObject()
+                .ToDictionary(p => p.Name, p => ConvertElement(p.Value)),
+            JsonValueKind.Array  => el.EnumerateArray()
+                .Select(ConvertElement)
+                .ToList<object?>(),
+            JsonValueKind.String => el.GetString(),
+            JsonValueKind.Number => el.TryGetInt64(out long l) ? (object?)l : el.GetDouble(),
+            JsonValueKind.True   => (object?)true,
+            JsonValueKind.False  => (object?)false,
+            JsonValueKind.Null   => null,
+            _                    => null,
+        };
+    }
+
+    // Deep structural equality (numbers are compared by value, ignoring
+    // int/long/double; NONE compares equal to null).
+    public static bool DeepEqual(object? a, object? b)
+    {
+        // NONE (TS undefined) compares equal to null for test comparison.
+        bool aNone = ReferenceEquals(a, StructUtils.NONE);
+        bool bNone = ReferenceEquals(b, StructUtils.NONE);
+        if (aNone) a = null;
+        if (bNone) b = null;
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+
+        // Numeric equivalence across int/long/double.
+        if (IsNumeric(a) && IsNumeric(b))
+            return ToDouble(a) == ToDouble(b);
+
+        if (a is bool ab && b is bool bb) return ab == bb;
+        if (a is string sa && b is string sb) return sa == sb;
+
+        if (a is Dictionary<string, object?> am && b is Dictionary<string, object?> bm)
+        {
+            if (am.Count != bm.Count) return false;
+            foreach (var kv in am)
+            {
+                if (!bm.TryGetValue(kv.Key, out object? bv)) return false;
+                if (!DeepEqual(kv.Value, bv)) return false;
+            }
+            return true;
+        }
+
+        // Handle any IList (List<object?>, List<string>, List<List<object?>>, etc.)
+        if (a is System.Collections.IList al && b is System.Collections.IList bl)
+        {
+            if (al.Count != bl.Count) return false;
+            for (int i = 0; i < al.Count; i++)
+                if (!DeepEqual(al[i], bl[i])) return false;
+            return true;
+        }
+
+        return a.Equals(b);
+    }
+
+    private static bool IsNumeric(object? v) =>
+        v is int or long or double or float or short or byte;
+
+    public static bool IsNumericValue(object? v) => IsNumeric(v);
+
+    private static double ToDouble(object? v) => v switch
+    {
+        int    i => i,
+        long   l => l,
+        double d => d,
+        float  f => f,
+        _        => 0,
+    };
+
+    public static double ToDoubleVal(object? v) => ToDouble(v);
 }
 
 public static class TestRunner
@@ -153,6 +254,51 @@ public static class TestRunner
         return _testControl;
     }
 
+    // LiveClientOptions returns the extra SDK options every LIVE client is
+    // constructed with, read from sdk-test-control.json `test.client.options`.
+    //
+    // The generated live client knows two things: the base URL (from the
+    // spec) and the credential (from the environment). Everything else about
+    // how a particular API wants to be talked to - which features to switch
+    // on, and with what settings - is a property of THAT API, known to the
+    // project and to nothing in the toolchain.
+    //
+    // Merged UNDER the generated fields, so the suite's own
+    // base/apikey/server values win: this ADDS to the live client, it does
+    // not redirect it.
+    //
+    // Reserved fields are stripped HERE rather than at each merge site: the
+    // generated dictionary only names a field when the model calls for one,
+    // so a "base" in this block would face no competing value and would
+    // silently redirect the whole suite - credential included - to another
+    // host.
+    private static readonly string[] LiveReserved =
+        { "base", "prefix", "suffix", "server", "apikey", "secret" };
+
+    public static Dictionary<string, object?> LiveClientOptions()
+    {
+        var ctrl = LoadTestControl();
+        if (!ctrl.TryGetValue("test", out var testRaw) ||
+            testRaw is not Dictionary<string, object?> test ||
+            !test.TryGetValue("client", out var clientRaw) ||
+            clientRaw is not Dictionary<string, object?> client ||
+            !client.TryGetValue("options", out var optsRaw) ||
+            optsRaw is not Dictionary<string, object?> opts)
+        {
+            return new Dictionary<string, object?>();
+        }
+
+        var out_ = new Dictionary<string, object?>();
+        foreach (var kv in opts)
+        {
+            if (Array.IndexOf(LiveReserved, kv.Key) < 0)
+            {
+                out_[kv.Key] = kv.Value;
+            }
+        }
+        return out_;
+    }
+
     // IsControlSkipped checks sdk-test-control.json for a skip entry.
     // Returns (skip, reason).
     public static (bool, string) IsControlSkipped(string kind, string name, string mode)
@@ -244,272 +390,6 @@ public static class TestRunner
             }
         }
         return cur as Dictionary<string, object?>;
-    }
-
-    // --- runset ---------------------------------------------------------------
-
-    public delegate object? RunSubject(Dictionary<string, object?> entry);
-
-    public static void RunSet(Dictionary<string, object?>? testspec, RunSubject subject)
-    {
-        if (testspec == null ||
-            !testspec.TryGetValue("set", out var setRaw) ||
-            setRaw is not List<object?> set)
-        {
-            return;
-        }
-
-        for (var i = 0; i < set.Count; i++)
-        {
-            if (set[i] is not Dictionary<string, object?> entry)
-            {
-                continue;
-            }
-
-            var mark = entry.TryGetValue("mark", out var m) && m != null
-                ? $" (mark={m})" : "";
-
-            object? result = null;
-            Exception? err = null;
-            try
-            {
-                result = subject(entry);
-            }
-            catch (Exception ex)
-            {
-                err = ex;
-            }
-
-            var expectedErr = entry.TryGetValue("err", out var ee) ? ee : null;
-
-            if (err != null)
-            {
-                if (expectedErr != null)
-                {
-                    var errMsg = err.Message;
-                    if (expectedErr is string expStr)
-                    {
-                        Assert.True(MatchString(expStr, errMsg),
-                            $"entry {i}{mark}: error mismatch: got \"{errMsg}\"," +
-                            $" want contains \"{expStr}\"");
-                    }
-                    // err: true means any error is acceptable.
-                    if (entry.TryGetValue("match", out var ms) &&
-                        ms is Dictionary<string, object?> matchSpecErr)
-                    {
-                        var resultMap = new Dictionary<string, object?>
-                        {
-                            ["in"] = entry.TryGetValue("in", out var inv) ? inv : null,
-                            ["out"] = JsonNormalize(result),
-                            ["err"] = new Dictionary<string, object?>
-                            {
-                                ["message"] = err.Message,
-                            },
-                        };
-                        MatchDeep(i, mark, matchSpecErr, resultMap, "");
-                    }
-                    continue;
-                }
-                Assert.Fail($"entry {i}{mark}: unexpected error: {err}");
-                continue;
-            }
-
-            if (expectedErr != null)
-            {
-                Assert.Fail($"entry {i}{mark}: expected error containing" +
-                    $" \"{expectedErr}\" but got result: {JsonStr(result)}");
-                continue;
-            }
-
-            var matched = false;
-            if (entry.TryGetValue("match", out var msRaw) &&
-                msRaw is Dictionary<string, object?> matchSpec)
-            {
-                var resultMap = new Dictionary<string, object?>
-                {
-                    ["in"] = entry.TryGetValue("in", out var inv) ? inv : null,
-                    ["out"] = JsonNormalize(result),
-                };
-                if (entry.TryGetValue("args", out var args) && args != null)
-                {
-                    resultMap["args"] = args;
-                }
-                else if (entry.TryGetValue("in", out var inv2) && inv2 != null)
-                {
-                    resultMap["args"] = new List<object?> { inv2 };
-                }
-                if (entry.TryGetValue("ctx", out var ctxData) && ctxData != null)
-                {
-                    resultMap["ctx"] = ctxData;
-                }
-                MatchDeep(i, mark, matchSpec, resultMap, "");
-                matched = true;
-            }
-
-            var expectedOut = entry.TryGetValue("out", out var eo) ? eo : null;
-            if (expectedOut == null && matched)
-            {
-                continue;
-            }
-            if (expectedOut != null)
-            {
-                var normResult = JsonNormalize(result);
-                var normExpected = JsonNormalize(expectedOut);
-                Assert.True(DeepEqual(normResult, normExpected),
-                    $"entry {i}{mark}: output mismatch:\n  got:  {JsonStr(normResult)}" +
-                    $"\n  want: {JsonStr(normExpected)}");
-            }
-        }
-    }
-
-    // JsonNormalize converts an arbitrary value graph into the canonical
-    // loose object model: maps/lists recursively, all integral numbers to
-    // long. Non-JSON values (delegates, SDK objects) pass through as-is.
-    public static object? JsonNormalize(object? val)
-    {
-        switch (val)
-        {
-            case null:
-                return null;
-            case Dictionary<string, object?> map:
-            {
-                var norm = new Dictionary<string, object?>();
-                foreach (var kv in map)
-                {
-                    norm[kv.Key] = JsonNormalize(kv.Value);
-                }
-                return norm;
-            }
-            case List<object?> list:
-                return list.Select(JsonNormalize).ToList();
-            case System.Collections.IList ilist:
-            {
-                var norm = new List<object?>();
-                foreach (var item in ilist)
-                {
-                    norm.Add(JsonNormalize(item));
-                }
-                return norm;
-            }
-            case int n:
-                return (long)n;
-            case short n:
-                return (long)n;
-            case byte n:
-                return (long)n;
-            case float f:
-                return f == Math.Floor(f) ? (long)f : (double)f;
-            case double d:
-                return d == Math.Floor(d) ? (long)d : d;
-            default:
-                return val;
-        }
-    }
-
-    public static string JsonStr(object? val)
-    {
-        try
-        {
-            return StructUtils.Jsonify(val, -1);
-        }
-        catch (Exception)
-        {
-            return val?.ToString() ?? "null";
-        }
-    }
-
-    public static bool DeepEqual(object? a, object? b)
-    {
-        return StructRunner.DeepEqual(a, b);
-    }
-
-    public static void MatchDeep(int entryIdx, string mark, object? check,
-        object? baseval, string path)
-    {
-        if (check == null)
-        {
-            return;
-        }
-
-        if (check is Dictionary<string, object?> checkMap)
-        {
-            foreach (var kv in checkMap)
-            {
-                var childPath = path + "." + kv.Key;
-                object? childBase = null;
-                if (baseval is Dictionary<string, object?> baseMap &&
-                    baseMap.TryGetValue(kv.Key, out var bv))
-                {
-                    childBase = bv;
-                }
-                MatchDeep(entryIdx, mark, kv.Value, childBase, childPath);
-            }
-        }
-        else if (check is List<object?> checkList)
-        {
-            for (var i = 0; i < checkList.Count; i++)
-            {
-                var childPath = $"{path}[{i}]";
-                object? childBase = null;
-                if (baseval is List<object?> baseList && i < baseList.Count)
-                {
-                    childBase = baseList[i];
-                }
-                MatchDeep(entryIdx, mark, checkList[i], childBase, childPath);
-            }
-        }
-        else
-        {
-            if (check is string checkStr)
-            {
-                if (checkStr == "__EXISTS__")
-                {
-                    Assert.True(baseval != null,
-                        $"entry {entryIdx}{mark}: match {path}: expected value" +
-                        " to exist but got null");
-                    return;
-                }
-                if (checkStr == "__UNDEF__")
-                {
-                    Assert.True(baseval == null,
-                        $"entry {entryIdx}{mark}: match {path}: expected null" +
-                        $" but got {baseval}");
-                    return;
-                }
-            }
-
-            var normCheck = JsonNormalize(check);
-            var normBase = JsonNormalize(baseval);
-
-            if (!DeepEqual(normCheck, normBase))
-            {
-                if (check is string cs && cs != "" &&
-                    MatchString(cs, StructUtils.Stringify(baseval)))
-                {
-                    return;
-                }
-                Assert.Fail($"entry {entryIdx}{mark}: match {path}:" +
-                    $" got {JsonStr(normBase)}, want {JsonStr(normCheck)}");
-            }
-        }
-    }
-
-    // MatchString checks if val matches pattern. If pattern is /regex/, use
-    // a regex; otherwise do a case-insensitive contains.
-    public static bool MatchString(string pattern, string val)
-    {
-        if (pattern.Length >= 2 && pattern[0] == '/' && pattern[^1] == '/')
-        {
-            try
-            {
-                return Regex.IsMatch(val, pattern[1..^1]);
-            }
-            catch (ArgumentException)
-            {
-                return false;
-            }
-        }
-        return val.ToLowerInvariant().Contains(pattern.ToLowerInvariant());
     }
 
     // --- context factories ------------------------------------------------

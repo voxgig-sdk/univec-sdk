@@ -143,6 +143,45 @@ bool skipIfMissingIds(T t, Map setup, List<String> requiredKeys) {
 
 // Per-test live pacing delay (ms). Read from sdk-test-control.json
 // `test.live.delayMs`; defaults to 500ms if absent or invalid.
+// Extra SDK options every LIVE client is constructed with, read from
+// sdk-test-control.json `test.client.options`.
+//
+// The generated live client knows two things: the base URL (from the spec)
+// and the credential (from the environment). Everything else about how a
+// particular API wants to be talked to - which features to switch on, and
+// with what settings - is a property of THAT API, known to the project and
+// to nothing in the toolchain.
+//
+// Merged UNDER the generated fields, so the suite's own base/apikey/server
+// values win: this ADDS to the live client, it does not redirect it.
+//
+// Reserved fields are stripped HERE rather than at each merge site: the
+// generated map only names a field when the model calls for one, so a
+// 'base' in this block would face no competing value and would silently
+// redirect the whole suite - credential included - to another host.
+const List<String> liveReserved = [
+  'base', 'prefix', 'suffix', 'server', 'apikey', 'secret'
+];
+
+Map<String, dynamic> liveClientOptions() {
+  final ctrl = loadTestControl();
+  final t = ctrl['test'];
+  if (t is! Map) return <String, dynamic>{};
+  final c = t['client'];
+  if (c is! Map) return <String, dynamic>{};
+  final opts = c['options'];
+  if (opts is! Map) return <String, dynamic>{};
+
+  final out = <String, dynamic>{};
+  opts.forEach((k, v) {
+    if (!liveReserved.contains(k)) {
+      out['$k'] = v;
+    }
+  });
+  return out;
+}
+
+
 int liveDelayMs() {
   final ctrl = loadTestControl();
   final t = ctrl['test'];

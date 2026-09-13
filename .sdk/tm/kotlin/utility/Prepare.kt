@@ -141,7 +141,7 @@ fun prepareHeaders(ctx: Context): MutableMap<String, Any?> {
   return out ?: linkedMapOf()
 }
 
-fun prepareMethod(ctx: Context): String {
+fun prepareMethod(ctx: Context): String? {
   val opname = ctx.op.name
 
   // The API definition is authoritative: a POST-only or PATCH-based API
@@ -152,11 +152,11 @@ fun prepareMethod(ctx: Context): String {
     return pm.uppercase()
   }
 
-  val m = METHOD_MAP[opname]
-  if (m != null) {
-    return m
-  }
-  return "GET"
+  // No default: an op name outside the convention resolves to NO method,
+  // exactly as the ts reference (`methodMap[key]` is undefined there).
+  // The silent-pass engine hid a stray "GET" fallback here; the shared
+  // corpus (prepareMethod, opname "bad" -> null) pins it now.
+  return METHOD_MAP[opname]
 }
 
 @Suppress("UNCHECKED_CAST")

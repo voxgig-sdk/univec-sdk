@@ -3,7 +3,8 @@ import type {
   ModelEntity
 } from '@voxgig/apidef'
 
-import { cmp, each, Folder, entityCollection } from '@voxgig/sdkgen'
+import { cmp, each, Folder, entityCollection,
+  TestControl } from '@voxgig/sdkgen'
 
 
 import { TestEntity } from './TestEntity_cpp'
@@ -19,6 +20,9 @@ const Test = cmp(function Test(props: any) {
   // netsim / struct corpus) ships as tm/cpp/test templates (copied verbatim).
   // Here we generate the per-entity model-driven tests into test/.
   Folder({ name: 'test' }, () => {
+
+    // Write-once: a project's edited control file survives regeneration.
+    TestControl({ target, dir: 'test' })
     const entity = each(entityCollection(model))
       .filter((e: any) => false !== e.active)
     each(entity, (entity: ModelEntity) => {

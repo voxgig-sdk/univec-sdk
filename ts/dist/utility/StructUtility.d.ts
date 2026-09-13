@@ -48,9 +48,9 @@ declare function ismap(val: any): val is {
 declare function islist(val: any): val is any[];
 declare function iskey(key: any): key is PropKey;
 declare function isempty(val: any): boolean;
-declare function isfunc(val: any): val is Function;
+declare function isfunc(val: any): val is (...args: any[]) => any;
 declare function size(val: any): number;
-declare function slice<V extends any>(val: V, start?: number, end?: number, mutate?: boolean): V;
+declare function slice<V>(val: V, start?: number, end?: number, mutate?: boolean): V;
 declare function pad(str: any, padding?: number, padchar?: string): string;
 declare function typify(value: any): number;
 declare function getelem(val: any, key: any, alt?: any): any;
@@ -63,7 +63,13 @@ declare function items<T>(val: any, apply: (item: [string, any]) => T): T[];
 declare function flatten(list: any[], depth?: number): any[];
 declare function filter(val: any, check: (item: [string, any]) => boolean): any[];
 declare function escre(s: string): string;
+declare function re_escape(s: string): string;
 declare function escurl(s: string): string;
+declare function re_compile(pattern: string | RegExp, flags?: string): RegExp;
+declare function re_find(pattern: string | RegExp, input: string): RegExpMatchArray | null;
+declare function re_find_all(pattern: string | RegExp, input: string): RegExpMatchArray[];
+declare function re_replace(pattern: string | RegExp, input: string, replacement: string | ((m: RegExpMatchArray) => string)): string;
+declare function re_test(pattern: string | RegExp, input: string): boolean;
 declare function join(arr: any[], sep?: string, url?: boolean): string;
 declare function jsonify(val: any, flags?: {
     indent?: number;
@@ -76,7 +82,7 @@ declare function jm(...kv: any[]): Record<string, any>;
 declare function jt(...v: any[]): any[];
 declare function delprop<PARENT>(parent: PARENT, key: any): PARENT;
 declare function setprop<PARENT>(parent: PARENT, key: any, val: any): PARENT;
-declare function walk(val: any, before?: WalkApply, after?: WalkApply, maxdepth?: number, key?: string | number, parent?: any, path?: string[]): any;
+declare function walk(val: any, before?: WalkApply, after?: WalkApply, maxdepth?: number, key?: string | number, parent?: any, path?: string[], pool?: string[][]): any;
 declare function merge(val: any, maxdepth?: number): any;
 declare function setpath(store: any, path: number | string | string[], val: any, injdef?: Partial<Injection>): any;
 declare function getpath(store: any, path: number | string | string[], injdef?: Partial<Injection>): any;
@@ -119,9 +125,12 @@ declare function injectorArgs(argTypes: number[], args: any[]): any;
 declare function injectChild(child: any, store: any, inj: Injection): Injection;
 declare class StructUtility {
     clone: typeof clone;
+    condense: typeof condense;
+    condenseview: typeof condenseview;
     delprop: typeof delprop;
     escre: typeof escre;
     escurl: typeof escurl;
+    expand: typeof expand;
     filter: typeof filter;
     flatten: typeof flatten;
     getdef: typeof getdef;
@@ -131,6 +140,7 @@ declare class StructUtility {
     haskey: typeof haskey;
     inject: typeof inject;
     isempty: typeof isempty;
+    iscondensed: typeof iscondensed;
     isfunc: typeof isfunc;
     iskey: typeof iskey;
     islist: typeof islist;
@@ -155,6 +165,12 @@ declare class StructUtility {
     typename: typeof typename;
     validate: typeof validate;
     walk: typeof walk;
+    re_compile: typeof re_compile;
+    re_find: typeof re_find;
+    re_find_all: typeof re_find_all;
+    re_replace: typeof re_replace;
+    re_test: typeof re_test;
+    re_escape: typeof re_escape;
     SKIP: {
         '`$SKIP`': boolean;
     };
@@ -183,5 +199,19 @@ declare class StructUtility {
     injectorArgs: typeof injectorArgs;
     injectChild: typeof injectChild;
 }
-export { StructUtility, clone, delprop, escre, escurl, filter, flatten, getdef, getelem, getpath, getprop, haskey, inject, isempty, isfunc, iskey, islist, ismap, isnode, items, join, jsonify, keysof, merge, pad, pathify, select, setpath, setprop, size, slice, strkey, stringify, transform, typify, typename, validate, walk, SKIP, DELETE, jm, jt, T_any, T_noval, T_boolean, T_decimal, T_integer, T_number, T_string, T_function, T_symbol, T_null, T_list, T_map, T_instance, T_scalar, T_node, M_KEYPRE, M_KEYPOST, M_VAL, MODENAME, checkPlacement, injectorArgs, injectChild, };
+declare function iscondensed(val: any): boolean;
+declare function condense(val: any): any;
+declare function expand(cond: any): any;
+type CondenseView = {
+    get: (path?: any) => any;
+    keys: (path?: any) => string[];
+    has: (path?: any) => boolean;
+    at: (path?: any) => CondenseView;
+    value: () => any;
+    size: () => number;
+    exists: () => boolean;
+    ref: () => any;
+};
+declare function condenseview(cond: any, idx?: number, memo?: any): CondenseView;
+export { StructUtility, clone, condense, condenseview, expand, iscondensed, delprop, escre, escurl, filter, flatten, getdef, getelem, getpath, getprop, haskey, inject, isempty, isfunc, iskey, islist, ismap, isnode, items, join, jsonify, keysof, merge, pad, pathify, select, setpath, setprop, size, slice, strkey, stringify, transform, typify, typename, validate, walk, re_compile, re_find, re_find_all, re_replace, re_test, re_escape, SKIP, DELETE, jm, jt, T_any, T_noval, T_boolean, T_decimal, T_integer, T_number, T_string, T_function, T_symbol, T_null, T_list, T_map, T_instance, T_scalar, T_node, M_KEYPRE, M_KEYPOST, M_VAL, MODENAME, checkPlacement, injectorArgs, injectChild, };
 export type { Injection, Injector, WalkApply };

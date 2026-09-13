@@ -9,7 +9,8 @@ import type {
   ModelEntity
 } from '@voxgig/apidef'
 
-import { cmp, each, Folder, File, Content, entityCollection } from '@voxgig/sdkgen'
+import { cmp, each, Folder, File, Content, entityCollection,
+  TestControl } from '@voxgig/sdkgen'
 
 
 import { TestEntity } from './TestEntity_scala'
@@ -30,6 +31,9 @@ const Test = cmp(function Test(props: any) {
   // (SdkTestMain), the struct corpus (Runner) and the shared SdkTestSupport
   // template, and are driven by the generated SdkEntityTestMain aggregator.
   Folder({ name: 'sdktest' }, () => {
+
+    // Write-once: a project's edited control file survives regeneration.
+    TestControl({ target, dir: 'sdktest' })
 
     const entities: { Name: string; entity: boolean; direct: boolean }[] = []
 

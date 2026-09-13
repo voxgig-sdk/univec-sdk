@@ -7,6 +7,7 @@ import {
   configReprSetting,
   each,
   isConfigData,
+  targetFeatures,
 } from '@voxgig/sdkgen'
 
 
@@ -33,7 +34,10 @@ const Config = cmp(async function Config(props: any) {
 
   const model: Model = ctx$.model
 
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  // Gated by the applicability tags, so this target never imports or
+  // registers a feature it has no source for. One rule, one place:
+  // helpers/applicability.
+  const feature = targetFeatures(model, target)
 
   // The same config as an OBJECT, built by the shared helper so this target's
   // literal and the data that replaces it above the threshold are the same
@@ -47,6 +51,49 @@ const Config = cmp(async function Config(props: any) {
   // disagree on identity (mirrors Config_ts's #MainMeta block).
   const { def: configDef, json: configJson } = configDefinition(model, target.name)
   const asData = isConfigData(configJson, configReprSetting(model))
+
+  // THE FEATURE PLUGIN MAP (the csharp peer of Config_go's featurePlugins).
+  //
+  // Upstream sekreto replaced its self-registration registry with
+  // voxgig/plugin definitions: a provider kind the caller did not pass in
+  // via `Plugins: [...]` is unknown to that Sekreto. So the config names
+  // each active plugin's exported Definition (the model's per-target `def`
+  // map - `AwsPlugins.Secrets`, a C# static field) and hands the list to
+  // the feature through SdkConfig.FeaturePlugins.
+  //
+  // FULLY QUALIFIED with `global::`, which is what makes an inactive model
+  // cost nothing: no `using` is emitted, so a config for a project with no
+  // plugin groups names no sekreto type at all and the generated file is
+  // byte-identical to one from a tree that has never heard of the feature.
+  const featurePlugins: Record<string, string[]> = {}
+
+  each(feature, (f: any) => {
+    const syms: string[] = []
+    each(f.plugin, (plugin: any) => {
+      // Filter on `active` HERE rather than trusting the feature object to
+      // arrive filtered (see Config_go: getting this wrong emits a
+      // reference to a file the plugin trim has just deleted, and the SDK
+      // does not compile).
+      if (false === plugin.active || null == plugin.active) return
+      for (const sym of Object.keys(plugin.def?.csharp || {})) {
+        syms.push(sym)
+      }
+    })
+    if (0 < syms.length) {
+      featurePlugins[f.name] = syms.sort()
+    }
+  })
+
+  const featurePluginCases = Object.keys(featurePlugins).sort()
+    .map((fname: string) =>
+      `            case ${JSON.stringify(fname)}:
+                return new List<object?>
+                {
+` + featurePlugins[fname]
+        .map((sym: string) => `                    global::Voxgig.Sekreto.Plugins.${sym},
+`).join('') +
+      `                };
+`).join('')
 
   File({ name: 'Config.' + target.ext }, () => {
 
@@ -179,6 +226,33 @@ public static class SdkConfig
     public static Dictionary<string, object?> SharedConfig()
     {
         return SharedConfigVal.Value;
+    }
+`)
+
+    // ALWAYS EMITTED, even with no case at all - the same rule Config_py
+    // states for FEATURE_PLUGINS, and for the same reason. csharp's feature
+    // source is copied by Main's blanket `tm/<target>` copy whether or not
+    // the model declares the feature (only `target add` trims it, and only
+    // for a project that runs it), so SecretsFeature.cs can be present in a
+    // tree whose model has secrets switched off. Emitting this
+    // conditionally was tried and it breaks exactly there: `error CS0117:
+    // 'SdkConfig' does not contain a definition for 'FeaturePlugins'`,
+    // which takes the whole assembly down rather than leaving one unused
+    // class behind.
+    //
+    // The cost of always emitting is five inert lines and NO type
+    // reference: the return is List<object?>, so a Config.cs for a project
+    // with no plugin groups names nothing from the vendored trees and needs
+    // no `using`. The feature reads the list back and type-tests, which is
+    // go's shape too.
+    Content(`
+    public static List<object?> FeaturePlugins(string name)
+    {
+        switch (name)
+        {
+${featurePluginCases}            default:
+                return new List<object?>();
+        }
     }
 `)
 

@@ -17,7 +17,9 @@ import {
   each,
   buildIdNames,
   getMatchEntries,
-  isAuthActive, envName, envToken
+  isAuthActive, envName, envToken,
+  serverVarEnv,
+  serverVariables
 } from '@voxgig/sdkgen'
 
 
@@ -56,11 +58,27 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const authActive = isAuthActive(model)
   const apikeyEnvEntry = authActive
-    ? `\n        ("${PROJUPPER}_APIKEY", Value::str("NONE")),`
+    ? `\n        ("${PROJUPPER}_APIKEY", Value::str("")),`
     : ''
   const apikeyLiveField = authActive
     ? `("apikey", getp(&env, "${PROJUPPER}_APIKEY"))`
     : ''
+
+  // A templated server URL (OpenAPI server variables) makes a LIVE client
+  // impossible to construct without values: makeOptions raises rather than
+  // request a URL with a literal `{account_id}` in it. So the live suite
+  // takes them from the environment the same way it takes the apikey.
+  //
+  // Emitted as a jo() tuple entry, so it carries its own leading comma only
+  // when an apikey entry precedes it - otherwise `jo(vec![, ...])`.
+  const svars = serverVariables(model)
+  const serverEnvEntry = svars
+    .map((v: any) => `\n        ("${serverVarEnv(PROJUPPER, v.name)}", Value::str(${JSON.stringify(v.dflt)})),`).join('')
+  const serverLiveEntry = 0 === svars.length ? '' :
+    `("server", jo(vec![${svars
+      .map((v: any) => `("${v.name}", getp(&env, "${serverVarEnv(PROJUPPER, v.name)}"))`).join(', ')}]))`
+  const serverLiveField = '' === serverLiveEntry ? '' :
+    ('' === apikeyLiveField ? serverLiveEntry : ', ' + serverLiveEntry)
 
   const idnames = buildIdNames(entity, basicflow)
   const idnamesStr = idnames.map(n => `Value::str("${n}")`).join(', ')
@@ -268,7 +286,7 @@ ${allSteps.length > 0 ? '    let client = setup.client.clone();\n' : ''}`)
     let env = env_override(jo(vec![
         ("${PROJUPPER}_TEST_${ENTUPPER}_ENTID", idmap.clone()),
         ("${PROJUPPER}_TEST_LIVE", Value::str("FALSE")),
-        ("${PROJUPPER}_TEST_EXPLAIN", Value::str("FALSE")),${apikeyEnvEntry}
+        ("${PROJUPPER}_TEST_EXPLAIN", Value::str("FALSE")),${apikeyEnvEntry}${serverEnvEntry}
     ]));
 
     let idmap_resolved = match to_map(&getp(&env, "${PROJUPPER}_TEST_${ENTUPPER}_ENTID")) {
@@ -293,7 +311,22 @@ ${allSteps.length > 0 ? '    let client = setup.client.clone();\n' : ''}`)
 
     let client = if live {
         let merged = vs::merge(
-            &ja(vec![jo(vec![${apikeyLiveField}]), extra]),
+            // live_client_options() FIRST, so the generated entries below win:
+            // sdk-test-control.json's test.client.options adds to the live
+            // client, it does not redirect it.
+            &ja(vec![
+                live_client_options(),
+                jo(vec![${apikeyLiveField}${serverLiveField}]),
+                // A NON-NODE later entry REPLACES the accumulated map in
+                // vs::merge, and the normal call passes Value::Noval - so a
+                // a bare extra discarded live_client_options() and the
+                // apikey/server map above it, and the live client was
+                // constructed with nothing.
+                match extra {
+                    Value::Map(m) => Value::Map(m),
+                    _ => Value::empty_map(),
+                },
+            ]),
             None,
         );
         ${model.const.Name}SDK::new(to_map(&merged))

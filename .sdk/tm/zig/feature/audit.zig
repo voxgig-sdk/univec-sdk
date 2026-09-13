@@ -32,7 +32,7 @@ pub const AuditFeature = struct {
 
     pub fn make() Feature {
         const self = h.A().create(AuditFeature) catch unreachable;
-        self.* = .{ .records = std.ArrayList(Value).init(h.A()) };
+        self.* = .{ .records = .empty };
         return .{ .ptr = @ptrCast(self), .vtable = &vtable };
     }
 
@@ -73,7 +73,7 @@ pub const AuditFeature = struct {
         h.setp(record, "correlationId", h.vstr(ctx.id));
         if (ctx.result) |r| h.setp(record, "status", h.vnum(r.status));
 
-        self.records.append(record) catch {};
+        self.records.append(h.A(), record) catch {};
         const max: usize = @intCast(@max(sup.fopt_int(self.options, "max", 1000), 0));
         while (self.records.items.len > max) {
             _ = self.records.orderedRemove(0);

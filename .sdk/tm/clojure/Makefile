@@ -5,6 +5,9 @@
 
 # Run the full test suite (pipeline, features, netsim, primary utility and the
 # vendored struct corpus) through a single tools.deps main entry point.
+# `clojure -M:test --sdk-only` runs the SDK's own suites without the shared
+# corpus (.sdk/test/test.json); the skip is printed, and it is what sdkgen's
+# own CI runs, having no corpus of its own.
 test:
 	clojure -M:test
 

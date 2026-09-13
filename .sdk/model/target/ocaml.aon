@@ -9,6 +9,33 @@ main: kit: target: ocaml: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability (docs/design/feature-tags.md). A vendored sekreto port
+  # lives in this target's feature container (tm/ocaml/feature/secrets/:
+  # the sekreto core under sekreto/, the voxgig/plugin host under plugin/
+  # and the provider kinds under plugins/), so a feature that resolves
+  # secrets through sekreto can apply here.
+  #
+  # What ocaml ships: the four built-in kinds (env, memory, dotenv, file)
+  # in the vendored core, and every plugin kind as a trimmable group. The
+  # four HTTPS groups (vault, cloud, saas, aws) reach plugins/http.ml ->
+  # plugins/tls.ml, whose externals are bound in plugins/tls_stubs.c
+  # against OpenSSL (-lssl -lcrypto, and `ocamlc -custom` to carry the
+  # stub). That dependency is scoped INSIDE the gated feature: the
+  # generated feature/secrets/feature.mk (Main_ocaml) compiles the stub
+  # and links OpenSSL ONLY when a plugin group that needs a transport is
+  # active, so an SDK without secrets, or with the built-in chain alone,
+  # or with `secretspec` alone, runs no C compiler and links no OpenSSL.
+  provides: { sekreto: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the hand-written corpus engine, replaced by
+  # test/omni_resolver.ml over the vendored @voxgig/omni port
+  # (test/vendor/omni/omni.ml). `doctor` reports leftovers; `doctor prune`
+  # deletes them (jostraca only ever writes, it cannot delete).
+  superseded: [
+    'test/corpus_runner.ml'
+  ]
+
   deps: &: {
     kind: *'prod' | string
   }
@@ -16,6 +43,17 @@ main: kit: target: ocaml: {
   # struct is vendored under utility/ (voxgig_struct.ml + vregex.ml) — the
   # runtime is dependency-free: it compiles with the stock ocamlc, no opam
   # packages, no dune. So there are no manifest dependencies.
+  #
+  # The CORE also bundles no HTTP transport (sdk_runtime.ml
+  # fetch_no_transport): a live request needs a caller-supplied
+  # `options.system.fetch`. The only external dependency an ocaml SDK can
+  # have arrives with the `secrets` feature, and only when a plugin group
+  # needing a transport is active: the vendored HTTPS kinds bind OpenSSL
+  # through plugins/tls_stubs.c, and the feature's token-exchange transport
+  # of last resort rides the same vendored HTTP client. The generated
+  # feature/secrets/feature.mk turns both on from the trimmed tree, so an
+  # SDK with secrets inactive, or with no plugin group, links the OCaml
+  # distribution alone (unix.cma for the dotenv/file built-ins).
   deps: {}
 }
 
@@ -51,10 +89,24 @@ main: kit: target: ocaml: publish: {
 }
 
 
-# Feature source is NOT trimmed to the model's selection here: every
-# feature lives inside a single generated module (sdk_features.ml), not in
-# per-feature source files, so there is nothing per-feature to leave out.
-# Trimming waits on that module becoming model-driven.
+# Feature source IS trimmed to the model's selection. The eighteen pipeline
+# features live inside one template module (sdk_features.ml), which is not
+# feature source and is never a trim candidate - so for a long time there
+# was nothing per-feature to leave out and trim stayed off. `secrets`
+# changed that: it is the first ocaml feature carried as a CONTAINER
+# (feature/secrets_feature.ml, feature/secrets/ with the vendored sekreto
+# and voxgig/plugin trees, test/feature/secrets/), some 5.5k lines that a
+# project which never selected the feature must not carry. With trim on,
+# `target add ocaml` copies that container only when the project's model
+# selects `secrets`; the per-feature placeholder dirs under src/feature/
+# (never generated - Main_ocaml excludes src/) are trimmed on the same
+# rule, which is what every trim:true target does.
+#
+# fullset is EMPTY on purpose: test/t_feature.ml gates every block on
+# `has_feature`, and the harness only constructs features the generated
+# config knows, so the cross-feature suite compiles and runs against any
+# trimmed set. Nothing else references a feature by name.
 main: kit: target: ocaml: feature: {
-  trim: false
+  trim: true
+  fullset: []
 }

@@ -6,6 +6,7 @@ const ReadmeTopTest = cmp(function ReadmeTopTest(props: any) {
   Content(`\`\`\`bash
 cd ${target.name}
 lake build
+lake exe omnismoke      # the vendored @voxgig/omni corpus engine itself
 lake exe primary        # shared corpus: request-shaping utilities
 lake exe feature        # the feature catalog (retry, cache, rbac, netsim, …)
 lake exe structcorpus   # shared corpus: the vendored struct model

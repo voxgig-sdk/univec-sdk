@@ -1,7 +1,16 @@
-// Univec SDK test runner - shared infrastructure for the generated test
-// suites. Because the SDK's loose model IS the struct Value, the corpus loads
-// directly to Value (no conversion) and comparisons use a canonical
-// sorted-key JSON with .noval/.null unification.
+// Univec SDK test SUPPORT - shared infrastructure for the generated
+// test suites. SUPPORT ONLY: the corpus ENGINE that used to live here
+// (runSet / matchDeep, a second hand-written implementation of omni's
+// runner) is retired in favour of the vendored @voxgig/omni port, driven
+// through OmniResolver. The file KEEPS ITS NAME and the SdkRunner enum
+// keeps its members, so every emitted call site - FeatureTest's deepEqual /
+// matchString / errCode, the primary suite's makeCtxFromMap / fixCtx /
+// errFromMap - needs no churn.
+//
+// What survives here is everything that is ABOUT THE SDK rather than about
+// running a corpus: where the shared spec lives, how a loose ctx map
+// becomes the typed Context a generated utility takes, and the value
+// comparison the behavioural (non-corpus) suites use.
 
 import XCTest
 
@@ -20,20 +29,10 @@ enum SdkRunner {
       .appendingPathComponent("test.json").path
   }
 
-  static func loadAll() -> Value {
-    let text = (try? String(contentsOfFile: testJsonPath(), encoding: .utf8)) ?? "{}"
-    return (try? JSON.parse(text)) ?? .map(VMap())
-  }
-
-  static func loadPrimary() -> Value { getprop(loadAll(), .string("primary")) }
-
-  static func spec(_ v: Value, _ keys: String...) -> Value {
-    var cur = v
-    for k in keys { cur = getprop(cur, .string(k)) }
-    return cur
-  }
-
-  // Canonical sorted-key JSON with .noval/.null unification for comparison.
+  // Canonical sorted-key JSON with .noval/.null unification, for the
+  // BEHAVIOURAL suites' own assertions (FeatureTest). The corpus lanes
+  // compare through omni's deepequal/matchval instead - .noval and .null
+  // are DISTINCT there, which is the whole point of the `null` flag.
   static func canon(_ v: Value) -> String { stringify(normaliseAbsent(v)) }
 
   private static func normaliseAbsent(_ v: Value) -> Value {
@@ -64,101 +63,6 @@ enum SdkRunner {
       return false
     }
     return val.lowercased().contains(pattern.lowercased())
-  }
-
-  // matchDeep: recursively assert `check` against `base` (subset match).
-  static func matchDeep(_ idx: Int, _ check: Value, _ base: Value, _ path: String) {
-    switch check {
-    case .map(let cm):
-      for (k, cv) in cm.entries {
-        let childBase = base.asMap?.entries[k] ?? .noval
-        matchDeep(idx, cv, childBase, path + "." + k)
-      }
-    case .list(let cl):
-      let bl = base.asList
-      for (i, cv) in cl.items.enumerated() {
-        let childBase = (bl != nil && i < bl!.items.count) ? bl!.items[i] : .noval
-        matchDeep(idx, cv, childBase, "\(path)[\(i)]")
-      }
-    default:
-      if case .string(let cs) = check {
-        if cs == "__EXISTS__" {
-          XCTAssertFalse(isNil(base), "entry \(idx): match \(path): expected value to exist")
-          return
-        }
-        if cs == "__UNDEF__" {
-          XCTAssertTrue(isNil(base), "entry \(idx): match \(path): expected absent, got \(canon(base))")
-          return
-        }
-      }
-      if !deepEqual(check, base) {
-        if case .string(let cs) = check, cs != "", matchString(cs, stringify(base)) { return }
-        XCTFail("entry \(idx): match \(path): got \(canon(base)), want \(canon(check))")
-      }
-    }
-  }
-
-  // runSet: drive a primary test set. `subject` returns (result, thrownError)
-  // and may mutate `entry` (e.g. record produced ctx state under "ctx").
-  static func runSet(_ testspec: Value, _ subject: (VMap) throws -> Value) {
-    guard let set = testspec.asMap?.entries["set"]?.asList else { return }
-    for (i, entryV) in set.items.enumerated() {
-      guard let entry = entryV.asMap else { continue }
-      let mark = entry.entries["mark"].map { " (mark=\(stringify($0)))" } ?? ""
-
-      var result: Value = .noval
-      var err: Error? = nil
-      do { result = try subject(entry) } catch { err = error }
-
-      let expectedErr = entry.entries["err"]
-
-      if let err = err {
-        if let expectedErr = expectedErr {
-          if case .string(let expStr) = expectedErr {
-            XCTAssertTrue(matchString(expStr, errMessage(err)),
-              "entry \(i)\(mark): error mismatch: got \"\(errMessage(err))\" want contains \"\(expStr)\"")
-          }
-          if let matchSpec = entry.entries["match"]?.asMap {
-            let rm = VMap()
-            rm.entries["in"] = entry.entries["in"] ?? .noval
-            rm.entries["out"] = result
-            let em = VMap(); em.entries["message"] = .string(errMessage(err))
-            rm.entries["err"] = .map(em)
-            matchDeep(i, .map(matchSpec), .map(rm), "")
-          }
-          continue
-        }
-        XCTFail("entry \(i)\(mark): unexpected error: \(errMessage(err))")
-        continue
-      }
-
-      if let expectedErr = expectedErr {
-        XCTFail("entry \(i)\(mark): expected error \(canon(expectedErr)) but got \(canon(result))")
-        continue
-      }
-
-      var matched = false
-      if let matchSpec = entry.entries["match"]?.asMap {
-        let rm = VMap()
-        rm.entries["in"] = entry.entries["in"] ?? .noval
-        rm.entries["out"] = result
-        if let args = entry.entries["args"] {
-          rm.entries["args"] = args
-        } else if let inv = entry.entries["in"] {
-          rm.entries["args"] = .list([inv])
-        }
-        if let ctxData = entry.entries["ctx"] { rm.entries["ctx"] = ctxData }
-        matchDeep(i, .map(matchSpec), .map(rm), "")
-        matched = true
-      }
-
-      let expectedOut = entry.entries["out"]
-      if expectedOut == nil && matched { continue }
-      if let expectedOut = expectedOut {
-        XCTAssertTrue(deepEqual(result, expectedOut),
-          "entry \(i)\(mark): output mismatch:\n  got:  \(canon(result))\n  want: \(canon(expectedOut))")
-      }
-    }
   }
 
   // nativeCtx converts a loose Value ctx map into the native [String:Any?]

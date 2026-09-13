@@ -8,6 +8,34 @@ main: kit: target: swift: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability (docs/design/feature-tags.md). A vendored sekreto port
+  # lives in this target's feature container
+  # (tm/swift/Sources/ProjectNameSDK/feature/secrets/{plugin,sekreto,plugins}),
+  # so a feature that resolves secrets through sekreto can apply here. The
+  # three vendored trees are SEPARATE SwiftPM modules (VoxgigPlugin, Sekreto,
+  # SekretoPlugins - upstream's own module boundary, and load-bearing: the
+  # SDK, plugin and sekreto each declare a `Value`, a `Point` or a `Json`),
+  # which Package_swift declares only when the feature is active.
+  provides: { sekreto: true }
+
+  # Retired by the move to the vendored @voxgig/omni corpus runner
+  # (vendor-tag rollout): NOTHING, deliberately, and the empty list says so
+  # rather than leaving the key off.
+  #
+  # Swift's corpus ENGINE was never a file of its own. It lived inline in
+  # two places - `SdkRunner.runSet`/`matchDeep` inside
+  # Tests/ProjectNameSDKTests/Runner.swift, and a second, independent
+  # engine (`runset`/`canon`/`fixNull`) private to
+  # Tests/ProjectNameSDKTests/StructUtilityTest.swift. Both were rewritten
+  # IN PLACE onto Tests/ProjectNameSDKTests/OmniResolver.swift, so both
+  # files KEEP THEIR NAMES and every emitted call site needs no churn:
+  # Runner.swift is support-ONLY now (testJsonPath, makeCtxFromMap, fixCtx,
+  # errFromMap, and the deepEqual/matchString/errCode the behavioural
+  # suites use) and is RETAINED, exactly as csharp's Runner.cs and java's
+  # RunnerSupport.java. There is therefore no whole-file leftover for
+  # `doctor` to report or `doctor prune` to delete.
+  superseded: []
+
   deps: &: {
     kind: *'prod' | string
   }

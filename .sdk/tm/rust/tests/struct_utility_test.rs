@@ -1,28 +1,56 @@
 // Struct utility tests — run the shared `struct` corpus subtree from
-// ../.sdk/test/test.json against the vendored voxgig struct port
-// (mirrors tm/go/test/struct_utility_test.go).
+// ../.sdk/test/test.json against the vendored voxgig struct port.
+//
+// The corpus is driven by the VENDORED omni runner through the adapter in
+// tests/omni_resolver/mod.rs (which superseded the hand-written
+// tests/struct_runner/mod.rs). Group labels, null flags and subjects are
+// unchanged; the engine underneath them is now the shared one.
 
-mod struct_runner;
+mod omni_resolver;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use struct_runner::*;
+use omni_resolver::*;
 
 use RUSTCRATE::utility::voxgigstruct::ordered_map::OrderedMap;
 use RUSTCRATE::utility::voxgigstruct::value::Value;
 use RUSTCRATE::utility::voxgigstruct::*;
 
 
+/// Groups this SDK's corpus subset does not carry, so a run over it reports
+/// zero checks for them BY DESIGN.
+///
+/// `Run::report` holds this list to the corpus in both directions: a group
+/// that goes absent without being named here fails the suite, and a name
+/// here that is no longer absent fails it too. Nothing else stops a renamed
+/// or deleted group from taking its whole check count away while `cargo
+/// test` still prints `ok`.
+///
+/// `sentinels` is the Group A null-unification block (UNDEF_SPEC.md): the
+/// subjects below are wired and ready, and the entries arrive with the
+/// corpus refresh that adds `struct.sentinels`.
+const EXPECTED_SKIPS: &[&str] = &[
+    "sentinels-getprop_unify",
+    "sentinels-getelem_absent",
+    "sentinels-haskey_unify",
+    "sentinels-isempty_unify",
+    "sentinels-isnode_unify",
+    "sentinels-stringify_null",
+];
+
+
 #[test]
 fn struct_utility() {
-    let spec = test_json();
-    let s = vget(&spec, "struct");
-    let mut run = Run::new();
+    let mut run = Run::section("struct");
+    // A detached handle on the resolved section, so a `set!` argument does
+    // not borrow `run` while `run` is borrowed mutably by the call.
+    let s = run.spec.clone();
+    let all = run.all.clone();
 
     macro_rules! set {
         ($cat:expr, $name:expr) => {
-            vget_path(&s, &[$cat, $name])
+            jpath(&s, &[$cat, $name])
         };
     }
 
@@ -211,6 +239,28 @@ fn struct_utility() {
         |v| Value::str(stringify(&v, None, false)),
     );
 
+    // -------- nullsem (does a PRESENT key holding JSON null read as "no
+    // value"?) — the peer of go's `nullsem` subtest and py's test_nullsem.
+    // null_flag is false throughout so a stored null survives into the
+    // subject rather than being normalised to a sentinel string.
+    run.run_set(&set!("nullsem", "getprop"), false, "nullsem-getprop", |vin| {
+        let alt = vget(&vin, "alt");
+        get_prop(&vget(&vin, "val"), &vget(&vin, "key"), alt)
+    });
+    run.run_set(&set!("nullsem", "getelem"), false, "nullsem-getelem", |vin| {
+        let alt = vget(&vin, "alt");
+        get_elem(&vget(&vin, "val"), &vget(&vin, "key"), alt)
+    });
+    run.run_set(&set!("nullsem", "getpath"), false, "nullsem-getpath", |vin| {
+        get_path(&vget(&vin, "store"), &vget(&vin, "path"), None)
+    });
+    run.run_set(&set!("nullsem", "haskey"), false, "nullsem-haskey", |vin| {
+        b(has_key(&vget(&vin, "src"), &vget(&vin, "key")))
+    });
+    run.run_set(&set!("nullsem", "keysof"), false, "nullsem-keysof", |v| {
+        keys_of(&v)
+    });
+
     // -------- walk ---------------------------------------------------
     run.run_set(&set!("walk", "basic"), true, "walk-basic", |vin| {
         let mut walkpath = |_k: &Value, val: &Value, _p: &Value, path: &[String]| -> Value {
@@ -223,7 +273,7 @@ fn struct_utility() {
     });
     // walk.log — three runs (after-only / before-only / both) of a logging callback.
     {
-        let log_spec = vget_path(&s, &["walk", "log"]);
+        let log_spec = tostruct(&jpath(&s, &["walk", "log"]));
         let input = clone(&vget(&log_spec, "in"));
         let want = vget(&log_spec, "out");
         let mk_log = |inp: &Value, before: bool, after: bool| -> Value {
@@ -377,8 +427,7 @@ fn struct_utility() {
     });
     // merge.basic is a single { in, out } object (not a `set`); handle inline.
     {
-        let mb = vget(&s, "merge");
-        let basic = vget(&mb, "basic");
+        let basic = tostruct(&jpath(&s, &["merge", "basic"]));
         let bin = clone(&vget(&basic, "in"));
         let bout = fix_json(&vget(&basic, "out"), true);
         let got = fix_json(&merge(&bin, None), true);
@@ -455,7 +504,7 @@ fn struct_utility() {
     // -------- inject -------------------------------------------------
     {
         // inject.basic is a single { in: {val, store}, out } object.
-        let basic = vget_path(&s, &["inject", "basic"]);
+        let basic = tostruct(&jpath(&s, &["inject", "basic"]));
         let bin = vget(&basic, "in");
         let bout = fix_json(&vget(&basic, "out"), true);
         let got = fix_json(
@@ -504,7 +553,7 @@ fn struct_utility() {
 
     // -------- transform ---------------------------------------------
     {
-        let basic = vget_path(&s, &["transform", "basic"]);
+        let basic = tostruct(&jpath(&s, &["transform", "basic"]));
         let bin = vget(&basic, "in");
         let bout = fix_json(&vget(&basic, "out"), true);
         let got = match transform(
@@ -620,7 +669,7 @@ fn struct_utility() {
         Value::map_of([("zed".to_string(), Value::str(format!("ZED{foo_s}_{bar_s}")))])
     }
     {
-        let check = vget_path(&spec, &["primary", "check"]);
+        let check = tostruct(&jpath(&all, &["primary", "check"]));
         // resolve clients from DEF.client (options are inject()'d against {} — a no-op here)
         let def_clients = vget_path(&check, &["DEF", "client"]);
         let mut clients: OrderedMap<Value> = OrderedMap::new();
@@ -657,20 +706,9 @@ fn struct_utility() {
     }
 
     // -------- report -------------------------------------------------
-    if !run.failures.is_empty() {
-        let n = run.failures.len();
-        let mut msg = format!("\n{} corpus check(s) failed ({} passed):\n", n, run.passed);
-        for f in run.failures.iter().take(60) {
-            msg.push_str("  - ");
-            msg.push_str(f);
-            msg.push('\n');
-        }
-        if n > 60 {
-            msg.push_str(&format!("  ... and {} more\n", n - 60));
-        }
-        panic!("{msg}");
-    }
-    eprintln!("corpus: {} checks passed", run.passed);
+    // Strict: any group that went absent, any expected skip that did not
+    // happen, and any corpus group nothing here drives, is a FAILURE.
+    run.report("corpus", EXPECTED_SKIPS);
 }
 
 // Function values embedded in data: `get_elem` with a callable `alt`, and

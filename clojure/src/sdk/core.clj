@@ -988,7 +988,22 @@
             (if (and member (not= member :custom) (contains? members member))
               (oset! util member v)
               (.put ^java.util.Map (oget util :custom) k v))))))
-    (let [opts0 (let [c (vs/clone options)] (if (vs/ismap c) c (vs/jm)))
+    (let [;; `auth` nil is the documented way to disable auth outright, and
+          ;; u-prepare-auth honours it before it ever reads the apikey. It
+          ;; cannot survive validate: a stored null reads as "no value", so the
+          ;; optspec's `auth` default fires and the suppression silently
+          ;; becomes "use default auth" - transmitting the credential the
+          ;; caller withheld. Withhold the key for validate, then put the nil
+          ;; back. Same fix as ts/js/go makeOptions.
+          ;;
+          ;; `.containsKey` rather than a nil check on the value: the latter
+          ;; cannot tell an ABSENT auth from a suppressed one, and only the
+          ;; second is a suppression.
+          auth-suppressed (and (vs/ismap options)
+                               (.containsKey ^java.util.Map options "auth")
+                               (nil? (.get ^java.util.Map options "auth")))
+          opts0 (let [c (vs/clone options)] (if (vs/ismap c) c (vs/jm)))
+          _ (when auth-suppressed (.remove ^java.util.Map opts0 "auth"))
           ;; Feature add-order. options.feature may be given as an ordered
           ;; ARRAY of {name active ...opts} entries (array position = add
           ;; order) or a {name {opts}} map. Normalize an array to a map (so
@@ -1024,6 +1039,15 @@
                    "entity" (vs/jm "`$CHILD`" (vs/jm "`$OPEN`" true "active" false "alias" (vs/jm)))
                    "feature" (vs/jm "`$CHILD`" (vs/jm "`$OPEN`" true "active" false))
                    "utility" (vs/jm)
+                   ;; Feature INSTANCES supplied at construction (the station
+                   ;; adopt path): consumed by make-sdk's feature-add loop, so
+                   ;; they are live feature atoms, not data - `$ANY` accepts
+                   ;; them verbatim. Without this entry the seam is DEAD:
+                   ;; client.clj reads options.extend, but validate rejected
+                   ;; the key ("Unexpected keys at field <root>: extend"), so
+                   ;; every construction that used it failed outright.
+                   ;; Mirrors go's make_options.go and MakeOptionsUtility.ts.
+                   "extend" "`$ANY`"
                    "system" (vs/jm)
                    "test" (vs/jm "active" false "entity" (vs/jm "`$OPEN`" true))
                    "clean" (vs/jm "keys" "key,token,id")
@@ -1037,6 +1061,8 @@
           merged (vs/merge (vs/jt (vs/jm) cfgopts opts0))
           validated (vs/validate merged optspec)
           opts (if (vs/ismap validated) validated (vs/jm))
+          ;; Restore the suppression the optspec default would otherwise erase.
+          _ (when auth-suppressed (.put ^java.util.Map opts "auth" nil))
           ;; Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
           ;; Every placeholder must resolve to a non-empty value: from
           ;; options["server"] (user), else the config default. A placeholder

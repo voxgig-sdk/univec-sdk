@@ -29,13 +29,22 @@ fn model_direct_setup(mockres: Value) -> ModelDirectSetup {
     let env = env_override(jo(vec![
         ("UNIVEC_TEST_MODEL_ENTID", Value::empty_map()),
         ("UNIVEC_TEST_LIVE", Value::str("FALSE")),
-        ("UNIVEC_APIKEY", Value::str("NONE")),
+        ("UNIVEC_APIKEY", Value::str("")),
     ]));
 
     let live = getp(&env, "UNIVEC_TEST_LIVE") == Value::str("TRUE");
 
     if live {
-        let client = UnivecSDK::new(jo(vec![("apikey", getp(&env, "UNIVEC_APIKEY"))]));
+        // live_client_options() FIRST, so the generated entries below win:
+        // sdk-test-control.json's test.client.options adds to the live
+        // client, it does not redirect it.
+        let client = UnivecSDK::new(to_map(&vs::merge(
+            &ja(vec![
+                live_client_options(),
+                jo(vec![("apikey", getp(&env, "UNIVEC_APIKEY"))]),
+            ]),
+            None,
+        )));
         let idmap = match to_map(&getp(&env, "UNIVEC_TEST_MODEL_ENTID")) {
             Value::Map(m) => Value::Map(m),
             _ => Value::empty_map(),

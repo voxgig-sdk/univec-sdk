@@ -9,13 +9,36 @@ main: kit: target: c: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability tags (docs/design/feature-tags.md): this target vendors
+  # the c port of @voxgig/sekreto (with voxgig/plugin under it) inside its
+  # gated `feature/secrets/` container, so the `secrets` feature applies.
+  provides: { sekreto: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the fused corpus runner, whose engine half is now
+  # the vendored omni runner (tests/vendor/omni) and whose support half
+  # (normalize / deep_equal / brief / null_substitute) is subsumed by
+  # omni_deepequal / omni_matchval / omni_stringify. `doctor` reports
+  # leftovers; `doctor prune` deletes them.
+  superseded: [
+    'tests/runner.h'
+  ]
+
   deps: &: {
     kind: *'prod' | string
   }
 
   # struct is vendored under utility/struct — no external dep. The whole
-  # pipeline is synchronous; the transport uses libcurl when available at
-  # build time (weak, optional) else returns a transport error.
+  # pipeline is synchronous, and the CORE ships no HTTP client at all: a
+  # live request without a caller-supplied `options.system.fetch` returns
+  # a transport error (utility/fetcher.c). The only external dependencies
+  # a c SDK can have arrive with the `secrets` feature, and only when it
+  # is active with a plugin group: the vendored vault kinds link OpenSSL
+  # (-lssl -lcrypto, plugins/tls.c), and the feature's token-exchange
+  # transport of last resort (feature/secrets/kinds.c, generated) links
+  # libcurl. Both are turned on by the generated feature/secrets/kinds.mk
+  # the Makefile includes, so an SDK with secrets inactive, or with no
+  # plugin group, links libc alone.
   deps: {
   }
 }

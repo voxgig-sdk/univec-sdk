@@ -12,6 +12,11 @@ const Gitignore = cmp(async function Gitignore(_props: any) {
 test/*.out
 *.o
 *.out
+# The gated secrets feature's vendored archive (tm/cpp/Makefile)
+*.a
+
+# Struct-corpus run report (written by test/struct_corpus_test.cpp)
+corpus-scoreboard.json
 
 # IDE / OS
 .idea/

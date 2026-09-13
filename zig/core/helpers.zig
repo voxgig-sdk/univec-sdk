@@ -19,6 +19,12 @@ pub fn A() Allocator {
     return mem.a();
 }
 
+// The SDK's process-global Io (0.16 routes clocks/sleep/env/file IO through
+// one). See core/mem.zig for why it is global rather than a parameter.
+pub fn IO() std.Io {
+    return mem.io();
+}
+
 // ---- constructors ------------------------------------------------------
 
 pub fn vstr(s: []const u8) Value {
@@ -249,33 +255,33 @@ pub fn veq(x: Value, y: Value) bool {
 // ---- key / item vectors (test feature convenience) ---------------------
 
 pub fn keysof_vec(v: Value) [][]const u8 {
-    var out = std.ArrayList([]const u8).init(A());
+    var out: std.ArrayList([]const u8) = .empty;
     if (v == .object) {
         var it = v.object.iterator();
-        while (it.next()) |kv| out.append(kv.key_ptr.*) catch {};
+        while (it.next()) |kv| out.append(A(), kv.key_ptr.*) catch {};
     }
-    return out.toOwnedSlice() catch &.{};
+    return out.toOwnedSlice(A()) catch &.{};
 }
 
 pub const KVpair = struct { k: []const u8, v: Value };
 
 pub fn items_vec(v: Value) []KVpair {
-    var out = std.ArrayList(KVpair).init(A());
+    var out: std.ArrayList(KVpair) = .empty;
     if (v == .object) {
         var it = v.object.iterator();
-        while (it.next()) |kv| out.append(.{ .k = kv.key_ptr.*, .v = kv.value_ptr.* }) catch {};
+        while (it.next()) |kv| out.append(A(), .{ .k = kv.key_ptr.*, .v = kv.value_ptr.* }) catch {};
     }
-    return out.toOwnedSlice() catch &.{};
+    return out.toOwnedSlice(A()) catch &.{};
 }
 
 // ---- clocks / rng ------------------------------------------------------
 
 pub fn now_ms() i64 {
-    return std.time.milliTimestamp();
+    return std.Io.Clock.real.now(IO()).toMilliseconds();
 }
 
 pub fn sleep_ms(ms: i64) void {
-    if (ms > 0) std.time.sleep(@as(u64, @intCast(ms)) * std.time.ns_per_ms);
+    if (ms > 0) IO().sleep(.fromMilliseconds(ms), .awake) catch {};
 }
 
 var rand_seed: i64 = 123456789;
@@ -290,15 +296,50 @@ pub fn rand_int(n: i64) i64 {
 
 pub const CallFn = *const fn (ctx: *anyopaque, allocator: Allocator, arg: Value) anyerror!Value;
 
+// An SDK callable — an injected transport, clock, sleeper, id generator, a
+// custom utility, or a response body thunk — carries a captured context
+// pointer, because every one of them is created at run time over run-time
+// state. Zig has no closures, so the context travels beside the function.
+//
+// The struct port's `JsonFunc` is a bare `*const fn (Allocator) anyerror!Value`
+// with no context slot, so the BOX is what lives in the `.function` slot,
+// pointer-cast to fit. That is the same arrangement the SDK has always had:
+// the slot held `*const Callable` before too, and the type it is declared with
+// upstream is the only thing that changed. Every struct operation the SDK puts
+// callables through — clone, merge, validate, stringify, typify — treats the
+// slot as an opaque pointer and is unaffected.
+//
+// The one thing that must not happen is struct CALLING the slot as code. It
+// does that in exactly three places: a `getprop` whose `alt` is a function, a
+// single-segment `getpath` whose one part names a function held directly in
+// the store, and a `$`-prefixed validate command that is not built in and
+// resolves to a function in the store. The SDK reaches none of them — its
+// `getprop` alts are never functions, `h.getpath` is never called with a
+// one-segment path, and the validate store only ever holds `$TOP`/`$DTOP`-style
+// keys, all of which are built in. SDK code invokes its own callables through
+// `call_vfn`, never by letting struct resolve them.
+//
+// That was measured, not just reasoned: instrumenting all three sites in a
+// throwaway copy of the vendored file and running the whole suite records ONE
+// invocation, and it is the struct corpus's own `$FOO` handler — a real
+// context-free JsonFunc, which is what those sites are for.
+pub const Callable = struct {
+    ctx: *anyopaque,
+    call: CallFn,
+};
+
 pub fn callable(ctx_ptr: *anyopaque, f: CallFn) Value {
-    const c = A().create(vs.Callable) catch unreachable;
+    const c = A().create(Callable) catch unreachable;
     c.* = .{ .ctx = ctx_ptr, .call = f };
-    return .{ .function = c };
+    return .{ .function = @ptrCast(@alignCast(c)) };
 }
 
 pub fn call_vfn(f: Value, arg: Value) Value {
     return switch (f) {
-        .function => |c| c.call(c.ctx, A(), arg) catch vnull(),
+        .function => |fp| blk: {
+            const c: *const Callable = @ptrCast(@alignCast(fp));
+            break :blk c.call(c.ctx, A(), arg) catch vnull();
+        },
         else => vnull(),
     };
 }

@@ -93,14 +93,24 @@ let make_client ?(server : server option) ?(mode = "test") ?(base = "http://api.
   rootctx.c_op <- new_operation (jo [("name", Str "root"); ("entity", Str "_")]);
   client.cl_rootctx <- Some rootctx;
   List.iter (fun (name, opts) ->
-      if has_feature name then begin
-        let ftr = Sdk_config.make_feature name in
+      (* `netsim` is a test-only network simulator implemented in
+         Sdk_features, not a model feature, so it never appears in the
+         generated config and has_feature rejects it. Construct it directly:
+         without this every netsim-driven test (retry backoff, timeout,
+         and the metrics/telemetry/audit error paths) silently runs against
+         an unsimulated transport and sees a plain 200. *)
+      let ftr =
+        if name = "netsim" then Some (Sdk_features.netsim_feature ())
+        else if has_feature name then Some (Sdk_config.make_feature name)
+        else None in
+      match ftr with
+      | None -> ()
+      | Some ftr ->
         let fopts = jo [("active", Bool true)] in
         (match opts with Map _ -> List.iter (fun k -> setp fopts k (getp opts k)) (keysof opts) | _ -> ());
         setp (getp client.cl_options "feature") name fopts;
         ftr.f_init rootctx fopts;
-        client.cl_features <- client.cl_features @ [ftr]
-      end) features;
+        client.cl_features <- client.cl_features @ [ftr]) features;
   feature_hook_util rootctx "PostConstruct";
   { h_base = base; h_headers = hheaders; h_client = client; h_utility = utility; h_rootctx = rootctx }
 

@@ -1,6 +1,14 @@
 # Univec SDK configuration
 
 
+# The sekreto plugin DEFINITIONS the model selected per feature, imported
+# above by name from the modules the catalogue's active `plugin.def`
+# entries declare. Handed to each feature (secrets builds its Sekreto
+# with them): a provider kind not listed here is unknown to that SDK.
+FEATURE_PLUGINS = {
+}
+
+
 _shared_config = None
 
 
@@ -280,62 +288,100 @@ def make_config():
                 "kind": "http",
                 "method": "POST",
                 "orig": "/v1/convert",
-                "parts": [
-                  "v1",
-                  "convert",
+                "segments": [
+                  {
+                    "lit": "v1",
+                  },
+                  {
+                    "lit": "convert",
+                  },
                 ],
                 "select": {},
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
                 },
+                "parts": [
+                  "v1",
+                  "convert",
+                ],
               },
               {
                 "args": {},
                 "kind": "http",
                 "method": "POST",
                 "orig": "/v1/embed-bridge",
-                "parts": [
-                  "v1",
-                  "embed-bridge",
+                "segments": [
+                  {
+                    "lit": "v1",
+                  },
+                  {
+                    "lit": "embed-bridge",
+                  },
                 ],
                 "select": {},
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
                 },
+                "parts": [
+                  "v1",
+                  "embed-bridge",
+                ],
               },
               {
                 "args": {},
                 "kind": "http",
                 "method": "POST",
                 "orig": "/v1/ephemeral/convert",
-                "parts": [
-                  "v1",
-                  "ephemeral",
-                  "convert",
+                "segments": [
+                  {
+                    "lit": "v1",
+                  },
+                  {
+                    "lit": "ephemeral",
+                  },
+                  {
+                    "lit": "convert",
+                  },
                 ],
                 "select": {},
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
                 },
+                "parts": [
+                  "v1",
+                  "ephemeral",
+                  "convert",
+                ],
               },
               {
                 "args": {},
                 "kind": "http",
                 "method": "POST",
                 "orig": "/v1/ephemeral/embed-bridge",
-                "parts": [
-                  "v1",
-                  "ephemeral",
-                  "embed-bridge",
+                "segments": [
+                  {
+                    "lit": "v1",
+                  },
+                  {
+                    "lit": "ephemeral",
+                  },
+                  {
+                    "lit": "embed-bridge",
+                  },
                 ],
                 "select": {},
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
                 },
+                "parts": [
+                  "v1",
+                  "ephemeral",
+                  "embed-bridge",
+                ],
               },
             ],
           },
@@ -376,31 +422,50 @@ def make_config():
                 "kind": "http",
                 "method": "POST",
                 "orig": "/v1/embed",
-                "parts": [
-                  "v1",
-                  "embed",
+                "segments": [
+                  {
+                    "lit": "v1",
+                  },
+                  {
+                    "lit": "embed",
+                  },
                 ],
                 "select": {},
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
                 },
+                "parts": [
+                  "v1",
+                  "embed",
+                ],
               },
               {
                 "args": {},
                 "kind": "http",
                 "method": "POST",
                 "orig": "/v1/ephemeral/embed",
-                "parts": [
-                  "v1",
-                  "ephemeral",
-                  "embed",
+                "segments": [
+                  {
+                    "lit": "v1",
+                  },
+                  {
+                    "lit": "ephemeral",
+                  },
+                  {
+                    "lit": "embed",
+                  },
                 ],
                 "select": {},
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
                 },
+                "parts": [
+                  "v1",
+                  "ephemeral",
+                  "embed",
+                ],
               },
             ],
           },
@@ -430,6 +495,7 @@ def make_config():
             "type": "`$STRING`",
           },
           {
+            "format": "date-time",
             "name": "resetsAt",
             "req": True,
             "short": "When the daily allowance resets.",
@@ -447,16 +513,27 @@ def make_config():
                 "kind": "http",
                 "method": "POST",
                 "orig": "/v1/ephemeral/key",
-                "parts": [
-                  "v1",
-                  "ephemeral",
-                  "key",
+                "segments": [
+                  {
+                    "lit": "v1",
+                  },
+                  {
+                    "lit": "ephemeral",
+                  },
+                  {
+                    "lit": "key",
+                  },
                 ],
                 "select": {},
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
                 },
+                "parts": [
+                  "v1",
+                  "ephemeral",
+                  "key",
+                ],
               },
             ],
           },
@@ -533,15 +610,23 @@ def make_config():
                 "kind": "http",
                 "method": "GET",
                 "orig": "/v1/models",
-                "parts": [
-                  "v1",
-                  "models",
+                "segments": [
+                  {
+                    "lit": "v1",
+                  },
+                  {
+                    "lit": "models",
+                  },
                 ],
                 "select": {},
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
                 },
+                "parts": [
+                  "v1",
+                  "models",
+                ],
               },
             ],
           },

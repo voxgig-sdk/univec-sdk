@@ -243,8 +243,24 @@ defmodule Univec.Utility do
       end
     end
 
+    # `auth` nil is the documented way to disable auth outright, and
+    # prepare_auth honours it before it ever reads the apikey. It cannot
+    # survive validate: a stored null reads as "no value", so the optspec's
+    # `auth` default fires and the suppression silently becomes "use default
+    # auth" - transmitting the credential the caller withheld. Withhold the
+    # key for validate, then put the nil back. Same fix as ts/js/go
+    # makeOptions.
+    #
+    # keysof rather than S.haskey: haskey is `getprop(...) != nil`, which
+    # collapses a stored null and so cannot tell an ABSENT auth from a
+    # suppressed one. keysof lists the key either way.
+    auth_suppressed =
+      S.ismap(options) and "auth" in S.keysof(options) and
+        S.getprop(options, "auth") == nil
+
     opts0 = S.clone(options)
     opts0 = if S.ismap(opts0), do: opts0, else: S.jm([])
+    if auth_suppressed, do: S.delprop(opts0, "auth")
 
     # Feature add-order. options.feature may be given as an ordered LIST of
     # {name, active, ...opts} entries (list position = add order) or a
@@ -328,6 +344,9 @@ defmodule Univec.Utility do
     merged = S.merge(S.jt([S.jm([]), S.clone(cfgopts), opts0]))
     validated = S.validate(merged, optspec)
     opts = if S.ismap(validated), do: validated, else: S.jm([])
+
+    # Restore the suppression the optspec default would otherwise erase.
+    if auth_suppressed, do: S.setprop(opts, "auth", nil)
 
     # Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
     # Every placeholder must resolve to a non-empty value: from options.server

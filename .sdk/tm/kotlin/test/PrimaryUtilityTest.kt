@@ -1,7 +1,14 @@
 package KOTLINPACKAGE.sdktest
 
 // Drives the primary utility functions against the shared test.json spec
-// (../.sdk/test/test.json, section "primary").
+// (../.sdk/test/test.json, section "primary") through the VENDORED omni
+// runner (OmniResolver over test/vendor/omni). Mirrors
+// tm/java/test/PrimaryUtilityTest.java and tm/go/test/primary_utility_test.go.
+//
+// Subjects receive omni's native argument list as plain values: a ctx entry
+// arrives as args[0], a MAP - OmniResolver.omniCtx builds the typed Context
+// a generated utility takes, and OmniResolver.omniSyncCtx writes the
+// observable ctx state back for `match: {ctx: ...}` assertions.
 
 import java.util.function.BiFunction
 
@@ -10,34 +17,95 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 
 import KOTLINPACKAGE.core.Context
+import KOTLINPACKAGE.core.Entity
 import KOTLINPACKAGE.core.Helpers
 import KOTLINPACKAGE.core.Operation
 import KOTLINPACKAGE.core.UnivecSDK
 import KOTLINPACKAGE.core.Result
+import KOTLINPACKAGE.core.SdkError
 import KOTLINPACKAGE.core.Spec
 import KOTLINPACKAGE.core.Utility
 import KOTLINPACKAGE.feature.BaseFeature
 import KOTLINPACKAGE.sdktest.FeatureHarness.fhMap
-import KOTLINPACKAGE.sdktest.RunnerSupport.getSpec
-import KOTLINPACKAGE.sdktest.RunnerSupport.loadTestSpec
-import KOTLINPACKAGE.sdktest.RunnerSupport.makeCtxFromMap
-import KOTLINPACKAGE.sdktest.RunnerSupport.runset
 
 @Suppress("UNCHECKED_CAST")
 class PrimaryUtilityTest {
 
-  private fun primary(): MutableMap<String, Any?> {
-    val spec = loadTestSpec()
-    val primary = getSpec(spec, "primary")
-    assertNotNull(primary, "primary section not found in test.json")
-    return primary!!
+  companion object {
+    const val TEST_JSON_FILE = "../.sdk/test/test.json"
+
+    // PENDING sections are the ones deliberately left empty in the shared
+    // corpus (.sdk/test/primary/<name>.aon). Everything else MUST
+    // contribute cases.
+    val PENDING = setOf(
+      "fetcher", "makeFetchDef", "makeResult",
+      "featureAdd", "featureHook", "featureInit",
+    )
+
+    // One client + one corpus runner for the whole suite (the go shape).
+    private var CLIENT: UnivecSDK? = null
+    private var UTILITY: Utility? = null
+    private var RUN: OmniResolver.Run? = null
+
+    @Synchronized
+    fun run(): OmniResolver.Run {
+      var r = RUN
+      if (null == r) {
+        val client = UnivecSDK.testSDK()
+        CLIENT = client
+        UTILITY = client.getUtility()
+        r = OmniResolver.makeRunner(TEST_JSON_FILE, client).runner("primary", null)
+        assertNotNull(r.spec, "primary section not found in test.json")
+        RUN = r
+      }
+      return r
+    }
+
+    fun client(): UnivecSDK {
+      run()
+      return CLIENT!!
+    }
+
+    fun utility(): Utility {
+      run()
+      return UTILITY!!
+    }
   }
 
-  private fun client(): UnivecSDK = UnivecSDK.testSDK()
+  // Run one corpus section, failing loudly when it would run ZERO cases.
+  // A renamed section, a fixture that failed to compile, or an empty set
+  // used to report PASS while running zero assertions - the whole point of
+  // a shared oracle lost without a single red test. (The guard lives here
+  // rather than in the runner, which is vendored verbatim; the shared
+  // corpus is a v0 spec, and v0 tolerates an empty set.)
+  private fun runsection(name: String, subject: OmniResolver.Subject) {
+    val run = run()
+    val section = Helpers.toMapAny(run.spec[name])
+    assertNotNull(
+      section,
+      "test corpus section \"$name\" missing - check the name against .sdk/test/primary/",
+    )
+    val basic = Helpers.toMapAny(section!!["basic"])
+    val set = basic?.get("set")
+    if (set !is List<*>) {
+      fail<Any>("test corpus section \"$name\" has no basic.set list - zero cases would run")
+      return
+    }
+    if (set.isEmpty() && !PENDING.contains(name)) {
+      fail<Any>(
+        "test corpus section \"$name\" is EMPTY - zero cases would run; " +
+          "add cases, or mark the fixture PENDING in .sdk/test/primary/",
+      )
+      return
+    }
+    run.runset(basic, subject)
+  }
 
+  // Helper: create basic test context.
   private fun makeTestCtx(client: UnivecSDK, utility: Utility, overrides: MutableMap<String, Any?>?): Context {
     val ctxmap = linkedMapOf<String, Any?>()
     ctxmap["opname"] = "load"
@@ -49,6 +117,7 @@ class PrimaryUtilityTest {
     return utility.makeContext(ctxmap, client.getRootCtx())
   }
 
+  // Helper: create full test context with point and match.
   private fun makeTestFullCtx(client: UnivecSDK, utility: Utility): Context {
     val ctx = makeTestCtx(client, utility, null)
     val params = mutableListOf<Any?>()
@@ -74,8 +143,7 @@ class PrimaryUtilityTest {
 
   @Test
   fun exists() {
-    val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
 
     assertNotNull(utility.clean, "clean")
     assertNotNull(utility.done, "done")
@@ -111,54 +179,51 @@ class PrimaryUtilityTest {
   @Test
   fun cleanBasic() {
     val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
     val ctx = makeTestCtx(client, utility, null)
     val cleaned = utility.clean(ctx, fhMap("key", "secret123", "name", "test"))
     assertNotNull(cleaned, "cleaned should not be null")
   }
 
   @Test
+  fun cleanCorpus() {
+    runsection("clean") { args ->
+      if (2 != args.size) {
+        throw RuntimeException("clean: expected 2 args, got ${args.size}")
+      }
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      utility().clean(ctx, args[1])
+    }
+  }
+
+  @Test
   fun doneBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "done", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      RunnerSupport.fixctx(ctx, client)
-      utility.done(ctx)
+    runsection("done") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      utility().done(ctx)
     }
   }
 
   @Test
   fun makeErrorBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "makeError", "basic")) { entry ->
-      val args = if (entry["args"] is List<*>) (entry["args"] as MutableList<Any?>) else mutableListOf()
-      if (args.isEmpty()) {
-        args.add(linkedMapOf<String, Any?>())
-      }
+    runsection("makeError") { args ->
+      val ctxarg = if (args.isEmpty()) linkedMapOf<String, Any?>() else args[0]
 
-      var ctxmap = Helpers.toMapAny(args[0])
-      if (ctxmap == null) {
-        ctxmap = linkedMapOf()
-      }
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      RunnerSupport.fixctx(ctx, client)
+      val ctx = OmniResolver.omniCtx(ctxarg, client(), utility())
 
       var err: RuntimeException? = null
       if (args.size > 1) {
         err = RunnerSupport.errFromMap(Helpers.toMapAny(args[1]))
       }
 
-      utility.makeError(ctx, err)
+      utility().makeError(ctx, err)
     }
   }
 
   @Test
   fun makeErrorNoThrow() {
     val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
     val ctx = makeTestFullCtx(client, utility)
     ctx.ctrl.throwing = false
     val resmap = linkedMapOf<String, Any?>()
@@ -175,7 +240,7 @@ class PrimaryUtilityTest {
   @Test
   fun featureAddBasic() {
     val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
     val ctx = makeTestCtx(client, utility, null)
     val startLen = client.features.size
 
@@ -194,7 +259,7 @@ class PrimaryUtilityTest {
 
   @Test
   fun featureHookBasic() {
-    val hookClient = client()
+    val hookClient = UnivecSDK.testSDK()
     val hookUtility = hookClient.getUtility()
     val ctx = makeTestCtx(hookClient, hookUtility, null)
 
@@ -217,7 +282,7 @@ class PrimaryUtilityTest {
 
   @Test
   fun featureInitBasic() {
-    val initClient = client()
+    val initClient = UnivecSDK.testSDK()
     val initUtility = initClient.getUtility()
     val ctx = makeTestCtx(initClient, initUtility, null)
     ctx.options!!["feature"] = fhMap("initfeat", fhMap("active", true))
@@ -234,7 +299,7 @@ class PrimaryUtilityTest {
 
   @Test
   fun featureInitInactive() {
-    val initClient = client()
+    val initClient = UnivecSDK.testSDK()
     val initUtility = initClient.getUtility()
     val ctx = makeTestCtx(initClient, initUtility, null)
     ctx.options!!["feature"] = fhMap("nofeat", fhMap("active", false))
@@ -252,8 +317,11 @@ class PrimaryUtilityTest {
   @Test
   fun fetcherLive() {
     val calls = mutableListOf<MutableMap<String, Any?>>()
+    // Concrete base: a live construction must satisfy any server variables a
+    // templated base URL declares; a literal base sidesteps the requirement.
     val liveClient = UnivecSDK(
       fhMap(
+        "base", "http://localhost:8080",
         "system",
         fhMap(
           "fetch",
@@ -279,8 +347,13 @@ class PrimaryUtilityTest {
 
   @Test
   fun fetcherBlockedTestMode() {
+    // Create a live SDK then set mode to test (not using testSDK, which
+    // installs the test feature).
+    // Concrete base: a live construction must satisfy any server variables a
+    // templated base URL declares; a literal base sidesteps the requirement.
     val blockedClient = UnivecSDK(
       fhMap(
+        "base", "http://localhost:8080",
         "system",
         fhMap("fetch", BiFunction<String, MutableMap<String, Any?>, MutableMap<String, Any?>> { _, _ -> linkedMapOf() }),
       ),
@@ -305,12 +378,10 @@ class PrimaryUtilityTest {
 
   @Test
   fun makeContextBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "makeContext", "basic")) { entry ->
-      val inm = Helpers.toMapAny(entry["in"])
+    runsection("makeContext") { args ->
+      val inm = Helpers.toMapAny(args.getOrNull(0))
       if (inm != null) {
-        val ctx = utility.makeContext(inm, null)
+        val ctx = utility().makeContext(inm, null)
         val out = linkedMapOf<String, Any?>()
         out["id"] = ctx.id
         out["op"] = fhMap("name", ctx.op.name, "input", ctx.op.input)
@@ -324,7 +395,7 @@ class PrimaryUtilityTest {
   @Test
   fun makeFetchDefBasic() {
     val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
     val ctx = makeTestFullCtx(client, utility)
     ctx.spec = Spec(
       fhMap(
@@ -352,7 +423,7 @@ class PrimaryUtilityTest {
   @Test
   fun makeFetchDefWithBody() {
     val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
     val ctx = makeTestFullCtx(client, utility)
     ctx.spec = Spec(
       fhMap(
@@ -378,42 +449,30 @@ class PrimaryUtilityTest {
 
   @Test
   fun makeOptionsBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "makeOptions", "basic")) { entry ->
-      val inm = Helpers.toMapAny(entry["in"])
+    runsection("makeOptions") { args ->
+      val inm = Helpers.toMapAny(args.getOrNull(0))
       val ctxmap = linkedMapOf<String, Any?>()
       if (inm != null) {
         ctxmap["options"] = inm["options"]
         ctxmap["config"] = inm["config"]
       }
-      val ctx = utility.makeContext(ctxmap, null)
-      ctx.client = client
-      ctx.utility = utility
-      utility.makeOptions(ctx)
+      val ctx = utility().makeContext(ctxmap, null)
+      ctx.client = client()
+      ctx.utility = utility()
+      utility().makeOptions(ctx)
     }
   }
 
   @Test
   fun makeRequestBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "makeRequest", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      ctx.options = client.optionsMap()
+    runsection("makeRequest") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      ctx.options = client().optionsMap()
 
-      utility.makeRequest(ctx)
+      utility().makeRequest(ctx)
 
-      val entryCtx = Helpers.toMapAny(entry["ctx"])
-      if (entryCtx != null) {
-        if (ctx.response != null) {
-          entryCtx["response"] = "exists"
-        }
-        if (ctx.result != null) {
-          entryCtx["result"] = "exists"
-        }
-      }
+      // Expose response/result existence for the match assertions.
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       null
     }
@@ -421,25 +480,12 @@ class PrimaryUtilityTest {
 
   @Test
   fun makeResponseBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "makeResponse", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      RunnerSupport.fixctx(ctx, client)
+    runsection("makeResponse") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
 
-      utility.makeResponse(ctx)
+      utility().makeResponse(ctx)
 
-      val entryCtx = Helpers.toMapAny(entry["ctx"])
-      if (entryCtx != null && ctx.result != null) {
-        entryCtx["result"] = fhMap(
-          "ok", ctx.result!!.ok,
-          "status", ctx.result!!.status,
-          "statusText", ctx.result!!.statusText,
-          "headers", ctx.result!!.headers,
-          "body", ctx.result!!.body,
-        )
-      }
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       null
     }
@@ -448,7 +494,7 @@ class PrimaryUtilityTest {
   @Test
   fun makeResultBasic() {
     val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
     val ctx = makeTestFullCtx(client, utility)
     ctx.spec = Spec(
       fhMap(
@@ -480,7 +526,7 @@ class PrimaryUtilityTest {
   @Test
   fun makeResultNoSpec() {
     val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
     val ctx = makeTestFullCtx(client, utility)
     ctx.spec = null
     ctx.result = Result(fhMap("ok", true, "status", 200, "statusText", "OK", "headers", linkedMapOf<String, Any?>()))
@@ -496,7 +542,7 @@ class PrimaryUtilityTest {
   @Test
   fun makeResultNoResult() {
     val client = client()
-    val utility = client.getUtility()
+    val utility = utility()
     val ctx = makeTestFullCtx(client, utility)
     ctx.spec = Spec(fhMap("step", "start"))
     ctx.result = null
@@ -511,76 +557,79 @@ class PrimaryUtilityTest {
 
   @Test
   fun makeSpecBasic() {
-    val setupOpts = getSpec(primary(), "makeSpec", "DEF", "setup", "a")
+    val setupOpts = RunnerSupport.getSpec(run().spec, "makeSpec", "DEF", "setup", "a")
     val specClient = UnivecSDK.testSDK(null, setupOpts)
     val specUtility = specClient.getUtility()
 
-    runset(getSpec(primary(), "makeSpec", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, specClient, specUtility)
+    runsection("makeSpec") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], specClient, specUtility)
       ctx.options = specClient.optionsMap()
 
       specUtility.makeSpec(ctx)
 
-      val entryCtx = Helpers.toMapAny(entry["ctx"])
-      if (entryCtx != null && ctx.spec != null) {
-        entryCtx["spec"] = fhMap(
-          "base", ctx.spec!!.base,
-          "prefix", ctx.spec!!.prefix,
-          "suffix", ctx.spec!!.suffix,
-          "method", ctx.spec!!.method,
-          "params", ctx.spec!!.params,
-          "query", ctx.spec!!.query,
-          "headers", ctx.spec!!.headers,
-          "step", ctx.spec!!.step,
-        )
-      }
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       null
     }
   }
 
+  // A minimal Entity: Context resolves the op through the Entity interface,
+  // and a literal {name: ...} map from the fixture is not one - entname
+  // would be "" and every lookup would miss, reporting point_no_points for
+  // all seven cases. TS reads the same field with getprop and accepts the
+  // plain map. (The java peer is PlEntity; the go peer is plEntity.)
+  private class PuEntity(override val name: String) : Entity {
+    override fun make(): Entity = PuEntity(name)
+
+    override fun data(vararg args: Any?): Any? = null
+
+    override fun match(vararg args: Any?): Any? = null
+  }
+
+  // Corpus-driven, like go/java: TS returns the error AS the value; kotlin
+  // throws SdkError. The corpus says `match: out: code` for both, so the
+  // error is normalised to a map carrying its code here rather than forking
+  // the fixture per language.
   @Test
   fun makePointBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    val ctx = makeTestCtx(client, utility, null)
-    val parts = mutableListOf<Any?>()
-    parts.add("items")
-    parts.add("{id}")
-    val point = fhMap(
-      "parts", parts,
-      "args", fhMap("params", mutableListOf<Any?>()),
-      "params", mutableListOf<Any?>(),
-      "alias", linkedMapOf<String, Any?>(),
-      "select", linkedMapOf<String, Any?>(),
-      "active", true,
-      "transform", linkedMapOf<String, Any?>(),
-    )
-    ctx.op.points = mutableListOf(point)
+    runsection("makePoint") { args ->
+      var ctxmap = Helpers.toMapAny(args.getOrNull(0))
+      if (ctxmap == null) {
+        ctxmap = linkedMapOf()
+      }
 
-    utility.makePoint(ctx)
-    assertNotNull(ctx.point, "expected point to be set")
+      val em = Helpers.toMapAny(ctxmap["entity"])
+      if (em != null) {
+        val name = if (em["name"] is String) em["name"] as String else ""
+        val swapped = LinkedHashMap<String, Any?>(ctxmap)
+        swapped["entity"] = PuEntity(name)
+        ctxmap = swapped
+      }
+
+      val ctx = OmniResolver.omniCtx(ctxmap, client(), utility())
+      try {
+        utility().makePoint(ctx)
+      } catch (e: SdkError) {
+        fhMap("code", e.code)
+      }
+    }
   }
 
   @Test
   fun makeUrlBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "makeUrl", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
+    runsection("makeUrl") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
       if (ctx.result == null) {
         ctx.result = Result(linkedMapOf())
       }
-      utility.makeUrl(ctx)
+      utility().makeUrl(ctx)
     }
   }
 
   @Test
   fun operatorBasic() {
-    runset(getSpec(primary(), "operator", "basic")) { entry ->
-      val inm = Helpers.toMapAny(entry["in"])
+    runsection("operator") { args ->
+      val inm = Helpers.toMapAny(args.getOrNull(0))
       val op = Operation(inm ?: linkedMapOf())
       fhMap("entity", op.entity, "name", op.name, "input", op.input, "points", op.points)
     }
@@ -588,38 +637,18 @@ class PrimaryUtilityTest {
 
   @Test
   fun paramBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "param", "basic")) { entry ->
-      val args = if (entry["args"] is List<*>) (entry["args"] as List<Any?>) else mutableListOf<Any?>()
+    runsection("param") { args ->
       if (args.size < 2) {
-        return@runset null
+        return@runsection null
       }
 
-      var ctxmap = Helpers.toMapAny(args[0])
-      if (ctxmap == null) {
-        ctxmap = linkedMapOf()
-      }
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
       val paramdef = args[1]
 
-      val result = utility.param(ctx, paramdef)
+      val result = utility().param(ctx, paramdef)
 
-      val matchSpec = Helpers.toMapAny(entry["match"])
-      if (matchSpec != null) {
-        val ctxMatch = Helpers.toMapAny(matchSpec["ctx"])
-        if (ctxMatch != null) {
-          var entryCtx = Helpers.toMapAny(entry["ctx"])
-          if (entryCtx == null) {
-            entryCtx = linkedMapOf()
-            entry["ctx"] = entryCtx
-          }
-          val specMatch = Helpers.toMapAny(ctxMatch["spec"])
-          if (specMatch != null && ctx.spec != null && specMatch["alias"] is Map<*, *>) {
-            entryCtx["spec"] = fhMap("alias", ctx.spec!!.alias)
-          }
-        }
-      }
+      // The spec alias mutation is what the match assertion reads.
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       result
     }
@@ -627,21 +656,16 @@ class PrimaryUtilityTest {
 
   @Test
   fun prepareAuthBasic() {
-    val setupOpts = getSpec(primary(), "prepareAuth", "DEF", "setup", "a")
+    val setupOpts = RunnerSupport.getSpec(run().spec, "prepareAuth", "DEF", "setup", "a")
     val authClient = UnivecSDK.testSDK(null, setupOpts)
     val authUtility = authClient.getUtility()
 
-    runset(getSpec(primary(), "prepareAuth", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, authClient, authUtility)
-      RunnerSupport.fixctx(ctx, authClient)
+    runsection("prepareAuth") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], authClient, authUtility)
 
       authUtility.prepareAuth(ctx)
 
-      val entryCtx = Helpers.toMapAny(entry["ctx"])
-      if (entryCtx != null && ctx.spec != null) {
-        entryCtx["spec"] = fhMap("headers", ctx.spec!!.headers)
-      }
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       null
     }
@@ -649,83 +673,66 @@ class PrimaryUtilityTest {
 
   @Test
   fun prepareBodyBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "prepareBody", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      RunnerSupport.fixctx(ctx, client)
-      utility.prepareBody(ctx)
+    runsection("prepareBody") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      utility().prepareBody(ctx)
     }
   }
 
   @Test
   fun prepareHeadersBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "prepareHeaders", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      utility.prepareHeaders(ctx)
+    runsection("prepareHeaders") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      utility().prepareHeaders(ctx)
     }
   }
 
   @Test
   fun prepareMethodBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "prepareMethod", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      utility.prepareMethod(ctx)
+    runsection("prepareMethod") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      // An op the API does not define resolves NO method; ts answers
+      // undefined there and kotlin answers null - both are "no value" to
+      // the corpus.
+      val method = utility().prepareMethod(ctx)
+      if (method.isNullOrEmpty()) null else method
     }
   }
 
   @Test
   fun prepareParamsBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "prepareParams", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      utility.prepareParams(ctx)
+    runsection("prepareParams") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      utility().prepareParams(ctx)
     }
   }
 
+  // Was two hand-written cases that had drifted out of the shared corpus
+  // (the preparePath fixture shipped as an empty `set: []`). Now driven by
+  // the corpus like every other section, so all ports assert the same
+  // separator/blank-segment behaviour.
   @Test
   fun preparePathBasic() {
-    // Was two hand-written cases that had drifted out of the shared corpus
-    // (the preparePath fixture shipped as an empty `set: []`).
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "preparePath", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      utility.preparePath(ctx)
+    runsection("preparePath") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      utility().preparePath(ctx)
     }
   }
 
   @Test
   fun prepareQueryBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "prepareQuery", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      utility.prepareQuery(ctx)
+    runsection("prepareQuery") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
+      utility().prepareQuery(ctx)
     }
   }
 
   @Test
   fun resultBasicBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "resultBasic", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
-      RunnerSupport.fixctx(ctx, client)
+    runsection("resultBasic") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
 
-      val result = utility.resultBasic(ctx)
+      val result = utility().resultBasic(ctx)
 
       val out = fhMap("status", result.status, "statusText", result.statusText)
       if (result.err != null) {
@@ -738,18 +745,12 @@ class PrimaryUtilityTest {
 
   @Test
   fun resultBodyBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "resultBody", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
+    runsection("resultBody") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
 
-      utility.resultBody(ctx)
+      utility().resultBody(ctx)
 
-      val entryCtx = Helpers.toMapAny(entry["ctx"])
-      if (entryCtx != null && ctx.result != null) {
-        entryCtx["result"] = fhMap("body", ctx.result!!.body)
-      }
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       null
     }
@@ -757,18 +758,12 @@ class PrimaryUtilityTest {
 
   @Test
   fun resultHeadersBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "resultHeaders", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
+    runsection("resultHeaders") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
 
-      utility.resultHeaders(ctx)
+      utility().resultHeaders(ctx)
 
-      val entryCtx = Helpers.toMapAny(entry["ctx"])
-      if (entryCtx != null && ctx.result != null) {
-        entryCtx["result"] = fhMap("headers", ctx.result!!.headers)
-      }
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       null
     }
@@ -776,19 +771,13 @@ class PrimaryUtilityTest {
 
   @Test
   fun transformRequestBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "transformRequest", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
+    runsection("transformRequest") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
 
-      val result = utility.transformRequest(ctx)
+      val result = utility().transformRequest(ctx)
 
-      val entryCtx = Helpers.toMapAny(entry["ctx"])
-      if (entryCtx != null && ctx.spec != null) {
-        val specMap = Helpers.toMapAny(entryCtx["spec"])
-        specMap?.put("step", ctx.spec!!.step)
-      }
+      // The step advance is what the match assertion reads.
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       result
     }
@@ -796,19 +785,12 @@ class PrimaryUtilityTest {
 
   @Test
   fun transformResponseBasic() {
-    val client = client()
-    val utility = client.getUtility()
-    runset(getSpec(primary(), "transformResponse", "basic")) { entry ->
-      val ctxmap = Helpers.toMapAny(entry["ctx"])
-      val ctx = makeCtxFromMap(ctxmap, client, utility)
+    runsection("transformResponse") { args ->
+      val ctx = OmniResolver.omniCtx(args[0], client(), utility())
 
-      val result = utility.transformResponse(ctx)
+      val result = utility().transformResponse(ctx)
 
-      val entryCtx = Helpers.toMapAny(entry["ctx"])
-      if (entryCtx != null && ctx.spec != null) {
-        val specMap = Helpers.toMapAny(entryCtx["spec"])
-        specMap?.put("step", ctx.spec!!.step)
-      }
+      OmniResolver.omniSyncCtx(args[0], ctx)
 
       result
     }

@@ -8,6 +8,22 @@ main: kit: target: kotlin: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability (docs/design/feature-tags.md): this target's feature
+  # container carries a vendored sekreto port, so the `secrets` feature —
+  # whose `needs` is exactly this tag — applies here. Without it
+  # featureApplies() refuses the feature and Config emits neither the
+  # import nor the registry entry.
+  provides: { sekreto: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the struct-corpus runner class
+  # (test/RunnerSupport.kt is support-only and RETAINED, name unchanged
+  # so emitted call sites need no churn). `doctor` reports leftovers;
+  # `doctor prune` deletes them.
+  superseded: [
+    'test/StructRunner.kt'
+  ]
+
   deps: &: {
     kind: *'prod' | string
   }

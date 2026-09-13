@@ -37,15 +37,15 @@ fn makeAlwaysOk() Value {
 }
 
 // A deterministic sleep recorder: appends each requested ms to `sleep_log`.
-var sleep_log: std.ArrayList(i64) = undefined;
+var sleep_log: std.ArrayList(i64) = .empty;
 var sleep_log_init = false;
 var sleep_dummy: u8 = 0;
 fn sleepRecCall(_: *anyopaque, _: std.mem.Allocator, arg: Value) anyerror!Value {
     if (!sleep_log_init) {
-        sleep_log = std.ArrayList(i64).init(h.A());
+        sleep_log = .empty;
         sleep_log_init = true;
     }
-    sleep_log.append(h.to_int(arg)) catch {};
+    sleep_log.append(h.A(), h.to_int(arg)) catch {};
     return vnull();
 }
 fn sleepRec() Value {
@@ -200,7 +200,7 @@ test "gotcha6: netsim conn error code" {
 test "gotcha6: netsim seeded latency is deterministic" {
     const mk = struct {
         fn build() []const i64 {
-            sleep_log = std.ArrayList(i64).init(h.A());
+            sleep_log = .empty;
             sleep_log_init = true;
             const opts = h.jo(&.{
                 .{ "feature", h.jo(&.{.{ "netsim", h.jo(&.{
@@ -217,7 +217,7 @@ test "gotcha6: netsim seeded latency is deterministic" {
             while (i < 4) : (i += 1) {
                 _ = client.sdkUtility.fetch(ctx, "http://x", h.jo(&.{.{ "url", h.vstr("http://x") }})) catch {};
             }
-            return sleep_log.toOwnedSlice() catch &.{};
+            return sleep_log.toOwnedSlice(h.A()) catch &.{};
         }
     };
     const run1 = mk.build();

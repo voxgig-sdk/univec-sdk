@@ -1,8 +1,14 @@
 package JAVAPACKAGE.sdktest;
 
-// Shared test-runner support: env overrides, sdk-test-control.json skips,
-// the ../.sdk/test/test.json spec loader, and the runset/match engine whose
-// matching logic mirrors js/test/runner.js (and the go runner_test.go).
+// Shared test-runner SUPPORT (vendor-tag rollout): env overrides, the
+// sdk-test-control.json skip machinery, live pacing, the
+// ../.sdk/test/test.json spec loader, ctx/entity conversion helpers, and
+// the canon/jsonStr comparison helpers the feature tests use. The corpus
+// ENGINE that used to live beside them (runset/matchDeep/matchString) is
+// retired: both corpora now run on the vendored omni runner through
+// OmniResolver.java. The class name is unchanged so the emitted
+// TestEntity/TestDirect call sites (RunnerSupport.skipReason,
+// RunnerSupport.envOverride, ...) need no churn.
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,7 +19,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 
 import JAVAPACKAGE.core.Context;
 import JAVAPACKAGE.core.Entity;
@@ -172,6 +177,49 @@ public final class RunnerSupport {
     return null;
   }
 
+  // liveClientOptions returns the extra SDK options every LIVE client is
+  // constructed with, from sdk-test-control.json `test.client.options`.
+  //
+  // The generated live client knows two things: the base URL (from the
+  // spec) and the credential (from the environment). Everything else about
+  // how a particular API wants to be talked to - which features to switch
+  // on, and with what settings - is a property of THAT API, known to the
+  // project and to nothing in the toolchain.
+  //
+  // Merged UNDER the generated fields, so the suite's own base/apikey/server
+  // values win: this ADDS to the live client, it does not redirect it.
+  //
+  // That contract is enforced HERE rather than left to each merge site: the
+  // generated map only names a field when the model calls for one, so a
+  // "base" in this block would face no competing value and would silently
+  // redirect the whole suite - credential included - to another host.
+  private static final List<String> LIVE_RESERVED = List.of(
+      "base", "prefix", "suffix", "server", "apikey", "secret");
+
+  public static Map<String, Object> liveClientOptions() {
+    Map<String, Object> ctrl = loadTestControl();
+    Map<String, Object> test = Helpers.toMapAny(ctrl.get("test"));
+    if (test == null) {
+      return new LinkedHashMap<>();
+    }
+    Map<String, Object> client = Helpers.toMapAny(test.get("client"));
+    if (client == null) {
+      return new LinkedHashMap<>();
+    }
+    Map<String, Object> opts = Helpers.toMapAny(client.get("options"));
+    if (opts == null) {
+      return new LinkedHashMap<>();
+    }
+
+    Map<String, Object> out = new LinkedHashMap<>();
+    for (Map.Entry<String, Object> e : opts.entrySet()) {
+      if (!LIVE_RESERVED.contains(e.getKey())) {
+        out.put(e.getKey(), e.getValue());
+      }
+    }
+    return out;
+  }
+
   // liveDelayMs returns the configured per-test live delay in ms; default 500.
   public static int liveDelayMs() {
     Map<String, Object> ctrl = loadTestControl();
@@ -217,123 +265,6 @@ public final class RunnerSupport {
     return Helpers.toMapAny(cur);
   }
 
-  @FunctionalInterface
-  public interface RunSubject {
-    Object run(Map<String, Object> entry) throws Exception;
-  }
-
-  // runset drives a test.json entry set against a subject, mirroring the
-  // matching semantics of the go/js runners. All entry failures are
-  // reported together as one AssertionError.
-  public static void runset(Map<String, Object> testspec, RunSubject subject) {
-    if (testspec == null || !(testspec.get("set") instanceof List)) {
-      return;
-    }
-    List<Object> set = (List<Object>) testspec.get("set");
-
-    List<String> failures = new ArrayList<>();
-
-    for (int i = 0; i < set.size(); i++) {
-      Map<String, Object> entry = Helpers.toMapAny(set.get(i));
-      if (entry == null) {
-        continue;
-      }
-
-      String mark = entry.get("mark") == null ? "" : " (mark=" + entry.get("mark") + ")";
-
-      Object result = null;
-      Exception err = null;
-      try {
-        result = subject.run(entry);
-      }
-      catch (Exception e) {
-        err = e;
-      }
-
-      Object expectedErr = entry.get("err");
-
-      if (err != null) {
-        if (expectedErr != null) {
-          String errMsg = err.getMessage() == null ? String.valueOf(err) : err.getMessage();
-          if (expectedErr instanceof String
-              && !matchString((String) expectedErr, errMsg)) {
-            failures.add("entry " + i + mark + ": error mismatch: got \"" + errMsg
-                + "\", want contains \"" + expectedErr + "\"");
-          }
-          Map<String, Object> matchSpec = Helpers.toMapAny(entry.get("match"));
-          if (matchSpec != null) {
-            Map<String, Object> resultMap = new LinkedHashMap<>();
-            resultMap.put("in", entry.get("in"));
-            resultMap.put("out", jsonNormalize(result));
-            Map<String, Object> errRec = new LinkedHashMap<>();
-            errRec.put("message", errMsg);
-            resultMap.put("err", errRec);
-            matchDeep(failures, i, mark, matchSpec, resultMap, "");
-          }
-          continue;
-        }
-        failures.add("entry " + i + mark + ": unexpected error: " + err);
-        continue;
-      }
-
-      if (expectedErr != null) {
-        failures.add("entry " + i + mark + ": expected error containing \""
-            + expectedErr + "\" but got result: " + jsonStr(result));
-        continue;
-      }
-
-      boolean matched = false;
-      Map<String, Object> matchSpec = Helpers.toMapAny(entry.get("match"));
-      if (matchSpec != null) {
-        Map<String, Object> resultMap = new LinkedHashMap<>();
-        resultMap.put("in", entry.get("in"));
-        resultMap.put("out", jsonNormalize(result));
-        if (entry.get("args") != null) {
-          resultMap.put("args", entry.get("args"));
-        }
-        else if (entry.get("in") != null) {
-          List<Object> args = new ArrayList<>();
-          args.add(entry.get("in"));
-          resultMap.put("args", args);
-        }
-        if (entry.get("ctx") != null) {
-          resultMap.put("ctx", entry.get("ctx"));
-        }
-        matchDeep(failures, i, mark, matchSpec, resultMap, "");
-        matched = true;
-      }
-
-      Object expectedOut = entry.get("out");
-      if (expectedOut == null && matched) {
-        continue;
-      }
-      if (expectedOut != null) {
-        Object normResult = jsonNormalize(result);
-        Object normExpected = jsonNormalize(expectedOut);
-        if (!Objects.equals(canon(normResult), canon(normExpected))) {
-          failures.add("entry " + i + mark + ": output mismatch:\n  got:  "
-              + jsonStr(normResult) + "\n  want: " + jsonStr(normExpected));
-        }
-      }
-    }
-
-    if (!failures.isEmpty()) {
-      throw new AssertionError(String.join("\n", failures));
-    }
-  }
-
-  public static Object jsonNormalize(Object val) {
-    if (val == null) {
-      return null;
-    }
-    try {
-      return Json.parse(Struct.jsonify(val));
-    }
-    catch (RuntimeException e) {
-      return val;
-    }
-  }
-
   public static String jsonStr(Object val) {
     try {
       return Struct.jsonify(val);
@@ -374,79 +305,6 @@ public final class RunnerSupport {
       return out;
     }
     return String.valueOf(v);
-  }
-
-  static void matchDeep(List<String> failures, int entryIdx, String mark,
-      Object check, Object base, String path) {
-
-    if (check == null) {
-      return;
-    }
-
-    if (check instanceof Map) {
-      for (Map.Entry<String, Object> e : ((Map<String, Object>) check).entrySet()) {
-        String childPath = path + "." + e.getKey();
-        Object baseVal = base instanceof Map
-            ? ((Map<String, Object>) base).get(e.getKey()) : null;
-        matchDeep(failures, entryIdx, mark, e.getValue(), baseVal, childPath);
-      }
-    }
-    else if (check instanceof List) {
-      List<Object> checkList = (List<Object>) check;
-      for (int i = 0; i < checkList.size(); i++) {
-        String childPath = path + "[" + i + "]";
-        Object baseVal = null;
-        if (base instanceof List && i < ((List<Object>) base).size()) {
-          baseVal = ((List<Object>) base).get(i);
-        }
-        matchDeep(failures, entryIdx, mark, checkList.get(i), baseVal, childPath);
-      }
-    }
-    else {
-      if ("__EXISTS__".equals(check)) {
-        if (base == null) {
-          failures.add("entry " + entryIdx + mark + ": match " + path
-              + ": expected value to exist but got null");
-        }
-        return;
-      }
-      if ("__UNDEF__".equals(check)) {
-        if (base != null) {
-          failures.add("entry " + entryIdx + mark + ": match " + path
-              + ": expected null but got " + base);
-        }
-        return;
-      }
-
-      Object normCheck = jsonNormalize(check);
-      Object normBase = jsonNormalize(base);
-
-      if (!Objects.equals(canon(normCheck), canon(normBase))) {
-        if (check instanceof String && !"".equals(check)) {
-          String baseStr = Struct.stringify(base);
-          if (matchString((String) check, baseStr)) {
-            return;
-          }
-        }
-        failures.add("entry " + entryIdx + mark + ": match " + path + ": got "
-            + jsonStr(normBase) + ", want " + jsonStr(normCheck));
-      }
-    }
-  }
-
-  // matchString checks if val matches pattern. If pattern is /regex/, use
-  // regex; otherwise do case-insensitive contains.
-  public static boolean matchString(String pattern, String val) {
-    if (pattern.length() >= 2 && pattern.startsWith("/") && pattern.endsWith("/")) {
-      try {
-        return Pattern.compile(pattern.substring(1, pattern.length() - 1))
-            .matcher(val).find();
-      }
-      catch (RuntimeException e) {
-        return false;
-      }
-    }
-    return val.toLowerCase().contains(pattern.toLowerCase());
   }
 
   // makeCtxFromMap creates a Context from a JSON test entry's ctx or args map.

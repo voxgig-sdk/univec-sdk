@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import JAVAPACKAGE.core.Context;
 import JAVAPACKAGE.core.Helpers;
@@ -11,6 +13,9 @@ import JAVAPACKAGE.utility.struct.Struct;
 
 @SuppressWarnings({"unchecked"})
 final class MakeOptions {
+
+  // {name} placeholders in a templated server URL (OpenAPI server variables).
+  private static final Pattern SERVER_VAR = Pattern.compile("\\{([A-Za-z0-9_]+)\\}");
 
   private MakeOptions() {}
 
@@ -36,7 +41,23 @@ final class MakeOptions {
       }
     }
 
+    // `auth: null` is the documented way to disable auth outright, and
+    // PrepareAuth honours it before it ever reads the apikey. It cannot
+    // survive validate: depending on the struct port a stored null is either
+    // REPLACED by the optspec default - transmitting the credential the
+    // caller withheld - or REJECTED outright. Withhold the key for validate,
+    // then put the null back. Same fix as ts/js/go makeOptions.
+    //
+    // Suppliedness cannot be recovered after validate, hence here, and it
+    // must tell an ABSENT auth from a present null: containsKey rather than
+    // a get() null check, which cannot distinguish them.
+    boolean authSuppressed = options.containsKey("auth") && null == options.get("auth");
+
     Map<String, Object> opts = (Map<String, Object>) Struct.clone(options);
+
+    if (authSuppressed) {
+      opts.remove("auth");
+    }
 
     // Feature add-order. options.feature may be given as an ordered LIST of
     // { name, active, ...opts } entries (the list position IS the order in
@@ -89,9 +110,21 @@ final class MakeOptions {
         + "\"feature\": { \"`$CHILD`\": {"
         + "  \"`$OPEN`\": true, \"active\": false } },"
         + "\"utility\": {},"
+        // Feature INSTANCES supplied at construction (the `extend` seam
+        // SdkClient's constructor reads at line 82): class instances, not
+        // data, so `$ANY` accepts them verbatim. Without this entry the
+        // seam is DEAD - validate drops the unknown key and the
+        // constructor's loop never sees a feature. Ported from
+        // MakeOptionsUtility.ts / make_options.go, which both carry it.
+        + "\"extend\": \"`$ANY`\","
         + "\"system\": {},"
         + "\"test\": { \"active\": false, \"entity\": { \"`$OPEN`\": true } },"
-        + "\"clean\": { \"keys\": \"key,token,id\" }"
+        + "\"clean\": { \"keys\": \"key,token,id\" },"
+        // Server-variable values for a templated base URL (OpenAPI server
+        // variables): {name} placeholders in `base` are substituted from
+        // this map at construction. Spec defaults arrive via the generated
+        // Config; user values override them.
+        + "\"server\": { \"`$CHILD`\": \"\" }"
         + "}");
 
     // Preserve system.fetch before merge/validate.
@@ -115,6 +148,11 @@ final class MakeOptions {
     Object validated = Struct.validate(merged, optspec, vopts);
     opts = (Map<String, Object>) validated;
 
+    // Restore the suppression the optspec default would otherwise erase.
+    if (authSuppressed) {
+      opts.put("auth", null);
+    }
+
     // Restore system.fetch.
     if (sysFetch != null) {
       Map<String, Object> sys = Helpers.toMapAny(opts.get("system"));
@@ -126,6 +164,58 @@ final class MakeOptions {
         sm.put("fetch", sysFetch);
         opts.put("system", sm);
       }
+    }
+
+    // Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
+    //
+    // Every placeholder must resolve to a non-empty value: from
+    // options["server"] (user), else the Config default. A placeholder that
+    // resolves to "" is a construction ERROR in live mode - the URL cannot
+    // work - but in test mode substitutes the deterministic value
+    // `test-<name>` so offline tests need no configuration.
+    Object baseObj = opts.get("base");
+    if (baseObj instanceof String && ((String) baseObj).indexOf('{') >= 0) {
+      String base = (String) baseObj;
+
+      boolean testmode =
+          Boolean.TRUE.equals(Struct.getpath(opts, List.of("test", "active")))
+          || Boolean.TRUE.equals(
+              Struct.getpath(opts, List.of("feature", "test", "active")));
+
+      Map<String, Object> server = Helpers.toMapAny(opts.get("server"));
+
+      Matcher m = SERVER_VAR.matcher(base);
+      StringBuilder resolved = new StringBuilder();
+      int at = 0;
+      while (m.find()) {
+        String name = m.group(1);
+        Object raw = server == null ? null : server.get(name);
+        String val = raw instanceof String ? (String) raw : "";
+
+        if ("".equals(val)) {
+          if (testmode) {
+            val = "test-" + name;
+          }
+          else {
+            String sdkname = "SDK";
+            Object mainName = Struct.getpath(config, List.of("main", "name"));
+            if (mainName instanceof String) {
+              sdkname = (String) mainName;
+            }
+            throw new IllegalArgumentException(
+                sdkname + ": the server variable '" + name + "' is required: "
+                + "the API base URL is '" + base + "' - pass "
+                + "options.put(\"server\", Map.of(\"" + name + "\", \"...\")) "
+                + "in the SDK options");
+          }
+        }
+
+        resolved.append(base, at, m.start()).append(val);
+        at = m.end();
+      }
+      resolved.append(base.substring(at));
+
+      opts.put("base", resolved.toString());
     }
 
     // Derived clean config.

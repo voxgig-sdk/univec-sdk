@@ -9,7 +9,26 @@ function makeOptions(ctx) {
   const validate = struct.validate
   const escre = struct.escre
 
+  // `auth: null` is the documented way to disable auth outright, and
+  // prepareAuth honours it before it ever reads the apikey. But it cannot
+  // survive validate: this target's struct rejects a stored null outright
+  // ("Expected field auth to be map, but found no value"), so passing it
+  // through turns the documented suppression into a CONSTRUCTION ERROR.
+  //
+  // Withhold the key for validate, then put the null back. Deleting rather
+  // than leaving it is what avoids the throw; restoring it afterwards is
+  // what stops the optspec's `auth` default from taking its place, which
+  // would transmit the credential the caller asked to withhold.
+  //
+  // Suppliedness cannot be recovered after validate, hence here. `null ===`
+  // rather than `null ==`, so an OMITTED auth is not read as a suppression.
+  const authsuppressed = null === (options || {}).auth
+
   let opts = { ...(options || {}) }
+
+  if (authsuppressed) {
+    delete opts.auth
+  }
 
   // Feature add-order. `options.feature` may be given as an ordered ARRAY of
   // { name, active, ...opts } entries (the array position IS the order in
@@ -107,6 +126,11 @@ function makeOptions(ctx) {
   opts = merge([{}, struct.clone(cfgopts), opts])
 
   opts = validate(opts, optspec)
+
+  // Restore the suppression the optspec default would otherwise erase.
+  if (authsuppressed) {
+    opts.auth = null
+  }
 
   // Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
   // Every placeholder must resolve to a non-empty value: from

@@ -322,16 +322,27 @@ public static class SdkConfig
                                     ["kind"] = "http",
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/convert",
-                                    ["parts"] = new List<object?>
+                                    ["segments"] = new List<object?>
                                     {
-                                        "v1",
-                                        "convert",
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "convert",
+                                        },
                                     },
                                     ["select"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "convert",
                                     },
                                 },
                                 new Dictionary<string, object?>
@@ -340,16 +351,27 @@ public static class SdkConfig
                                     ["kind"] = "http",
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/embed-bridge",
-                                    ["parts"] = new List<object?>
+                                    ["segments"] = new List<object?>
                                     {
-                                        "v1",
-                                        "embed-bridge",
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "embed-bridge",
+                                        },
                                     },
                                     ["select"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "embed-bridge",
                                     },
                                 },
                                 new Dictionary<string, object?>
@@ -358,17 +380,32 @@ public static class SdkConfig
                                     ["kind"] = "http",
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/convert",
-                                    ["parts"] = new List<object?>
+                                    ["segments"] = new List<object?>
                                     {
-                                        "v1",
-                                        "ephemeral",
-                                        "convert",
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "ephemeral",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "convert",
+                                        },
                                     },
                                     ["select"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "ephemeral",
+                                        "convert",
                                     },
                                 },
                                 new Dictionary<string, object?>
@@ -377,17 +414,32 @@ public static class SdkConfig
                                     ["kind"] = "http",
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/embed-bridge",
-                                    ["parts"] = new List<object?>
+                                    ["segments"] = new List<object?>
                                     {
-                                        "v1",
-                                        "ephemeral",
-                                        "embed-bridge",
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "ephemeral",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "embed-bridge",
+                                        },
                                     },
                                     ["select"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "ephemeral",
+                                        "embed-bridge",
                                     },
                                 },
                             },
@@ -439,16 +491,27 @@ public static class SdkConfig
                                     ["kind"] = "http",
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/embed",
-                                    ["parts"] = new List<object?>
+                                    ["segments"] = new List<object?>
                                     {
-                                        "v1",
-                                        "embed",
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "embed",
+                                        },
                                     },
                                     ["select"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "embed",
                                     },
                                 },
                                 new Dictionary<string, object?>
@@ -457,17 +520,32 @@ public static class SdkConfig
                                     ["kind"] = "http",
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/embed",
-                                    ["parts"] = new List<object?>
+                                    ["segments"] = new List<object?>
                                     {
-                                        "v1",
-                                        "ephemeral",
-                                        "embed",
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "ephemeral",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "embed",
+                                        },
                                     },
                                     ["select"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "ephemeral",
+                                        "embed",
                                     },
                                 },
                             },
@@ -505,6 +583,7 @@ public static class SdkConfig
                         },
                         new Dictionary<string, object?>
                         {
+                            ["format"] = "date-time",
                             ["name"] = "resetsAt",
                             ["req"] = true,
                             ["short"] = "When the daily allowance resets.",
@@ -526,17 +605,32 @@ public static class SdkConfig
                                     ["kind"] = "http",
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/key",
-                                    ["parts"] = new List<object?>
+                                    ["segments"] = new List<object?>
                                     {
-                                        "v1",
-                                        "ephemeral",
-                                        "key",
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "ephemeral",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "key",
+                                        },
                                     },
                                     ["select"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "ephemeral",
+                                        "key",
                                     },
                                 },
                             },
@@ -631,16 +725,27 @@ public static class SdkConfig
                                     ["kind"] = "http",
                                     ["method"] = "GET",
                                     ["orig"] = "/v1/models",
-                                    ["parts"] = new List<object?>
+                                    ["segments"] = new List<object?>
                                     {
-                                        "v1",
-                                        "models",
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "models",
+                                        },
                                     },
                                     ["select"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "models",
                                     },
                                 },
                             },
@@ -665,6 +770,15 @@ public static class SdkConfig
     public static Dictionary<string, object?> SharedConfig()
     {
         return SharedConfigVal.Value;
+    }
+
+    public static List<object?> FeaturePlugins(string name)
+    {
+        switch (name)
+        {
+            default:
+                return new List<object?>();
+        }
     }
 
     public static Feature.BaseFeature MakeFeature(string name)

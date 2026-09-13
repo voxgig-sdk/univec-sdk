@@ -263,14 +263,22 @@ func MakeConfig() map[string]any {
 								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/convert",
-								"parts": []any{
-									"v1",
-									"convert",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "convert",
+									},
 								},
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
+								},
+								"parts": []any{
+									"v1",
+									"convert",
 								},
 							},
 							map[string]any{
@@ -278,14 +286,22 @@ func MakeConfig() map[string]any {
 								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/embed-bridge",
-								"parts": []any{
-									"v1",
-									"embed-bridge",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "embed-bridge",
+									},
 								},
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
+								},
+								"parts": []any{
+									"v1",
+									"embed-bridge",
 								},
 							},
 							map[string]any{
@@ -293,15 +309,26 @@ func MakeConfig() map[string]any {
 								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/ephemeral/convert",
-								"parts": []any{
-									"v1",
-									"ephemeral",
-									"convert",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "ephemeral",
+									},
+									map[string]any{
+										"lit": "convert",
+									},
 								},
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
+								},
+								"parts": []any{
+									"v1",
+									"ephemeral",
+									"convert",
 								},
 							},
 							map[string]any{
@@ -309,15 +336,26 @@ func MakeConfig() map[string]any {
 								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/ephemeral/embed-bridge",
-								"parts": []any{
-									"v1",
-									"ephemeral",
-									"embed-bridge",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "ephemeral",
+									},
+									map[string]any{
+										"lit": "embed-bridge",
+									},
 								},
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
+								},
+								"parts": []any{
+									"v1",
+									"ephemeral",
+									"embed-bridge",
 								},
 							},
 						},
@@ -359,14 +397,22 @@ func MakeConfig() map[string]any {
 								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/embed",
-								"parts": []any{
-									"v1",
-									"embed",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "embed",
+									},
 								},
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
+								},
+								"parts": []any{
+									"v1",
+									"embed",
 								},
 							},
 							map[string]any{
@@ -374,15 +420,26 @@ func MakeConfig() map[string]any {
 								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/ephemeral/embed",
-								"parts": []any{
-									"v1",
-									"ephemeral",
-									"embed",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "ephemeral",
+									},
+									map[string]any{
+										"lit": "embed",
+									},
 								},
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
+								},
+								"parts": []any{
+									"v1",
+									"ephemeral",
+									"embed",
 								},
 							},
 						},
@@ -413,6 +470,7 @@ func MakeConfig() map[string]any {
 						"type": "`$STRING`",
 					},
 					map[string]any{
+						"format": "date-time",
 						"name": "resetsAt",
 						"req": true,
 						"short": "When the daily allowance resets.",
@@ -430,15 +488,26 @@ func MakeConfig() map[string]any {
 								"kind": "http",
 								"method": "POST",
 								"orig": "/v1/ephemeral/key",
-								"parts": []any{
-									"v1",
-									"ephemeral",
-									"key",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "ephemeral",
+									},
+									map[string]any{
+										"lit": "key",
+									},
 								},
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
+								},
+								"parts": []any{
+									"v1",
+									"ephemeral",
+									"key",
 								},
 							},
 						},
@@ -516,14 +585,22 @@ func MakeConfig() map[string]any {
 								"kind": "http",
 								"method": "GET",
 								"orig": "/v1/models",
-								"parts": []any{
-									"v1",
-									"models",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "models",
+									},
 								},
 								"select": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
+								},
+								"parts": []any{
+									"v1",
+									"models",
 								},
 							},
 						},
@@ -535,6 +612,17 @@ func MakeConfig() map[string]any {
 			},
 		},
 	}
+}
+
+// The plugin definitions the model selected per feature, as []any so a
+// feature package can consume them without core naming its types. Empty
+// when no active feature declares active plugin groups for this target.
+var featurePlugins = map[string][]any{
+}
+
+// FeaturePlugins is the definitions list for one feature's chain.
+func FeaturePlugins(name string) []any {
+	return featurePlugins[name]
 }
 
 var (

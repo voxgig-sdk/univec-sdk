@@ -8,14 +8,38 @@ main: kit: target: scala: {
   package: '@voxgig/sdkgen'
   srcfeature: false
 
+  # Applicability (docs/design/feature-tags.md). A vendored sekreto port
+  # lives in this target's feature container, so a feature that resolves
+  # secrets through sekreto can apply here.
+  provides: { sekreto: true }
+
+  # Retired by the move to the vendored @voxgig/omni corpus runner
+  # (vendor-tag rollout): NOTHING, deliberately, and the empty list says so
+  # rather than leaving the key off.
+  #
+  # Scala's corpus ENGINE was never a file of its own. It lived FUSED inside
+  # sdktest/StructCorpus.scala — `object Runner`'s own JSON reader, fixJson,
+  # deep equality, matchval/doMatch, resolveArgs, checkResult, handleError and
+  # runSet — and sdktest/PrimaryCorpus.scala drove the same object. Both files
+  # were rewritten IN PLACE onto sdktest/OmniResolver.scala, so both KEEP
+  # THEIR NAMES, `object Runner` keeps its name (the Makefile still runs
+  # `--main-class Runner`), and no emitted call site needed churn.
+  # sdktest/SdkTestSupport.scala is support-ONLY and is RETAINED, exactly as
+  # java's RunnerSupport.java and csharp's Runner.cs. There is therefore no
+  # whole-file leftover for `doctor` to report or `doctor prune` to delete.
+  superseded: []
+
   deps: &: {
     kind: *'prod' | string
   }
 
   # struct is inlined under utility/struct — no external runtime dep.
   # JSON parsing is the zero-dep utility/Json.java; HTTP transport is
-  # java.net.http.HttpClient (JDK built-in). The corpus runner and pipeline
-  # tests are plain scala-cli mains (no test-framework dependency).
+  # java.net.http.HttpClient (JDK built-in). The corpus ENGINE is the vendored
+  # @voxgig/omni scala port under sdktest/vendor/omni — source, not a
+  # dependency, and scala-cli compiles it with everything else. The corpus
+  # runners, the omni smoke test and the pipeline tests are plain scala-cli
+  # mains (no test-framework dependency).
   deps: {}
 }
 
@@ -54,8 +78,39 @@ main: kit: target: scala: publish: {
 
 # Feature source is NOT trimmed to the model's selection here: the cross-
 # feature tests live inside sdktest/SdkTestMain.scala, the single test
-# entry point, so they cannot be dropped without losing every other test
-# too. Trimming stays off until that suite is split per feature.
+# entry point, and that file constructs fifteen feature classes BY NAME
+# (NetsimFeature, RetryFeature, TimeoutFeature, RatelimitFeature,
+# CacheFeature, ...), so a trim that dropped an unselected feature's source
+# would stop the whole suite compiling. Every other target that trims has a
+# `fullset` file to drop with it (java's test/FeatureTest.java, go's
+# test/feature_test.go); scala's equivalent is fused into SdkTestMain, so
+# `fullset: ['sdktest/SdkTestMain.scala']` would take 137 runtime assertions
+# with it. Trimming stays off until that suite is split per feature.
+#
+# WHAT THAT COSTS, stated rather than left to be discovered. Every feature's
+# source ships to every scala SDK whatever the model selected, and the
+# secrets feature is by far the largest: measured on a feature-OFF SDK it
+# adds 26 files / 6,443 lines - SecretsFeature.scala, the vendored sekreto
+# core (6 files) and voxgig/plugin core (16), and the two UNGROUPED plugin
+# files. Those two are the ones with teeth: plugins/Sigv4.scala links
+# javax.crypto for AWS HMAC-SHA256 request signing, and
+# plugins/Httpjson.scala carries both the shared HTTP client and `runcmd`,
+# a ProcessBuilder child-process launcher. Neither can join a plugin group -
+# four and eight provider kinds respectively compile against them, so any
+# group owning them would let another group's trim delete them (which is
+# exactly how Sigv4.scala broke the saas and cloud groups once).
+#
+# The NINE provider clients ARE trimmed, in both directions: Main_scala
+# applies pluginExcludes for an active feature's inactive groups, and every
+# declared group of a feature that is itself off - so a secrets-off SDK
+# carries no vault, cloud, saas, aws or secretspec client. Both ends are
+# pinned, in ts/test/generate.test.ts and in the generated suite itself
+# (SecretsTestMain's vocabulary case reads the compiled module set).
+#
+# Flipping trim on is therefore a THREE-part change, not a one-line one:
+# split the feature tests out of SdkTestMain.scala into a `fullset` file,
+# stop the Makefile naming a per-feature suite that may not have shipped,
+# and re-measure. It is deliberately not part of the secrets work.
 main: kit: target: scala: feature: {
   trim: false
 }

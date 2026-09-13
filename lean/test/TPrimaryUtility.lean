@@ -1,363 +1,227 @@
-/- Univec SDK primary utility test.
+/- Univec SDK primary utility corpus.
 
    Drives the SHARED language-neutral corpus (.sdk/test/test.json, section
-   `primary`) — the same fixtures every other target executes — so this suite
-   cannot drift from the reference implementation. Each section is looked up
-   with `getSpec` and executed with `runset`, as the ts/js reference harness
-   does. -/
+   `primary`) — the same fixtures every other target executes — through this
+   SDK's request-shaping utilities, so the cases cannot drift from the
+   reference implementation. Each section is looked up by name and executed on
+   the VENDORED @voxgig/omni engine through OmniResolver, exactly as the ts/js
+   reference harness does.
+
+   The ENGINE used to be in this file: `runset`, `deepEq`, `strCheck`,
+   `matchDeep` and the pass/fail tally were this port's own copy of omni's
+   algorithm. All of it is gone. What remains is what belongs to this SDK:
+   which corpus section drives which utility, and how a corpus map becomes a
+   live context. The file keeps its name (and the `primary` executable keeps
+   its root), so no call site needed churn.
+
+   Every section uses `runsetArgs`: a `ctx` entry arrives as `args[0]`, a MAP
+   on this SDK's own heap, which the call site wires to the client
+   options/config, runs the utility on, and which the resolver writes back
+   after the call — which is what makes `match: {ctx: ...}` (retargeted onto
+   `match: {args: {"0": ...}}` by the resolver, decision 4) read the POST-call
+   state rather than a stale pre-call copy. This port needs no separate
+   "typed context" step: `ctx` here IS a struct map, heap-backed and
+   reference-stable, and the utilities mutate it in place. -/
 
 import VoxgigStruct
 import Vregex
 import SdkJson
 import SdkUtility
 import SdkConfig
+import Omni
+import OmniResolver
 
 open VoxgigStruct
-
-initialize npass : IO.Ref Nat ← IO.mkRef 0
-initialize nfail : IO.Ref Nat ← IO.mkRef 0
-initialize failures : IO.Ref (Array String) ← IO.mkRef #[]
-
-def pass : SIO Unit := do npass.modify (· + 1)
-
-def fail (msg : String) : SIO Unit := do
-  nfail.modify (· + 1)
-  failures.modify (·.push msg)
-
--- ---------------------------------------------------------------------------
--- corpus navigation
--- ---------------------------------------------------------------------------
-
-/-- Navigate into the nested corpus map by keys. -/
-def getSpec (root : Value) (path : Array String) : SIO Value := do
-  let mut cur := root
-  for k in path do
-    cur ← SdkUtility.gp cur k
-  pure cur
-
-def itemsOf (v : Value) : SIO (Array Value) := do
-  match v with
-  | .list i => listItems i
-  | _ => pure #[]
-
-def argAt (args : Value) (i : Nat) : SIO Value := do
-  pure ((← itemsOf args)[i]?.getD .noval)
-
--- ---------------------------------------------------------------------------
--- comparison
--- ---------------------------------------------------------------------------
-
-/-- Deep structural equality; an empty list and an empty map are equivalent. -/
-partial def deepEq (a b : Value) : SIO Bool := do
-  match a, b with
-  | .map ia, .map ib => do
-    let ka ← keysof (.map ia)
-    let kb ← keysof (.map ib)
-    if ka.size != kb.size then pure false
-    else do
-      let mut ok := true
-      for k in ka do
-        let va ← SdkUtility.gp (.map ia) k
-        let vb ← SdkUtility.gp (.map ib) k
-        if !(← deepEq va vb) then ok := false
-      pure ok
-  | .list ia, .list ib => do
-    let la ← listItems ia
-    let lb ← listItems ib
-    if la.size != lb.size then pure false
-    else do
-      let mut ok := true
-      for i in [0:la.size] do
-        if !(← deepEq (la[i]!) (lb[i]!)) then ok := false
-      pure ok
-  | .map ia, .list ib => do
-    pure ((← keysof (.map ia)).isEmpty && (← listItems ib).isEmpty)
-  | .list ia, .map ib => do
-    pure ((← listItems ia).isEmpty && (← keysof (.map ib)).isEmpty)
-  | x, y => pure (x == y)
-
-/-- A corpus string check: `/re/` is a regex, otherwise substring containment. -/
-def strCheck (checkStr subject : String) : Bool :=
-  if checkStr.length > 1 && checkStr.startsWith "/" && checkStr.endsWith "/" then
-    let inner := String.ofList (checkStr.toList.drop 1).dropLast
-    Vregex.testStr inner subject
-  else if checkStr == subject then true
-  else (subject.splitOn checkStr).length > 1
-
-/-- Partial deep match: every key present in `check` must hold in `base`. -/
-partial def matchDeep (check base : Value) (path : String) (errs : IO.Ref (Array String)) :
-    SIO Unit := do
-  match check with
-  | .map ic =>
-    for k in (← keysof (.map ic)) do
-      let cv ← SdkUtility.gp (.map ic) k
-      let bv ← SdkUtility.gp base k
-      matchDeep cv bv (if path == "" then k else path ++ "." ++ k) errs
-  | .list ic => do
-    let items ← listItems ic
-    let bitems ← itemsOf base
-    for i in [0:items.size] do
-      let bv := bitems[i]?.getD .noval
-      matchDeep (items[i]!) bv (path ++ "[" ++ toString i ++ "]") errs
-  | .str s =>
-    if s == "__EXISTS__" then
-      (if SdkUtility.isNov base then errs.modify (·.push (path ++ ": expected to exist")) else pure ())
-    else if s == "__UNDEF__" then
-      (if SdkUtility.isNov base then pure () else errs.modify (·.push (path ++ ": expected undefined")))
-    else do
-      let bs := SdkUtility.vs base
-      if strCheck s bs then pure ()
-      else errs.modify (·.push (path ++ ": want " ++ s ++ ", got " ++ bs))
-  | _ => do
-    if (← deepEq check base) then pure ()
-    else do
-      let cs ← stringify check
-      let bs ← stringify base
-      errs.modify (·.push (path ++ ": want " ++ cs ++ ", got " ++ bs))
-
--- ---------------------------------------------------------------------------
--- the runner
--- ---------------------------------------------------------------------------
-
-abbrev Subject := Value → SIO (Value × Option Value)
-
-def runset (secname : String) (spec : Value) (subject : Subject) : SIO Unit := do
-  let entries ← itemsOf (← SdkUtility.gp spec "set")
-  for idx in [0:entries.size] do
-    let entry := entries[idx]!
-    let label := secname ++ "[" ++ toString idx ++ "]"
-    let errs ← IO.mkRef (#[] : Array String)
-    let (res, merr) ← subject entry
-    let expErr ← SdkUtility.gp entry "err"
-    let mspec ← SdkUtility.gp entry "match"
-    match merr with
-    | some e => do
-      let em ← SdkUtility.gpS e "message"
-      if SdkUtility.isNov expErr then fail (label ++ ": unexpected error: " ++ em)
-      else do
-        let ok := match expErr with
-          | .str s => strCheck s em
-          | .bool b => b
-          | _ => false
-        if !ok then fail (label ++ ": error mismatch: got " ++ em)
-        else do
-          if !(SdkUtility.isNov mspec) then do
-            let rm ← emptyMap
-            let emap ← newMap #[("message", .str em)]
-            SdkUtility.sp rm "err" emap
-            SdkUtility.sp rm "out" res
-            matchDeep mspec rm "" errs
-          let es ← errs.get
-          if es.isEmpty then pass else fail (label ++ ": " ++ String.intercalate "; " es.toList)
-    | none => do
-      if !(SdkUtility.isNov expErr) then fail (label ++ ": expected an error, got a result")
-      else do
-        if !(SdkUtility.isNov mspec) then do
-          let rm ← emptyMap
-          SdkUtility.sp rm "out" res
-          SdkUtility.sp rm "in" (← SdkUtility.gp entry "in")
-          SdkUtility.sp rm "ctx" (← SdkUtility.gp entry "ctx")
-          SdkUtility.sp rm "args" (← SdkUtility.gp entry "args")
-          matchDeep mspec rm "" errs
-        let expOut ← SdkUtility.gp entry "out"
-        if !(SdkUtility.isNov expOut) then
-          if !(← deepEq expOut res) then do
-            let rs ← stringify res
-            let os ← stringify expOut
-            errs.modify (·.push ("out: want " ++ os ++ ", got " ++ rs))
-        let es ← errs.get
-        if es.isEmpty then pass else fail (label ++ ": " ++ String.intercalate "; " es.toList)
+open OmniResolver
 
 -- ---------------------------------------------------------------------------
 -- context construction
 -- ---------------------------------------------------------------------------
 
-/-- The entry's own `ctx` map (created and attached when absent), wired to the
-    client options/config so the utilities see them. -/
-def entryCtx (entry options config : Value) : SIO Value := do
-  let ctx ← match (← SdkUtility.gp entry "ctx") with
-    | .map i => pure (Value.map i)
-    | _ => do
-      let m ← emptyMap
-      SdkUtility.sp entry "ctx" m
-      pure m
-  SdkUtility.sp ctx "options" options
-  SdkUtility.sp ctx "config" config
-  pure ctx
+/-- The entry's ctx map, wired to the client options/config so the utilities
+    see them. `args[0]` IS the map omni handed over, so every write the
+    utility makes to it is what `match.args.0` reads back.
 
-/-- A ctx from a bare map (args-style sections); published back onto the entry
-    as `ctx` so a `match: ctx:` assertion sees the mutated context. -/
-def mapCtx (entry v options config : Value) : SIO Value := do
-  let ctx ← match v with
+    A non-map first argument cannot occur in the shipped corpus (every entry
+    of every ctx section supplies one); a fresh map is used rather than
+    failing, so a future fixture degrades to "asserts nothing about the ctx"
+    instead of crashing the suite. -/
+def ctxOf (vals : Array Value) (options config : Value) : SIO Value := do
+  let ctx ← match arg vals 0 with
     | .map i => pure (Value.map i)
     | _ => emptyMap
   SdkUtility.sp ctx "options" options
   SdkUtility.sp ctx "config" config
-  SdkUtility.sp entry "ctx" ctx
   pure ctx
+
+/-- A utility that answers `(result, error?)`. omni reports a subject failure
+    by its MESSAGE, so a returned SDK error becomes a thrown `IO.userError`
+    carrying exactly the message the corpus's `err` expectations match on. -/
+def unwrap (pair : Value × Option Value) : SIO Value := do
+  match pair.2 with
+  | some e => throw (IO.userError (← SdkUtility.gpS e "message"))
+  | none => pure pair.1
 
 -- ---------------------------------------------------------------------------
 -- main
 -- ---------------------------------------------------------------------------
 
-def specPaths : Array String :=
-  #["../.sdk/test/test.json", ".sdk/test/test.json", "test/test.json"]
-
-def readSpecFile : IO String := do
-  match (← IO.getEnv "SDK_TEST_SPEC") with
-  | some p => IO.FS.readFile p
-  | none => do
-    for p in specPaths do
-      if ← System.FilePath.pathExists p then
-        return (← IO.FS.readFile p)
-    throw (IO.userError "cannot find .sdk/test/test.json (set SDK_TEST_SPEC)")
-
-def main : IO UInt32 := do
-  let raw ← readSpecFile
+def main (argv : List String) : IO UInt32 := do
+  let testfile ← resolveSpecPath argv
+  let r ← makeRun testfile "primary"
   let sctx ← mkCtx
+
   let go : SIO Unit := do
-    let root ← SdkJson.jsonRead raw
-    let primary ← SdkUtility.gp root "primary"
     let config ← SdkJson.jsonRead SdkConfig.configJson
     let opts ← SdkUtility.makeOptions config (← emptyMap)
 
-    runset "done" (← getSpec primary #["done", "basic"]) fun entry => do
-      SdkUtility.done (← entryCtx entry opts config)
+    runsetArgs r "done" (getset r ["done", "basic"]) (fun vals => do
+      unwrap (← SdkUtility.done (← ctxOf vals opts config)))
 
-    runset "makeContext" (← getSpec primary #["makeContext", "basic"]) fun entry => do
-      let ctx ← mapCtx entry (← SdkUtility.gp entry "in") opts config
-      pure ((← SdkUtility.makeContext ctx), none)
+    runsetArgs r "makeContext" (getset r ["makeContext", "basic"]) (fun vals => do
+      SdkUtility.makeContext (← ctxOf vals opts config))
 
-    runset "makeError" (← getSpec primary #["makeError", "basic"]) fun entry => do
-      let args ← SdkUtility.gp entry "args"
-      let ctx ← mapCtx entry (← argAt args 0) opts config
-      pure (.noval, some (← SdkUtility.makeError ctx (← argAt args 1)))
+    -- makeError RETURNS the error rather than raising it, and the corpus
+    -- asserts it as one (`err`, and one `match: {err: ...}`), so the message
+    -- is thrown here.
+    runsetArgs r "makeError" (getset r ["makeError", "basic"]) (fun vals => do
+      let ctx ← ctxOf vals opts config
+      let e ← SdkUtility.makeError ctx (arg vals 1)
+      throw (IO.userError (← SdkUtility.gpS e "message")))
 
-    runset "makeOptions" (← getSpec primary #["makeOptions", "basic"]) fun entry => do
-      let inv ← SdkUtility.gp entry "in"
-      pure ((← SdkUtility.makeOptions (← SdkUtility.gp inv "config") (← SdkUtility.gp inv "options")), none)
+    runsetArgs r "makeOptions" (getset r ["makeOptions", "basic"]) (fun vals => do
+      let inv := arg vals 0
+      SdkUtility.makeOptions (← getp inv "config") (← getp inv "options"))
 
-    runset "makeRequest" (← getSpec primary #["makeRequest", "basic"]) fun entry => do
-      SdkUtility.makeRequest (← entryCtx entry opts config)
+    runsetArgs r "makeRequest" (getset r ["makeRequest", "basic"]) (fun vals => do
+      unwrap (← SdkUtility.makeRequest (← ctxOf vals opts config)))
 
-    runset "makeResponse" (← getSpec primary #["makeResponse", "basic"]) fun entry => do
-      SdkUtility.makeResponse (← entryCtx entry opts config)
+    runsetArgs r "makeResponse" (getset r ["makeResponse", "basic"]) (fun vals => do
+      unwrap (← SdkUtility.makeResponse (← ctxOf vals opts config)))
 
-    let specOpts ← SdkUtility.makeOptions config (← getSpec primary #["makeSpec", "DEF", "setup", "a"])
-    runset "makeSpec" (← getSpec primary #["makeSpec", "basic"]) fun entry => do
-      SdkUtility.makeSpec (← entryCtx entry specOpts config)
+    -- Sections configured by their own DEF.setup.a block get their own
+    -- options: prepareAuth reads the CLIENT's options, as the ts reference
+    -- does via client.options(), so a section's setup cannot reach it
+    -- through ctx.options.
+    let specOpts ← SdkUtility.makeOptions config
+      (← tostruct (getset r ["makeSpec", "DEF", "setup", "a"]))
+    runsetArgs r "makeSpec" (getset r ["makeSpec", "basic"]) (fun vals => do
+      unwrap (← SdkUtility.makeSpec (← ctxOf vals specOpts config)))
 
-    runset "makeUrl" (← getSpec primary #["makeUrl", "basic"]) fun entry => do
-      SdkUtility.makeUrl (← entryCtx entry opts config)
+    runsetArgs r "makeUrl" (getset r ["makeUrl", "basic"]) (fun vals => do
+      unwrap (← SdkUtility.makeUrl (← ctxOf vals opts config)))
 
-    runset "operator" (← getSpec primary #["operator", "basic"]) fun entry => do
-      pure ((← SdkUtility.operator (← SdkUtility.gp entry "in")), none)
+    runsetArgs r "operator" (getset r ["operator", "basic"]) (fun vals => do
+      SdkUtility.operator (arg vals 0))
 
-    runset "param" (← getSpec primary #["param", "basic"]) fun entry => do
-      let args ← SdkUtility.gp entry "args"
-      let ctx ← mapCtx entry (← argAt args 0) opts config
-      pure ((← SdkUtility.param ctx (← argAt args 1)), none)
+    runsetArgs r "param" (getset r ["param", "basic"]) (fun vals => do
+      SdkUtility.param (← ctxOf vals opts config) (arg vals 1))
 
-    let authOpts ← SdkUtility.makeOptions config (← getSpec primary #["prepareAuth", "DEF", "setup", "a"])
-    runset "prepareAuth" (← getSpec primary #["prepareAuth", "basic"]) fun entry => do
-      SdkUtility.prepareAuth (← entryCtx entry authOpts config)
+    let authOpts ← SdkUtility.makeOptions config
+      (← tostruct (getset r ["prepareAuth", "DEF", "setup", "a"]))
+    runsetArgs r "prepareAuth" (getset r ["prepareAuth", "basic"]) (fun vals => do
+      unwrap (← SdkUtility.prepareAuth (← ctxOf vals authOpts config)))
 
-    runset "prepareBody" (← getSpec primary #["prepareBody", "basic"]) fun entry => do
-      pure ((← SdkUtility.prepareBody (← entryCtx entry opts config)), none)
+    runsetArgs r "prepareBody" (getset r ["prepareBody", "basic"]) (fun vals => do
+      SdkUtility.prepareBody (← ctxOf vals opts config))
 
-    runset "prepareHeaders" (← getSpec primary #["prepareHeaders", "basic"]) fun entry => do
-      pure ((← SdkUtility.prepareHeaders (← entryCtx entry opts config)), none)
+    runsetArgs r "prepareHeaders" (getset r ["prepareHeaders", "basic"]) (fun vals => do
+      SdkUtility.prepareHeaders (← ctxOf vals opts config))
 
-    runset "prepareMethod" (← getSpec primary #["prepareMethod", "basic"]) fun entry => do
-      let m ← SdkUtility.prepareMethod (← entryCtx entry opts config)
-      pure (.str m, none)
+    -- An op the API does not define resolves NO method: ts answers undefined
+    -- there and this port answers "", and both are "no value" to the corpus
+    -- (`prepareMethod` case 6, opname "bad", authors no `out`).
+    runsetArgs r "prepareMethod" (getset r ["prepareMethod", "basic"]) (fun vals => do
+      let m ← SdkUtility.prepareMethod (← ctxOf vals opts config)
+      pure (if m == "" then .noval else .str m))
 
-    runset "prepareParams" (← getSpec primary #["prepareParams", "basic"]) fun entry => do
-      pure ((← SdkUtility.prepareParams (← entryCtx entry opts config)), none)
+    runsetArgs r "prepareParams" (getset r ["prepareParams", "basic"]) (fun vals => do
+      SdkUtility.prepareParams (← ctxOf vals opts config))
 
-    runset "preparePath" (← getSpec primary #["preparePath", "basic"]) fun entry => do
-      let p ← SdkUtility.preparePath (← entryCtx entry opts config)
-      pure (.str p, none)
+    runsetArgs r "preparePath" (getset r ["preparePath", "basic"]) (fun vals => do
+      pure (.str (← SdkUtility.preparePath (← ctxOf vals opts config))))
 
-    runset "prepareQuery" (← getSpec primary #["prepareQuery", "basic"]) fun entry => do
-      pure ((← SdkUtility.prepareQuery (← entryCtx entry opts config)), none)
+    runsetArgs r "prepareQuery" (getset r ["prepareQuery", "basic"]) (fun vals => do
+      SdkUtility.prepareQuery (← ctxOf vals opts config))
 
-    runset "resultBasic" (← getSpec primary #["resultBasic", "basic"]) fun entry => do
-      let ctx ← entryCtx entry opts config
+    runsetArgs r "resultBasic" (getset r ["resultBasic", "basic"]) (fun vals => do
+      let ctx ← ctxOf vals opts config
       SdkUtility.resultBasic ctx
-      pure ((← SdkUtility.gp ctx "result"), none)
+      getp ctx "result")
 
-    runset "resultBody" (← getSpec primary #["resultBody", "basic"]) fun entry => do
-      let ctx ← entryCtx entry opts config
+    runsetArgs r "resultBody" (getset r ["resultBody", "basic"]) (fun vals => do
+      let ctx ← ctxOf vals opts config
       SdkUtility.resultBody ctx
-      pure ((← SdkUtility.gp ctx "result"), none)
+      getp ctx "result")
 
-    runset "resultHeaders" (← getSpec primary #["resultHeaders", "basic"]) fun entry => do
-      let ctx ← entryCtx entry opts config
+    runsetArgs r "resultHeaders" (getset r ["resultHeaders", "basic"]) (fun vals => do
+      let ctx ← ctxOf vals opts config
       SdkUtility.resultHeaders ctx
-      pure ((← SdkUtility.gp ctx "result"), none)
+      getp ctx "result")
 
-    runset "transformRequest" (← getSpec primary #["transformRequest", "basic"]) fun entry => do
-      pure ((← SdkUtility.transformRequest (← entryCtx entry opts config)), none)
+    runsetArgs r "transformRequest" (getset r ["transformRequest", "basic"]) (fun vals => do
+      SdkUtility.transformRequest (← ctxOf vals opts config))
 
-    runset "transformResponse" (← getSpec primary #["transformResponse", "basic"]) fun entry => do
-      pure ((← SdkUtility.transformResponse (← entryCtx entry opts config)), none)
-
-    -- The remaining corpus sections. They carry no cases in this project's
-    -- corpus, but are driven here so any future fixture runs against Lean too.
+    runsetArgs r "transformResponse" (getset r ["transformResponse", "basic"]) (fun vals => do
+      SdkUtility.transformResponse (← ctxOf vals opts config))
 
     -- clean takes (ctx, val), so the fixture supplies `args`, not `in` —
-    -- same shape as param/makeError above.
-    runset "clean" (← getSpec primary #["clean", "basic"]) fun entry => do
-      let args ← SdkUtility.gp entry "args"
-      let ctx ← mapCtx entry (← argAt args 0) opts config
-      pure ((← SdkUtility.clean ctx (← argAt args 1)), none)
+    -- the same shape as param/makeError above.
+    runsetArgs r "clean" (getset r ["clean", "basic"]) (fun vals => do
+      SdkUtility.clean (← ctxOf vals opts config) (arg vals 1))
 
-    runset "makeResult" (← getSpec primary #["makeResult", "basic"]) fun entry => do
-      pure ((← SdkUtility.makeResult (← entryCtx entry opts config)), none)
+    -- The remaining corpus sections carry no cases in this project's corpus.
+    -- They are driven anyway so a future fixture runs against Lean too — and
+    -- the resolver now NAMES each one as SKIPPED rather than passing it
+    -- silently, which is the whole point of driving an empty group.
+    runsetArgs r "makeResult" (getset r ["makeResult", "basic"]) (fun vals => do
+      SdkUtility.makeResult (← ctxOf vals opts config))
+
+    runsetArgs r "makeFetchDef" (getset r ["makeFetchDef", "basic"]) (fun vals => do
+      SdkUtility.makeFetchDef (← ctxOf vals opts config))
+
+    -- fetcher/featureHook take extra scalars. The retired engine read them
+    -- off the ENTRY (`entry.url`, `entry.stage`); omni never shows an entry
+    -- to a subject, so they are read from the ctx map — where an authored
+    -- fixture puts everything the subject needs. Both sections are empty
+    -- today, so this is the shape the first fixture must use.
+    runsetArgs r "fetcher" (getset r ["fetcher", "basic"]) (fun vals => do
+      let ctx ← ctxOf vals opts config
+      SdkUtility.fetcher ctx (← SdkUtility.gpS ctx "url") (← getp ctx "fetchdef"))
+
+    runsetArgs r "featureAdd" (getset r ["featureAdd", "basic"]) (fun vals => do
+      let client ← emptyMap
+      SdkUtility.featureAdd client (arg vals 0)
+      getp client "features")
+
+    runsetArgs r "featureInit" (getset r ["featureInit", "basic"]) (fun vals => do
+      let client ← emptyMap
+      SdkUtility.featureInit client (← ctxOf vals opts config)
+      getp client "features")
+
+    runsetArgs r "featureHook" (getset r ["featureHook", "basic"]) (fun vals => do
+      let client ← emptyMap
+      let ctx ← ctxOf vals opts config
+      SdkUtility.featureHook client (← SdkUtility.gpS ctx "stage") ctx
+      getp client "features")
 
     -- makePoint is NOT driven here, and this is deliberate.
     --
     -- The section used to be empty, so running it asserted nothing. It now
     -- carries seven cases, and every one supplies its own `options` (for
-    -- allow.op) and `config` (for the operation's points) — but `entryCtx`
+    -- allow.op) and `config` (for the operation's points) — but `ctxOf`
     -- OVERWRITES both with the SDK's, so the cases would not run as authored.
-    -- Wiring it up needs entryCtx to prefer a fixture-supplied options/config,
+    -- Wiring it up needs ctxOf to prefer a fixture-supplied options/config,
     -- which changes every section here and could not be compiled or run when
     -- this change was made.
     --
     -- Left out rather than left in: an entry that runs with the wrong context
     -- is worse than one that does not run, and no coverage is lost — this
     -- section asserted nothing before either.
-
-    runset "makeFetchDef" (← getSpec primary #["makeFetchDef", "basic"]) fun entry => do
-      pure ((← SdkUtility.makeFetchDef (← entryCtx entry opts config)), none)
-
-    runset "fetcher" (← getSpec primary #["fetcher", "basic"]) fun entry => do
-      let ctx ← entryCtx entry opts config
-      let url ← SdkUtility.gpS entry "url"
-      pure ((← SdkUtility.fetcher ctx url (← SdkUtility.gp entry "fetchdef")), none)
-
-    runset "featureAdd" (← getSpec primary #["featureAdd", "basic"]) fun entry => do
-      let client ← emptyMap
-      SdkUtility.featureAdd client (← SdkUtility.gp entry "in")
-      pure ((← SdkUtility.gp client "features"), none)
-
-    runset "featureInit" (← getSpec primary #["featureInit", "basic"]) fun entry => do
-      let client ← emptyMap
-      SdkUtility.featureInit client (← entryCtx entry opts config)
-      pure ((← SdkUtility.gp client "features"), none)
-
-    runset "featureHook" (← getSpec primary #["featureHook", "basic"]) fun entry => do
-      let client ← emptyMap
-      SdkUtility.featureHook client (← SdkUtility.gpS entry "stage") (← entryCtx entry opts config)
-      pure ((← SdkUtility.gp client "features"), none)
+    --
+    -- `primary.check` is likewise not driven: it is omni's OWN
+    -- provider/DEF.client conformance group, not an SDK utility, and this
+    -- suite passes its subjects explicitly rather than through a provider.
 
   go.run sctx
-  for f in (← failures.get) do
-    IO.println ("FAIL - " ++ f)
-  let p ← npass.get
-  let f ← nfail.get
-  IO.println ""
-  IO.println s!"primary-utility: PASS {p}  FAIL {f}"
-  if f > 0 then return 1 else return 0
+  report r "PRIMARY CORPUS: "

@@ -5,7 +5,7 @@ const assert = require('node:assert')
 
 const {
   makeRunner,
-} = require('../runner')
+} = require('../omni')
 
 const {
   SDK,
@@ -38,7 +38,11 @@ describe('PrimaryUtility', async () => {
     spec = run.spec
     runset = run.runset
     runsetflags = run.runsetflags
-    client = run.client
+    // Under the old hand-vendored runner, run.client WAS the SDK; under
+    // omni it is the provider wrapping it. This suite treats the client as
+    // the SDK — including ASSIGNING to client._features, which prototype
+    // delegation cannot forward — so unwrap the real instance.
+    client = run.client.sdk
     utility = client.utility()
     struct = utility.struct
   })

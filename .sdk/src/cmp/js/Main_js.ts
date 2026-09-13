@@ -4,7 +4,10 @@ import * as Path from 'node:path'
 import {
   cmp, each, names, cmap,
   List, File, Content, Copy, Folder, Fragment, Line, FeatureHook,
-  entityClassName, entityCollection, srcFeatureExcludes, stationLibrary,
+  entityClassName, entityCollection, srcFeatureExcludes, pluginExcludes,
+  stationLibrary,
+  targetFeatures,
+  TEST_CONTROL_EXCLUDE
 } from '@voxgig/sdkgen'
 
 
@@ -35,7 +38,14 @@ const Main = cmp(async function Main(props: any) {
   const { model } = props.ctx$
 
   const entity: ModelEntity = getModelPath(model, `main.${KIT}.entity`)
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  // Gated by the applicability tags, so this target never imports or
+  // registers a feature it has no source for. One rule, one place:
+  // helpers/applicability.
+  const feature = targetFeatures(model, target)
+
+  // Does the secrets feature apply here and is it switched on? Both, since
+  // targetFeatures already dropped it for a target with no sekreto port.
+  const secrets = null != feature.secrets
 
   Package({ target })
 
@@ -45,7 +55,18 @@ const Main = cmp(async function Main(props: any) {
     from: 'tm/' + target.name,
     // Root copies src/feature/<name>/ per ACTIVE feature; keep this blanket
     // copy from restoring one that was switched off after `target add`.
-    exclude: srcFeatureExcludes(model),
+    // A feature's inactive plugins go too - same rule, one level
+    // deeper. See helpers/featureSource.pluginExcludes.
+    //
+    // pluginExcludes is REQUIRED, not cosmetic: Feature() renders before
+    // Main(), so its per-feature Copy applies pluginExcludesFor and then
+    // this blanket copy runs — and without the same patterns here it puts
+    // every trimmed plugin straight back.
+    exclude: [
+      ...srcFeatureExcludes(model),
+      ...pluginExcludes(model),
+      TEST_CONTROL_EXCLUDE,
+    ],
     replace: {
       ...props.ctx$.stdrep,
     }
@@ -69,6 +90,54 @@ const Main = cmp(async function Main(props: any) {
           from: Path.normalize(__dirname + '/../../../src/cmp/js/fragment/Main.fragment.js'),
           replace: {
             ...props.ctx$.stdrep,
+
+            // SECRETS. All five slots are emitted only when the secrets
+            // feature applies to this target AND the model activates it.
+            // An unconditional edit here would land in every generated SDK
+            // and break the inactive-output gate: a model without the
+            // feature must generate byte-identically to pre-migration.
+            //
+            // `feature` is already gated by targetFeatures, so a target
+            // that does not provide 'sekreto' never reaches these.
+            '// #SecretsImport': () => secrets ?
+              Line(`const sekreto = require('./feature/secrets/sekreto')`) : undefined,
+
+            '// #SecretsField': ({ indent }: any) => secrets ?
+              Line({ indent }, '_secrets') : undefined,
+
+            // The LIVE instance, not a clone: sekreto holds provider and
+            // cache state, so a clone would resolve into a copy that
+            // prepareAuth never sees.
+            '// #SecretsAccessor': ({ indent }: any) => secrets ?
+              Content({ indent }, `
+secrets() {
+  return this._secrets && this._secrets.sekreto()
+}
+`) : undefined,
+
+            // prepare() bypasses the feature hook pipeline, so the PreSpec
+            // hook that resolves the secret for entity ops never runs on
+            // this path and the resolve has to be explicit. This is also
+            // what defends direct() and graphql(), which run no feature
+            // hooks at all and reach the wire through prepare().
+            //
+            // It RETURNS the Error rather than rejecting: _rawRequest
+            // awaits prepare() outside its try, and direct()/graphql() are
+            // documented to return a value or an Error, never reject.
+            '// #SecretsResolve': ({ indent }: any) => secrets ?
+              Content({ indent }, `
+if (null != this._secrets) {
+  try {
+    await this._secrets.resolve()
+  }
+  catch (err) {
+    return err instanceof Error ? err : new Error(String(err))
+  }
+}
+`) : undefined,
+
+            '// #SecretsExport': ({ indent }: any) => secrets ?
+              Line({ indent }, 'sekreto,') : undefined,
 
             '#BuildFeatures': ({ indent }: any) => {
               List({ item: feature, line: false }, ({ item }: any) =>

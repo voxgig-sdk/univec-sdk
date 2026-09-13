@@ -106,11 +106,33 @@ dynamic makeOptions(dynamic ctx) {
     mergeOptions['feature'] = fmap;
   }
 
+  // `auth: null` is the documented way to disable auth outright, and
+  // prepareAuth honours it before it ever reads the apikey. It cannot survive
+  // validate: depending on the struct port a stored null is either REPLACED
+  // by the optspec default — transmitting the credential the caller withheld
+  // — or REJECTED outright. Withhold the key for validate, then put the null
+  // back. Same fix as ts/js/go makeOptions.
+  //
+  // Suppliedness cannot be recovered after validate, hence here, and it must
+  // tell an ABSENT auth from a present null: containsKey rather than a null
+  // check on the value, which cannot distinguish them.
+  final authSuppressed =
+      options is Map && options.containsKey('auth') && null == options['auth'];
+
   // User option maps are cloned first — their (possibly narrow) literal
   // types must not constrain the merged structures.
   dynamic opts = vs.merge([{}, cfgopts, vs.clone(mergeOptions)]);
 
+  if (authSuppressed && opts is Map) {
+    opts.remove('auth');
+  }
+
   opts = vs.validate(opts, optspec);
+
+  // Restore the suppression the optspec default would otherwise erase.
+  if (authSuppressed && opts is Map) {
+    opts['auth'] = null;
+  }
 
   // Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
   // Every placeholder must resolve to a non-empty value: from options.server
