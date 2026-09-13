@@ -1,13 +1,14 @@
 {
   "files": {
-    "getpath.jsonic": {"passed": 87, "total": 87},
-    "inject.jsonic": {"passed": 41, "total": 41},
-    "merge.jsonic": {"passed": 133, "total": 133},
-    "minor.jsonic": {"passed": 506, "total": 506},
-    "select.jsonic": {"passed": 47, "total": 47},
-    "transform.jsonic": {"passed": 187, "total": 187},
-    "validate.jsonic": {"passed": 131, "total": 131},
-    "walk.jsonic": {"passed": 46, "total": 46}
+    "getpath.jsonic": {"cases": 87, "failed": 0},
+    "inject.jsonic": {"cases": 41, "failed": 0},
+    "merge.jsonic": {"cases": 133, "failed": 0},
+    "minor.jsonic": {"cases": 506, "failed": 0},
+    "nullsem.jsonic": {"cases": 33, "failed": 0},
+    "select.jsonic": {"cases": 47, "failed": 0},
+    "transform.jsonic": {"cases": 187, "failed": 0},
+    "validate.jsonic": {"cases": 131, "failed": 0},
+    "walk.jsonic": {"cases": 46, "failed": 0}
   },
-  "total": {"passed": 1178, "total": 1178}
+  "total": {"cases": 1211, "failed": 0}
 }
