@@ -17,3 +17,6 @@ dist-test/
 
 # OS
 .DS_Store
+
+# Downloaded Vale rule package
+/doc/qa/styles/Google/

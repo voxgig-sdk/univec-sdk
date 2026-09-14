@@ -16,3 +16,6 @@ logs/
 # Editor
 *~
 *.swp
+
+# Slidev build output
+/docs/slidev/dist/

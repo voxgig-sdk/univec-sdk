@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "slidev slides.md",
+    "build": "slidev build slides.md --base ./ --router-mode hash --out dist"
+  },
+  "devDependencies": {
+    "@slidev/cli": "52.19.1",
+    "@slidev/client": "52.19.1"
+  }
+}

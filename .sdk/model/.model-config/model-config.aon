@@ -5,7 +5,6 @@
 sys: model: action: {
   apidef: load: 'build/apidef.js'
   sdkgen: load: 'build/sdkgen.js'
-  # docgen: load: 'build/docgen.js'
 }
 
 sys: model: order: action: 'apidef,sdkgen'
@@ -15,5 +14,4 @@ sys: model: watch: {
   'dist': {}
   'tm': {}
   'def': {}
-  # 'doc/static/src': {}
 }
