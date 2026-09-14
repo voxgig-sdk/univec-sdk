@@ -38,6 +38,12 @@ main: kit: entity: ephemeral_key: {
       name: "create"
       points: [
         {
+          contract: {
+            id: "POST /v1/ephemeral/key"
+            json: "{\"live\":{\"assert\":{\"nonempty\":[\"key\"]},\"auth\":\"public\",\"id\":\"key\",\"input\":{},\"retention\":\"No deletion endpoint; issued key is subject to the service daily allowance\"},\"operationId\":\"createEphemeralKey\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{},\"schema\":{\"additionalProperties\":false,\"type\":\"object\"}}},\"required\":false},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"dailyLimit\":{\"description\":\"Calls permitted per day.\",\"type\":\"integer\"},\"dailyUsed\":{\"description\":\"Calls already used today.\",\"type\":\"integer\"},\"key\":{\"description\":\"The ephemeral API key, prefixed `eph_`.\",\"type\":\"string\"},\"resetsAt\":{\"description\":\"When the daily allowance resets.\",\"format\":\"date-time\",\"type\":\"string\"}},\"required\":[\"key\",\"dailyLimit\",\"dailyUsed\",\"resetsAt\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Issued key\"}},\"security\":[],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"operation\"}"
+            source: "openapi3"
+            version: 1
+          }
           method: "POST"
           orig: "/v1/ephemeral/key"
           segments: [

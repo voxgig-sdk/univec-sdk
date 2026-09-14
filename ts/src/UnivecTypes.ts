@@ -19,6 +19,12 @@ export interface ConvertCreateData {
   source_model: string
   target_model: string
   texts: any[]
+
+  // Selects a custom action instead of the plain create:
+  //   'bridge' | 'ephemeral' | 'ephemeral_bridge'
+  // The remaining keys are that action's own payload.
+  $action?: string
+  [action: string]: any
 }
 
 export interface Embed {
@@ -31,6 +37,12 @@ export interface EmbedCreateData {
   embeddings: any[]
   model: string
   texts: any[]
+
+  // Selects a custom action instead of the plain create:
+  //   'ephemeral'
+  // The remaining keys are that action's own payload.
+  $action?: string
+  [action: string]: any
 }
 
 export interface EphemeralKey {

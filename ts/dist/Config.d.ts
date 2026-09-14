@@ -142,6 +142,28 @@ declare class Config {
             };
             transport: string;
         };
+        secrets: {
+            options: {
+                active: boolean;
+                cache: boolean;
+                exchange: {
+                    active: boolean;
+                    method: string;
+                    path: string;
+                    refresh: string;
+                    request: string;
+                    response: string;
+                    retries: number;
+                    statuses: number[];
+                };
+                name: string;
+                providers: {
+                    kind: string;
+                    namespace: string;
+                }[];
+            };
+            transport: string;
+        };
         streaming: {
             options: {
                 active: boolean;
@@ -198,7 +220,7 @@ declare class Config {
                 create: {
                     input: string;
                     name: string;
-                    points: {
+                    points: ({
                         args: {};
                         kind: string;
                         method: string;
@@ -206,13 +228,31 @@ declare class Config {
                         segments: {
                             lit: string;
                         }[];
-                        select: {};
+                        select: {
+                            $action?: undefined;
+                        };
                         transform: {
                             req: string;
                             res: string;
                         };
                         parts: string[];
-                    }[];
+                    } | {
+                        args: {};
+                        kind: string;
+                        method: string;
+                        orig: string;
+                        segments: {
+                            lit: string;
+                        }[];
+                        select: {
+                            $action: string;
+                        };
+                        transform: {
+                            req: string;
+                            res: string;
+                        };
+                        parts: string[];
+                    })[];
                 };
             };
             relations: {
@@ -231,7 +271,7 @@ declare class Config {
                 create: {
                     input: string;
                     name: string;
-                    points: {
+                    points: ({
                         args: {};
                         kind: string;
                         method: string;
@@ -239,13 +279,31 @@ declare class Config {
                         segments: {
                             lit: string;
                         }[];
-                        select: {};
+                        select: {
+                            $action?: undefined;
+                        };
                         transform: {
                             req: string;
                             res: string;
                         };
                         parts: string[];
-                    }[];
+                    } | {
+                        args: {};
+                        kind: string;
+                        method: string;
+                        orig: string;
+                        segments: {
+                            lit: string;
+                        }[];
+                        select: {
+                            $action: string;
+                        };
+                        transform: {
+                            req: string;
+                            res: string;
+                        };
+                        parts: string[];
+                    })[];
                 };
             };
             relations: {

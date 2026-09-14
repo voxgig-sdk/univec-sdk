@@ -14,10 +14,13 @@ import { ProxyFeature } from './feature/proxy/ProxyFeature'
 import { RatelimitFeature } from './feature/ratelimit/RatelimitFeature'
 import { RbacFeature } from './feature/rbac/RbacFeature'
 import { RetryFeature } from './feature/retry/RetryFeature'
+import { SecretsFeature } from './feature/secrets/SecretsFeature'
 import { StreamingFeature } from './feature/streaming/StreamingFeature'
 import { TelemetryFeature } from './feature/telemetry/TelemetryFeature'
 import { TestFeature } from './feature/test/TestFeature'
 import { TimeoutFeature } from './feature/timeout/TimeoutFeature'
+import { boru } from './feature/secrets/sekreto/plugins/boru'
+import { hashicorp } from './feature/secrets/sekreto/plugins/hashicorp'
 
 
 
@@ -36,6 +39,7 @@ const FEATURE_CLASS: Record<string, typeof BaseFeature> = {
  ratelimit: RatelimitFeature,
  rbac: RbacFeature,
  retry: RetryFeature,
+ secrets: SecretsFeature,
  streaming: StreamingFeature,
  telemetry: TelemetryFeature,
  test: TestFeature,
@@ -51,7 +55,8 @@ const FEATURE_CLASS: Record<string, typeof BaseFeature> = {
 // an SDK carries exactly the plugin modules its model selects — the same
 // leanness the old side-effect registry imports bought, without a registry.
 const FEATURE_PLUGINS: Record<string, any[]> = {
-  
+   secrets: [boru, hashicorp],
+
 }
 
 
@@ -241,6 +246,32 @@ class Config {
       },
       "transport": "wrap"
     },
+ secrets:     {
+      "options": {
+        "active": false,
+        "cache": true,
+        "exchange": {
+          "active": false,
+          "method": "POST",
+          "path": "auth/token",
+          "refresh": "",
+          "request": "refresh_token",
+          "response": "access_token",
+          "retries": 1,
+          "statuses": [
+            401
+          ]
+        },
+        "name": "univec",
+        "providers": [
+          {
+            "kind": "boru",
+            "namespace": "sdk"
+          }
+        ]
+      },
+      "transport": "wrap"
+    },
  streaming:     {
       "options": {
         "active": false,
@@ -377,7 +408,9 @@ class Config {
                   "lit": "embed-bridge"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "bridge"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -403,7 +436,9 @@ class Config {
                   "lit": "convert"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -430,7 +465,9 @@ class Config {
                   "lit": "embed-bridge"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral_bridge"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -514,7 +551,9 @@ class Config {
                   "lit": "embed"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"

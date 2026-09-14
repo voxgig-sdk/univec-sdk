@@ -178,17 +178,42 @@ const client = new ${model.const.Name}SDK({${apikeyExtendField}
 
 ### Run live tests
 
-Create a \`.env.local\` file at the project root:
-
-\`\`\`
-${envName(model)}_TEST_LIVE=TRUE${apikeyEnvLine}
-\`\`\`
-
-Then run:
+Supply your API key through the environment or a configured secrets provider,
+then enable live execution for the generated suite:
 
 \`\`\`bash
-cd ts && npm test
+cd ts && ${envName(model)}_TEST_LIVE=TRUE npm test
 \`\`\`
+
+Live entity flows record each operation's outcome and continue independent
+work after errors. Cleanup runs after ordinary steps. Missing prerequisites
+are reported as blocked; failures and blocked required steps produce a nonzero
+exit status after the remaining work completes. Offline feature and utility
+tests still run in the same suite.
+
+To supply the key from Boru without writing it to a file, configure the vault
+folder/suffix and run:
+
+\`\`\`bash
+${envName(model)}_TEST_LIVE=TRUE boru vault exec sdk:${model.name}=${envName(model)}_APIKEY -- npm test
+\`\`\`
+
+The \`npm run test:live\` command runs the same eight-route scenario suite
+without the offline tests. It covers public model discovery and key issuance,
+account embedding/conversion/bridge calls, and the three ephemeral routes.
+Conversion uses actual source embeddings and catalogue dimensions. Failed
+prerequisites block their dependants; independent calls continue.
+
+Use the existing vault explicitly:
+
+\`\`\`bash
+${envName(model)}_TEST_LIVE=TRUE boru vault --folder="$HOME/.vxgboru01" --suffix=sdk01 exec sdk:${model.name}=${envName(model)}_APIKEY -- npm test
+\`\`\`
+
+The final LIVE SUMMARY records eight planned routes. A complete run has eight
+passed routes and zero failed or blocked routes. Key issuance has no deletion
+endpoint; the suite reuses that key for the three ephemeral calls and never
+prints it.
 
 `)
 

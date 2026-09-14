@@ -1,0 +1,231 @@
+{
+  "date": "2026-09-14",
+  "target": "ts",
+  "service": "https://api.univec.ai",
+  "execution": "real HTTP through generated scenario runner; user-provided terminal output",
+  "account_credential": "Boru exec injected sdk:univec as UNIVEC_APIKEY in the user terminal",
+  "complete": true,
+  "report": {
+    "planned": 8,
+    "attempted": 8,
+    "passed": 8,
+    "failed": 0,
+    "blocked": 0,
+    "excluded": 0,
+    "results": [
+      {
+        "id": "key",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/ephemeral/key",
+            "status": 200
+          }
+        ],
+        "role": "public",
+        "retention": "No deletion endpoint; issued key is subject to the service daily allowance"
+      },
+      {
+        "id": "models",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "GET",
+            "path": "https://api.univec.ai/v1/models",
+            "status": 200
+          }
+        ],
+        "role": "public"
+      },
+      {
+        "id": "account-embed-bridge",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/embed-bridge",
+            "status": 200
+          }
+        ],
+        "role": "account"
+      },
+      {
+        "id": "ephemeral-embed-bridge",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/ephemeral/embed-bridge",
+            "status": 200
+          }
+        ],
+        "role": "issued"
+      },
+      {
+        "id": "account-embed",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/embed",
+            "status": 200
+          }
+        ],
+        "role": "account"
+      },
+      {
+        "id": "ephemeral-embed",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/ephemeral/embed",
+            "status": 200
+          }
+        ],
+        "role": "issued"
+      },
+      {
+        "id": "account-convert",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/convert",
+            "status": 200
+          }
+        ],
+        "role": "account"
+      },
+      {
+        "id": "ephemeral-convert",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/ephemeral/convert",
+            "status": 200
+          }
+        ],
+        "role": "issued"
+      }
+    ]
+  },
+  "previous_assistant_run": {
+    "planned": 8,
+    "attempted": 5,
+    "passed": 5,
+    "failed": 0,
+    "blocked": 3,
+    "excluded": 0,
+    "results": [
+      {
+        "id": "key",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/ephemeral/key",
+            "status": 200
+          }
+        ],
+        "role": "public",
+        "retention": "No deletion endpoint; issued key is subject to the service daily allowance"
+      },
+      {
+        "id": "models",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "GET",
+            "path": "https://api.univec.ai/v1/models",
+            "status": 200
+          }
+        ],
+        "role": "public"
+      },
+      {
+        "id": "account-embed-bridge",
+        "state": "blocked",
+        "attempted": false,
+        "reason": "Missing output: interactive-account-credential",
+        "role": "account"
+      },
+      {
+        "id": "ephemeral-embed-bridge",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/ephemeral/embed-bridge",
+            "status": 200
+          }
+        ],
+        "role": "issued"
+      },
+      {
+        "id": "account-embed",
+        "state": "blocked",
+        "attempted": false,
+        "reason": "Missing output: interactive-account-credential",
+        "role": "account"
+      },
+      {
+        "id": "ephemeral-embed",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/ephemeral/embed",
+            "status": 200
+          }
+        ],
+        "role": "issued"
+      },
+      {
+        "id": "account-convert",
+        "state": "blocked",
+        "attempted": false,
+        "reason": "Missing output: interactive-account-credential, account-embed",
+        "role": "account"
+      },
+      {
+        "id": "ephemeral-convert",
+        "state": "passed",
+        "attempted": true,
+        "requests": [
+          {
+            "method": "POST",
+            "path": "https://api.univec.ai/v1/ephemeral/convert",
+            "status": 200
+          }
+        ],
+        "role": "issued"
+      }
+    ]
+  },
+  "suite": {
+    "tests": 312,
+    "suites": 57,
+    "passed": 307,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 5,
+    "todo": 0,
+    "duration_ms": 13675.732042,
+    "skip_reason": "Older entity/direct live tests delegated to the consolidated live operation scenarios"
+  }
+}

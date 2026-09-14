@@ -1,0 +1,351 @@
+{
+  "date": "2026-09-14",
+  "complete": true,
+  "mode": "Offline API-definition and generated-SDK regression tests; generated README examples run in test mode. This is not a live-network run against the other services.",
+  "tool_commits": {
+    "apidef": "501c3de32716af4c413eb18035dd62e110ad00fc",
+    "sdkgen": "1ef1a27825669fef209e6bdce86597d51b6a4f66",
+    "create-sdkgen": "561396865c592829789f2daa4f087669c60d5412"
+  },
+  "apidef_validate": {
+    "revision": "778cf4782f616a5b69be6e399936b813f5e0cd0a",
+    "typescript": {
+      "apis": 18,
+      "rest": 15,
+      "graphql": 3,
+      "suite_passed": 3,
+      "suite_failed": 0,
+      "suite_skipped": 0
+    },
+    "go": {
+      "rest_apis": 14,
+      "passed": true,
+      "module_override": "github.com/voxgig/apidef/go => local modified apidef/go"
+    },
+    "goldens": {
+      "compared_entity_files": 1115,
+      "contract_only_changed_files": 1015,
+      "added_contract_blocks": 4008,
+      "other_differences": 0,
+      "method": "Assert that removing only added contract blocks exactly restores the checked-in goldens; then rerun the entire TS validator against an isolated copy with those reviewed contract-only additions.",
+      "checked_in_goldens_changed": false,
+      "raw_suite": "The published-version goldens reject the new contract additions; they were not blindly updated or treated as a passing raw run."
+    }
+  },
+  "sdkgen_validate": {
+    "revision": "11a28515ab8ff0290d61a000363e1e71c0492e7c",
+    "apis": 14,
+    "targets": [
+      "ts",
+      "js",
+      "go",
+      "py",
+      "php",
+      "rb",
+      "lua"
+    ],
+    "target_suites_passed": 98,
+    "target_suites_failed": 0,
+    "local_overrides_verified": true,
+    "tools": {
+      "node": "v24.14.1",
+      "npm": "11.11.0",
+      "python3": "Python 3.14.5",
+      "go": "go1.26.3",
+      "pip": "26.1.1",
+      "php": "8.5.7",
+      "composer": "2.10.1",
+      "ruby": "4.0.5",
+      "bundle": "",
+      "lua": "5.5.0",
+      "busted": "2.3.0",
+      "make": "3.81"
+    },
+    "runs": [
+      {
+        "api": "petstore",
+        "spec": "petstore-1.0.7-swagger-2.0.json",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "solar",
+        "spec": "solar-1.0.0-openapi-3.0.0.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "taxonomy",
+        "spec": "taxonomy-1.0.0-openapi-3.1.0.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "foo",
+        "spec": "foo-1.0.0-openapi-3.1.0.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "pokeapi",
+        "spec": "pokeapi-20220523-openapi-3.0.0.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "dingconnect",
+        "spec": "dingconnect-v1-swagger-2.0.json",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "codatplatform",
+        "spec": "codatplatform-3.0.0-openapi-3.1.0.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "contentfulcma",
+        "spec": "contentfulcma-1.0.0-openapi-3.0.0.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "learnworldsnew",
+        "spec": "learnworlds-2-openapi-3.1.0.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "statuspage",
+        "spec": "statuspage-1.0.0-openapi-3.0.0.json",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "shortcut",
+        "spec": "shortcut-v3-openapi-3.0.0.json",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "cloudsmith",
+        "spec": "cloudsmith-v1-swagger-2.0.json",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "gitlab",
+        "spec": "gitlab-v4-swagger-2.0.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      },
+      {
+        "api": "github",
+        "spec": "github-1.1.4-openapi-3.0.3.yaml",
+        "scaffold": "passed",
+        "build": "passed",
+        "generate": "passed",
+        "tests": {
+          "ts": "passed",
+          "js": "passed",
+          "go": "passed",
+          "py": "passed",
+          "php": "passed",
+          "rb": "passed",
+          "lua": "passed"
+        }
+      }
+    ],
+    "passes_used": "All seven languages from the fresh full corpus, with PHP results replaced by a 14-API rerun after the output-streaming and record-display fixes. All 21,298 non-PHP source/data/documentation fingerprints match the tested output after regeneration with isolated PR tool checkouts.",
+    "non_php_output_changes": 0,
+    "command": "PATH=\"<venv>/bin:/opt/homebrew/opt/ruby/bin:/opt/homebrew/bin:$HOME/.luarocks/bin:$PATH\" npm_config_yes=true ./bin/validate-sdkgen --out <temporary-output> --test --gen-timeout 1800 --test-timeout 600 --sdkgen-path \"$HOME/Projects/voxgig/sdkgen/ts\" --apidef-path \"$HOME/Projects/voxgig/apidef/ts\" --create-sdkgen-path \"$HOME/Projects/voxgig/create-sdkgen\"",
+    "php_recheck": "Same command with --targets php --keep, using isolated sdkgen/create-sdkgen PR checkouts; all active targets regenerate and their non-PHP fingerprints are compared against the passing test run."
+  },
+  "issues_fixed": [
+    {
+      "repo": "apidef",
+      "issue": "Recursive schemas overflowed Go contract copying and were rejected in TS.",
+      "fix": "Encode ancestor references as JSON pointers; preserve shared schemas without mutation."
+    },
+    {
+      "repo": "apidef",
+      "issue": "Large GraphQL APIs duplicated the whole type catalogue per operation and exhausted the Node heap.",
+      "fix": "Retain the transitive input types and the generated invocation; declare typesScope=inputs."
+    },
+    {
+      "repo": "sdkgen",
+      "issue": "Codat contract descriptions contained a BOM that broke Go source compilation.",
+      "fix": "Escape BOM and control characters in generated Go literals; compile both representations and verify values."
+    },
+    {
+      "repo": "sdkgen",
+      "issue": "Test-only operation contracts inflated runtime configuration, clones, and printed client graphs.",
+      "fix": "Keep contracts in generator/test inputs and omit them from runtime configuration; retain live execution regression coverage."
+    },
+    {
+      "repo": "sdkgen",
+      "issue": "Cloudsmith PHP README output exceeded the harness heap limit.",
+      "fix": "Scan subprocess output incrementally, retaining snippet markers and error excerpts. A 16 MiB-heap regression processes 128 MiB and detects a late error across chunk boundaries. PHP examples now print record data, unwrap list entities, and retain expected mock-domain error handling; memory failures can no longer pass silently."
+    }
+  ],
+  "repository_checks": {
+    "apidef": {
+      "passed": 835,
+      "failed": 0,
+      "skipped": 1,
+      "go_and_parity_passed": true
+    },
+    "sdkgen": {
+      "passed": 1310,
+      "failed": 0,
+      "skipped": 8
+    },
+    "create-sdkgen": {
+      "passed": 54,
+      "failed": 0
+    },
+    "univec_ts": {
+      "offline_passed": 311,
+      "offline_failed": 0,
+      "live_only_skipped": 1,
+      "loopback_passed": 12
+    }
+  },
+  "limitations": [
+    "Corpus test suites retain existing skips and PHP no-assertion/risky notices; passing the corpus does not establish exhaustive live API coverage.",
+    "Vale was unavailable; repository prose scripts passed.",
+    "Declarative live scenario execution is implemented for TS and JS; the other targets report those scenarios as unsupported.",
+    "The separately recorded user-terminal Univec run exercised all eight real routes successfully; see live-verification.json."
+  ]
+}

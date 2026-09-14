@@ -51,6 +51,7 @@ component.* After editing a component run `npm run build` before
 - [`ratelimit`](./src/feature/ratelimit/AGENTS.md) — Client-side rate limiting via a token bucket
 - [`rbac`](./src/feature/rbac/AGENTS.md) — Client-side role/permission enforcement
 - [`retry`](./src/feature/retry/AGENTS.md) — Automatic retry of transient failures with exponential backoff
+- [`secrets`](./src/feature/secrets/AGENTS.md) — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens
 - [`streaming`](./src/feature/streaming/AGENTS.md) — Incremental streaming of list results via async iteration
 - [`telemetry`](./src/feature/telemetry/AGENTS.md) — Distributed tracing spans with W3C trace-context propagation
 - [`test`](./src/feature/test/AGENTS.md) — In-memory mock transport for testing without a live server

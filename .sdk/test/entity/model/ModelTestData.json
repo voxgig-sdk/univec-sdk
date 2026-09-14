@@ -7,10 +7,10 @@
         "modelCard": {},
         "modelType": "s67",
         "name": "s68",
-        "sequenceLen": "s69",
-        "sourceDim": "s6a",
+        "sequenceLen": 105,
+        "sourceDim": 106,
         "sourceModel": "s6b",
-        "targetDim": "s6c",
+        "targetDim": 108,
         "targetModel": "s6d"
       },
       "MODEL01": {
@@ -19,10 +19,10 @@
         "modelCard": {},
         "modelType": "scb",
         "name": "scc",
-        "sequenceLen": "scd",
-        "sourceDim": "sce",
+        "sequenceLen": 205,
+        "sourceDim": 206,
         "sourceModel": "scf",
-        "targetDim": "sd0",
+        "targetDim": 208,
         "targetModel": "sd1"
       },
       "MODEL02": {
@@ -31,10 +31,10 @@
         "modelCard": {},
         "modelType": "s12f",
         "name": "s130",
-        "sequenceLen": "s131",
-        "sourceDim": "s132",
+        "sequenceLen": 305,
+        "sourceDim": 306,
         "sourceModel": "s133",
-        "targetDim": "s134",
+        "targetDim": 308,
         "targetModel": "s135"
       }
     }
@@ -47,11 +47,194 @@
         "modelCard": {},
         "modelType": "s193",
         "name": "s194",
-        "sequenceLen": "s195",
-        "sourceDim": "s196",
+        "sequenceLen": 405,
+        "sourceDim": 406,
         "sourceModel": "s197",
-        "targetDim": "s198",
+        "targetDim": 408,
         "targetModel": "s199"
+      }
+    }
+  },
+  "requests": {
+    "GET /v1/models": {
+      "provenance": "operation-contract",
+      "contract": {
+        "factSources": {
+          "responses": "guide"
+        },
+        "live": {
+          "assert": {
+            "nonempty": [
+              ""
+            ]
+          },
+          "auth": "public",
+          "id": "models"
+        },
+        "operationId": "listModels",
+        "parameters": [],
+        "protocol": "http",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "items": {
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "eval": {
+                                "description": "Retrieval-fidelity metrics for a convert model.",
+                                "properties": {
+                                  "cosine_mean": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "cosine_median": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "cosine_std": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "kendall_p_value": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "kendall_tau": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "mrr": {
+                                    "description": "Mean reciprocal rank.",
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "p_at_1": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "p_at_10": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "p_at_5": {
+                                    "format": "float",
+                                    "type": "number"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "executionProvider": {
+                                "description": "Hardware backend, e.g. `cpu`.",
+                                "type": "string"
+                              },
+                              "modelCard": {
+                                "additionalProperties": true,
+                                "description": "Convert models only: training provenance and architecture detail.",
+                                "type": "object"
+                              },
+                              "modelType": {
+                                "description": "`embed` for text-to-vector models, `convert` for space-translation models.",
+                                "enum": [
+                                  "embed",
+                                  "convert"
+                                ],
+                                "type": "string"
+                              },
+                              "name": {
+                                "description": "Model identifier used in requests.",
+                                "type": "string"
+                              },
+                              "sequenceLen": {
+                                "description": "Embed models only: maximum input sequence length.",
+                                "type": "integer"
+                              },
+                              "sourceDim": {
+                                "description": "Convert models only: source vector dimension.",
+                                "type": "integer"
+                              },
+                              "sourceModel": {
+                                "description": "Convert models only: the source model space.",
+                                "type": "string"
+                              },
+                              "targetDim": {
+                                "description": "Dimension of the produced vectors.",
+                                "type": "integer"
+                              },
+                              "targetModel": {
+                                "description": "The model space produced.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "modelType",
+                              "targetModel",
+                              "targetDim"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "executionProvider": {
+                                "type": "string"
+                              },
+                              "modelType": {
+                                "enum": [
+                                  "convert-bridge",
+                                  "embed-bridge"
+                                ],
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "restrictedTargets": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "modelType",
+                              "executionProvider"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Model list"
+          }
+        },
+        "security": [],
+        "securitySchemes": {
+          "bearerAuth": {
+            "description": "UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.",
+            "scheme": "bearer",
+            "type": "http"
+          }
+        },
+        "securitySource": "operation"
       }
     }
   }

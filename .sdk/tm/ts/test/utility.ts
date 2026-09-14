@@ -62,8 +62,8 @@ function makeCtrl(explain: boolean) {
 // Overrides configuration values with environment variables if available
 function envOverride(m: Record<string, any>) {
   if (
-    'TRUE' === process.env.PROJECTENV_TEST_LIVE ||
-    'TRUE' === process.env.PROJECTENV_TEST_OVERRIDE
+    'TRUE' === process.env.UNIVEC_TEST_LIVE ||
+    'TRUE' === process.env.UNIVEC_TEST_OVERRIDE
   ) {
     Object.entries(m).map(n => {
       let envval = process.env[n[0]]
@@ -74,7 +74,7 @@ function envOverride(m: Record<string, any>) {
     })
   }
 
-  m.PROJECTENV_TEST_EXPLAIN = process.env.PROJECTENV_TEST_EXPLAIN || m.PROJECTENV_TEST_EXPLAIN
+  m.UNIVEC_TEST_EXPLAIN = process.env.UNIVEC_TEST_EXPLAIN || m.UNIVEC_TEST_EXPLAIN
 
   return m
 }
@@ -161,8 +161,7 @@ function skipIfMissingIds(t: any, setup: any, requiredKeys: string[]): boolean {
   if (!setup.live) return false
   const missing = requiredKeys.filter(k => null == setup.idmap?.[k])
   if (missing.length > 0) {
-    t.skip(`live test needs ${missing.join(', ')} via *_ENTID env var (synthetic IDs only)`)
-    return true
+    throw new Error(`Live test blocked: needs ${missing.join(', ')} via *_ENTID env var`)
   }
   return false
 }

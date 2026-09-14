@@ -4,6 +4,7 @@
   "description": "Univec SDK Project",
   "scripts": {
     "generate": "tsc --build src && voxgig-model model/sdk.aon && voxgig-model test/test.aon",
+    "generate:ts": "SDKGEN_TARGET=ts npm run generate",
     "watch-generate": "voxgig-model -w model/sdk.aon",
     "dry-generate": "tsc --build src && voxgig-model -y model/sdk.aon",
     "watch-dry-generate": "voxgig-model -w -y model/sdk.aon",

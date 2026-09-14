@@ -29,5 +29,503 @@
         "texts": []
       }
     }
+  },
+  "requests": {
+    "POST /v1/embed": {
+      "provenance": "operation-contract",
+      "contract": {
+        "live": {
+          "assert": {
+            "equal": {
+              "model": {
+                "from": "models",
+                "path": "sourceModel",
+                "related": {
+                  "foreign": "name",
+                  "from": "models",
+                  "local": "sourceModel",
+                  "where": {
+                    "modelType": "embed"
+                  }
+                },
+                "where": {
+                  "modelType": "convert"
+                }
+              }
+            },
+            "vectors": {
+              "count": 1,
+              "dimension": {
+                "from": "models",
+                "path": "sourceDim",
+                "related": {
+                  "foreign": "name",
+                  "from": "models",
+                  "local": "sourceModel",
+                  "where": {
+                    "modelType": "embed"
+                  }
+                },
+                "where": {
+                  "modelType": "convert"
+                }
+              },
+              "path": "embeddings"
+            }
+          },
+          "auth": "account",
+          "id": "account-embed",
+          "input": {
+            "model": {
+              "from": "models",
+              "path": "sourceModel",
+              "related": {
+                "foreign": "name",
+                "from": "models",
+                "local": "sourceModel",
+                "where": {
+                  "modelType": "embed"
+                }
+              },
+              "where": {
+                "modelType": "convert"
+              }
+            },
+            "texts": [
+              "SDK live coverage test."
+            ]
+          }
+        },
+        "operationId": "createEmbedding",
+        "parameters": [],
+        "protocol": "http",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "model": "baai-bge-base-en-v1.5",
+                "texts": [
+                  "hello world"
+                ]
+              },
+              "schema": {
+                "properties": {
+                  "model": {
+                    "description": "Name of an embed model, as returned by listModels.",
+                    "example": "baai-bge-base-en-v1.5",
+                    "type": "string"
+                  },
+                  "texts": {
+                    "description": "Texts to embed. One vector is returned per text, in order.",
+                    "example": [
+                      "hello world"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "model",
+                  "texts"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "embeddings": {
+                          "description": "One vector per input text, in input order.",
+                          "items": {
+                            "description": "A single embedding vector.",
+                            "items": {
+                              "format": "float",
+                              "type": "number"
+                            },
+                            "type": "array"
+                          },
+                          "type": "array"
+                        },
+                        "model": {
+                          "description": "Model that produced the vectors.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "embeddings",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Generated embeddings"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "message": {
+                          "description": "Human-readable error detail.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    "success": {
+                      "description": "Always false on an error.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "message": {
+                          "description": "Human-readable error detail.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    "success": {
+                      "description": "Always false on an error.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "securitySchemes": {
+          "bearerAuth": {
+            "description": "UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.",
+            "scheme": "bearer",
+            "type": "http"
+          }
+        },
+        "securitySource": "definition"
+      }
+    },
+    "POST /v1/ephemeral/embed": {
+      "provenance": "operation-contract",
+      "contract": {
+        "live": {
+          "assert": {
+            "equal": {
+              "model": {
+                "from": "models",
+                "path": "sourceModel",
+                "related": {
+                  "foreign": "name",
+                  "from": "models",
+                  "local": "sourceModel",
+                  "where": {
+                    "modelType": "embed"
+                  }
+                },
+                "where": {
+                  "modelType": "convert"
+                }
+              }
+            },
+            "vectors": {
+              "count": 1,
+              "dimension": {
+                "from": "models",
+                "path": "sourceDim",
+                "related": {
+                  "foreign": "name",
+                  "from": "models",
+                  "local": "sourceModel",
+                  "where": {
+                    "modelType": "embed"
+                  }
+                },
+                "where": {
+                  "modelType": "convert"
+                }
+              },
+              "path": "embeddings"
+            }
+          },
+          "auth": "issued",
+          "credential": {
+            "from": "key",
+            "path": "key"
+          },
+          "id": "ephemeral-embed",
+          "input": {
+            "model": {
+              "from": "models",
+              "path": "sourceModel",
+              "related": {
+                "foreign": "name",
+                "from": "models",
+                "local": "sourceModel",
+                "where": {
+                  "modelType": "embed"
+                }
+              },
+              "where": {
+                "modelType": "convert"
+              }
+            },
+            "texts": [
+              "SDK live coverage test."
+            ]
+          }
+        },
+        "operationId": "createEphemeralEmbedding",
+        "parameters": [],
+        "protocol": "http",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "model": "baai-bge-base-en-v1.5",
+                "texts": [
+                  "hello world"
+                ]
+              },
+              "schema": {
+                "properties": {
+                  "model": {
+                    "description": "Name of an embed model, as returned by listModels.",
+                    "example": "baai-bge-base-en-v1.5",
+                    "type": "string"
+                  },
+                  "texts": {
+                    "description": "Texts to embed. One vector is returned per text, in order.",
+                    "example": [
+                      "hello world"
+                    ],
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "model",
+                  "texts"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "embeddings": {
+                          "description": "One vector per input text, in input order.",
+                          "items": {
+                            "description": "A single embedding vector.",
+                            "items": {
+                              "format": "float",
+                              "type": "number"
+                            },
+                            "type": "array"
+                          },
+                          "type": "array"
+                        },
+                        "model": {
+                          "description": "Model that produced the vectors.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "embeddings",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Generated embeddings"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "message": {
+                          "description": "Human-readable error detail.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    "success": {
+                      "description": "Always false on an error.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "message": {
+                          "description": "Human-readable error detail.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    "success": {
+                      "description": "Always false on an error.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "message": {
+                          "description": "Human-readable error detail.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    "success": {
+                      "description": "Always false on an error.",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "securitySchemes": {
+          "bearerAuth": {
+            "description": "UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.",
+            "scheme": "bearer",
+            "type": "http"
+          }
+        },
+        "securitySource": "definition"
+      }
+    }
   }
 }

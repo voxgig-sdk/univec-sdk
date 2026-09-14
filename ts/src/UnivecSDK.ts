@@ -18,6 +18,7 @@ import { Utility } from './utility/Utility'
 
 
 import { BaseFeature } from './feature/base/BaseFeature'
+import * as sekreto from './feature/secrets/sekreto'
 
 
 
@@ -30,7 +31,8 @@ class UnivecSDK {
   _utility = new Utility()
   _features: Feature[]
   _rootctx: Context
-  
+  _secrets?: any
+
 
   constructor(options?: any) {
 
@@ -104,6 +106,10 @@ class UnivecSDK {
   }
 
   
+secrets() {
+  return this._secrets && this._secrets.sekreto()
+}
+
 
 
   async prepare(fetchargs?: any) {
@@ -152,6 +158,15 @@ class UnivecSDK {
     }
 
     
+if (null != this._secrets) {
+  try {
+    await this._secrets.resolve()
+  }
+  catch (err: any) {
+    return err instanceof Error ? err : new Error(String(err))
+  }
+}
+
 
     // Apply SDK auth (apikey, auth prefix, etc.)
     const authResult = prepareAuth(ctx)
@@ -385,7 +400,8 @@ const SDK = UnivecSDK
 export {
   stdutil,
   config,
-  
+  sekreto,
+
 
   BaseFeature,
   UnivecEntityBase,

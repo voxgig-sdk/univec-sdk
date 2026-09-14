@@ -40,6 +40,8 @@ const node_path_1 = __importDefault(require("node:path"));
 const Fs = __importStar(require("node:fs"));
 const node_test_1 = require("node:test");
 const node_assert_1 = __importDefault(require("node:assert"));
+const live_runner_1 = require("../../live-runner");
+const live_entity_1 = require("../../live-entity");
 const __1 = require("../../..");
 const utility_1 = require("../../utility");
 // AFTER the imports on purpose: TypeScript hoists `import` above any
@@ -59,16 +61,16 @@ const utility_1 = require("../../utility");
     (0, node_test_1.test)('basic', async (t) => {
         const live = 'TRUE' === process.env.UNIVEC_TEST_LIVE;
         for (const op of ['create']) {
-            if ((0, utility_1.maybeSkipControl)(t, 'entityOp', 'ephemeral_key.' + op, live))
+            if (!live && (0, utility_1.maybeSkipControl)(t, 'entityOp', 'ephemeral_key.' + op, live))
                 return;
         }
-        const setup = basicSetup();
-        // The basic flow consumes synthetic IDs and field values from the
-        // fixture (entity TestData.json). Those don't exist on the live API.
-        // Skip live runs unless the user provided a real ENTID env override.
-        if (setup.syntheticOnly) {
-            t.skip('live entity test uses synthetic IDs from fixture — set UNIVEC_TEST_EPHEMERAL_KEY_ENTID JSON to run live');
+        if (live) {
+            t.skip('Covered by live operation scenarios');
             return;
+        }
+        const setup = basicSetup();
+        if (setup.live) {
+            return (0, live_entity_1.runLiveEntity)(setup, { "active": true, "alias": { "field": {} }, "fields": [{ "active": true, "name": "dailyLimit", "req": true, "short": "Calls permitted per day.", "type": "`$INTEGER`", "index$": 0 }, { "active": true, "name": "dailyUsed", "req": true, "short": "Calls already used today.", "type": "`$INTEGER`", "index$": 1 }, { "active": true, "name": "key", "req": true, "short": "The ephemeral API key, prefixed `eph_`.", "type": "`$STRING`", "index$": 2 }, { "active": true, "format": "date-time", "name": "resetsAt", "req": true, "short": "When the daily allowance resets.", "type": "`$STRING`", "index$": 3 }], "name": "ephemeral_key", "op": { "create": { "input": "data", "name": "create", "points": [{ "active": true, "args": {}, "contract": { "id": "POST /v1/ephemeral/key", "json": "{\"live\":{\"assert\":{\"nonempty\":[\"key\"]},\"auth\":\"public\",\"id\":\"key\",\"input\":{},\"retention\":\"No deletion endpoint; issued key is subject to the service daily allowance\"},\"operationId\":\"createEphemeralKey\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{},\"schema\":{\"additionalProperties\":false,\"type\":\"object\"}}},\"required\":false},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"dailyLimit\":{\"description\":\"Calls permitted per day.\",\"type\":\"integer\"},\"dailyUsed\":{\"description\":\"Calls already used today.\",\"type\":\"integer\"},\"key\":{\"description\":\"The ephemeral API key, prefixed `eph_`.\",\"type\":\"string\"},\"resetsAt\":{\"description\":\"When the daily allowance resets.\",\"format\":\"date-time\",\"type\":\"string\"}},\"required\":[\"key\",\"dailyLimit\",\"dailyUsed\",\"resetsAt\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Issued key\"}},\"security\":[],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"operation\"}", "source": "openapi3", "version": 1 }, "kind": "http", "method": "POST", "orig": "/v1/ephemeral/key", "segments": [{ "lit": "v1" }, { "lit": "ephemeral" }, { "lit": "key" }], "select": {}, "transform": { "req": "`reqdata`", "res": "`body.data`" }, "index$": 0 }], "key$": "create" } }, "relations": { "ancestors": [] }, "key$": "ephemeral_key", "name__orig": "ephemeral_key", "Name": "EphemeralKey", "name_": "ephemeral_key", "name-": "ephemeral-key", "NAME": "EPHEMERAL_KEY", "index$": 2 }, { "active": true, "entity": "ephemeral_key", "key$": "BasicEphemeralKeyFlow", "kind": "basic", "name": "BasicEphemeralKeyFlow", "param": {}, "step": [{ "active": true, "data": {}, "input": { "ref": "ephemeral_key_ref01" }, "match": {}, "op": "create", "spec": [], "valid": [] }] }, 'EphemeralKey');
         }
         const client = setup.client;
         const struct = setup.struct;
@@ -101,12 +103,6 @@ function basicSetup(extra) {
                 '`$VAL`': ['`$FORMAT`', 'upper', '`$COPY`']
             }]
     });
-    // Detect whether the user provided a real ENTID JSON via env var. The
-    // basic flow consumes synthetic IDs from the fixture file; without an
-    // override those synthetic IDs reach the live API and 4xx. Surface this
-    // to the test so it can skip rather than fail.
-    const idmapEnvVal = process.env['UNIVEC_TEST_EPHEMERAL_KEY_ENTID'];
-    const idmapOverridden = null != idmapEnvVal && idmapEnvVal.trim().startsWith('{');
     const env = (0, utility_1.envOverride)({
         'UNIVEC_TEST_EPHEMERAL_KEY_ENTID': idmap,
         'UNIVEC_TEST_LIVE': 'FALSE',
@@ -115,7 +111,13 @@ function basicSetup(extra) {
     });
     idmap = env['UNIVEC_TEST_EPHEMERAL_KEY_ENTID'];
     const live = 'TRUE' === env.UNIVEC_TEST_LIVE;
+    const transport = (0, live_runner_1.createLiveTransport)();
     if (live) {
+        const rawIds = process.env['UNIVEC_TEST_EPHEMERAL_KEY_ENTID'];
+        idmap = rawIds && rawIds.trim() ? JSON.parse(rawIds) : {};
+        if (!idmap || Array.isArray(idmap) || typeof idmap !== 'object') {
+            throw new Error('Live ENTID must be a JSON object');
+        }
         client = new __1.UnivecSDK(merge([
             // FIRST, so the generated fields below win: sdk-test-control.json's
             // test.client.options adds to the live client, it does not redirect it.
@@ -128,7 +130,8 @@ function basicSetup(extra) {
             // argument at all - so a bare 'extra' silently discarded the apikey
             // and server values above and handed the SDK undefined. Harmless
             // while there was nothing in that object; not harmless now.
-            extra || {}
+            extra || {},
+            { system: { fetch: transport.fetch } }
         ]));
     }
     const setup = {
@@ -140,7 +143,7 @@ function basicSetup(extra) {
         data: entityData,
         explain: 'TRUE' === env.UNIVEC_TEST_EXPLAIN,
         live,
-        syntheticOnly: live && !idmapOverridden,
+        transport,
         now: Date.now(),
     };
     return setup;

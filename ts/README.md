@@ -175,18 +175,42 @@ const client = new UnivecSDK({
 
 ### Run live tests
 
-Create a `.env.local` file at the project root:
-
-```
-UNIVEC_TEST_LIVE=TRUE
-UNIVEC_APIKEY=<your-key>
-```
-
-Then run:
+Supply your API key through the environment or a configured secrets provider,
+then enable live execution for the generated suite:
 
 ```bash
-cd ts && npm test
+cd ts && UNIVEC_TEST_LIVE=TRUE npm test
 ```
+
+Live entity flows record each operation's outcome and continue independent
+work after errors. Cleanup runs after ordinary steps. Missing prerequisites
+are reported as blocked; failures and blocked required steps produce a nonzero
+exit status after the remaining work completes. Offline feature and utility
+tests still run in the same suite.
+
+To supply the key from Boru without writing it to a file, configure the vault
+folder/suffix and run:
+
+```bash
+UNIVEC_TEST_LIVE=TRUE boru vault exec sdk:univec=UNIVEC_APIKEY -- npm test
+```
+
+The `npm run test:live` command runs the same eight-route scenario suite
+without the offline tests. It covers public model discovery and key issuance,
+account embedding/conversion/bridge calls, and the three ephemeral routes.
+Conversion uses actual source embeddings and catalogue dimensions. Failed
+prerequisites block their dependants; independent calls continue.
+
+Use the existing vault explicitly:
+
+```bash
+UNIVEC_TEST_LIVE=TRUE boru vault --folder="$HOME/.vxgboru01" --suffix=sdk01 exec sdk:univec=UNIVEC_APIKEY -- npm test
+```
+
+The final LIVE SUMMARY records eight planned routes. A complete run has eight
+passed routes and zero failed or blocked routes. Key issuance has no deletion
+endpoint; the suite reuses that key for the three ephemeral calls and never
+prints it.
 
 
 ## Reference
@@ -483,7 +507,7 @@ const models = await client.Model().list()
 
 ## Features
 
-This SDK ships 18 optional features. Each is **inactive until you
+This SDK ships 19 optional features. Each is **inactive until you
 switch it on**, so an SDK you have not configured behaves exactly as if none of
 them existed — no retries, no cache, no logging, no measurable overhead.
 
@@ -506,12 +530,13 @@ above:
 | [`ratelimit`](#ratelimit) | Client-side rate limiting via a token bucket |
 | [`rbac`](#rbac) | Client-side role/permission enforcement |
 | [`retry`](#retry) | Automatic retry of transient failures with exponential backoff |
+| [`secrets`](#secrets) | Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens |
 | [`streaming`](#streaming) | Incremental streaming of list results via async iteration |
 | [`telemetry`](#telemetry) | Distributed tracing spans with W3C trace-context propagation |
 | [`test`](#test) | In-memory mock transport for testing without a live server |
 | [`timeout`](#timeout) | Per-request timeout with transport abort |
 
-> **Order matters for `cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `timeout`.** These wrap the
+> **Order matters for `cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `secrets`, `timeout`.** These wrap the
 > transport, so each one wraps whatever is already installed: the order you
 > activate them in IS the nesting order. Activating them as an ordered list
 > rather than a map is what fixes that order.
@@ -728,6 +753,24 @@ Set `feature.retry.active` to enable it, then override any of the options above.
 transport features decides what it sees. A feature activated later wraps one
 activated earlier.
 
+### secrets
+
+Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `cache` | `true` |
+| `exchange` | `{active: false, method: 'POST', path: 'auth/token', refresh: '', request: 'refresh_token', response: 'access_token', retries: 1, statuses: [401]}` |
+| `name` | `'univec'` |
+| `providers` | `[{kind: 'boru', namespace: 'sdk'}]` |
+
+Set `feature.secrets.active` to enable it, then override any of the options above.
+
+`secrets` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
 ### streaming
 
 Incremental streaming of list results via async iteration.
@@ -828,6 +871,7 @@ The SDK ships with built-in features:
 - **RatelimitFeature**: Client-side rate limiting via a token bucket
 - **RbacFeature**: Client-side role/permission enforcement
 - **RetryFeature**: Automatic retry of transient failures with exponential backoff
+- **SecretsFeature**: Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens
 - **StreamingFeature**: Incremental streaming of list results via async iteration
 - **TelemetryFeature**: Distributed tracing spans with W3C trace-context propagation
 - **TestFeature**: In-memory mock transport for testing without a live server

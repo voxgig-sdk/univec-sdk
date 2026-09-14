@@ -15,10 +15,13 @@ const ProxyFeature_1 = require("./feature/proxy/ProxyFeature");
 const RatelimitFeature_1 = require("./feature/ratelimit/RatelimitFeature");
 const RbacFeature_1 = require("./feature/rbac/RbacFeature");
 const RetryFeature_1 = require("./feature/retry/RetryFeature");
+const SecretsFeature_1 = require("./feature/secrets/SecretsFeature");
 const StreamingFeature_1 = require("./feature/streaming/StreamingFeature");
 const TelemetryFeature_1 = require("./feature/telemetry/TelemetryFeature");
 const TestFeature_1 = require("./feature/test/TestFeature");
 const TimeoutFeature_1 = require("./feature/timeout/TimeoutFeature");
+const boru_1 = require("./feature/secrets/sekreto/plugins/boru");
+const hashicorp_1 = require("./feature/secrets/sekreto/plugins/hashicorp");
 const FEATURE_CLASS = {
     audit: AuditFeature_1.AuditFeature,
     cache: CacheFeature_1.CacheFeature,
@@ -34,6 +37,7 @@ const FEATURE_CLASS = {
     ratelimit: RatelimitFeature_1.RatelimitFeature,
     rbac: RbacFeature_1.RbacFeature,
     retry: RetryFeature_1.RetryFeature,
+    secrets: SecretsFeature_1.SecretsFeature,
     streaming: StreamingFeature_1.StreamingFeature,
     telemetry: TelemetryFeature_1.TelemetryFeature,
     test: TestFeature_1.TestFeature,
@@ -45,7 +49,9 @@ const FEATURE_CLASS = {
 // none. Named imports above make each definition statically reachable, so
 // an SDK carries exactly the plugin modules its model selects — the same
 // leanness the old side-effect registry imports bought, without a registry.
-const FEATURE_PLUGINS = {};
+const FEATURE_PLUGINS = {
+    secrets: [boru_1.boru, hashicorp_1.hashicorp],
+};
 exports.FEATURE_PLUGINS = FEATURE_PLUGINS;
 class Config {
     makeFeature(fn) {
@@ -226,6 +232,32 @@ class Config {
             },
             "transport": "wrap"
         },
+        secrets: {
+            "options": {
+                "active": false,
+                "cache": true,
+                "exchange": {
+                    "active": false,
+                    "method": "POST",
+                    "path": "auth/token",
+                    "refresh": "",
+                    "request": "refresh_token",
+                    "response": "access_token",
+                    "retries": 1,
+                    "statuses": [
+                        401
+                    ]
+                },
+                "name": "univec",
+                "providers": [
+                    {
+                        "kind": "boru",
+                        "namespace": "sdk"
+                    }
+                ]
+            },
+            "transport": "wrap"
+        },
         streaming: {
             "options": {
                 "active": false,
@@ -345,7 +377,9 @@ class Config {
                                     "lit": "embed-bridge"
                                 }
                             ],
-                            "select": {},
+                            "select": {
+                                "$action": "bridge"
+                            },
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
@@ -371,7 +405,9 @@ class Config {
                                     "lit": "convert"
                                 }
                             ],
-                            "select": {},
+                            "select": {
+                                "$action": "ephemeral"
+                            },
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
@@ -398,7 +434,9 @@ class Config {
                                     "lit": "embed-bridge"
                                 }
                             ],
-                            "select": {},
+                            "select": {
+                                "$action": "ephemeral_bridge"
+                            },
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"
@@ -482,7 +520,9 @@ class Config {
                                     "lit": "embed"
                                 }
                             ],
-                            "select": {},
+                            "select": {
+                                "$action": "ephemeral"
+                            },
                             "transform": {
                                 "req": "`reqdata`",
                                 "res": "`body.data`"

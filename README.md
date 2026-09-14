@@ -12,7 +12,7 @@ Learn more about Voxgig SDKs at [voxgig.com/sdk](https://voxgig.com/sdk/).
 
 > TypeScript, Python, PHP, Golang, Ruby, Lua, C, Clojure, C++, C#, Dart, Elixir, Haskell, Java, JavaScript, Kotlin, Lean, OCaml, Perl, Python Data, Rust, Scala, Swift, Zig SDKs, a CLI with an interactive REPL, and an MCP server for AI agents — all generated from one OpenAPI spec by [@voxgig/sdkgen](https://github.com/voxgig/sdkgen).
 
-> **Features:** `audit`, `cache`, `clienttrack`, `cost`, `debug`, `idempotency`, `log`, `metrics`, `netsim`, `paging`, `proxy`, `ratelimit`, `rbac`, `retry`, `streaming`, `telemetry`, `test`, `timeout` — opt-in,
+> **Features:** `audit`, `cache`, `clienttrack`, `cost`, `debug`, `idempotency`, `log`, `metrics`, `netsim`, `paging`, `proxy`, `ratelimit`, `rbac`, `retry`, `secrets`, `streaming`, `telemetry`, `test`, `timeout` — opt-in,
 > inactive until switched on, and configured per client. See the Features
 > section of any SDK README below for what each one does.
 
@@ -914,6 +914,7 @@ forking the SDK.
 | **RatelimitFeature** | Client-side rate limiting via a token bucket |
 | **RbacFeature** | Client-side role/permission enforcement |
 | **RetryFeature** | Automatic retry of transient failures with exponential backoff |
+| **SecretsFeature** | Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens |
 | **StreamingFeature** | Incremental streaming of list results via async iteration |
 | **TelemetryFeature** | Distributed tracing spans with W3C trace-context propagation |
 | **TestFeature** | In-memory mock transport for testing without a live server |

@@ -11,6 +11,8 @@ export interface ConvertCreateData {
     source_model: string;
     target_model: string;
     texts: any[];
+    $action?: string;
+    [action: string]: any;
 }
 export interface Embed {
     embeddings: any[];
@@ -21,6 +23,8 @@ export interface EmbedCreateData {
     embeddings: any[];
     model: string;
     texts: any[];
+    $action?: string;
+    [action: string]: any;
 }
 export interface EphemeralKey {
     dailyLimit: number;

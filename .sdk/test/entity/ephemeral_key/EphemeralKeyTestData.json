@@ -2,22 +2,22 @@
   "existing": {
     "ephemeral_key": {
       "EPHEMERAL_KEY00": {
-        "dailyLimit": "s28",
-        "dailyUsed": "s29",
+        "dailyLimit": 40,
+        "dailyUsed": 41,
         "key": "s2a",
         "resetsAt": "s2b",
         "id": "EPHEMERAL_KEY00"
       },
       "EPHEMERAL_KEY01": {
-        "dailyLimit": "s50",
-        "dailyUsed": "s51",
+        "dailyLimit": 80,
+        "dailyUsed": 81,
         "key": "s52",
         "resetsAt": "s53",
         "id": "EPHEMERAL_KEY01"
       },
       "EPHEMERAL_KEY02": {
-        "dailyLimit": "s78",
-        "dailyUsed": "s79",
+        "dailyLimit": 120,
+        "dailyUsed": 121,
         "key": "s7a",
         "resetsAt": "s7b",
         "id": "EPHEMERAL_KEY02"
@@ -27,10 +27,101 @@
   "new": {
     "ephemeral_key": {
       "ephemeral_key_ref01": {
-        "dailyLimit": "sa0",
-        "dailyUsed": "sa1",
+        "dailyLimit": 160,
+        "dailyUsed": 161,
         "key": "sa2",
         "resetsAt": "sa3"
+      }
+    }
+  },
+  "requests": {
+    "POST /v1/ephemeral/key": {
+      "provenance": "operation-contract",
+      "contract": {
+        "live": {
+          "assert": {
+            "nonempty": [
+              "key"
+            ]
+          },
+          "auth": "public",
+          "id": "key",
+          "input": {},
+          "retention": "No deletion endpoint; issued key is subject to the service daily allowance"
+        },
+        "operationId": "createEphemeralKey",
+        "parameters": [],
+        "protocol": "http",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {},
+              "schema": {
+                "additionalProperties": false,
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "dailyLimit": {
+                          "description": "Calls permitted per day.",
+                          "type": "integer"
+                        },
+                        "dailyUsed": {
+                          "description": "Calls already used today.",
+                          "type": "integer"
+                        },
+                        "key": {
+                          "description": "The ephemeral API key, prefixed `eph_`.",
+                          "type": "string"
+                        },
+                        "resetsAt": {
+                          "description": "When the daily allowance resets.",
+                          "format": "date-time",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "dailyLimit",
+                        "dailyUsed",
+                        "resetsAt"
+                      ],
+                      "type": "object"
+                    },
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Issued key"
+          }
+        },
+        "security": [],
+        "securitySchemes": {
+          "bearerAuth": {
+            "description": "UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.",
+            "scheme": "bearer",
+            "type": "http"
+          }
+        },
+        "securitySource": "operation"
       }
     }
   }

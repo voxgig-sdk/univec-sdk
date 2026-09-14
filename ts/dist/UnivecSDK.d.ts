@@ -9,6 +9,7 @@ import { config } from './Config';
 import { UnivecEntityBase } from './UnivecEntityBase';
 import { Utility } from './utility/Utility';
 import { BaseFeature } from './feature/base/BaseFeature';
+import * as sekreto from './feature/secrets/sekreto';
 declare const stdutil: Utility;
 declare class UnivecSDK {
     _mode: string;
@@ -16,9 +17,11 @@ declare class UnivecSDK {
     _utility: Utility;
     _features: Feature[];
     _rootctx: Context;
+    _secrets?: any;
     constructor(options?: any);
     options(): any;
     utility(): any;
+    secrets(): any;
     prepare(fetchargs?: any): Promise<any>;
     direct(fetchargs?: any): Promise<Error | {
         ok: boolean;
@@ -60,4 +63,4 @@ declare class UnivecSDK {
     [inspect.custom](): string;
 }
 declare const SDK: typeof UnivecSDK;
-export { stdutil, config, BaseFeature, UnivecEntityBase, UnivecSDK, SDK, };
+export { stdutil, config, sekreto, BaseFeature, UnivecEntityBase, UnivecSDK, SDK, };

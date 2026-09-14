@@ -51,10 +51,10 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   // The op-driven test-mode line, shown only when the SDK has an entity op.
   // A direct()-only SDK (no ops anywhere) shows a direct() call instead.
   const testModeExample = primaryOp
-    ? `// Entity ops return the ENTITY (throws on error);
+    ? `// ${primaryOp === 'list' ? 'list() returns entity instances' : 'Entity ops return the ENTITY'} (throws on error);
 // call data_get() for the mock record.
 $${eName.toLowerCase()} = $client->${phpEntityAccessor(eName)}()->${primaryOp}(${testCallArg});
-print_r($${eName.toLowerCase()});`
+print_r(${primaryOp === 'list' ? `array_map(fn($item) => $item->data_get(), $${eName.toLowerCase()})` : `$${eName.toLowerCase()}->data_get()`});`
     : `$result = $client->direct(["path" => "/api/resource", "method" => "GET"]);
 print_r($result);`
 

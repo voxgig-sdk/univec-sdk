@@ -1,8 +1,1029 @@
-# Guide
-
+# Guide corrections and live recipes. The definition remains unchanged.
 @"@voxgig/apidef/model/guide.aon"
-
 @"base-guide.aon"
-
-
-
+guide: entity: {
+  "model": {
+    "path": {
+      "/v1/models": {
+        "op": {
+          "list": {
+            "live": {
+              "id": "models",
+              "auth": "public",
+              "assert": {
+                "nonempty": [
+                  ""
+                ]
+              }
+            },
+            "contract": {
+              "responses": {
+                "200": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "data": {
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "properties": {
+                                    "eval": {
+                                      "description": "Retrieval-fidelity metrics for a convert model.",
+                                      "properties": {
+                                        "cosine_mean": {
+                                          "format": "float",
+                                          "type": "number"
+                                        },
+                                        "cosine_median": {
+                                          "format": "float",
+                                          "type": "number"
+                                        },
+                                        "cosine_std": {
+                                          "format": "float",
+                                          "type": "number"
+                                        },
+                                        "kendall_p_value": {
+                                          "format": "float",
+                                          "type": "number"
+                                        },
+                                        "kendall_tau": {
+                                          "format": "float",
+                                          "type": "number"
+                                        },
+                                        "mrr": {
+                                          "description": "Mean reciprocal rank.",
+                                          "format": "float",
+                                          "type": "number"
+                                        },
+                                        "p_at_1": {
+                                          "format": "float",
+                                          "type": "number"
+                                        },
+                                        "p_at_10": {
+                                          "format": "float",
+                                          "type": "number"
+                                        },
+                                        "p_at_5": {
+                                          "format": "float",
+                                          "type": "number"
+                                        }
+                                      },
+                                      "type": "object"
+                                    },
+                                    "executionProvider": {
+                                      "description": "Hardware backend, e.g. `cpu`.",
+                                      "type": "string"
+                                    },
+                                    "modelCard": {
+                                      "additionalProperties": true,
+                                      "description": "Convert models only: training provenance and architecture detail.",
+                                      "type": "object"
+                                    },
+                                    "modelType": {
+                                      "description": "`embed` for text-to-vector models, `convert` for space-translation models.",
+                                      "enum": [
+                                        "embed",
+                                        "convert"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "description": "Model identifier used in requests.",
+                                      "type": "string"
+                                    },
+                                    "sequenceLen": {
+                                      "description": "Embed models only: maximum input sequence length.",
+                                      "type": "integer"
+                                    },
+                                    "sourceDim": {
+                                      "description": "Convert models only: source vector dimension.",
+                                      "type": "integer"
+                                    },
+                                    "sourceModel": {
+                                      "description": "Convert models only: the source model space.",
+                                      "type": "string"
+                                    },
+                                    "targetDim": {
+                                      "description": "Dimension of the produced vectors.",
+                                      "type": "integer"
+                                    },
+                                    "targetModel": {
+                                      "description": "The model space produced.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "modelType",
+                                    "targetModel",
+                                    "targetDim"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "type": "object",
+                                  "required": [
+                                    "name",
+                                    "modelType",
+                                    "executionProvider"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "modelType": {
+                                      "type": "string",
+                                      "enum": [
+                                        "convert-bridge",
+                                        "embed-bridge"
+                                      ]
+                                    },
+                                    "executionProvider": {
+                                      "type": "string"
+                                    },
+                                    "restrictedTargets": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "type": "array"
+                          },
+                          "success": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "success",
+                          "data"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "description": "Model list"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "ephemeral_key": {
+    "path": {
+      "/v1/ephemeral/key": {
+        "op": {
+          "create": {
+            "live": {
+              "id": "key",
+              "auth": "public",
+              "input": {},
+              "assert": {
+                "nonempty": [
+                  "key"
+                ]
+              },
+              "retention": "No deletion endpoint; issued key is subject to the service daily allowance"
+            }
+          }
+        }
+      }
+    }
+  },
+  "embed": {
+    "path": {
+      "/v1/embed": {
+        "op": {
+          "create": {
+            "live": {
+              "id": "account-embed",
+              "auth": "account",
+              "input": {
+                "model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "sourceModel"
+                },
+                "texts": [
+                  "SDK live coverage test."
+                ]
+              },
+              "assert": {
+                "equal": {
+                  "model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "sourceModel"
+                  }
+                },
+                "vectors": {
+                  "path": "embeddings",
+                  "count": 1,
+                  "dimension": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "sourceDim"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/v1/ephemeral/embed": {
+        "op": {
+          "create": {
+            "live": {
+              "id": "ephemeral-embed",
+              "auth": "issued",
+              "credential": {
+                "from": "key",
+                "path": "key"
+              },
+              "input": {
+                "model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "sourceModel"
+                },
+                "texts": [
+                  "SDK live coverage test."
+                ]
+              },
+              "assert": {
+                "equal": {
+                  "model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "sourceModel"
+                  }
+                },
+                "vectors": {
+                  "path": "embeddings",
+                  "count": 1,
+                  "dimension": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "sourceDim"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "action": {
+          "ephemeral": {}
+        }
+      }
+    }
+  },
+  "convert": {
+    "path": {
+      "/v1/convert": {
+        "op": {
+          "create": {
+            "live": {
+              "id": "account-convert",
+              "auth": "account",
+              "input": {
+                "source_model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "sourceModel"
+                },
+                "target_model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "targetModel"
+                },
+                "embeddings": {
+                  "from": "account-embed",
+                  "path": "embeddings"
+                }
+              },
+              "assert": {
+                "equal": {
+                  "source_model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "sourceModel"
+                  },
+                  "target_model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "targetModel"
+                  }
+                },
+                "vectors": {
+                  "path": "embeddings",
+                  "count": 1,
+                  "dimension": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "targetDim"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/v1/embed-bridge": {
+        "op": {
+          "create": {
+            "live": {
+              "id": "account-embed-bridge",
+              "auth": "account",
+              "input": {
+                "bridge_model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "sourceModel"
+                },
+                "target_model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "targetModel"
+                },
+                "texts": [
+                  "SDK live coverage test."
+                ]
+              },
+              "assert": {
+                "equal": {
+                  "target_model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "targetModel"
+                  },
+                  "bridge_model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "sourceModel"
+                  }
+                },
+                "vectors": {
+                  "path": "embeddings",
+                  "count": 1,
+                  "dimension": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "targetDim"
+                  }
+                }
+              }
+            },
+            "contract": {
+              "responses": {
+                "200": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "data": {
+                            "properties": {
+                              "embeddings": {
+                                "description": "Translated vectors, in the target model's dimension.",
+                                "items": {
+                                  "description": "A single embedding vector.",
+                                  "items": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "type": "array"
+                                },
+                                "type": "array"
+                              },
+                              "target_model": {
+                                "type": "string"
+                              },
+                              "bridge_model": {
+                                "type": "string"
+                              },
+                              "model": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "embeddings",
+                              "bridge_model",
+                              "target_model"
+                            ],
+                            "type": "object"
+                          },
+                          "success": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "success",
+                          "data"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "description": "Translated embeddings"
+                },
+                "401": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "error": {
+                            "properties": {
+                              "message": {
+                                "description": "Human-readable error detail.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "success": {
+                            "description": "Always false on an error.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "success",
+                          "error"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "description": "Error"
+                },
+                "422": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "error": {
+                            "properties": {
+                              "message": {
+                                "description": "Human-readable error detail.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "success": {
+                            "description": "Always false on an error.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "success",
+                          "error"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "description": "Error"
+                }
+              }
+            }
+          }
+        },
+        "action": {
+          "bridge": {}
+        }
+      },
+      "/v1/ephemeral/convert": {
+        "op": {
+          "create": {
+            "live": {
+              "id": "ephemeral-convert",
+              "auth": "issued",
+              "credential": {
+                "from": "key",
+                "path": "key"
+              },
+              "input": {
+                "source_model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "sourceModel"
+                },
+                "target_model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "targetModel"
+                },
+                "embeddings": {
+                  "from": "ephemeral-embed",
+                  "path": "embeddings"
+                }
+              },
+              "assert": {
+                "equal": {
+                  "source_model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "sourceModel"
+                  },
+                  "target_model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "targetModel"
+                  }
+                },
+                "vectors": {
+                  "path": "embeddings",
+                  "count": 1,
+                  "dimension": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "targetDim"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "action": {
+          "ephemeral": {}
+        }
+      },
+      "/v1/ephemeral/embed-bridge": {
+        "op": {
+          "create": {
+            "live": {
+              "id": "ephemeral-embed-bridge",
+              "auth": "issued",
+              "credential": {
+                "from": "key",
+                "path": "key"
+              },
+              "input": {
+                "bridge_model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "sourceModel"
+                },
+                "target_model": {
+                  "from": "models",
+                  "where": {
+                    "modelType": "convert"
+                  },
+                  "related": {
+                    "from": "models",
+                    "local": "sourceModel",
+                    "foreign": "name",
+                    "where": {
+                      "modelType": "embed"
+                    }
+                  },
+                  "path": "targetModel"
+                },
+                "texts": [
+                  "SDK live coverage test."
+                ]
+              },
+              "assert": {
+                "equal": {
+                  "target_model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "targetModel"
+                  },
+                  "bridge_model": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "sourceModel"
+                  }
+                },
+                "vectors": {
+                  "path": "embeddings",
+                  "count": 1,
+                  "dimension": {
+                    "from": "models",
+                    "where": {
+                      "modelType": "convert"
+                    },
+                    "related": {
+                      "from": "models",
+                      "local": "sourceModel",
+                      "foreign": "name",
+                      "where": {
+                        "modelType": "embed"
+                      }
+                    },
+                    "path": "targetDim"
+                  }
+                }
+              }
+            },
+            "contract": {
+              "responses": {
+                "200": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "data": {
+                            "properties": {
+                              "embeddings": {
+                                "description": "Translated vectors, in the target model's dimension.",
+                                "items": {
+                                  "description": "A single embedding vector.",
+                                  "items": {
+                                    "format": "float",
+                                    "type": "number"
+                                  },
+                                  "type": "array"
+                                },
+                                "type": "array"
+                              },
+                              "target_model": {
+                                "type": "string"
+                              },
+                              "bridge_model": {
+                                "type": "string"
+                              },
+                              "model": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "embeddings",
+                              "bridge_model",
+                              "target_model"
+                            ],
+                            "type": "object"
+                          },
+                          "success": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "success",
+                          "data"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "description": "Translated embeddings"
+                },
+                "401": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "error": {
+                            "properties": {
+                              "message": {
+                                "description": "Human-readable error detail.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "success": {
+                            "description": "Always false on an error.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "success",
+                          "error"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "description": "Error"
+                },
+                "422": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "error": {
+                            "properties": {
+                              "message": {
+                                "description": "Human-readable error detail.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "success": {
+                            "description": "Always false on an error.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "success",
+                          "error"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "description": "Error"
+                },
+                "429": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "properties": {
+                          "error": {
+                            "properties": {
+                              "message": {
+                                "description": "Human-readable error detail.",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "success": {
+                            "description": "Always false on an error.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "success",
+                          "error"
+                        ],
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "description": "Error"
+                }
+              }
+            }
+          }
+        },
+        "action": {
+          "ephemeral_bridge": {}
+        }
+      }
+    }
+  }
+}

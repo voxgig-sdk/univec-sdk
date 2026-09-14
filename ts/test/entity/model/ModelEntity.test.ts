@@ -5,6 +5,8 @@ import * as Fs from 'node:fs'
 
 import { test, describe, afterEach } from 'node:test'
 import assert from 'node:assert'
+import { createLiveTransport } from '../../live-runner'
+import { runLiveEntity } from '../../live-entity'
 
 
 import { UnivecSDK, BaseFeature, stdutil } from '../../..'
@@ -47,16 +49,13 @@ describe('ModelEntity', async () => {
 
     const live = 'TRUE' === process.env.UNIVEC_TEST_LIVE
     for (const op of ['list']) {
-      if (maybeSkipControl(t, 'entityOp', 'model.' + op, live)) return
+      if (!live && maybeSkipControl(t, 'entityOp', 'model.' + op, live)) return
     }
 
+    if (live) { t.skip('Covered by live operation scenarios'); return }
     const setup = basicSetup()
-    // The basic flow consumes synthetic IDs and field values from the
-    // fixture (entity TestData.json). Those don't exist on the live API.
-    // Skip live runs unless the user provided a real ENTID env override.
-    if (setup.syntheticOnly) {
-      t.skip('live entity test uses synthetic IDs from fixture — set UNIVEC_TEST_MODEL_ENTID JSON to run live')
-      return
+    if (setup.live) {
+      return runLiveEntity(setup, {"active":true,"alias":{"field":{}},"fields":[{"active":true,"name":"eval","req":false,"short":"Retrieval-fidelity metrics for a convert model.","type":"`$OBJECT`","index$":0},{"active":true,"name":"executionProvider","req":false,"short":"Hardware backend, e.g.","type":"`$STRING`","index$":1},{"active":true,"name":"modelCard","req":false,"short":"Convert models only: training provenance and architecture detail.","type":"`$OBJECT`","index$":2},{"active":true,"name":"modelType","req":true,"short":"`embed` for text-to-vector models, `convert` for space-translation models.","type":"`$STRING`","index$":3},{"active":true,"name":"name","req":true,"short":"Model identifier used in requests.","type":"`$STRING`","index$":4},{"active":true,"name":"sequenceLen","req":false,"short":"Embed models only: maximum input sequence length.","type":"`$INTEGER`","index$":5},{"active":true,"name":"sourceDim","req":false,"short":"Convert models only: source vector dimension.","type":"`$INTEGER`","index$":6},{"active":true,"name":"sourceModel","req":false,"short":"Convert models only: the source model space.","type":"`$STRING`","index$":7},{"active":true,"name":"targetDim","req":true,"short":"Dimension of the produced vectors.","type":"`$INTEGER`","index$":8},{"active":true,"name":"targetModel","req":true,"short":"The model space produced.","type":"`$STRING`","index$":9}],"name":"model","op":{"list":{"input":"data","name":"list","points":[{"active":true,"args":{},"contract":{"id":"GET /v1/models","json":"{\"factSources\":{\"responses\":\"guide\"},\"live\":{\"assert\":{\"nonempty\":[\"\"]},\"auth\":\"public\",\"id\":\"models\"},\"operationId\":\"listModels\",\"parameters\":[],\"protocol\":\"http\",\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"items\":{\"oneOf\":[{\"properties\":{\"eval\":{\"description\":\"Retrieval-fidelity metrics for a convert model.\",\"properties\":{\"cosine_mean\":{\"format\":\"float\",\"type\":\"number\"},\"cosine_median\":{\"format\":\"float\",\"type\":\"number\"},\"cosine_std\":{\"format\":\"float\",\"type\":\"number\"},\"kendall_p_value\":{\"format\":\"float\",\"type\":\"number\"},\"kendall_tau\":{\"format\":\"float\",\"type\":\"number\"},\"mrr\":{\"description\":\"Mean reciprocal rank.\",\"format\":\"float\",\"type\":\"number\"},\"p_at_1\":{\"format\":\"float\",\"type\":\"number\"},\"p_at_10\":{\"format\":\"float\",\"type\":\"number\"},\"p_at_5\":{\"format\":\"float\",\"type\":\"number\"}},\"type\":\"object\"},\"executionProvider\":{\"description\":\"Hardware backend, e.g. `cpu`.\",\"type\":\"string\"},\"modelCard\":{\"additionalProperties\":true,\"description\":\"Convert models only: training provenance and architecture detail.\",\"type\":\"object\"},\"modelType\":{\"description\":\"`embed` for text-to-vector models, `convert` for space-translation models.\",\"enum\":[\"embed\",\"convert\"],\"type\":\"string\"},\"name\":{\"description\":\"Model identifier used in requests.\",\"type\":\"string\"},\"sequenceLen\":{\"description\":\"Embed models only: maximum input sequence length.\",\"type\":\"integer\"},\"sourceDim\":{\"description\":\"Convert models only: source vector dimension.\",\"type\":\"integer\"},\"sourceModel\":{\"description\":\"Convert models only: the source model space.\",\"type\":\"string\"},\"targetDim\":{\"description\":\"Dimension of the produced vectors.\",\"type\":\"integer\"},\"targetModel\":{\"description\":\"The model space produced.\",\"type\":\"string\"}},\"required\":[\"name\",\"modelType\",\"targetModel\",\"targetDim\"],\"type\":\"object\"},{\"properties\":{\"executionProvider\":{\"type\":\"string\"},\"modelType\":{\"enum\":[\"convert-bridge\",\"embed-bridge\"],\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"restrictedTargets\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"name\",\"modelType\",\"executionProvider\"],\"type\":\"object\"}]},\"type\":\"array\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Model list\"}},\"security\":[],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"operation\"}","source":"openapi3","version":1},"kind":"http","method":"GET","orig":"/v1/models","segments":[{"lit":"v1"},{"lit":"models"}],"select":{},"transform":{"req":"`reqdata`","res":"`body.data`"},"index$":0}],"key$":"list"}},"relations":{"ancestors":[]},"key$":"model","name__orig":"model","Name":"Model","name_":"model","name-":"model","NAME":"MODEL","index$":3}, {"active":true,"entity":"model","key$":"BasicModelFlow","kind":"basic","name":"BasicModelFlow","param":{},"step":[{"active":true,"data":{},"input":{},"match":{},"op":"list","spec":[],"valid":[{"apply":"ItemExists","def":{"ref":"model_ref01"}}]}]}, 'Model')
     }
     const client = setup.client
     const struct = setup.struct
@@ -109,13 +108,6 @@ function basicSetup(extra?: any) {
       }]
     })
 
-  // Detect whether the user provided a real ENTID JSON via env var. The
-  // basic flow consumes synthetic IDs from the fixture file; without an
-  // override those synthetic IDs reach the live API and 4xx. Surface this
-  // to the test so it can skip rather than fail.
-  const idmapEnvVal = process.env['UNIVEC_TEST_MODEL_ENTID']
-  const idmapOverridden = null != idmapEnvVal && idmapEnvVal.trim().startsWith('{')
-
   const env = envOverride({
     'UNIVEC_TEST_MODEL_ENTID': idmap,
     'UNIVEC_TEST_LIVE': 'FALSE',
@@ -127,7 +119,13 @@ function basicSetup(extra?: any) {
 
   const live = 'TRUE' === env.UNIVEC_TEST_LIVE
 
+  const transport = createLiveTransport()
   if (live) {
+    const rawIds = process.env['UNIVEC_TEST_MODEL_ENTID']
+    idmap = rawIds && rawIds.trim() ? JSON.parse(rawIds) : {}
+    if (!idmap || Array.isArray(idmap) || typeof idmap !== 'object') {
+      throw new Error('Live ENTID must be a JSON object')
+    }
     client = new UnivecSDK(merge([
       // FIRST, so the generated fields below win: sdk-test-control.json's
       // test.client.options adds to the live client, it does not redirect it.
@@ -140,7 +138,8 @@ function basicSetup(extra?: any) {
       // argument at all - so a bare 'extra' silently discarded the apikey
       // and server values above and handed the SDK undefined. Harmless
       // while there was nothing in that object; not harmless now.
-      extra || {}
+      extra || {},
+      { system: { fetch: transport.fetch } }
     ]))
   }
 
@@ -153,7 +152,7 @@ function basicSetup(extra?: any) {
     data: entityData,
     explain: 'TRUE' === env.UNIVEC_TEST_EXPLAIN,
     live,
-    syntheticOnly: live && !idmapOverridden,
+    transport,
     now: Date.now(),
   }
 

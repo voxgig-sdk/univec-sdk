@@ -91,6 +91,8 @@ const Package = cmp(async function Package(props: any) {
       // and cannot be forgotten by a caller invoking `npm test` directly.
       'pretest': 'npm run build',
       'test': 'node --enable-source-maps --test-concurrency=1 --test \'dist-test/**/*.test.js\'',
+      // Explicit build also works when npm's ignore-scripts disables pretest.
+      'test:live': 'npm run build && UNIVEC_TEST_LIVE=TRUE node --enable-source-maps --test dist-test/live.test.js',
       'test-some': 'node --enable-source-maps --experimental-test-isolation=none ' +
         '--test-name-pattern=\"$TEST_PATTERN\" --test \'dist-test/**/*.test.js\'',
       'test-utility': 'node --enable-source-maps --test test/utility/*.test.ts',

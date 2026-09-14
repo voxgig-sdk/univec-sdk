@@ -86,6 +86,12 @@
                 {
                   "active": true,
                   "args": {},
+                  "contract": {
+                    "id": "POST /v1/convert",
+                    "json": "{\"live\":{\"assert\":{\"equal\":{\"source_model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"target_model\":{\"from\":\"models\",\"path\":\"targetModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}}},\"vectors\":{\"count\":1,\"dimension\":{\"from\":\"models\",\"path\":\"targetDim\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"path\":\"embeddings\"}},\"auth\":\"account\",\"id\":\"account-convert\",\"input\":{\"embeddings\":{\"from\":\"account-embed\",\"path\":\"embeddings\"},\"source_model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"target_model\":{\"from\":\"models\",\"path\":\"targetModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}}}},\"operationId\":\"convertEmbedding\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{\"embeddings\":[[0.01,0.02,0.03]],\"source_model\":\"alibaba-nlp-gte-large-en-v1.5\",\"target_model\":\"nomic-embed-text-v1.5\"},\"schema\":{\"properties\":{\"embeddings\":{\"description\":\"Vectors to translate. Each must match the source model's dimension exactly.\",\"items\":{\"description\":\"A single embedding vector.\",\"items\":{\"format\":\"float\",\"type\":\"number\"},\"type\":\"array\"},\"type\":\"array\"},\"source_model\":{\"description\":\"Model space the supplied vectors are currently in.\",\"example\":\"alibaba-nlp-gte-large-en-v1.5\",\"type\":\"string\"},\"target_model\":{\"description\":\"Model space to translate into. A converter must exist for the source/target pair — see listModels.\",\"example\":\"nomic-embed-text-v1.5\",\"type\":\"string\"}},\"required\":[\"source_model\",\"target_model\",\"embeddings\"],\"type\":\"object\"}}},\"required\":true},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"embeddings\":{\"description\":\"Translated vectors, in the target model's dimension.\",\"items\":{\"description\":\"A single embedding vector.\",\"items\":{\"format\":\"float\",\"type\":\"number\"},\"type\":\"array\"},\"type\":\"array\"},\"source_model\":{\"type\":\"string\"},\"target_model\":{\"type\":\"string\"}},\"required\":[\"embeddings\",\"source_model\",\"target_model\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Translated embeddings\"},\"401\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"422\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"}},\"security\":[{\"bearerAuth\":[]}],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"definition\"}",
+                    "source": "openapi3",
+                    "version": 1
+                  },
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/convert",
@@ -106,6 +112,12 @@
                 {
                   "active": true,
                   "args": {},
+                  "contract": {
+                    "id": "POST /v1/embed-bridge",
+                    "json": "{\"factSources\":{\"responses\":\"guide\"},\"live\":{\"assert\":{\"equal\":{\"bridge_model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"target_model\":{\"from\":\"models\",\"path\":\"targetModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}}},\"vectors\":{\"count\":1,\"dimension\":{\"from\":\"models\",\"path\":\"targetDim\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"path\":\"embeddings\"}},\"auth\":\"account\",\"id\":\"account-embed-bridge\",\"input\":{\"bridge_model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"target_model\":{\"from\":\"models\",\"path\":\"targetModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"texts\":[\"SDK live coverage test.\"]}},\"operationId\":\"embedBridge\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{\"bridge_model\":\"alibaba-nlp-gte-large-en-v1.5\",\"target_model\":\"nomic-embed-text-v1.5\",\"texts\":[\"hello world\"]},\"schema\":{\"properties\":{\"bridge_model\":{\"description\":\"Embed model used to vectorise the text before translation.\",\"example\":\"alibaba-nlp-gte-large-en-v1.5\",\"type\":\"string\"},\"target_model\":{\"description\":\"Model space to translate into.\",\"example\":\"nomic-embed-text-v1.5\",\"type\":\"string\"},\"texts\":{\"description\":\"Texts to embed and translate.\",\"example\":[\"hello world\"],\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"bridge_model\",\"target_model\",\"texts\"],\"type\":\"object\"}}},\"required\":true},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"bridge_model\":{\"type\":\"string\"},\"embeddings\":{\"description\":\"Translated vectors, in the target model's dimension.\",\"items\":{\"description\":\"A single embedding vector.\",\"items\":{\"format\":\"float\",\"type\":\"number\"},\"type\":\"array\"},\"type\":\"array\"},\"model\":{\"type\":\"string\"},\"target_model\":{\"type\":\"string\"}},\"required\":[\"embeddings\",\"bridge_model\",\"target_model\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Translated embeddings\"},\"401\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"422\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"}},\"security\":[{\"bearerAuth\":[]}],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"definition\"}",
+                    "source": "openapi3",
+                    "version": 1
+                  },
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/embed-bridge",
@@ -117,7 +129,9 @@
                       "lit": "embed-bridge"
                     }
                   ],
-                  "select": {},
+                  "select": {
+                    "$action": "bridge"
+                  },
                   "transform": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
@@ -126,6 +140,12 @@
                 {
                   "active": true,
                   "args": {},
+                  "contract": {
+                    "id": "POST /v1/ephemeral/convert",
+                    "json": "{\"live\":{\"assert\":{\"equal\":{\"source_model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"target_model\":{\"from\":\"models\",\"path\":\"targetModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}}},\"vectors\":{\"count\":1,\"dimension\":{\"from\":\"models\",\"path\":\"targetDim\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"path\":\"embeddings\"}},\"auth\":\"issued\",\"credential\":{\"from\":\"key\",\"path\":\"key\"},\"id\":\"ephemeral-convert\",\"input\":{\"embeddings\":{\"from\":\"ephemeral-embed\",\"path\":\"embeddings\"},\"source_model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"target_model\":{\"from\":\"models\",\"path\":\"targetModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}}}},\"operationId\":\"convertEphemeralEmbedding\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{\"embeddings\":[[0.01,0.02,0.03]],\"source_model\":\"alibaba-nlp-gte-large-en-v1.5\",\"target_model\":\"nomic-embed-text-v1.5\"},\"schema\":{\"properties\":{\"embeddings\":{\"description\":\"Vectors to translate. Each must match the source model's dimension exactly.\",\"items\":{\"description\":\"A single embedding vector.\",\"items\":{\"format\":\"float\",\"type\":\"number\"},\"type\":\"array\"},\"type\":\"array\"},\"source_model\":{\"description\":\"Model space the supplied vectors are currently in.\",\"example\":\"alibaba-nlp-gte-large-en-v1.5\",\"type\":\"string\"},\"target_model\":{\"description\":\"Model space to translate into. A converter must exist for the source/target pair — see listModels.\",\"example\":\"nomic-embed-text-v1.5\",\"type\":\"string\"}},\"required\":[\"source_model\",\"target_model\",\"embeddings\"],\"type\":\"object\"}}},\"required\":true},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"embeddings\":{\"description\":\"Translated vectors, in the target model's dimension.\",\"items\":{\"description\":\"A single embedding vector.\",\"items\":{\"format\":\"float\",\"type\":\"number\"},\"type\":\"array\"},\"type\":\"array\"},\"source_model\":{\"type\":\"string\"},\"target_model\":{\"type\":\"string\"}},\"required\":[\"embeddings\",\"source_model\",\"target_model\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Translated embeddings\"},\"401\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"422\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"429\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"}},\"security\":[{\"bearerAuth\":[]}],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"definition\"}",
+                    "source": "openapi3",
+                    "version": 1
+                  },
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/convert",
@@ -140,7 +160,9 @@
                       "lit": "convert"
                     }
                   ],
-                  "select": {},
+                  "select": {
+                    "$action": "ephemeral"
+                  },
                   "transform": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
@@ -149,6 +171,12 @@
                 {
                   "active": true,
                   "args": {},
+                  "contract": {
+                    "id": "POST /v1/ephemeral/embed-bridge",
+                    "json": "{\"factSources\":{\"responses\":\"guide\"},\"live\":{\"assert\":{\"equal\":{\"bridge_model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"target_model\":{\"from\":\"models\",\"path\":\"targetModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}}},\"vectors\":{\"count\":1,\"dimension\":{\"from\":\"models\",\"path\":\"targetDim\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"path\":\"embeddings\"}},\"auth\":\"issued\",\"credential\":{\"from\":\"key\",\"path\":\"key\"},\"id\":\"ephemeral-embed-bridge\",\"input\":{\"bridge_model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"target_model\":{\"from\":\"models\",\"path\":\"targetModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"texts\":[\"SDK live coverage test.\"]}},\"operationId\":\"embedBridgeEphemeral\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{\"bridge_model\":\"alibaba-nlp-gte-large-en-v1.5\",\"target_model\":\"nomic-embed-text-v1.5\",\"texts\":[\"hello world\"]},\"schema\":{\"properties\":{\"bridge_model\":{\"description\":\"Embed model used to vectorise the text before translation.\",\"example\":\"alibaba-nlp-gte-large-en-v1.5\",\"type\":\"string\"},\"target_model\":{\"description\":\"Model space to translate into.\",\"example\":\"nomic-embed-text-v1.5\",\"type\":\"string\"},\"texts\":{\"description\":\"Texts to embed and translate.\",\"example\":[\"hello world\"],\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"bridge_model\",\"target_model\",\"texts\"],\"type\":\"object\"}}},\"required\":true},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"bridge_model\":{\"type\":\"string\"},\"embeddings\":{\"description\":\"Translated vectors, in the target model's dimension.\",\"items\":{\"description\":\"A single embedding vector.\",\"items\":{\"format\":\"float\",\"type\":\"number\"},\"type\":\"array\"},\"type\":\"array\"},\"model\":{\"type\":\"string\"},\"target_model\":{\"type\":\"string\"}},\"required\":[\"embeddings\",\"bridge_model\",\"target_model\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Translated embeddings\"},\"401\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"422\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"429\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"}},\"security\":[{\"bearerAuth\":[]}],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"definition\"}",
+                    "source": "openapi3",
+                    "version": 1
+                  },
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/embed-bridge",
@@ -163,7 +191,9 @@
                       "lit": "embed-bridge"
                     }
                   ],
-                  "select": {},
+                  "select": {
+                    "$action": "ephemeral_bridge"
+                  },
                   "transform": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
@@ -213,6 +243,12 @@
                 {
                   "active": true,
                   "args": {},
+                  "contract": {
+                    "id": "POST /v1/embed",
+                    "json": "{\"live\":{\"assert\":{\"equal\":{\"model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}}},\"vectors\":{\"count\":1,\"dimension\":{\"from\":\"models\",\"path\":\"sourceDim\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"path\":\"embeddings\"}},\"auth\":\"account\",\"id\":\"account-embed\",\"input\":{\"model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"texts\":[\"SDK live coverage test.\"]}},\"operationId\":\"createEmbedding\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{\"model\":\"baai-bge-base-en-v1.5\",\"texts\":[\"hello world\"]},\"schema\":{\"properties\":{\"model\":{\"description\":\"Name of an embed model, as returned by listModels.\",\"example\":\"baai-bge-base-en-v1.5\",\"type\":\"string\"},\"texts\":{\"description\":\"Texts to embed. One vector is returned per text, in order.\",\"example\":[\"hello world\"],\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"model\",\"texts\"],\"type\":\"object\"}}},\"required\":true},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"embeddings\":{\"description\":\"One vector per input text, in input order.\",\"items\":{\"description\":\"A single embedding vector.\",\"items\":{\"format\":\"float\",\"type\":\"number\"},\"type\":\"array\"},\"type\":\"array\"},\"model\":{\"description\":\"Model that produced the vectors.\",\"type\":\"string\"}},\"required\":[\"embeddings\",\"model\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Generated embeddings\"},\"401\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"422\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"}},\"security\":[{\"bearerAuth\":[]}],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"definition\"}",
+                    "source": "openapi3",
+                    "version": 1
+                  },
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/embed",
@@ -233,6 +269,12 @@
                 {
                   "active": true,
                   "args": {},
+                  "contract": {
+                    "id": "POST /v1/ephemeral/embed",
+                    "json": "{\"live\":{\"assert\":{\"equal\":{\"model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}}},\"vectors\":{\"count\":1,\"dimension\":{\"from\":\"models\",\"path\":\"sourceDim\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"path\":\"embeddings\"}},\"auth\":\"issued\",\"credential\":{\"from\":\"key\",\"path\":\"key\"},\"id\":\"ephemeral-embed\",\"input\":{\"model\":{\"from\":\"models\",\"path\":\"sourceModel\",\"related\":{\"foreign\":\"name\",\"from\":\"models\",\"local\":\"sourceModel\",\"where\":{\"modelType\":\"embed\"}},\"where\":{\"modelType\":\"convert\"}},\"texts\":[\"SDK live coverage test.\"]}},\"operationId\":\"createEphemeralEmbedding\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{\"model\":\"baai-bge-base-en-v1.5\",\"texts\":[\"hello world\"]},\"schema\":{\"properties\":{\"model\":{\"description\":\"Name of an embed model, as returned by listModels.\",\"example\":\"baai-bge-base-en-v1.5\",\"type\":\"string\"},\"texts\":{\"description\":\"Texts to embed. One vector is returned per text, in order.\",\"example\":[\"hello world\"],\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"model\",\"texts\"],\"type\":\"object\"}}},\"required\":true},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"embeddings\":{\"description\":\"One vector per input text, in input order.\",\"items\":{\"description\":\"A single embedding vector.\",\"items\":{\"format\":\"float\",\"type\":\"number\"},\"type\":\"array\"},\"type\":\"array\"},\"model\":{\"description\":\"Model that produced the vectors.\",\"type\":\"string\"}},\"required\":[\"embeddings\",\"model\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Generated embeddings\"},\"401\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"422\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"},\"429\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"error\":{\"properties\":{\"message\":{\"description\":\"Human-readable error detail.\",\"type\":\"string\"}},\"required\":[\"message\"],\"type\":\"object\"},\"success\":{\"description\":\"Always false on an error.\",\"type\":\"boolean\"}},\"required\":[\"success\",\"error\"],\"type\":\"object\"}}},\"description\":\"Error\"}},\"security\":[{\"bearerAuth\":[]}],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"definition\"}",
+                    "source": "openapi3",
+                    "version": 1
+                  },
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/embed",
@@ -247,7 +289,9 @@
                       "lit": "embed"
                     }
                   ],
-                  "select": {},
+                  "select": {
+                    "$action": "ephemeral"
+                  },
                   "transform": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
@@ -305,6 +349,12 @@
                 {
                   "active": true,
                   "args": {},
+                  "contract": {
+                    "id": "POST /v1/ephemeral/key",
+                    "json": "{\"live\":{\"assert\":{\"nonempty\":[\"key\"]},\"auth\":\"public\",\"id\":\"key\",\"input\":{},\"retention\":\"No deletion endpoint; issued key is subject to the service daily allowance\"},\"operationId\":\"createEphemeralKey\",\"parameters\":[],\"protocol\":\"http\",\"requestBody\":{\"content\":{\"application/json\":{\"example\":{},\"schema\":{\"additionalProperties\":false,\"type\":\"object\"}}},\"required\":false},\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"properties\":{\"dailyLimit\":{\"description\":\"Calls permitted per day.\",\"type\":\"integer\"},\"dailyUsed\":{\"description\":\"Calls already used today.\",\"type\":\"integer\"},\"key\":{\"description\":\"The ephemeral API key, prefixed `eph_`.\",\"type\":\"string\"},\"resetsAt\":{\"description\":\"When the daily allowance resets.\",\"format\":\"date-time\",\"type\":\"string\"}},\"required\":[\"key\",\"dailyLimit\",\"dailyUsed\",\"resetsAt\"],\"type\":\"object\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Issued key\"}},\"security\":[],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"operation\"}",
+                    "source": "openapi3",
+                    "version": 1
+                  },
                   "kind": "http",
                   "method": "POST",
                   "orig": "/v1/ephemeral/key",
@@ -418,6 +468,12 @@
                 {
                   "active": true,
                   "args": {},
+                  "contract": {
+                    "id": "GET /v1/models",
+                    "json": "{\"factSources\":{\"responses\":\"guide\"},\"live\":{\"assert\":{\"nonempty\":[\"\"]},\"auth\":\"public\",\"id\":\"models\"},\"operationId\":\"listModels\",\"parameters\":[],\"protocol\":\"http\",\"responses\":{\"200\":{\"content\":{\"application/json\":{\"schema\":{\"properties\":{\"data\":{\"items\":{\"oneOf\":[{\"properties\":{\"eval\":{\"description\":\"Retrieval-fidelity metrics for a convert model.\",\"properties\":{\"cosine_mean\":{\"format\":\"float\",\"type\":\"number\"},\"cosine_median\":{\"format\":\"float\",\"type\":\"number\"},\"cosine_std\":{\"format\":\"float\",\"type\":\"number\"},\"kendall_p_value\":{\"format\":\"float\",\"type\":\"number\"},\"kendall_tau\":{\"format\":\"float\",\"type\":\"number\"},\"mrr\":{\"description\":\"Mean reciprocal rank.\",\"format\":\"float\",\"type\":\"number\"},\"p_at_1\":{\"format\":\"float\",\"type\":\"number\"},\"p_at_10\":{\"format\":\"float\",\"type\":\"number\"},\"p_at_5\":{\"format\":\"float\",\"type\":\"number\"}},\"type\":\"object\"},\"executionProvider\":{\"description\":\"Hardware backend, e.g. `cpu`.\",\"type\":\"string\"},\"modelCard\":{\"additionalProperties\":true,\"description\":\"Convert models only: training provenance and architecture detail.\",\"type\":\"object\"},\"modelType\":{\"description\":\"`embed` for text-to-vector models, `convert` for space-translation models.\",\"enum\":[\"embed\",\"convert\"],\"type\":\"string\"},\"name\":{\"description\":\"Model identifier used in requests.\",\"type\":\"string\"},\"sequenceLen\":{\"description\":\"Embed models only: maximum input sequence length.\",\"type\":\"integer\"},\"sourceDim\":{\"description\":\"Convert models only: source vector dimension.\",\"type\":\"integer\"},\"sourceModel\":{\"description\":\"Convert models only: the source model space.\",\"type\":\"string\"},\"targetDim\":{\"description\":\"Dimension of the produced vectors.\",\"type\":\"integer\"},\"targetModel\":{\"description\":\"The model space produced.\",\"type\":\"string\"}},\"required\":[\"name\",\"modelType\",\"targetModel\",\"targetDim\"],\"type\":\"object\"},{\"properties\":{\"executionProvider\":{\"type\":\"string\"},\"modelType\":{\"enum\":[\"convert-bridge\",\"embed-bridge\"],\"type\":\"string\"},\"name\":{\"type\":\"string\"},\"restrictedTargets\":{\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"name\",\"modelType\",\"executionProvider\"],\"type\":\"object\"}]},\"type\":\"array\"},\"success\":{\"type\":\"boolean\"}},\"required\":[\"success\",\"data\"],\"type\":\"object\"}}},\"description\":\"Model list\"}},\"security\":[],\"securitySchemes\":{\"bearerAuth\":{\"description\":\"UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.\",\"scheme\":\"bearer\",\"type\":\"http\"}},\"securitySource\":\"operation\"}",
+                    "source": "openapi3",
+                    "version": 1
+                  },
                   "kind": "http",
                   "method": "GET",
                   "orig": "/v1/models",
@@ -2612,6 +2668,929 @@
           "title": "Automatic retry of transient failures with exponential backoff",
           "transport": "wrap",
           "version": "0.0.1"
+        },
+        "secrets": {
+          "active": true,
+          "base": "node_modules/@voxgig/sdkgen/project/.sdk",
+          "config": {
+            "options": {
+              "active": false,
+              "cache": true,
+              "exchange": {
+                "active": false,
+                "method": "POST",
+                "path": "auth/token",
+                "refresh": "",
+                "request": "refresh_token",
+                "response": "access_token",
+                "retries": 1,
+                "statuses": [
+                  401
+                ]
+              },
+              "name": "univec",
+              "providers": [
+                {
+                  "kind": "boru",
+                  "namespace": "sdk"
+                }
+              ]
+            }
+          },
+          "deps": {
+            "rust": {
+              "rustls": {
+                "active": true,
+                "default": false,
+                "features": [
+                  "std",
+                  "ring",
+                  "tls12"
+                ],
+                "kind": "prod",
+                "version": "0.23"
+              },
+              "webpki-roots": {
+                "active": true,
+                "kind": "prod",
+                "version": "0.26"
+              }
+            }
+          },
+          "hook": {
+            "GetData": {
+              "active": false,
+              "await": false
+            },
+            "GetMatch": {
+              "active": false,
+              "await": false
+            },
+            "PostConstruct": {
+              "active": false,
+              "await": false
+            },
+            "PostConstructEntity": {
+              "active": false,
+              "await": false
+            },
+            "PostOperation": {
+              "active": false,
+              "await": false
+            },
+            "PreRequest": {
+              "active": false,
+              "await": false
+            },
+            "PreResponse": {
+              "active": false,
+              "await": false
+            },
+            "PreResult": {
+              "active": false,
+              "await": false
+            },
+            "PreSpec": {
+              "active": true,
+              "await": true
+            },
+            "PreTarget": {
+              "active": false,
+              "await": false
+            },
+            "SetData": {
+              "active": false,
+              "await": false
+            }
+          },
+          "name": "secrets",
+          "needs": {
+            "sekreto": true
+          },
+          "origname": "",
+          "package": "@voxgig/sdkgen",
+          "plugin": {
+            "aws": {
+              "active": false,
+              "def": {
+                "c": {
+                  "sek_plugin_awsparams": "feature/secrets/plugins/aws.c",
+                  "sek_plugin_awssecrets": "feature/secrets/plugins/aws.c"
+                },
+                "clojure": {
+                  "voxgig.sekreto.plugins.aws/awsparams": "feature/secrets/voxgig/sekreto/plugins/aws.clj",
+                  "voxgig.sekreto.plugins.aws/awssecrets": "feature/secrets/voxgig/sekreto/plugins/aws.clj"
+                },
+                "cpp": {
+                  "awsparams": "feature/secrets/plugins/Aws.cpp",
+                  "awssecrets": "feature/secrets/plugins/Aws.cpp"
+                },
+                "csharp": {
+                  "AwsPlugins.Params": "feature/secrets/plugins/Aws.cs",
+                  "AwsPlugins.Secrets": "feature/secrets/plugins/Aws.cs"
+                },
+                "dart": {
+                  "awsparams": "lib/feature/secrets/sekreto/plugins/aws.dart",
+                  "awssecrets": "lib/feature/secrets/sekreto/plugins/aws.dart"
+                },
+                "elixir": {
+                  "Sekreto.Plugins.Aws.awsparams": "lib/projectname/feature/secrets/sekreto/plugins/aws.ex",
+                  "Sekreto.Plugins.Aws.awssecrets": "lib/projectname/feature/secrets/sekreto/plugins/aws.ex"
+                },
+                "go": {
+                  "aws.Params": "feature/secrets/plugins/aws/aws.go",
+                  "aws.Secrets": "feature/secrets/plugins/aws/aws.go"
+                },
+                "java": {
+                  "Aws.PARAMS": "feature/secrets/sekreto/plugins/Aws.java",
+                  "Aws.SECRETS": "feature/secrets/sekreto/plugins/Aws.java"
+                },
+                "js": {
+                  "awsparams": "src/feature/secrets/sekreto/plugins/aws.js",
+                  "awssecrets": "src/feature/secrets/sekreto/plugins/aws.js"
+                },
+                "kotlin": {
+                  "awsparams": "feature/secrets/sekreto/plugins/Aws.kt",
+                  "awssecrets": "feature/secrets/sekreto/plugins/Aws.kt"
+                },
+                "lean": {
+                  "Sekreto.awsparams": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Aws.lean",
+                  "Sekreto.awssecrets": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Aws.lean"
+                },
+                "lua": {
+                  "awsparams": "feature/secrets/sekreto/plugins/aws.lua",
+                  "awssecrets": "feature/secrets/sekreto/plugins/aws.lua"
+                },
+                "ocaml": {
+                  "Aws.paramsplugin": "feature/secrets/plugins/aws.ml",
+                  "Aws.secretsplugin": "feature/secrets/plugins/aws.ml"
+                },
+                "perl": {
+                  "awsparams": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Aws.pm",
+                  "awssecrets": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Aws.pm"
+                },
+                "php": {
+                  "awsparams": "feature/secrets/sekreto/plugins/aws.php",
+                  "awssecrets": "feature/secrets/sekreto/plugins/aws.php"
+                },
+                "py": {
+                  "awsparams": "pkg/feature/secrets/voxgig_sekreto/plugins/aws.py",
+                  "awssecrets": "pkg/feature/secrets/voxgig_sekreto/plugins/aws.py"
+                },
+                "rb": {
+                  "VoxgigSekreto::Plugins::AWSPARAMS": "feature/secrets/voxgig_sekreto/plugins/aws.rb",
+                  "VoxgigSekreto::Plugins::AWSSECRETS": "feature/secrets/voxgig_sekreto/plugins/aws.rb"
+                },
+                "rust": {
+                  "aws::params": "feature/secrets/plugins/aws.rs",
+                  "aws::secrets": "feature/secrets/plugins/aws.rs"
+                },
+                "scala": {
+                  "com.voxgig.sekreto.plugins.awsparams": "feature/secrets/sekreto/plugins/Aws.scala",
+                  "com.voxgig.sekreto.plugins.awssecrets": "feature/secrets/sekreto/plugins/Aws.scala"
+                },
+                "swift": {
+                  "awsparams": "Sources/ProjectNameSDK/feature/secrets/plugins/Aws.swift",
+                  "awssecrets": "Sources/ProjectNameSDK/feature/secrets/plugins/Aws.swift"
+                },
+                "ts": {
+                  "awsparams": "src/feature/secrets/sekreto/plugins/aws.ts",
+                  "awssecrets": "src/feature/secrets/sekreto/plugins/aws.ts"
+                },
+                "zig": {
+                  "awsparams": "feature/secrets/plugins/aws.zig",
+                  "awssecrets": "feature/secrets/plugins/aws.zig"
+                }
+              },
+              "name": "aws",
+              "needs": {
+                "crypto": true,
+                "fetch": true
+              },
+              "path": [
+                "src/feature/secrets/sekreto/plugins/aws.ts",
+                "src/feature/secrets/sekreto/plugins/sigv4.ts",
+                "feature/secrets/plugins/aws/aws.go",
+                "feature/secrets/plugins/aws/sigv4.go",
+                "feature/secrets/plugins/aws.rs",
+                "feature/secrets/plugins/aws/sigv4.rs",
+                "feature/secrets/plugins/aws/crypto.rs",
+                "feature/secrets/voxgig_sekreto/plugins/aws.py",
+                "feature/secrets/voxgig_sekreto/plugins/sigv4.py",
+                "src/feature/secrets/sekreto/plugins/aws.js",
+                "src/feature/secrets/sekreto/plugins/sigv4.js",
+                "feature/secrets/voxgig_sekreto/plugins/aws.rb",
+                "feature/secrets/voxgig_sekreto/plugins/sigv4.rb",
+                "feature/secrets/sekreto/plugins/aws.php",
+                "feature/secrets/sekreto/plugins/sigv4.php",
+                "feature/secrets/plugins/Aws.cs",
+                "feature/secrets/plugins/Sigv4.cs",
+                "feature/secrets/sekreto/plugins/Aws.java",
+                "feature/secrets/sekreto/plugins/Aws.scala",
+                "feature/secrets/sekreto/plugins/Aws.kt",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Aws.pm",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Sigv4.pm",
+                "lib/feature/secrets/sekreto/plugins/aws.dart",
+                "lib/feature/secrets/sekreto/plugins/sigv4.dart",
+                "lib/feature/secrets/sekreto/plugins/crypto.dart",
+                "feature/secrets/voxgig/sekreto/plugins/aws.clj",
+                "feature/secrets/voxgig/sekreto/plugins/sigv4.clj",
+                "feature/secrets/sekreto/plugins/aws.ex",
+                "feature/secrets/sekreto/plugins/sigv4.ex",
+                "feature/secrets/plugins/Aws.swift",
+                "feature/secrets/plugins/Sigv4.swift",
+                "feature/secrets/plugins/Crypto.swift",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Aws.lean",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Sigv4.lean",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Crypto.lean",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Clock.lean",
+                "feature/secrets/plugins/aws.c",
+                "feature/secrets/plugins/sigv4.c",
+                "feature/secrets/plugins/sha256.c",
+                "feature/secrets/sekreto/plugins/aws.lua",
+                "feature/secrets/sekreto/plugins/sigv4.lua",
+                "feature/secrets/plugins/aws.zig",
+                "feature/secrets/plugins/sigv4.zig",
+                "feature/secrets/plugins/aws.ml",
+                "feature/secrets/plugins/Aws.cpp",
+                "feature/secrets/plugins/Aws.hpp",
+                "feature/secrets/plugins/Sigv4.cpp",
+                "feature/secrets/plugins/Sigv4.hpp"
+              ],
+              "title": "AWS Secrets Manager and Parameter Store (SigV4 signing)"
+            },
+            "cloud": {
+              "active": false,
+              "def": {
+                "c": {
+                  "sek_plugin_azuresecrets": "feature/secrets/plugins/azuresecrets.c",
+                  "sek_plugin_gcpsecrets": "feature/secrets/plugins/gcpsecrets.c"
+                },
+                "clojure": {
+                  "voxgig.sekreto.plugins.azuresecrets/azuresecrets": "feature/secrets/voxgig/sekreto/plugins/azuresecrets.clj",
+                  "voxgig.sekreto.plugins.gcpsecrets/gcpsecrets": "feature/secrets/voxgig/sekreto/plugins/gcpsecrets.clj"
+                },
+                "cpp": {
+                  "azuresecrets": "feature/secrets/plugins/Azuresecrets.cpp",
+                  "gcpsecrets": "feature/secrets/plugins/Gcpsecrets.cpp"
+                },
+                "csharp": {
+                  "AzureSecrets.Plugin": "feature/secrets/plugins/AzureSecrets.cs",
+                  "GcpSecrets.Plugin": "feature/secrets/plugins/GcpSecrets.cs"
+                },
+                "dart": {
+                  "azuresecrets": "lib/feature/secrets/sekreto/plugins/azuresecrets.dart",
+                  "gcpsecrets": "lib/feature/secrets/sekreto/plugins/gcpsecrets.dart"
+                },
+                "elixir": {
+                  "Sekreto.Plugins.Azuresecrets.azuresecrets": "lib/projectname/feature/secrets/sekreto/plugins/azuresecrets.ex",
+                  "Sekreto.Plugins.Gcpsecrets.gcpsecrets": "lib/projectname/feature/secrets/sekreto/plugins/gcpsecrets.ex"
+                },
+                "go": {
+                  "azuresecrets.Plugin": "feature/secrets/plugins/azuresecrets/azuresecrets.go",
+                  "gcpsecrets.Plugin": "feature/secrets/plugins/gcpsecrets/gcpsecrets.go"
+                },
+                "java": {
+                  "Azuresecrets.PLUGIN": "feature/secrets/sekreto/plugins/Azuresecrets.java",
+                  "Gcpsecrets.PLUGIN": "feature/secrets/sekreto/plugins/Gcpsecrets.java"
+                },
+                "js": {
+                  "azuresecrets": "src/feature/secrets/sekreto/plugins/azuresecrets.js",
+                  "gcpsecrets": "src/feature/secrets/sekreto/plugins/gcpsecrets.js"
+                },
+                "kotlin": {
+                  "azuresecrets": "feature/secrets/sekreto/plugins/Azuresecrets.kt",
+                  "gcpsecrets": "feature/secrets/sekreto/plugins/Gcpsecrets.kt"
+                },
+                "lean": {
+                  "Sekreto.azuresecrets": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Azuresecrets.lean",
+                  "Sekreto.gcpsecrets": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Gcpsecrets.lean"
+                },
+                "lua": {
+                  "azuresecrets": "feature/secrets/sekreto/plugins/azuresecrets.lua",
+                  "gcpsecrets": "feature/secrets/sekreto/plugins/gcpsecrets.lua"
+                },
+                "ocaml": {
+                  "Azuresecrets.plugin": "feature/secrets/plugins/azuresecrets.ml",
+                  "Gcpsecrets.plugin": "feature/secrets/plugins/gcpsecrets.ml"
+                },
+                "perl": {
+                  "azuresecrets": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Azuresecrets.pm",
+                  "gcpsecrets": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Gcpsecrets.pm"
+                },
+                "php": {
+                  "azuresecrets": "feature/secrets/sekreto/plugins/azuresecrets.php",
+                  "gcpsecrets": "feature/secrets/sekreto/plugins/gcpsecrets.php"
+                },
+                "py": {
+                  "azuresecrets": "pkg/feature/secrets/voxgig_sekreto/plugins/azuresecrets.py",
+                  "gcpsecrets": "pkg/feature/secrets/voxgig_sekreto/plugins/gcpsecrets.py"
+                },
+                "rb": {
+                  "VoxgigSekreto::Plugins::AZURESECRETS": "feature/secrets/voxgig_sekreto/plugins/azuresecrets.rb",
+                  "VoxgigSekreto::Plugins::GCPSECRETS": "feature/secrets/voxgig_sekreto/plugins/gcpsecrets.rb"
+                },
+                "rust": {
+                  "azuresecrets::plugin": "feature/secrets/plugins/azuresecrets.rs",
+                  "gcpsecrets::plugin": "feature/secrets/plugins/gcpsecrets.rs"
+                },
+                "scala": {
+                  "com.voxgig.sekreto.plugins.azuresecrets": "feature/secrets/sekreto/plugins/Azuresecrets.scala",
+                  "com.voxgig.sekreto.plugins.gcpsecrets": "feature/secrets/sekreto/plugins/Gcpsecrets.scala"
+                },
+                "swift": {
+                  "azuresecrets": "Sources/ProjectNameSDK/feature/secrets/plugins/Azuresecrets.swift",
+                  "gcpsecrets": "Sources/ProjectNameSDK/feature/secrets/plugins/Gcpsecrets.swift"
+                },
+                "ts": {
+                  "azuresecrets": "src/feature/secrets/sekreto/plugins/azuresecrets.ts",
+                  "gcpsecrets": "src/feature/secrets/sekreto/plugins/gcpsecrets.ts"
+                },
+                "zig": {
+                  "azuresecrets": "feature/secrets/plugins/azuresecrets.zig",
+                  "gcpsecrets": "feature/secrets/plugins/gcpsecrets.zig"
+                }
+              },
+              "name": "cloud",
+              "needs": {
+                "fetch": true
+              },
+              "path": [
+                "src/feature/secrets/sekreto/plugins/gcpsecrets.ts",
+                "src/feature/secrets/sekreto/plugins/azuresecrets.ts",
+                "feature/secrets/plugins/gcpsecrets/gcpsecrets.go",
+                "feature/secrets/plugins/azuresecrets/azuresecrets.go",
+                "feature/secrets/plugins/gcpsecrets.rs",
+                "feature/secrets/plugins/azuresecrets.rs",
+                "feature/secrets/voxgig_sekreto/plugins/gcpsecrets.py",
+                "feature/secrets/voxgig_sekreto/plugins/azuresecrets.py",
+                "src/feature/secrets/sekreto/plugins/gcpsecrets.js",
+                "src/feature/secrets/sekreto/plugins/azuresecrets.js",
+                "feature/secrets/voxgig_sekreto/plugins/gcpsecrets.rb",
+                "feature/secrets/voxgig_sekreto/plugins/azuresecrets.rb",
+                "feature/secrets/sekreto/plugins/gcpsecrets.php",
+                "feature/secrets/sekreto/plugins/azuresecrets.php",
+                "feature/secrets/plugins/GcpSecrets.cs",
+                "feature/secrets/plugins/AzureSecrets.cs",
+                "feature/secrets/sekreto/plugins/Gcpsecrets.java",
+                "feature/secrets/sekreto/plugins/Azuresecrets.java",
+                "feature/secrets/sekreto/plugins/Gcpsecrets.scala",
+                "feature/secrets/sekreto/plugins/Azuresecrets.scala",
+                "feature/secrets/sekreto/plugins/Gcpsecrets.kt",
+                "feature/secrets/sekreto/plugins/Azuresecrets.kt",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Gcpsecrets.pm",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Azuresecrets.pm",
+                "lib/feature/secrets/sekreto/plugins/gcpsecrets.dart",
+                "lib/feature/secrets/sekreto/plugins/azuresecrets.dart",
+                "feature/secrets/sekreto/plugins/gcpsecrets.ex",
+                "feature/secrets/sekreto/plugins/azuresecrets.ex",
+                "feature/secrets/voxgig/sekreto/plugins/gcpsecrets.clj",
+                "feature/secrets/voxgig/sekreto/plugins/azuresecrets.clj",
+                "feature/secrets/plugins/Gcpsecrets.swift",
+                "feature/secrets/plugins/Azuresecrets.swift",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Gcpsecrets.lean",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Azuresecrets.lean",
+                "feature/secrets/plugins/gcpsecrets.c",
+                "feature/secrets/plugins/azuresecrets.c",
+                "feature/secrets/sekreto/plugins/gcpsecrets.lua",
+                "feature/secrets/sekreto/plugins/azuresecrets.lua",
+                "feature/secrets/plugins/gcpsecrets.zig",
+                "feature/secrets/plugins/azuresecrets.zig",
+                "feature/secrets/plugins/gcpsecrets.ml",
+                "feature/secrets/plugins/azuresecrets.ml",
+                "feature/secrets/plugins/Gcpsecrets.cpp",
+                "feature/secrets/plugins/Gcpsecrets.hpp",
+                "feature/secrets/plugins/Azuresecrets.cpp",
+                "feature/secrets/plugins/Azuresecrets.hpp"
+              ],
+              "title": "GCP Secret Manager and Azure Key Vault"
+            },
+            "saas": {
+              "active": false,
+              "def": {
+                "c": {
+                  "sek_plugin_doppler": "feature/secrets/plugins/doppler.c",
+                  "sek_plugin_infisical": "feature/secrets/plugins/infisical.c",
+                  "sek_plugin_onepassword": "feature/secrets/plugins/onepassword.c"
+                },
+                "clojure": {
+                  "voxgig.sekreto.plugins.doppler/doppler": "feature/secrets/voxgig/sekreto/plugins/doppler.clj",
+                  "voxgig.sekreto.plugins.infisical/infisical": "feature/secrets/voxgig/sekreto/plugins/infisical.clj",
+                  "voxgig.sekreto.plugins.onepassword/onepassword": "feature/secrets/voxgig/sekreto/plugins/onepassword.clj"
+                },
+                "cpp": {
+                  "doppler": "feature/secrets/plugins/Doppler.cpp",
+                  "infisical": "feature/secrets/plugins/Infisical.cpp",
+                  "onepassword": "feature/secrets/plugins/Onepassword.cpp"
+                },
+                "csharp": {
+                  "Doppler.Plugin": "feature/secrets/plugins/Doppler.cs",
+                  "Infisical.Plugin": "feature/secrets/plugins/Infisical.cs",
+                  "OnePassword.Plugin": "feature/secrets/plugins/OnePassword.cs"
+                },
+                "dart": {
+                  "doppler": "lib/feature/secrets/sekreto/plugins/doppler.dart",
+                  "infisical": "lib/feature/secrets/sekreto/plugins/infisical.dart",
+                  "onepassword": "lib/feature/secrets/sekreto/plugins/onepassword.dart"
+                },
+                "elixir": {
+                  "Sekreto.Plugins.Doppler.doppler": "lib/projectname/feature/secrets/sekreto/plugins/doppler.ex",
+                  "Sekreto.Plugins.Infisical.infisical": "lib/projectname/feature/secrets/sekreto/plugins/infisical.ex",
+                  "Sekreto.Plugins.Onepassword.onepassword": "lib/projectname/feature/secrets/sekreto/plugins/onepassword.ex"
+                },
+                "go": {
+                  "doppler.Plugin": "feature/secrets/plugins/doppler/doppler.go",
+                  "infisical.Plugin": "feature/secrets/plugins/infisical/infisical.go",
+                  "onepassword.Plugin": "feature/secrets/plugins/onepassword/onepassword.go"
+                },
+                "java": {
+                  "Doppler.PLUGIN": "feature/secrets/sekreto/plugins/Doppler.java",
+                  "Infisical.PLUGIN": "feature/secrets/sekreto/plugins/Infisical.java",
+                  "Onepassword.PLUGIN": "feature/secrets/sekreto/plugins/Onepassword.java"
+                },
+                "js": {
+                  "doppler": "src/feature/secrets/sekreto/plugins/doppler.js",
+                  "infisical": "src/feature/secrets/sekreto/plugins/infisical.js",
+                  "onepassword": "src/feature/secrets/sekreto/plugins/onepassword.js"
+                },
+                "kotlin": {
+                  "doppler": "feature/secrets/sekreto/plugins/Doppler.kt",
+                  "infisical": "feature/secrets/sekreto/plugins/Infisical.kt",
+                  "onepassword": "feature/secrets/sekreto/plugins/Onepassword.kt"
+                },
+                "lean": {
+                  "Sekreto.doppler": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Doppler.lean",
+                  "Sekreto.infisical": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Infisical.lean",
+                  "Sekreto.onepassword": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Onepassword.lean"
+                },
+                "lua": {
+                  "doppler": "feature/secrets/sekreto/plugins/doppler.lua",
+                  "infisical": "feature/secrets/sekreto/plugins/infisical.lua",
+                  "onepassword": "feature/secrets/sekreto/plugins/onepassword.lua"
+                },
+                "ocaml": {
+                  "Doppler.plugin": "feature/secrets/plugins/doppler.ml",
+                  "Infisical.plugin": "feature/secrets/plugins/infisical.ml",
+                  "Onepassword.plugin": "feature/secrets/plugins/onepassword.ml"
+                },
+                "perl": {
+                  "doppler": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Doppler.pm",
+                  "infisical": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Infisical.pm",
+                  "onepassword": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Onepassword.pm"
+                },
+                "php": {
+                  "doppler": "feature/secrets/sekreto/plugins/doppler.php",
+                  "infisical": "feature/secrets/sekreto/plugins/infisical.php",
+                  "onepassword": "feature/secrets/sekreto/plugins/onepassword.php"
+                },
+                "py": {
+                  "doppler": "pkg/feature/secrets/voxgig_sekreto/plugins/doppler.py",
+                  "infisical": "pkg/feature/secrets/voxgig_sekreto/plugins/infisical.py",
+                  "onepassword": "pkg/feature/secrets/voxgig_sekreto/plugins/onepassword.py"
+                },
+                "rb": {
+                  "VoxgigSekreto::Plugins::DOPPLER": "feature/secrets/voxgig_sekreto/plugins/doppler.rb",
+                  "VoxgigSekreto::Plugins::INFISICAL": "feature/secrets/voxgig_sekreto/plugins/infisical.rb",
+                  "VoxgigSekreto::Plugins::ONEPASSWORD": "feature/secrets/voxgig_sekreto/plugins/onepassword.rb"
+                },
+                "rust": {
+                  "doppler::plugin": "feature/secrets/plugins/doppler.rs",
+                  "infisical::plugin": "feature/secrets/plugins/infisical.rs",
+                  "onepassword::plugin": "feature/secrets/plugins/onepassword.rs"
+                },
+                "scala": {
+                  "com.voxgig.sekreto.plugins.doppler": "feature/secrets/sekreto/plugins/Doppler.scala",
+                  "com.voxgig.sekreto.plugins.infisical": "feature/secrets/sekreto/plugins/Infisical.scala",
+                  "com.voxgig.sekreto.plugins.onepassword": "feature/secrets/sekreto/plugins/Onepassword.scala"
+                },
+                "swift": {
+                  "doppler": "Sources/ProjectNameSDK/feature/secrets/plugins/Doppler.swift",
+                  "infisical": "Sources/ProjectNameSDK/feature/secrets/plugins/Infisical.swift",
+                  "onepassword": "Sources/ProjectNameSDK/feature/secrets/plugins/Onepassword.swift"
+                },
+                "ts": {
+                  "doppler": "src/feature/secrets/sekreto/plugins/doppler.ts",
+                  "infisical": "src/feature/secrets/sekreto/plugins/infisical.ts",
+                  "onepassword": "src/feature/secrets/sekreto/plugins/onepassword.ts"
+                },
+                "zig": {
+                  "doppler": "feature/secrets/plugins/doppler.zig",
+                  "infisical": "feature/secrets/plugins/infisical.zig",
+                  "onepassword": "feature/secrets/plugins/onepassword.zig"
+                }
+              },
+              "name": "saas",
+              "needs": {
+                "fetch": true
+              },
+              "path": [
+                "src/feature/secrets/sekreto/plugins/onepassword.ts",
+                "src/feature/secrets/sekreto/plugins/doppler.ts",
+                "src/feature/secrets/sekreto/plugins/infisical.ts",
+                "feature/secrets/plugins/onepassword/onepassword.go",
+                "feature/secrets/plugins/doppler/doppler.go",
+                "feature/secrets/plugins/infisical/infisical.go",
+                "feature/secrets/plugins/onepassword.rs",
+                "feature/secrets/plugins/doppler.rs",
+                "feature/secrets/plugins/infisical.rs",
+                "feature/secrets/voxgig_sekreto/plugins/onepassword.py",
+                "feature/secrets/voxgig_sekreto/plugins/doppler.py",
+                "feature/secrets/voxgig_sekreto/plugins/infisical.py",
+                "src/feature/secrets/sekreto/plugins/onepassword.js",
+                "src/feature/secrets/sekreto/plugins/doppler.js",
+                "src/feature/secrets/sekreto/plugins/infisical.js",
+                "feature/secrets/voxgig_sekreto/plugins/onepassword.rb",
+                "feature/secrets/voxgig_sekreto/plugins/doppler.rb",
+                "feature/secrets/voxgig_sekreto/plugins/infisical.rb",
+                "feature/secrets/sekreto/plugins/onepassword.php",
+                "feature/secrets/sekreto/plugins/doppler.php",
+                "feature/secrets/sekreto/plugins/infisical.php",
+                "feature/secrets/plugins/OnePassword.cs",
+                "feature/secrets/plugins/Doppler.cs",
+                "feature/secrets/plugins/Infisical.cs",
+                "feature/secrets/sekreto/plugins/Onepassword.java",
+                "feature/secrets/sekreto/plugins/Doppler.java",
+                "feature/secrets/sekreto/plugins/Infisical.java",
+                "feature/secrets/sekreto/plugins/Onepassword.scala",
+                "feature/secrets/sekreto/plugins/Doppler.scala",
+                "feature/secrets/sekreto/plugins/Infisical.scala",
+                "feature/secrets/sekreto/plugins/Onepassword.kt",
+                "feature/secrets/sekreto/plugins/Doppler.kt",
+                "feature/secrets/sekreto/plugins/Infisical.kt",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Onepassword.pm",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Doppler.pm",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Infisical.pm",
+                "lib/feature/secrets/sekreto/plugins/onepassword.dart",
+                "lib/feature/secrets/sekreto/plugins/doppler.dart",
+                "lib/feature/secrets/sekreto/plugins/infisical.dart",
+                "feature/secrets/voxgig/sekreto/plugins/onepassword.clj",
+                "feature/secrets/voxgig/sekreto/plugins/doppler.clj",
+                "feature/secrets/voxgig/sekreto/plugins/infisical.clj",
+                "feature/secrets/sekreto/plugins/onepassword.ex",
+                "feature/secrets/sekreto/plugins/doppler.ex",
+                "feature/secrets/sekreto/plugins/infisical.ex",
+                "feature/secrets/plugins/Onepassword.swift",
+                "feature/secrets/plugins/Doppler.swift",
+                "feature/secrets/plugins/Infisical.swift",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Onepassword.lean",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Doppler.lean",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Infisical.lean",
+                "feature/secrets/plugins/onepassword.c",
+                "feature/secrets/plugins/doppler.c",
+                "feature/secrets/plugins/infisical.c",
+                "feature/secrets/sekreto/plugins/onepassword.lua",
+                "feature/secrets/sekreto/plugins/doppler.lua",
+                "feature/secrets/sekreto/plugins/infisical.lua",
+                "feature/secrets/plugins/onepassword.zig",
+                "feature/secrets/plugins/doppler.zig",
+                "feature/secrets/plugins/infisical.zig",
+                "feature/secrets/plugins/onepassword.ml",
+                "feature/secrets/plugins/doppler.ml",
+                "feature/secrets/plugins/infisical.ml",
+                "feature/secrets/plugins/Onepassword.cpp",
+                "feature/secrets/plugins/Onepassword.hpp",
+                "feature/secrets/plugins/Doppler.cpp",
+                "feature/secrets/plugins/Doppler.hpp",
+                "feature/secrets/plugins/Infisical.cpp",
+                "feature/secrets/plugins/Infisical.hpp"
+              ],
+              "title": "1Password, Doppler and Infisical"
+            },
+            "secretspec": {
+              "active": false,
+              "def": {
+                "c": {
+                  "sek_plugin_secretspec": "feature/secrets/plugins/secretspec.c"
+                },
+                "clojure": {
+                  "voxgig.sekreto.plugins.secretspec/secretspec": "feature/secrets/voxgig/sekreto/plugins/secretspec.clj"
+                },
+                "cpp": {
+                  "secretspec": "feature/secrets/plugins/Secretspec.cpp"
+                },
+                "csharp": {
+                  "SecretSpec.Plugin": "feature/secrets/plugins/SecretSpec.cs"
+                },
+                "dart": {
+                  "secretspec": "lib/feature/secrets/sekreto/plugins/secretspec.dart"
+                },
+                "elixir": {
+                  "Sekreto.Plugins.Secretspec.secretspec": "lib/projectname/feature/secrets/sekreto/plugins/secretspec.ex"
+                },
+                "go": {
+                  "secretspec.Plugin": "feature/secrets/plugins/secretspec/secretspec.go"
+                },
+                "java": {
+                  "Secretspec.PLUGIN": "feature/secrets/sekreto/plugins/Secretspec.java"
+                },
+                "js": {
+                  "secretspec": "src/feature/secrets/sekreto/plugins/secretspec.js"
+                },
+                "kotlin": {
+                  "secretspec": "feature/secrets/sekreto/plugins/Secretspec.kt"
+                },
+                "lean": {
+                  "Sekreto.secretspec": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Secretspec.lean"
+                },
+                "lua": {
+                  "secretspec": "feature/secrets/sekreto/plugins/secretspec.lua"
+                },
+                "ocaml": {
+                  "Secretspec.plugin": "feature/secrets/plugins/secretspec.ml"
+                },
+                "perl": {
+                  "secretspec": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Secretspec.pm"
+                },
+                "php": {
+                  "secretspec": "feature/secrets/sekreto/plugins/secretspec.php"
+                },
+                "py": {
+                  "secretspec": "pkg/feature/secrets/voxgig_sekreto/plugins/secretspec.py"
+                },
+                "rb": {
+                  "VoxgigSekreto::Plugins::SECRETSPEC": "feature/secrets/voxgig_sekreto/plugins/secretspec.rb"
+                },
+                "rust": {
+                  "secretspec::plugin": "feature/secrets/plugins/secretspec.rs"
+                },
+                "scala": {
+                  "com.voxgig.sekreto.plugins.secretspec": "feature/secrets/sekreto/plugins/Secretspec.scala"
+                },
+                "swift": {
+                  "secretspec": "Sources/ProjectNameSDK/feature/secrets/plugins/Secretspec.swift"
+                },
+                "ts": {
+                  "secretspec": "src/feature/secrets/sekreto/plugins/secretspec.ts"
+                },
+                "zig": {
+                  "secretspec": "feature/secrets/plugins/secretspec.zig"
+                }
+              },
+              "name": "secretspec",
+              "needs": {
+                "fs": true
+              },
+              "path": [
+                "src/feature/secrets/sekreto/plugins/secretspec.ts",
+                "feature/secrets/plugins/secretspec/secretspec.go",
+                "feature/secrets/plugins/secretspec.rs",
+                "feature/secrets/voxgig_sekreto/plugins/secretspec.py",
+                "src/feature/secrets/sekreto/plugins/secretspec.js",
+                "feature/secrets/voxgig_sekreto/plugins/secretspec.rb",
+                "feature/secrets/sekreto/plugins/secretspec.php",
+                "feature/secrets/plugins/SecretSpec.cs",
+                "feature/secrets/sekreto/plugins/Secretspec.java",
+                "feature/secrets/sekreto/plugins/Secretspec.scala",
+                "feature/secrets/sekreto/plugins/Secretspec.kt",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Secretspec.pm",
+                "lib/feature/secrets/sekreto/plugins/secretspec.dart",
+                "feature/secrets/voxgig/sekreto/plugins/secretspec.clj",
+                "feature/secrets/sekreto/plugins/secretspec.ex",
+                "feature/secrets/plugins/Secretspec.swift",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Secretspec.lean",
+                "feature/secrets/plugins/secretspec.c",
+                "feature/secrets/sekreto/plugins/secretspec.lua",
+                "feature/secrets/plugins/secretspec.zig",
+                "feature/secrets/plugins/secretspec.ml",
+                "feature/secrets/plugins/Secretspec.cpp",
+                "feature/secrets/plugins/Secretspec.hpp"
+              ],
+              "title": "secretspec CLI bridge (child process)"
+            },
+            "vault": {
+              "active": true,
+              "def": {
+                "c": {
+                  "sek_plugin_boru": "feature/secrets/plugins/boru.c",
+                  "sek_plugin_hashicorp": "feature/secrets/plugins/hashicorp.c"
+                },
+                "clojure": {
+                  "voxgig.sekreto.plugins.boru/boru": "feature/secrets/voxgig/sekreto/plugins/boru.clj",
+                  "voxgig.sekreto.plugins.hashicorp/hashicorp": "feature/secrets/voxgig/sekreto/plugins/hashicorp.clj"
+                },
+                "cpp": {
+                  "boru": "feature/secrets/plugins/Boru.cpp",
+                  "hashicorp": "feature/secrets/plugins/Hashicorp.cpp"
+                },
+                "csharp": {
+                  "Boru.Plugin": "feature/secrets/plugins/Boru.cs",
+                  "Hashicorp.Plugin": "feature/secrets/plugins/Hashicorp.cs"
+                },
+                "dart": {
+                  "boru": "lib/feature/secrets/sekreto/plugins/boru.dart",
+                  "hashicorp": "lib/feature/secrets/sekreto/plugins/hashicorp.dart"
+                },
+                "elixir": {
+                  "Sekreto.Plugins.Boru.boru": "lib/projectname/feature/secrets/sekreto/plugins/boru.ex",
+                  "Sekreto.Plugins.Hashicorp.hashicorp": "lib/projectname/feature/secrets/sekreto/plugins/hashicorp.ex"
+                },
+                "go": {
+                  "boru.Plugin": "feature/secrets/plugins/boru/boru.go",
+                  "hashicorp.Plugin": "feature/secrets/plugins/hashicorp/hashicorp.go"
+                },
+                "java": {
+                  "Boru.PLUGIN": "feature/secrets/sekreto/plugins/Boru.java",
+                  "Hashicorp.PLUGIN": "feature/secrets/sekreto/plugins/Hashicorp.java"
+                },
+                "js": {
+                  "boru": "src/feature/secrets/sekreto/plugins/boru.js",
+                  "hashicorp": "src/feature/secrets/sekreto/plugins/hashicorp.js"
+                },
+                "kotlin": {
+                  "boru": "feature/secrets/sekreto/plugins/Boru.kt",
+                  "hashicorp": "feature/secrets/sekreto/plugins/Hashicorp.kt"
+                },
+                "lean": {
+                  "Sekreto.boru": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Boru.lean",
+                  "Sekreto.hashicorp": "src/feature/secrets/sekreto/plugins/SekretoPlugins/Hashicorp.lean"
+                },
+                "lua": {
+                  "boru": "feature/secrets/sekreto/plugins/boru.lua",
+                  "hashicorp": "feature/secrets/sekreto/plugins/hashicorp.lua"
+                },
+                "ocaml": {
+                  "Boru.plugin": "feature/secrets/plugins/boru.ml",
+                  "Hashicorp.plugin": "feature/secrets/plugins/hashicorp.ml"
+                },
+                "perl": {
+                  "boru": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Boru.pm",
+                  "hashicorp": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Hashicorp.pm"
+                },
+                "php": {
+                  "boru": "feature/secrets/sekreto/plugins/boru.php",
+                  "hashicorp": "feature/secrets/sekreto/plugins/hashicorp.php"
+                },
+                "py": {
+                  "boru": "pkg/feature/secrets/voxgig_sekreto/plugins/boru.py",
+                  "hashicorp": "pkg/feature/secrets/voxgig_sekreto/plugins/hashicorp.py"
+                },
+                "rb": {
+                  "VoxgigSekreto::Plugins::BORU": "feature/secrets/voxgig_sekreto/plugins/boru.rb",
+                  "VoxgigSekreto::Plugins::HASHICORP": "feature/secrets/voxgig_sekreto/plugins/hashicorp.rb"
+                },
+                "rust": {
+                  "boru::plugin": "feature/secrets/plugins/boru.rs",
+                  "hashicorp::plugin": "feature/secrets/plugins/hashicorp.rs"
+                },
+                "scala": {
+                  "com.voxgig.sekreto.plugins.boru": "feature/secrets/sekreto/plugins/Boru.scala",
+                  "com.voxgig.sekreto.plugins.hashicorp": "feature/secrets/sekreto/plugins/Hashicorp.scala"
+                },
+                "swift": {
+                  "boru": "Sources/ProjectNameSDK/feature/secrets/plugins/Boru.swift",
+                  "hashicorp": "Sources/ProjectNameSDK/feature/secrets/plugins/Hashicorp.swift"
+                },
+                "ts": {
+                  "boru": "src/feature/secrets/sekreto/plugins/boru.ts",
+                  "hashicorp": "src/feature/secrets/sekreto/plugins/hashicorp.ts"
+                },
+                "zig": {
+                  "boru": "feature/secrets/plugins/boru.zig",
+                  "hashicorp": "feature/secrets/plugins/hashicorp.zig"
+                }
+              },
+              "name": "vault",
+              "needs": {
+                "fetch": true,
+                "fs": true
+              },
+              "path": [
+                "src/feature/secrets/sekreto/plugins/hashicorp.ts",
+                "src/feature/secrets/sekreto/plugins/boru.ts",
+                "feature/secrets/plugins/hashicorp/hashicorp.go",
+                "feature/secrets/plugins/boru/boru.go",
+                "feature/secrets/plugins/hashicorp.rs",
+                "feature/secrets/plugins/boru.rs",
+                "feature/secrets/voxgig_sekreto/plugins/hashicorp.py",
+                "feature/secrets/voxgig_sekreto/plugins/boru.py",
+                "src/feature/secrets/sekreto/plugins/hashicorp.js",
+                "src/feature/secrets/sekreto/plugins/boru.js",
+                "feature/secrets/voxgig_sekreto/plugins/hashicorp.rb",
+                "feature/secrets/voxgig_sekreto/plugins/boru.rb",
+                "feature/secrets/sekreto/plugins/hashicorp.php",
+                "feature/secrets/sekreto/plugins/boru.php",
+                "feature/secrets/plugins/Hashicorp.cs",
+                "feature/secrets/plugins/Boru.cs",
+                "feature/secrets/sekreto/plugins/Hashicorp.java",
+                "feature/secrets/sekreto/plugins/Boru.java",
+                "feature/secrets/sekreto/plugins/Hashicorp.scala",
+                "feature/secrets/sekreto/plugins/Boru.scala",
+                "feature/secrets/sekreto/plugins/Hashicorp.kt",
+                "feature/secrets/sekreto/plugins/Boru.kt",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Hashicorp.pm",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Boru.pm",
+                "lib/feature/secrets/sekreto/plugins/hashicorp.dart",
+                "lib/feature/secrets/sekreto/plugins/boru.dart",
+                "feature/secrets/sekreto/plugins/hashicorp.ex",
+                "feature/secrets/sekreto/plugins/boru.ex",
+                "feature/secrets/voxgig/sekreto/plugins/hashicorp.clj",
+                "feature/secrets/voxgig/sekreto/plugins/boru.clj",
+                "feature/secrets/plugins/Hashicorp.swift",
+                "feature/secrets/plugins/Boru.swift",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Hashicorp.lean",
+                "src/feature/secrets/sekreto/plugins/SekretoPlugins/Boru.lean",
+                "feature/secrets/plugins/hashicorp.c",
+                "feature/secrets/plugins/boru.c",
+                "feature/secrets/sekreto/plugins/hashicorp.lua",
+                "feature/secrets/sekreto/plugins/boru.lua",
+                "feature/secrets/plugins/hashicorp.zig",
+                "feature/secrets/plugins/boru.zig",
+                "feature/secrets/plugins/hashicorp.ml",
+                "feature/secrets/plugins/boru.ml",
+                "feature/secrets/plugins/Hashicorp.cpp",
+                "feature/secrets/plugins/Hashicorp.hpp",
+                "feature/secrets/plugins/Boru.cpp",
+                "feature/secrets/plugins/Boru.hpp"
+              ],
+              "title": "HashiCorp Vault and boru"
+            }
+          },
+          "spec": {
+            "authexchange": "exchange"
+          },
+          "target": {
+            "c": {
+              "deps": {}
+            },
+            "clojure": {
+              "deps": {}
+            },
+            "cpp": {
+              "deps": {}
+            },
+            "csharp": {
+              "deps": {}
+            },
+            "dart": {
+              "deps": {}
+            },
+            "elixir": {
+              "deps": {}
+            },
+            "go": {
+              "deps": {}
+            },
+            "go-cli": {
+              "deps": {}
+            },
+            "go-mcp": {
+              "deps": {}
+            },
+            "haskell": {
+              "deps": {}
+            },
+            "java": {
+              "deps": {}
+            },
+            "js": {
+              "deps": {}
+            },
+            "kotlin": {
+              "deps": {}
+            },
+            "lean": {
+              "deps": {}
+            },
+            "lua": {
+              "deps": {}
+            },
+            "ocaml": {
+              "deps": {}
+            },
+            "perl": {
+              "deps": {}
+            },
+            "php": {
+              "deps": {}
+            },
+            "py": {
+              "deps": {}
+            },
+            "py-data": {
+              "deps": {}
+            },
+            "rb": {
+              "deps": {}
+            },
+            "rust": {
+              "deps": {}
+            },
+            "scala": {
+              "deps": {}
+            },
+            "swift": {
+              "deps": {}
+            },
+            "ts": {
+              "deps": {}
+            },
+            "zig": {
+              "deps": {}
+            }
+          },
+          "title": "Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens",
+          "transport": "wrap",
+          "version": "0.1.0"
         },
         "streaming": {
           "active": true,
@@ -5160,7 +6139,7 @@
         "live": {
           "app": false,
           "base": "",
-          "strict": false
+          "strict": true
         }
       }
     }
