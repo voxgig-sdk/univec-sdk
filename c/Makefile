@@ -15,8 +15,10 @@ CFLAGS ?= -std=c11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -O0 -g
 # point.h / types.h shadow nothing: the SDK's own value.h (utility/struct)
 # is reached by its neighbours through the including file's directory,
 # which a quoted include searches before any -I.
-PAYLOAD_DIRS := $(patsubst %/,%,$(wildcard feature/*/*/))
-INC := -I core -I utility/struct -I feature $(addprefix -I ,$(PAYLOAD_DIRS))
+PAYLOAD_DIRS := $(sort $(dir $(wildcard feature/*/*/*.h)))
+# Payload headers are quoted includes; they must not shadow system headers
+# such as <regex.h> with the plugin library's own regex.h.
+INC := -I core -I utility/struct -I feature $(addprefix -iquote ,$(PAYLOAD_DIRS))
 # The vendored omni test runner (tests/vendor/omni) is TEST-ONLY: it is
 # reachable from tests/ alone, never from LIB_SRCS, so it cannot enter the
 # shipped libsdk.a. That is why it lives under tests/ and not utility/.
@@ -74,6 +76,18 @@ all: build
 
 build: libsdk.a
 
+# Keep this before the generic rule for GNU make 3.81 on macOS.
+# omni's util.c includes <regex.h>. CFLAGS is `?=`, so an operator override
+# can drop the -D_GNU_SOURCE that exposes it; -D_POSIX_C_SOURCE is the
+# minimum omni itself compiles under (its own test/run.c sets exactly this).
+# _DARWIN_C_SOURCE is needed BESIDE it, not instead of it: on Darwin,
+# defining _POSIX_C_SOURCE alone LOWERS __DARWIN_C_LEVEL and hides regex_t,
+# so the same flag that exposes the header on glibc hides it on macOS. Each
+# platform ignores the other's macro.
+tests/vendor/omni/%.o: tests/vendor/omni/%.c
+	$(CC) $(CFLAGS) -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE -c $< -o $@
+
+
 %.o: %.c
 	$(CC) $(CFLAGS) $(INC) -c $< -o $@
 
@@ -87,15 +101,6 @@ libsdk.a: $(LIB_OBJS)
 	@rm -f $@
 	ar rcs $@ $(LIB_OBJS)
 
-# omni's util.c includes <regex.h>. CFLAGS is `?=`, so an operator override
-# can drop the -D_GNU_SOURCE that exposes it; -D_POSIX_C_SOURCE is the
-# minimum omni itself compiles under (its own test/run.c sets exactly this).
-# _DARWIN_C_SOURCE is needed BESIDE it, not instead of it: on Darwin,
-# defining _POSIX_C_SOURCE alone LOWERS __DARWIN_C_LEVEL and hides regex_t,
-# so the same flag that exposes the header on glibc hides it on macOS. Each
-# platform ignores the other's macro.
-tests/vendor/omni/%.o: tests/vendor/omni/%.c
-	$(CC) $(CFLAGS) -D_POSIX_C_SOURCE=200809L -D_DARWIN_C_SOURCE -c $< -o $@
 
 libomni.a: $(OMNI_OBJS)
 	@rm -f $@

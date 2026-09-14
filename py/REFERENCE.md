@@ -347,6 +347,7 @@ Return the entity name.
 | `ratelimit` | 0.0.1 | Client-side rate limiting via a token bucket |
 | `rbac` | 0.0.1 | Client-side role/permission enforcement |
 | `retry` | 0.0.1 | Automatic retry of transient failures with exponential backoff |
+| `secrets` | 0.1.0 | Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens |
 | `streaming` | 0.0.1 | Incremental streaming of list results via async iteration |
 | `telemetry` | 0.0.1 | Distributed tracing spans with W3C trace-context propagation |
 | `test` | 0.0.1 | In-memory mock transport for testing without a live server |
@@ -372,6 +373,7 @@ client = UnivecSDK({
         "ratelimit": {"active": True},
         "rbac": {"active": True},
         "retry": {"active": True},
+        "secrets": {"active": True},
         "streaming": {"active": True},
         "telemetry": {"active": True},
         "test": {"active": True},
@@ -392,7 +394,7 @@ transport, and the order you list them in is the order they nest.
 
 #### Ordering
 
-`cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `timeout` wrap the transport. Each
+`cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `secrets`, `timeout` wrap the transport. Each
 wraps whatever is already installed, so **activation order is nesting order**:
 a feature activated later sits OUTSIDE one activated earlier, and sees the call
 first.
@@ -809,6 +811,36 @@ reference.
 **Usage**
 
 Set `feature.retry.active` to true in the client options, and override any option above in the same entry. Every option keeps
+its default unless you name it.
+
+**Considerations**
+
+- Wraps the transport: its place in the activation order decides what it
+  sees. See [Ordering](#ordering) above.
+- Inactive by default: leaving it out costs nothing at runtime.
+
+#### `secrets`
+
+Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens.
+
+**Configuration**
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `cache` | `true` |
+| `exchange` | `{active: false, method: 'POST', path: 'auth/token', refresh: '', request: 'refresh_token', response: 'access_token', retries: 1, statuses: [401]}` |
+| `name` | `'univec'` |
+| `providers` | `[{kind: 'boru', namespace: 'sdk'}]` |
+
+Options above are those the model carries a default for. A feature may
+also accept callback options — a `sink` to receive each record, for
+instance — which have no default and are covered in the full feature
+reference.
+
+**Usage**
+
+Set `feature.secrets.active` to true in the client options, and override any option above in the same entry. Every option keeps
 its default unless you name it.
 
 **Considerations**

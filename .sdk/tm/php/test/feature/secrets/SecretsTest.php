@@ -240,7 +240,7 @@ class UnivecSecretsTest extends TestCase
     // seeded data, a scripted response); an op the API does not define fails
     // before it reaches the transport, which is why several may need
     // driving.
-    private function driveUntil($client, string $what, callable $stop): void
+    private function driveUntil($client, string $what, callable $stop, ?callable $onError = null): void
     {
         foreach ($this->entityAccessors($client) as $accessor) {
             try {
@@ -255,7 +255,10 @@ class UnivecSecretsTest extends TestCase
                 try {
                     $ent->$opname();
                 } catch (\Throwable $e) {
-                    // The op's own failure is not the assertion.
+                    // The op's own failure is not the assertion unless observed.
+                    if ($onError !== null) {
+                        $onError($e);
+                    }
                 }
                 if ($stop()) {
                     return;
@@ -263,6 +266,20 @@ class UnivecSecretsTest extends TestCase
             }
         }
         $this->fail('no entity operation ' . $what . ' - nothing to assert on');
+    }
+
+    // Capture a refusal from an operation this API actually defines.
+    private function entityError($client): UnivecError
+    {
+        $caught = null;
+        $this->driveUntil($client, 'returned an SDK error',
+            function () use (&$caught) { return $caught !== null; },
+            function (\Throwable $error) use (&$caught) {
+                if ($error instanceof UnivecError) {
+                    $caught = $error;
+                }
+            });
+        return $caught;
     }
 
     // Drive ops until one request reached the recorder.
@@ -469,15 +486,7 @@ class UnivecSecretsTest extends TestCase
             ]],
         ]);
 
-        $accessor = $this->entityAccessors($client)[0] ?? null;
-        $this->assertNotNull($accessor, 'no entity accessor - nothing to assert on');
-
-        $caught = null;
-        try {
-            $client->$accessor()->list();
-        } catch (UnivecError $e) {
-            $caught = $e;
-        }
+        $caught = $this->entityError($client);
 
         $this->assertNotNull($caught, 'the entity path must fail closed');
         $this->assertStringContainsString('vault unreachable', $caught->msg);
@@ -970,15 +979,8 @@ class UnivecSecretsTest extends TestCase
             ]],
         ]);
 
-        $accessor = $this->entityAccessors($client)[0] ?? null;
-        $this->assertNotNull($accessor);
-
-        try {
-            $client->$accessor()->list();
-            $this->fail('the op must fail closed');
-        } catch (UnivecError $e) {
-            // expected
-        }
+        $caught = $this->entityError($client);
+        $this->assertStringContainsString('vault unreachable', $caught->msg);
 
         $this->assertSame(1, $calls, 'the refusal must not be retried');
         $this->assertCount(0, $wire->calls);

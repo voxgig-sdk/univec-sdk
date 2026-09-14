@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "target": "js",
+  "scenarios": "supported",
+  "points": [
+    "POST /v1/convert",
+    "POST /v1/embed-bridge",
+    "POST /v1/ephemeral/convert",
+    "POST /v1/ephemeral/embed-bridge",
+    "POST /v1/embed",
+    "POST /v1/ephemeral/embed",
+    "POST /v1/ephemeral/key",
+    "GET /v1/models"
+  ]
+}

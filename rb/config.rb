@@ -1,6 +1,18 @@
 # Univec SDK configuration
 
+require_relative 'feature/secrets/voxgig_sekreto/plugins/boru'
+require_relative 'feature/secrets/voxgig_sekreto/plugins/hashicorp'
+
 module UnivecConfig
+  # The sekreto plugin DEFINITIONS the model selected per feature,
+  # required above from the modules the catalogue's active `plugin.def`
+  # entries declare. Handed to each feature (secrets builds its Sekreto
+  # with them): a provider kind not listed here is unknown to this SDK.
+  FEATURE_PLUGINS = {
+    "secrets" => [VoxgigSekreto::Plugins::BORU, VoxgigSekreto::Plugins::HASHICORP],
+  }.freeze
+
+
   # Return the process-wide config, built once on first use. The SDK reads
   # the config on every request and never writes to it, so one instance is
   # shared by every client rather than rebuilt per client.
@@ -183,6 +195,32 @@ module UnivecConfig
           },
           "transport" => "wrap",
         },
+        "secrets" => {
+          "options" => {
+            "active" => false,
+            "cache" => true,
+            "exchange" => {
+              "active" => false,
+              "method" => "POST",
+              "path" => "auth/token",
+              "refresh" => "",
+              "request" => "refresh_token",
+              "response" => "access_token",
+              "retries" => 1,
+              "statuses" => [
+                401,
+              ],
+            },
+            "name" => "univec",
+            "providers" => [
+              {
+                "kind" => "boru",
+                "namespace" => "sdk",
+              },
+            ],
+          },
+          "transport" => "wrap",
+        },
         "streaming" => {
           "options" => {
             "active" => false,
@@ -302,7 +340,9 @@ module UnivecConfig
                       "lit" => "embed-bridge",
                     },
                   ],
-                  "select" => {},
+                  "select" => {
+                    "$action" => "bridge",
+                  },
                   "transform" => {
                     "req" => "`reqdata`",
                     "res" => "`body.data`",
@@ -328,7 +368,9 @@ module UnivecConfig
                       "lit" => "convert",
                     },
                   ],
-                  "select" => {},
+                  "select" => {
+                    "$action" => "ephemeral",
+                  },
                   "transform" => {
                     "req" => "`reqdata`",
                     "res" => "`body.data`",
@@ -355,7 +397,9 @@ module UnivecConfig
                       "lit" => "embed-bridge",
                     },
                   ],
-                  "select" => {},
+                  "select" => {
+                    "$action" => "ephemeral_bridge",
+                  },
                   "transform" => {
                     "req" => "`reqdata`",
                     "res" => "`body.data`",
@@ -439,7 +483,9 @@ module UnivecConfig
                       "lit" => "embed",
                     },
                   ],
-                  "select" => {},
+                  "select" => {
+                    "$action" => "ephemeral",
+                  },
                   "transform" => {
                     "req" => "`reqdata`",
                     "res" => "`body.data`",

@@ -1,4 +1,6 @@
 # Univec SDK configuration
+from univec_sdk.feature.secrets.voxgig_sekreto.plugins.boru import boru
+from univec_sdk.feature.secrets.voxgig_sekreto.plugins.hashicorp import hashicorp
 
 
 # The sekreto plugin DEFINITIONS the model selected per feature, imported
@@ -6,6 +8,7 @@
 # entries declare. Handed to each feature (secrets builds its Sekreto
 # with them): a provider kind not listed here is unknown to that SDK.
 FEATURE_PLUGINS = {
+    "secrets": [boru, hashicorp],
 }
 
 
@@ -200,6 +203,32 @@ def make_config():
         },
         "transport": "wrap",
       },
+            "secrets": {
+        "options": {
+          "active": False,
+          "cache": True,
+          "exchange": {
+            "active": False,
+            "method": "POST",
+            "path": "auth/token",
+            "refresh": "",
+            "request": "refresh_token",
+            "response": "access_token",
+            "retries": 1,
+            "statuses": [
+              401,
+            ],
+          },
+          "name": "univec",
+          "providers": [
+            {
+              "kind": "boru",
+              "namespace": "sdk",
+            },
+          ],
+        },
+        "transport": "wrap",
+      },
             "streaming": {
         "options": {
           "active": False,
@@ -319,7 +348,9 @@ def make_config():
                     "lit": "embed-bridge",
                   },
                 ],
-                "select": {},
+                "select": {
+                  "$action": "bridge",
+                },
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
@@ -345,7 +376,9 @@ def make_config():
                     "lit": "convert",
                   },
                 ],
-                "select": {},
+                "select": {
+                  "$action": "ephemeral",
+                },
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
@@ -372,7 +405,9 @@ def make_config():
                     "lit": "embed-bridge",
                   },
                 ],
-                "select": {},
+                "select": {
+                  "$action": "ephemeral_bridge",
+                },
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",
@@ -456,7 +491,9 @@ def make_config():
                     "lit": "embed",
                   },
                 ],
-                "select": {},
+                "select": {
+                  "$action": "ephemeral",
+                },
                 "transform": {
                   "req": "`reqdata`",
                   "res": "`body.data`",

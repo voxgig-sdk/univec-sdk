@@ -171,6 +171,32 @@ local function make_config()
         },
         ["transport"] = "wrap",
       },
+      ["secrets"] = {
+        ["options"] = {
+          ["active"] = false,
+          ["cache"] = true,
+          ["exchange"] = {
+            ["active"] = false,
+            ["method"] = "POST",
+            ["path"] = "auth/token",
+            ["refresh"] = "",
+            ["request"] = "refresh_token",
+            ["response"] = "access_token",
+            ["retries"] = 1,
+            ["statuses"] = {
+              401,
+            },
+          },
+          ["name"] = "univec",
+          ["providers"] = {
+            {
+              ["kind"] = "boru",
+              ["namespace"] = "sdk",
+            },
+          },
+        },
+        ["transport"] = "wrap",
+      },
       ["streaming"] = {
         ["options"] = {
           ["active"] = false,
@@ -290,7 +316,9 @@ local function make_config()
                     ["lit"] = "embed-bridge",
                   },
                 },
-                ["select"] = {},
+                ["select"] = {
+                  ["$action"] = "bridge",
+                },
                 ["transform"] = {
                   ["req"] = "`reqdata`",
                   ["res"] = "`body.data`",
@@ -316,7 +344,9 @@ local function make_config()
                     ["lit"] = "convert",
                   },
                 },
-                ["select"] = {},
+                ["select"] = {
+                  ["$action"] = "ephemeral",
+                },
                 ["transform"] = {
                   ["req"] = "`reqdata`",
                   ["res"] = "`body.data`",
@@ -343,7 +373,9 @@ local function make_config()
                     ["lit"] = "embed-bridge",
                   },
                 },
-                ["select"] = {},
+                ["select"] = {
+                  ["$action"] = "ephemeral_bridge",
+                },
                 ["transform"] = {
                   ["req"] = "`reqdata`",
                   ["res"] = "`body.data`",
@@ -427,7 +459,9 @@ local function make_config()
                     ["lit"] = "embed",
                   },
                 },
-                ["select"] = {},
+                ["select"] = {
+                  ["$action"] = "ephemeral",
+                },
                 ["transform"] = {
                   ["req"] = "`reqdata`",
                   ["res"] = "`body.data`",

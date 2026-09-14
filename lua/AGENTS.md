@@ -57,6 +57,7 @@ the runtime under `.sdk/tm/lua/feature/` and regenerate.
 | **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.lua` | — |
 | **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.lua` | `PrePoint` |
 | **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.lua` | — |
+| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/secrets_feature.lua` | `PreSpec` |
 | **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.lua` | `PreResult` |
 | **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.lua` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
 | **test** — In-memory mock transport for testing without a live server | `feature/test_feature.lua` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |

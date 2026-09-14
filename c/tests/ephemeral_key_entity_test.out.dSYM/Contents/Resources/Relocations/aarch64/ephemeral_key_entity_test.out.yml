@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     'tests/ephemeral_key_entity_test.out'
+relocations:     []
+...

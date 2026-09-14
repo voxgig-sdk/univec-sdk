@@ -116,6 +116,19 @@ sub get_root_ctx {
   return $self->{_rootctx};
 }
 
+# The LIVE Sekreto instance: for arbitrary secrets and redaction.
+#
+#   $sdk->secrets->get('db.password')
+#   $sdk->secrets->redactall($logline)
+#
+# Never a clone: sekreto holds provider state (caches, vault
+# leases) that has to stay live to be worth anything.
+sub secrets {
+  my ($self) = @_;
+  my $f = $self->{_secrets};
+  return defined $f ? $f->sekreto : undef;
+}
+
 sub prepare {
   my ($self, $fetchargs) = @_;
   my $utility = $self->{_utility};

@@ -16,5 +16,5 @@ WriteMakefile(
     ABSTRACT         => 'Unofficial generated perl SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.',
     AUTHOR           => 'Voxgig',
     LICENSE          => 'mit',
-    MIN_PERL_VERSION => '5.018',
+    MIN_PERL_VERSION => '5.036',
 );

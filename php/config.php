@@ -197,6 +197,32 @@ class UnivecConfig
           ],
           'transport' => 'wrap',
         ],
+                "secrets" => [
+          'options' => [
+            'active' => false,
+            'cache' => true,
+            'exchange' => [
+              'active' => false,
+              'method' => 'POST',
+              'path' => 'auth/token',
+              'refresh' => '',
+              'request' => 'refresh_token',
+              'response' => 'access_token',
+              'retries' => 1,
+              'statuses' => [
+                401,
+              ],
+            ],
+            'name' => 'univec',
+            'providers' => [
+              [
+                'kind' => 'boru',
+                'namespace' => 'sdk',
+              ],
+            ],
+          ],
+          'transport' => 'wrap',
+        ],
                 "streaming" => [
           'options' => [
             'active' => false,
@@ -316,7 +342,9 @@ class UnivecConfig
                       'lit' => 'embed-bridge',
                     ],
                   ],
-                  'select' => [],
+                  'select' => [
+                    '$action' => 'bridge',
+                  ],
                   'transform' => [
                     'req' => '`reqdata`',
                     'res' => '`body.data`',
@@ -342,7 +370,9 @@ class UnivecConfig
                       'lit' => 'convert',
                     ],
                   ],
-                  'select' => [],
+                  'select' => [
+                    '$action' => 'ephemeral',
+                  ],
                   'transform' => [
                     'req' => '`reqdata`',
                     'res' => '`body.data`',
@@ -369,7 +399,9 @@ class UnivecConfig
                       'lit' => 'embed-bridge',
                     ],
                   ],
-                  'select' => [],
+                  'select' => [
+                    '$action' => 'ephemeral_bridge',
+                  ],
                   'transform' => [
                     'req' => '`reqdata`',
                     'res' => '`body.data`',
@@ -453,7 +485,9 @@ class UnivecConfig
                       'lit' => 'embed',
                     ],
                   ],
-                  'select' => [],
+                  'select' => [
+                    '$action' => 'ephemeral',
+                  ],
                   'transform' => [
                     'req' => '`reqdata`',
                     'res' => '`body.data`',
@@ -636,6 +670,31 @@ class UnivecConfig
         ];
     }
 
+
+    /**
+     * The sekreto plugin DEFINITIONS the model selected per feature, from
+     * the files the catalogue's active `plugin.def` entries declare.
+     * Handed to each feature (secrets builds its Sekreto with them): a
+     * provider kind not listed here is unknown to this SDK.
+     *
+     * A method rather than a constant: a definition holds closures, and PHP
+     * has no constant that can. The requires are INSIDE it, so a plugin
+     * file is read only when a feature asks for its definitions.
+     */
+    public static function feature_plugins(string $name): array
+    {
+        switch ($name) {
+            case "secrets":
+                require_once __DIR__ . '/feature/secrets/sekreto/plugins/boru.php';
+                require_once __DIR__ . '/feature/secrets/sekreto/plugins/hashicorp.php';
+                return [
+                    \Voxgig\Sekreto\Plugins\boru(),
+                    \Voxgig\Sekreto\Plugins\hashicorp(),
+                ];
+        }
+
+        return [];
+    }
 
     public static function make_feature(string $name)
     {

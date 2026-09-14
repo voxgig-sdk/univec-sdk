@@ -19,6 +19,7 @@ pub mod proxy;
 pub mod ratelimit;
 pub mod rbac;
 pub mod retry;
+pub mod secrets;
 pub mod streaming;
 pub mod telemetry;
 pub mod test;

@@ -14,10 +14,13 @@ const { ProxyFeature } = require('./feature/proxy/ProxyFeature')
 const { RatelimitFeature } = require('./feature/ratelimit/RatelimitFeature')
 const { RbacFeature } = require('./feature/rbac/RbacFeature')
 const { RetryFeature } = require('./feature/retry/RetryFeature')
+const { SecretsFeature } = require('./feature/secrets/SecretsFeature')
 const { StreamingFeature } = require('./feature/streaming/StreamingFeature')
 const { TelemetryFeature } = require('./feature/telemetry/TelemetryFeature')
 const { TestFeature } = require('./feature/test/TestFeature')
 const { TimeoutFeature } = require('./feature/timeout/TimeoutFeature')
+const { boru } = require('./feature/secrets/sekreto/plugins/boru')
+const { hashicorp } = require('./feature/secrets/sekreto/plugins/hashicorp')
 
 
 
@@ -36,6 +39,7 @@ const FEATURE_CLASS = {
  ratelimit: RatelimitFeature,
  rbac: RbacFeature,
  retry: RetryFeature,
+ secrets: SecretsFeature,
  streaming: StreamingFeature,
  telemetry: TelemetryFeature,
  test: TestFeature,
@@ -56,7 +60,8 @@ const FEATURE_CLASS = {
 // module.exports at the end of its body, so anything reading the map at
 // module load would get undefined. See tm/js/src/feature/secrets.
 const FEATURE_PLUGINS = {
-  
+   secrets: [boru, hashicorp],
+
 }
 
 
@@ -246,6 +251,32 @@ class Config {
       },
       "transport": "wrap"
     },
+ secrets:     {
+      "options": {
+        "active": false,
+        "cache": true,
+        "exchange": {
+          "active": false,
+          "method": "POST",
+          "path": "auth/token",
+          "refresh": "",
+          "request": "refresh_token",
+          "response": "access_token",
+          "retries": 1,
+          "statuses": [
+            401
+          ]
+        },
+        "name": "univec",
+        "providers": [
+          {
+            "kind": "boru",
+            "namespace": "sdk"
+          }
+        ]
+      },
+      "transport": "wrap"
+    },
  streaming:     {
       "options": {
         "active": false,
@@ -382,7 +413,9 @@ class Config {
                   "lit": "embed-bridge"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "bridge"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -408,7 +441,9 @@ class Config {
                   "lit": "convert"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -435,7 +470,9 @@ class Config {
                   "lit": "embed-bridge"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral_bridge"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -519,7 +556,9 @@ class Config {
                   "lit": "embed"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"

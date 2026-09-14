@@ -15,6 +15,7 @@ require_relative 'feature/proxy_feature'
 require_relative 'feature/ratelimit_feature'
 require_relative 'feature/rbac_feature'
 require_relative 'feature/retry_feature'
+require_relative 'feature/secrets_feature'
 require_relative 'feature/streaming_feature'
 require_relative 'feature/telemetry_feature'
 require_relative 'feature/test_feature'
@@ -54,6 +55,8 @@ module UnivecFeatures
       UnivecRbacFeature.new
     when "retry"
       UnivecRetryFeature.new
+    when "secrets"
+      UnivecSecretsFeature.new
     when "streaming"
       UnivecStreamingFeature.new
     when "telemetry"

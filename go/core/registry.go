@@ -32,6 +32,8 @@ var NewRbacFeatureFunc func() Feature
 
 var NewRetryFeatureFunc func() Feature
 
+var NewSecretsFeatureFunc func() Feature
+
 var NewStreamingFeatureFunc func() Feature
 
 var NewTelemetryFeatureFunc func() Feature

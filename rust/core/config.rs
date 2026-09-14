@@ -174,6 +174,32 @@ pub fn make_config() -> Value {
                 ])),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
+            ("secrets".to_string(), Value::map_of([
+                ("options".to_string(), Value::map_of([
+                    ("active".to_string(), Value::Bool(false)),
+                    ("cache".to_string(), Value::Bool(true)),
+                    ("exchange".to_string(), Value::map_of([
+                        ("active".to_string(), Value::Bool(false)),
+                        ("method".to_string(), Value::str("POST")),
+                        ("path".to_string(), Value::str("auth/token")),
+                        ("refresh".to_string(), Value::str("")),
+                        ("request".to_string(), Value::str("refresh_token")),
+                        ("response".to_string(), Value::str("access_token")),
+                        ("retries".to_string(), Value::Num(1f64)),
+                        ("statuses".to_string(), Value::list(vec![
+                            Value::Num(401f64),
+                        ])),
+                    ])),
+                    ("name".to_string(), Value::str("univec")),
+                    ("providers".to_string(), Value::list(vec![
+                        Value::map_of([
+                            ("kind".to_string(), Value::str("boru")),
+                            ("namespace".to_string(), Value::str("sdk")),
+                        ]),
+                    ])),
+                ])),
+                ("transport".to_string(), Value::str("wrap")),
+            ])),
             ("streaming".to_string(), Value::map_of([
                 ("options".to_string(), Value::map_of([
                     ("active".to_string(), Value::Bool(false)),
@@ -293,7 +319,9 @@ pub fn make_config() -> Value {
                                         ("lit".to_string(), Value::str("embed-bridge")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::empty_map()),
+                                ("select".to_string(), Value::map_of([
+                                    ("$action".to_string(), Value::str("bridge")),
+                                ])),
                                 ("transform".to_string(), Value::map_of([
                                     ("req".to_string(), Value::str("`reqdata`")),
                                     ("res".to_string(), Value::str("`body.data`")),
@@ -319,7 +347,9 @@ pub fn make_config() -> Value {
                                         ("lit".to_string(), Value::str("convert")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::empty_map()),
+                                ("select".to_string(), Value::map_of([
+                                    ("$action".to_string(), Value::str("ephemeral")),
+                                ])),
                                 ("transform".to_string(), Value::map_of([
                                     ("req".to_string(), Value::str("`reqdata`")),
                                     ("res".to_string(), Value::str("`body.data`")),
@@ -346,7 +376,9 @@ pub fn make_config() -> Value {
                                         ("lit".to_string(), Value::str("embed-bridge")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::empty_map()),
+                                ("select".to_string(), Value::map_of([
+                                    ("$action".to_string(), Value::str("ephemeral_bridge")),
+                                ])),
                                 ("transform".to_string(), Value::map_of([
                                     ("req".to_string(), Value::str("`reqdata`")),
                                     ("res".to_string(), Value::str("`body.data`")),
@@ -430,7 +462,9 @@ pub fn make_config() -> Value {
                                         ("lit".to_string(), Value::str("embed")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::empty_map()),
+                                ("select".to_string(), Value::map_of([
+                                    ("$action".to_string(), Value::str("ephemeral")),
+                                ])),
                                 ("transform".to_string(), Value::map_of([
                                     ("req".to_string(), Value::str("`reqdata`")),
                                     ("res".to_string(), Value::str("`body.data`")),
@@ -651,6 +685,7 @@ pub fn make_feature(name: &str) -> FeatureRef {
         "ratelimit" => Rc::new(RefCell::new(crate::feature::ratelimit::RatelimitFeature::new())),
         "rbac" => Rc::new(RefCell::new(crate::feature::rbac::RbacFeature::new())),
         "retry" => Rc::new(RefCell::new(crate::feature::retry::RetryFeature::new())),
+        "secrets" => Rc::new(RefCell::new(crate::feature::secrets::SecretsFeature::new())),
         "streaming" => Rc::new(RefCell::new(crate::feature::streaming::StreamingFeature::new())),
         "telemetry" => Rc::new(RefCell::new(crate::feature::telemetry::TelemetryFeature::new())),
         "test" => Rc::new(RefCell::new(crate::feature::test::TestFeature::new())),

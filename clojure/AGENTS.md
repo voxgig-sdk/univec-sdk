@@ -56,6 +56,7 @@ the runtime under `.sdk/tm/clojure/feature/` and regenerate.
 | **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.clj` | — |
 | **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.clj` | `PrePoint` |
 | **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.clj` | — |
+| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/secrets_feature.clj` | `PreSpec` |
 | **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.clj` | `PreResult` |
 | **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.clj` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
 | **test** — In-memory mock transport for testing without a live server | `feature/test_feature.clj` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |

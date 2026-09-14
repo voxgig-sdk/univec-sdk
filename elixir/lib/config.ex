@@ -172,6 +172,32 @@ defmodule Univec.Config do
           },
           "transport" => "wrap"
         },
+        "secrets" => %{
+          "options" => %{
+            "active" => false,
+            "cache" => true,
+            "exchange" => %{
+              "active" => false,
+              "method" => "POST",
+              "path" => "auth/token",
+              "refresh" => "",
+              "request" => "refresh_token",
+              "response" => "access_token",
+              "retries" => 1,
+              "statuses" => [
+                401
+              ]
+            },
+            "name" => "univec",
+            "providers" => [
+              %{
+                "kind" => "boru",
+                "namespace" => "sdk"
+              }
+            ]
+          },
+          "transport" => "wrap"
+        },
         "streaming" => %{
           "options" => %{
             "active" => false,
@@ -291,7 +317,9 @@ defmodule Univec.Config do
                       "lit" => "embed-bridge"
                     }
                   ],
-                  "select" => %{},
+                  "select" => %{
+                    "$action" => "bridge"
+                  },
                   "transform" => %{
                     "req" => "`reqdata`",
                     "res" => "`body.data`"
@@ -317,7 +345,9 @@ defmodule Univec.Config do
                       "lit" => "convert"
                     }
                   ],
-                  "select" => %{},
+                  "select" => %{
+                    "$action" => "ephemeral"
+                  },
                   "transform" => %{
                     "req" => "`reqdata`",
                     "res" => "`body.data`"
@@ -344,7 +374,9 @@ defmodule Univec.Config do
                       "lit" => "embed-bridge"
                     }
                   ],
-                  "select" => %{},
+                  "select" => %{
+                    "$action" => "ephemeral_bridge"
+                  },
                   "transform" => %{
                     "req" => "`reqdata`",
                     "res" => "`body.data`"
@@ -428,7 +460,9 @@ defmodule Univec.Config do
                       "lit" => "embed"
                     }
                   ],
-                  "select" => %{},
+                  "select" => %{
+                    "$action" => "ephemeral"
+                  },
                   "transform" => %{
                     "req" => "`reqdata`",
                     "res" => "`body.data`"
@@ -635,5 +669,14 @@ defmodule Univec.Config do
     true
   rescue
     ArgumentError -> false
+  end
+
+  # The plugin definitions the model selected per feature. Empty when no
+  # active feature declares active plugin groups for this target.
+  def feature_plugins(name) do
+    case name do
+      "secrets" -> [Sekreto.Plugins.Boru.boru(), Sekreto.Plugins.Hashicorp.hashicorp()]
+      _ -> []
+    end
   end
 end

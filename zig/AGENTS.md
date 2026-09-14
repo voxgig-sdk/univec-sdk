@@ -56,6 +56,7 @@ the runtime under `.sdk/tm/zig/feature/` and regenerate.
 | **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.zig` | — |
 | **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.zig` | `PrePoint` |
 | **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.zig` | — |
+| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/secrets_feature.zig` | `PreSpec` |
 | **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.zig` | `PreResult` |
 | **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.zig` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
 | **test** — In-memory mock transport for testing without a live server | `feature/test_feature.zig` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |

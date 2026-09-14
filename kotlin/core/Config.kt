@@ -1,6 +1,8 @@
 package voxgig.univecsdk.core
 
 import voxgig.univecsdk.utility.Json
+import voxgig.univecsdk.feature.secrets.sekreto.plugins.boru
+import voxgig.univecsdk.feature.secrets.sekreto.plugins.hashicorp
 
 /** Static SDK configuration and by-name feature construction. */
 @Suppress("UNCHECKED_CAST")
@@ -41,6 +43,7 @@ object Config {
       "ratelimit" -> voxgig.univecsdk.feature.RatelimitFeature()
       "rbac" -> voxgig.univecsdk.feature.RbacFeature()
       "retry" -> voxgig.univecsdk.feature.RetryFeature()
+      "secrets" -> voxgig.univecsdk.feature.SecretsFeature()
       "streaming" -> voxgig.univecsdk.feature.StreamingFeature()
       "telemetry" -> voxgig.univecsdk.feature.TelemetryFeature()
       "test" -> voxgig.univecsdk.feature.TestFeature()
@@ -54,6 +57,7 @@ object Config {
   // declares active plugin groups for this target - and then no plugin
   // import is emitted either.
   private val featurePluginsMap: Map<String, List<Any?>> = mapOf(
+    "secrets" to listOf(boru, hashicorp),
   )
 
   // featurePlugins is the definitions list for one feature's chain.
@@ -228,6 +232,32 @@ object Config {
     b.append("   },")
     b.append("   \"transport\": \"wrap\"")
     b.append("  },")
+    b.append("  \"secrets\": {")
+    b.append("   \"options\": {")
+    b.append("    \"active\": false,")
+    b.append("    \"cache\": true,")
+    b.append("    \"exchange\": {")
+    b.append("     \"active\": false,")
+    b.append("     \"method\": \"POST\",")
+    b.append("     \"path\": \"auth/token\",")
+    b.append("     \"refresh\": \"\",")
+    b.append("     \"request\": \"refresh_token\",")
+    b.append("     \"response\": \"access_token\",")
+    b.append("     \"retries\": 1,")
+    b.append("     \"statuses\": [")
+    b.append("      401")
+    b.append("     ]")
+    b.append("    },")
+    b.append("    \"name\": \"univec\",")
+    b.append("    \"providers\": [")
+    b.append("     {")
+    b.append("      \"kind\": \"boru\",")
+    b.append("      \"namespace\": \"sdk\"")
+    b.append("     }")
+    b.append("    ]")
+    b.append("   },")
+    b.append("   \"transport\": \"wrap\"")
+    b.append("  },")
     b.append("  \"streaming\": {")
     b.append("   \"options\": {")
     b.append("    \"active\": false,")
@@ -347,7 +377,9 @@ object Config {
     b.append("         \"lit\": \"embed-bridge\"")
     b.append("        }")
     b.append("       ],")
-    b.append("       \"select\": {},")
+    b.append("       \"select\": {")
+    b.append("        \"\$action\": \"bridge\"")
+    b.append("       },")
     b.append("       \"transform\": {")
     b.append("        \"req\": \"`reqdata`\",")
     b.append("        \"res\": \"`body.data`\"")
@@ -373,7 +405,9 @@ object Config {
     b.append("         \"lit\": \"convert\"")
     b.append("        }")
     b.append("       ],")
-    b.append("       \"select\": {},")
+    b.append("       \"select\": {")
+    b.append("        \"\$action\": \"ephemeral\"")
+    b.append("       },")
     b.append("       \"transform\": {")
     b.append("        \"req\": \"`reqdata`\",")
     b.append("        \"res\": \"`body.data`\"")
@@ -400,7 +434,9 @@ object Config {
     b.append("         \"lit\": \"embed-bridge\"")
     b.append("        }")
     b.append("       ],")
-    b.append("       \"select\": {},")
+    b.append("       \"select\": {")
+    b.append("        \"\$action\": \"ephemeral_bridge\"")
+    b.append("       },")
     b.append("       \"transform\": {")
     b.append("        \"req\": \"`reqdata`\",")
     b.append("        \"res\": \"`body.data`\"")
@@ -484,7 +520,9 @@ object Config {
     b.append("         \"lit\": \"embed\"")
     b.append("        }")
     b.append("       ],")
-    b.append("       \"select\": {},")
+    b.append("       \"select\": {")
+    b.append("        \"\$action\": \"ephemeral\"")
+    b.append("       },")
     b.append("       \"transform\": {")
     b.append("        \"req\": \"`reqdata`\",")
     b.append("        \"res\": \"`body.data`\"")

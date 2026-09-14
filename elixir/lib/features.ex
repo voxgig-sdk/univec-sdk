@@ -17,6 +17,7 @@ defmodule Univec.Features do
       "ratelimit" -> Univec.Feature.Ratelimit.new()
       "rbac" -> Univec.Feature.Rbac.new()
       "retry" -> Univec.Feature.Retry.new()
+      "secrets" -> Univec.Feature.Secrets.new()
       "streaming" -> Univec.Feature.Streaming.new()
       "telemetry" -> Univec.Feature.Telemetry.new()
       "test" -> Univec.Feature.Test.new()

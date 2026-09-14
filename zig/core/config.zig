@@ -174,6 +174,32 @@ pub fn make_config() Value {
                 }) },
                 .{ "transport", h.vstr("wrap") },
             }) },
+            .{ "secrets", h.jo(&.{
+                .{ "options", h.jo(&.{
+                    .{ "active", h.vbool(false) },
+                    .{ "cache", h.vbool(true) },
+                    .{ "exchange", h.jo(&.{
+                        .{ "active", h.vbool(false) },
+                        .{ "method", h.vstr("POST") },
+                        .{ "path", h.vstr("auth/token") },
+                        .{ "refresh", h.vstr("") },
+                        .{ "request", h.vstr("refresh_token") },
+                        .{ "response", h.vstr("access_token") },
+                        .{ "retries", h.vnum(1) },
+                        .{ "statuses", h.ja(&.{
+                            h.vnum(401),
+                        }) },
+                    }) },
+                    .{ "name", h.vstr("univec") },
+                    .{ "providers", h.ja(&.{
+                        h.jo(&.{
+                            .{ "kind", h.vstr("boru") },
+                            .{ "namespace", h.vstr("sdk") },
+                        }),
+                    }) },
+                }) },
+                .{ "transport", h.vstr("wrap") },
+            }) },
             .{ "streaming", h.jo(&.{
                 .{ "options", h.jo(&.{
                     .{ "active", h.vbool(false) },
@@ -293,7 +319,9 @@ pub fn make_config() Value {
                                         .{ "lit", h.vstr("embed-bridge") },
                                     }),
                                 }) },
-                                .{ "select", h.omap() },
+                                .{ "select", h.jo(&.{
+                                    .{ "$action", h.vstr("bridge") },
+                                }) },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
@@ -319,7 +347,9 @@ pub fn make_config() Value {
                                         .{ "lit", h.vstr("convert") },
                                     }),
                                 }) },
-                                .{ "select", h.omap() },
+                                .{ "select", h.jo(&.{
+                                    .{ "$action", h.vstr("ephemeral") },
+                                }) },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
@@ -346,7 +376,9 @@ pub fn make_config() Value {
                                         .{ "lit", h.vstr("embed-bridge") },
                                     }),
                                 }) },
-                                .{ "select", h.omap() },
+                                .{ "select", h.jo(&.{
+                                    .{ "$action", h.vstr("ephemeral_bridge") },
+                                }) },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
@@ -430,7 +462,9 @@ pub fn make_config() Value {
                                         .{ "lit", h.vstr("embed") },
                                     }),
                                 }) },
-                                .{ "select", h.omap() },
+                                .{ "select", h.jo(&.{
+                                    .{ "$action", h.vstr("ephemeral") },
+                                }) },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
@@ -654,5 +688,6 @@ pub fn make_feature(name: []const u8) Feature {
     if (std.mem.eql(u8, name, "telemetry")) return @import("../feature/telemetry.zig").TelemetryFeature.make();
     if (std.mem.eql(u8, name, "test")) return @import("../feature/test.zig").TestFeature.make();
     if (std.mem.eql(u8, name, "timeout")) return @import("../feature/timeout.zig").TimeoutFeature.make();
+    if (std.mem.eql(u8, name, "secrets")) return @import("../feature/secrets.zig").SecretsFeature.make();
     return @import("../feature/base.zig").BaseFeature.make();
 }

@@ -71,6 +71,9 @@ func init() {
 	core.NewRetryFeatureFunc = func() core.Feature {
 		return feature.NewRetryFeature()
 	}
+	core.NewSecretsFeatureFunc = func() core.Feature {
+		return feature.NewSecretsFeature()
+	}
 	core.NewStreamingFeatureFunc = func() core.Feature {
 		return feature.NewStreamingFeature()
 	}
@@ -129,6 +132,7 @@ var NewProxyFeature = feature.NewProxyFeature
 var NewRatelimitFeature = feature.NewRatelimitFeature
 var NewRbacFeature = feature.NewRbacFeature
 var NewRetryFeature = feature.NewRetryFeature
+var NewSecretsFeature = feature.NewSecretsFeature
 var NewStreamingFeature = feature.NewStreamingFeature
 var NewTelemetryFeature = feature.NewTelemetryFeature
 var NewTestFeature = feature.NewTestFeature

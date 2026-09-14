@@ -57,6 +57,7 @@ the runtime under `.sdk/tm/rb/feature/` and regenerate.
 | **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.rb` | — |
 | **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.rb` | `PrePoint` |
 | **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.rb` | — |
+| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/secrets_feature.rb` | `PreSpec` |
 | **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.rb` | `PreResult` |
 | **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.rb` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
 | **test** — In-memory mock transport for testing without a live server | `feature/test_feature.rb` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |

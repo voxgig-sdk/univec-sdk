@@ -14,6 +14,7 @@ const { UnivecEntityBase } = require('./UnivecEntityBase')
 
 
 const { BaseFeature } = require('./feature/base/BaseFeature')
+const sekreto = require('./feature/secrets/sekreto')
 
 
 
@@ -26,7 +27,8 @@ class UnivecSDK {
   _utility = new Utility()
   _features
   _rootctx
-  
+  _secrets
+
 
   constructor(options) {
 
@@ -100,6 +102,10 @@ class UnivecSDK {
   }
 
   
+secrets() {
+  return this._secrets && this._secrets.sekreto()
+}
+
 
 
   async prepare(fetchargs) {
@@ -148,6 +154,15 @@ class UnivecSDK {
     }
 
     
+if (null != this._secrets) {
+  try {
+    await this._secrets.resolve()
+  }
+  catch (err) {
+    return err instanceof Error ? err : new Error(String(err))
+  }
+}
+
 
     // Apply SDK auth (apikey, auth prefix, etc.)
     const authResult = prepareAuth(ctx)
@@ -381,7 +396,8 @@ const SDK = UnivecSDK
 module.exports = {
   stdutil,
   config,
-  
+  sekreto,
+
 
   BaseFeature,
   UnivecEntityBase,

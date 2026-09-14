@@ -15,3 +15,12 @@ depends: [
 build: [
   [make "build"]
 ]
+# The secrets feature's plugin groups (vault) bind
+# OpenSSL through the vendored plugins/tls_stubs.c (-lssl -lcrypto), the
+# one external dependency an ocaml SDK can have. Linked only because those
+# groups are active - see feature/secrets/feature.mk.
+depexts: [
+  ["libssl-dev"] {os-family = "debian"}
+  ["openssl-devel"] {os-family = "rhel"}
+  ["openssl"] {os = "macos" & os-distribution = "homebrew"}
+]

@@ -8,9 +8,23 @@ use Cwd ();
 
 my $__dir;
 BEGIN { $__dir = File::Basename::dirname(Cwd::abs_path(__FILE__)) }
+
+# The vendored sekreto and plugin ports keep their UPSTREAM package layout,
+# so they resolve through @INC rather than a file-path require - the same
+# convention feature/secrets_feature.pm and t/omni.pm use. This BEGIN runs
+# before the 'use' lines below, which are compile-time.
+BEGIN {
+  unshift @INC,
+    "$__dir/feature/secrets/sekreto",
+    "$__dir/feature/secrets/plugin",
+    "$__dir/feature/secrets/plugins";
+}
 require(Cwd::abs_path("$__dir/lib/Voxgig/Struct.pm"));
 
 package UnivecConfig;
+
+use Voxgig::Sekreto::Plugins::Boru qw(boru);
+use Voxgig::Sekreto::Plugins::Hashicorp qw(hashicorp);
 
 # GENERATED from the API model - do not edit by hand. Parsed fresh on
 # each call so callers can safely mutate their copy.
@@ -182,6 +196,32 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
       },
       "transport": "wrap"
     },
+    "secrets": {
+      "options": {
+        "active": false,
+        "cache": true,
+        "exchange": {
+          "active": false,
+          "method": "POST",
+          "path": "auth/token",
+          "refresh": "",
+          "request": "refresh_token",
+          "response": "access_token",
+          "retries": 1,
+          "statuses": [
+            401
+          ]
+        },
+        "name": "univec",
+        "providers": [
+          {
+            "kind": "boru",
+            "namespace": "sdk"
+          }
+        ]
+      },
+      "transport": "wrap"
+    },
     "streaming": {
       "options": {
         "active": false,
@@ -301,7 +341,9 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                   "lit": "embed-bridge"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "bridge"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -327,7 +369,9 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                   "lit": "convert"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -354,7 +398,9 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                   "lit": "embed-bridge"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral_bridge"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -438,7 +484,9 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                   "lit": "embed"
                 }
               ],
-              "select": {},
+              "select": {
+                "$action": "ephemeral"
+              },
               "transform": {
                 "req": "`reqdata`",
                 "res": "`body.data`"
@@ -644,6 +692,24 @@ sub make_feature {
   my ($name) = @_;
   require(Cwd::abs_path("$__dir/features.pm"));
   return UnivecFeatures::make_feature($name);
+}
+
+# THE SDK'S PROVIDER VOCABULARY, from the model's active plugin groups.
+#
+# sekreto's core ships four built-in kinds (env, memory, dotenv, file) and
+# nothing else: a kind not passed in here is UNKNOWN to that Sekreto. So
+# this table is what decides which vault, cloud, SaaS or CLI providers a
+# chain in this SDK may name - and an inactive group is not merely
+# unimported, its module is not generated at all.
+our %FEATURE_PLUGINS = (
+  'secrets' => [ boru(), hashicorp() ],
+);
+
+sub feature_plugins {
+  my ($name) = @_;
+  $name = '' unless defined $name;
+  my $list = $FEATURE_PLUGINS{$name};
+  return defined $list ? $list : [];
 }
 
 1;

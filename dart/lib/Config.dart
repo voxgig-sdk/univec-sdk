@@ -13,11 +13,14 @@ import 'feature/proxy/ProxyFeature.dart';
 import 'feature/ratelimit/RatelimitFeature.dart';
 import 'feature/rbac/RbacFeature.dart';
 import 'feature/retry/RetryFeature.dart';
+import 'feature/secrets/SecretsFeature.dart';
 import 'feature/streaming/StreamingFeature.dart';
 import 'feature/telemetry/TelemetryFeature.dart';
 import 'feature/test/TestFeature.dart';
 import 'feature/timeout/TimeoutFeature.dart';
 
+import 'feature/secrets/sekreto/plugins/boru.dart' show boru;
+import 'feature/secrets/sekreto/plugins/hashicorp.dart' show hashicorp;
 
 
 // ignore: non_constant_identifier_names
@@ -36,6 +39,7 @@ final Map<String, BaseFeature Function()> FEATURE_CLASS = {
   'ratelimit': () => RatelimitFeature(),
   'rbac': () => RbacFeature(),
   'retry': () => RetryFeature(),
+  'secrets': () => SecretsFeature(),
   'streaming': () => StreamingFeature(),
   'telemetry': () => TelemetryFeature(),
   'test': () => TestFeature(),
@@ -58,7 +62,8 @@ final Map<String, BaseFeature Function()> FEATURE_CLASS = {
 //
 // ignore: non_constant_identifier_names
 final Map<String, List<dynamic>> FEATURE_PLUGINS = <String, List<dynamic>>{
-  
+    'secrets': [boru, hashicorp],
+
 };
 
 class Config {
@@ -244,6 +249,32 @@ class Config {
       },
       'transport': 'wrap',
     },
+    'secrets': <String, dynamic>{
+      'options': <String, dynamic>{
+        'active': false,
+        'cache': true,
+        'exchange': <String, dynamic>{
+          'active': false,
+          'method': 'POST',
+          'path': 'auth/token',
+          'refresh': '',
+          'request': 'refresh_token',
+          'response': 'access_token',
+          'retries': 1,
+          'statuses': <dynamic>[
+            401,
+          ],
+        },
+        'name': 'univec',
+        'providers': <dynamic>[
+          <String, dynamic>{
+            'kind': 'boru',
+            'namespace': 'sdk',
+          },
+        ],
+      },
+      'transport': 'wrap',
+    },
     'streaming': <String, dynamic>{
       'options': <String, dynamic>{
         'active': false,
@@ -371,7 +402,9 @@ class Config {
                   'lit': 'embed-bridge',
                 },
               ],
-              'select': <String, dynamic>{},
+              'select': <String, dynamic>{
+                '\$action': 'bridge',
+              },
               'transform': <String, dynamic>{
                 'req': '`reqdata`',
                 'res': '`body.data`',
@@ -397,7 +430,9 @@ class Config {
                   'lit': 'convert',
                 },
               ],
-              'select': <String, dynamic>{},
+              'select': <String, dynamic>{
+                '\$action': 'ephemeral',
+              },
               'transform': <String, dynamic>{
                 'req': '`reqdata`',
                 'res': '`body.data`',
@@ -424,7 +459,9 @@ class Config {
                   'lit': 'embed-bridge',
                 },
               ],
-              'select': <String, dynamic>{},
+              'select': <String, dynamic>{
+                '\$action': 'ephemeral_bridge',
+              },
               'transform': <String, dynamic>{
                 'req': '`reqdata`',
                 'res': '`body.data`',
@@ -508,7 +545,9 @@ class Config {
                   'lit': 'embed',
                 },
               ],
-              'select': <String, dynamic>{},
+              'select': <String, dynamic>{
+                '\$action': 'ephemeral',
+              },
               'transform': <String, dynamic>{
                 'req': '`reqdata`',
                 'res': '`body.data`',

@@ -463,7 +463,7 @@ switch (client.model(h.vnull()).list(h.vnull(), h.vnull())) {
 
 ## Features
 
-This SDK ships 18 optional features. Each is **inactive until you
+This SDK ships 19 optional features. Each is **inactive until you
 switch it on**, so an SDK you have not configured behaves exactly as if none of
 them existed — no retries, no cache, no logging, no measurable overhead.
 
@@ -486,12 +486,13 @@ above:
 | [`ratelimit`](#ratelimit) | Client-side rate limiting via a token bucket |
 | [`rbac`](#rbac) | Client-side role/permission enforcement |
 | [`retry`](#retry) | Automatic retry of transient failures with exponential backoff |
+| [`secrets`](#secrets) | Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens |
 | [`streaming`](#streaming) | Incremental streaming of list results via async iteration |
 | [`telemetry`](#telemetry) | Distributed tracing spans with W3C trace-context propagation |
 | [`test`](#test) | In-memory mock transport for testing without a live server |
 | [`timeout`](#timeout) | Per-request timeout with transport abort |
 
-> **Order matters for `cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `timeout`.** These wrap the
+> **Order matters for `cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `secrets`, `timeout`.** These wrap the
 > transport, so each one wraps whatever is already installed: the order you
 > activate them in IS the nesting order. Activating them as an ordered list
 > rather than a map is what fixes that order.
@@ -708,6 +709,24 @@ Set `feature.retry.active` to enable it, then override any of the options above.
 transport features decides what it sees. A feature activated later wraps one
 activated earlier.
 
+### secrets
+
+Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `cache` | `true` |
+| `exchange` | `{active: false, method: 'POST', path: 'auth/token', refresh: '', request: 'refresh_token', response: 'access_token', retries: 1, statuses: [401]}` |
+| `name` | `'univec'` |
+| `providers` | `[{kind: 'boru', namespace: 'sdk'}]` |
+
+Set `feature.secrets.active` to enable it, then override any of the options above.
+
+`secrets` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
 ### streaming
 
 Incremental streaming of list results via async iteration.
@@ -808,6 +827,7 @@ The SDK ships with built-in features:
 - **RatelimitFeature**: Client-side rate limiting via a token bucket
 - **RbacFeature**: Client-side role/permission enforcement
 - **RetryFeature**: Automatic retry of transient failures with exponential backoff
+- **SecretsFeature**: Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens
 - **StreamingFeature**: Incremental streaming of list results via async iteration
 - **TelemetryFeature**: Distributed tracing spans with W3C trace-context propagation
 - **TestFeature**: In-memory mock transport for testing without a live server

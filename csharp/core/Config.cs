@@ -210,6 +210,38 @@ public static class SdkConfig
                     },
                     ["transport"] = "wrap",
                 },
+                ["secrets"] = new Dictionary<string, object?>
+                {
+                    ["options"] = new Dictionary<string, object?>
+                    {
+                        ["active"] = false,
+                        ["cache"] = true,
+                        ["exchange"] = new Dictionary<string, object?>
+                        {
+                            ["active"] = false,
+                            ["method"] = "POST",
+                            ["path"] = "auth/token",
+                            ["refresh"] = "",
+                            ["request"] = "refresh_token",
+                            ["response"] = "access_token",
+                            ["retries"] = 1,
+                            ["statuses"] = new List<object?>
+                            {
+                                401,
+                            },
+                        },
+                        ["name"] = "univec",
+                        ["providers"] = new List<object?>
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["kind"] = "boru",
+                                ["namespace"] = "sdk",
+                            },
+                        },
+                    },
+                    ["transport"] = "wrap",
+                },
                 ["streaming"] = new Dictionary<string, object?>
                 {
                     ["options"] = new Dictionary<string, object?>
@@ -362,7 +394,10 @@ public static class SdkConfig
                                             ["lit"] = "embed-bridge",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["select"] = new Dictionary<string, object?>
+                                    {
+                                        ["$action"] = "bridge",
+                                    },
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
@@ -395,7 +430,10 @@ public static class SdkConfig
                                             ["lit"] = "convert",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["select"] = new Dictionary<string, object?>
+                                    {
+                                        ["$action"] = "ephemeral",
+                                    },
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
@@ -429,7 +467,10 @@ public static class SdkConfig
                                             ["lit"] = "embed-bridge",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["select"] = new Dictionary<string, object?>
+                                    {
+                                        ["$action"] = "ephemeral_bridge",
+                                    },
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
@@ -535,7 +576,10 @@ public static class SdkConfig
                                             ["lit"] = "embed",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["select"] = new Dictionary<string, object?>
+                                    {
+                                        ["$action"] = "ephemeral",
+                                    },
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
@@ -776,6 +820,12 @@ public static class SdkConfig
     {
         switch (name)
         {
+            case "secrets":
+                return new List<object?>
+                {
+                    global::Voxgig.Sekreto.Plugins.Boru.Plugin,
+                    global::Voxgig.Sekreto.Plugins.Hashicorp.Plugin,
+                };
             default:
                 return new List<object?>();
         }
@@ -813,6 +863,8 @@ public static class SdkConfig
                 return new Feature.RbacFeature();
             case "retry":
                 return new Feature.RetryFeature();
+            case "secrets":
+                return new Feature.SecretsFeature();
             case "streaming":
                 return new Feature.StreamingFeature();
             case "telemetry":

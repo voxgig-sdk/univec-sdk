@@ -30,9 +30,9 @@
   "devDependencies": {
     "@types/node": ">=25.6",
     "@voxgig/apidef": "8.6.0",
-    "@voxgig/docgen": "0.10.1",
+    "@voxgig/docgen": "0.10.2",
     "@voxgig/model": ">=10.0",
-    "@voxgig/sdkgen": "4.17.0",
+    "@voxgig/sdkgen": "4.17.1",
     "@voxgig/sdkgen-langpack": "^0.0.3",
     "@voxgig/struct": ">=0.2",
     "@voxgig/util": ">=0.5",

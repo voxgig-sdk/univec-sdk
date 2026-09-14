@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 import voxgig.univecsdk.utility.Json;
+import voxgig.univecsdk.feature.secrets.sekreto.plugins.Boru;
+import voxgig.univecsdk.feature.secrets.sekreto.plugins.Hashicorp;
 
 /** Static SDK configuration and by-name feature construction. */
 @SuppressWarnings({"unchecked"})
@@ -66,6 +68,8 @@ public final class Config {
         return new voxgig.univecsdk.feature.RbacFeature();
       case "retry":
         return new voxgig.univecsdk.feature.RetryFeature();
+      case "secrets":
+        return new voxgig.univecsdk.feature.SecretsFeature();
       case "streaming":
         return new voxgig.univecsdk.feature.StreamingFeature();
       case "telemetry":
@@ -86,6 +90,8 @@ public final class Config {
    */
   public static List<Object> featurePlugins(String name) {
     switch (name) {
+      case "secrets":
+        return List.of(Boru.PLUGIN, Hashicorp.PLUGIN);
       default:
         return List.of();
     }
@@ -260,6 +266,32 @@ public final class Config {
     b.append("   },");
     b.append("   \"transport\": \"wrap\"");
     b.append("  },");
+    b.append("  \"secrets\": {");
+    b.append("   \"options\": {");
+    b.append("    \"active\": false,");
+    b.append("    \"cache\": true,");
+    b.append("    \"exchange\": {");
+    b.append("     \"active\": false,");
+    b.append("     \"method\": \"POST\",");
+    b.append("     \"path\": \"auth/token\",");
+    b.append("     \"refresh\": \"\",");
+    b.append("     \"request\": \"refresh_token\",");
+    b.append("     \"response\": \"access_token\",");
+    b.append("     \"retries\": 1,");
+    b.append("     \"statuses\": [");
+    b.append("      401");
+    b.append("     ]");
+    b.append("    },");
+    b.append("    \"name\": \"univec\",");
+    b.append("    \"providers\": [");
+    b.append("     {");
+    b.append("      \"kind\": \"boru\",");
+    b.append("      \"namespace\": \"sdk\"");
+    b.append("     }");
+    b.append("    ]");
+    b.append("   },");
+    b.append("   \"transport\": \"wrap\"");
+    b.append("  },");
     b.append("  \"streaming\": {");
     b.append("   \"options\": {");
     b.append("    \"active\": false,");
@@ -379,7 +411,9 @@ public final class Config {
     b.append("         \"lit\": \"embed-bridge\"");
     b.append("        }");
     b.append("       ],");
-    b.append("       \"select\": {},");
+    b.append("       \"select\": {");
+    b.append("        \"$action\": \"bridge\"");
+    b.append("       },");
     b.append("       \"transform\": {");
     b.append("        \"req\": \"`reqdata`\",");
     b.append("        \"res\": \"`body.data`\"");
@@ -405,7 +439,9 @@ public final class Config {
     b.append("         \"lit\": \"convert\"");
     b.append("        }");
     b.append("       ],");
-    b.append("       \"select\": {},");
+    b.append("       \"select\": {");
+    b.append("        \"$action\": \"ephemeral\"");
+    b.append("       },");
     b.append("       \"transform\": {");
     b.append("        \"req\": \"`reqdata`\",");
     b.append("        \"res\": \"`body.data`\"");
@@ -432,7 +468,9 @@ public final class Config {
     b.append("         \"lit\": \"embed-bridge\"");
     b.append("        }");
     b.append("       ],");
-    b.append("       \"select\": {},");
+    b.append("       \"select\": {");
+    b.append("        \"$action\": \"ephemeral_bridge\"");
+    b.append("       },");
     b.append("       \"transform\": {");
     b.append("        \"req\": \"`reqdata`\",");
     b.append("        \"res\": \"`body.data`\"");
@@ -516,7 +554,9 @@ public final class Config {
     b.append("         \"lit\": \"embed\"");
     b.append("        }");
     b.append("       ],");
-    b.append("       \"select\": {},");
+    b.append("       \"select\": {");
+    b.append("        \"$action\": \"ephemeral\"");
+    b.append("       },");
     b.append("       \"transform\": {");
     b.append("        \"req\": \"`reqdata`\",");
     b.append("        \"res\": \"`body.data`\"");

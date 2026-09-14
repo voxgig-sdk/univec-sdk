@@ -23,6 +23,7 @@ require(Cwd::abs_path("$__dir/feature/proxy_feature.pm"));
 require(Cwd::abs_path("$__dir/feature/ratelimit_feature.pm"));
 require(Cwd::abs_path("$__dir/feature/rbac_feature.pm"));
 require(Cwd::abs_path("$__dir/feature/retry_feature.pm"));
+require(Cwd::abs_path("$__dir/feature/secrets_feature.pm"));
 require(Cwd::abs_path("$__dir/feature/streaming_feature.pm"));
 require(Cwd::abs_path("$__dir/feature/telemetry_feature.pm"));
 require(Cwd::abs_path("$__dir/feature/test_feature.pm"));
@@ -48,6 +49,7 @@ sub make_feature {
   return UnivecRatelimitFeature->new if 'ratelimit' eq $name;
   return UnivecRbacFeature->new if 'rbac' eq $name;
   return UnivecRetryFeature->new if 'retry' eq $name;
+  return UnivecSecretsFeature->new if 'secrets' eq $name;
   return UnivecStreamingFeature->new if 'streaming' eq $name;
   return UnivecTelemetryFeature->new if 'telemetry' eq $name;
   return UnivecTestFeature->new if 'test' eq $name;

@@ -117,6 +117,7 @@ function UnivecSDK.new(options)
   -- feature: ratelimit
   -- feature: rbac
   -- feature: retry
+  -- feature: secrets
   -- feature: streaming
   -- feature: telemetry
   -- feature: test

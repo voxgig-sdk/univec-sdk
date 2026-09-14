@@ -142,6 +142,26 @@ let make_config () : value =
             (Num (503.));
             (Num (504.)) ])) ]));
         ("transport", (Str "wrap")) ]));
+      ("secrets", (jo [
+        ("options", (jo [
+          ("active", (Bool false));
+          ("cache", (Bool true));
+          ("exchange", (jo [
+            ("active", (Bool false));
+            ("method", (Str "POST"));
+            ("path", (Str "auth/token"));
+            ("refresh", (Str ""));
+            ("request", (Str "refresh_token"));
+            ("response", (Str "access_token"));
+            ("retries", (Num (1.)));
+            ("statuses", (ja [
+              (Num (401.)) ])) ]));
+          ("name", (Str "univec"));
+          ("providers", (ja [
+            (jo [
+              ("kind", (Str "boru"));
+              ("namespace", (Str "sdk")) ]) ])) ]));
+        ("transport", (Str "wrap")) ]));
       ("streaming", (jo [
         ("options", (jo [
           ("active", (Bool false));
@@ -233,7 +253,8 @@ let make_config () : value =
                     ("lit", (Str "v1")) ]);
                   (jo [
                     ("lit", (Str "embed-bridge")) ]) ]));
-                ("select", (empty_map ()));
+                ("select", (jo [
+                  ("$action", (Str "bridge")) ]));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
                   ("res", (Str "`body.data`")) ]));
@@ -252,7 +273,8 @@ let make_config () : value =
                     ("lit", (Str "ephemeral")) ]);
                   (jo [
                     ("lit", (Str "convert")) ]) ]));
-                ("select", (empty_map ()));
+                ("select", (jo [
+                  ("$action", (Str "ephemeral")) ]));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
                   ("res", (Str "`body.data`")) ]));
@@ -272,7 +294,8 @@ let make_config () : value =
                     ("lit", (Str "ephemeral")) ]);
                   (jo [
                     ("lit", (Str "embed-bridge")) ]) ]));
-                ("select", (empty_map ()));
+                ("select", (jo [
+                  ("$action", (Str "ephemeral_bridge")) ]));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
                   ("res", (Str "`body.data`")) ]));
@@ -334,7 +357,8 @@ let make_config () : value =
                     ("lit", (Str "ephemeral")) ]);
                   (jo [
                     ("lit", (Str "embed")) ]) ]));
-                ("select", (empty_map ()));
+                ("select", (jo [
+                  ("$action", (Str "ephemeral")) ]));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
                   ("res", (Str "`body.data`")) ]));
@@ -467,9 +491,37 @@ let make_config () : value =
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ])) ])) ])
 
-(* The plugin definitions the model selected, per feature: none - no
- * plugin-bearing feature is active in this SDK. *)
-let feature_plugins (_name : string) = []
+(* The plugin definitions the model selected for the secrets feature's
+ * provider chain (plugin groups: vault).
+ * Built, not held: every call is a fresh list, so two chains never share
+ * a definition. *)
+let feature_plugins (name : string) : Defs.definition list =
+  match name with
+  | "secrets" -> [
+      Boru.plugin ();
+      Hashicorp.plugin ();
+    ]
+  | _ -> []
+
+(* The token-exchange transport of last resort: the vendored sekreto HTTP
+ * client (plugins/http.ml over plugins/tls.ml), compiled because a plugin
+ * group needing a transport is active (vault).
+ * A network failure raises sekreto's own Sekreto_error, which the feature
+ * reports as the refusal. *)
+let secrets_transport (url : string) (fetchdef : value) : value =
+  let meth = match getp fetchdef "method" with Str s -> s | _ -> "POST" in
+  let headers = match getp fetchdef "headers" with
+    | Map _ as h ->
+      List.filter_map (fun k -> match getp h k with Str v -> Some (k, v) | _ -> None) (keysof h)
+    | _ -> [] in
+  let body = match getp fetchdef "body" with Str s -> Some s | _ -> None in
+  let res = Http.request meth url headers body in
+  let text = res.Http.body in
+  jo [("status", Num (float_of_int res.Http.status));
+      ("statusText", Str (if res.Http.status >= 400 then "ERR" else "OK"));
+      ("headers", empty_map ());
+      ("body", Str text);
+      ("json", json_thunk (try Sdk_json.json_read text with _ -> Noval))]
 
 let make_feature (name : string) : feature =
   match name with
@@ -491,4 +543,5 @@ let make_feature (name : string) : feature =
   | "telemetry" -> telemetry_feature ()
   | "test" -> test_feature ()
   | "timeout" -> timeout_feature ()
+  | "secrets" -> Secrets_feature.make ~plugins:(feature_plugins "secrets") ~transport:secrets_transport ()
   | _ -> base_feature ()

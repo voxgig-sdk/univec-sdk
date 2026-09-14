@@ -49,6 +49,33 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     sdk_mod.addImport("voxgig-struct", struct_mod);
+    // The secrets feature's vendored libraries (@voxgig/sekreto and
+    // voxgig/plugin at the shared vendor tag), as the three named modules
+    // upstream builds them as. Declared ONLY when the model activates the
+    // feature: feature/secrets.zig is the sole importer, and an inactive SDK
+    // never analyses it (zig compiles only what a module root reaches).
+    const plugin_mod = b.addModule("plugin", .{
+        .root_source_file = b.path("feature/secrets/plugin/plugin.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const sekreto_mod = b.addModule("sekreto", .{
+        .root_source_file = b.path("feature/secrets/sekreto/sekreto.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    sekreto_mod.addImport("plugin", plugin_mod);
+    // Rooted at the GENERATED selection (feature/secrets/plugins.zig), never
+    // at upstream's full-set all.zig: the root decides which kinds compile.
+    const sekretoplugins_mod = b.addModule("sekretoplugins", .{
+        .root_source_file = b.path("feature/secrets/plugins.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    sekretoplugins_mod.addImport("sekreto", sekreto_mod);
+    sekretoplugins_mod.addImport("plugin", plugin_mod);
+    sdk_mod.addImport("sekreto", sekreto_mod);
+    sdk_mod.addImport("sekretoplugins", sekretoplugins_mod);
 
     const test_step = b.step("test", "Run all tests");
 
@@ -77,5 +104,23 @@ pub fn build(b: *std.Build) void {
         const run_t = b.addRunArtifact(t);
         run_t.has_side_effects = true;
         test_step.dependOn(&run_t.step);
+    }
+    // The secrets feature suite: part of `zig build test`, and alone as
+    // `zig build test-secrets` (see FEATURE_TESTS in Main_zig).
+    {
+        const secrets_mod = b.createModule(.{
+            .root_source_file = b.path("test/feature/secrets/secrets_test.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        secrets_mod.addImport("voxgig-struct", struct_mod);
+        secrets_mod.addImport("sdk", sdk_mod);
+        secrets_mod.addImport("omni", omni_mod);
+        const secrets_test = b.addTest(.{ .root_module = secrets_mod });
+        const run_secrets = b.addRunArtifact(secrets_test);
+        run_secrets.has_side_effects = true;
+        test_step.dependOn(&run_secrets.step);
+        const secrets_step = b.step("test-secrets", "Run the secrets feature suite alone");
+        secrets_step.dependOn(&run_secrets.step);
     }
 }

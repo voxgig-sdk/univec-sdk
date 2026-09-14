@@ -18,6 +18,7 @@ require_once __DIR__ . '/feature/ProxyFeature.php';
 require_once __DIR__ . '/feature/RatelimitFeature.php';
 require_once __DIR__ . '/feature/RbacFeature.php';
 require_once __DIR__ . '/feature/RetryFeature.php';
+require_once __DIR__ . '/feature/SecretsFeature.php';
 require_once __DIR__ . '/feature/StreamingFeature.php';
 require_once __DIR__ . '/feature/TelemetryFeature.php';
 require_once __DIR__ . '/feature/TestFeature.php';
@@ -59,6 +60,8 @@ class UnivecFeatures
                 return new UnivecRbacFeature();
             case "retry":
                 return new UnivecRetryFeature();
+            case "secrets":
+                return new UnivecSecretsFeature();
             case "streaming":
                 return new UnivecStreamingFeature();
             case "telemetry":
@@ -96,6 +99,7 @@ class UnivecFeatures
             case "ratelimit":
             case "rbac":
             case "retry":
+            case "secrets":
             case "streaming":
             case "telemetry":
             case "test":

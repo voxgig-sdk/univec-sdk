@@ -53,7 +53,7 @@ main: kit: target: 'zig': publish: version: '0.1.1'
 # --- end cedar: release version
 
 # Record failed live requests while continuing the remaining test cases.
-# Explicit while the corresponding sdkgen default change is unreleased.
+# Keep this project choice explicit when updating the toolchain.
 main: kit: test: live: strict: true
 
 # Include Boru as the default provider for the opt-in secrets feature.

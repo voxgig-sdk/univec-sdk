@@ -13,6 +13,7 @@ import 'feature_test.dart' as feature_test;
 import 'netsim_test.dart' as netsim_test;
 import 'custom_test.dart' as custom_test;
 import 'readme_examples_test.dart' as readme_examples_test;
+import 'feature/secrets/secrets_test.dart' as secrets_test;
 import 'entity/convert/ConvertEntity_test.dart' as convert_entity_test;
 import 'entity/embed/EmbedEntity_test.dart' as embed_entity_test;
 import 'entity/ephemeral_key/EphemeralKeyEntity_test.dart' as ephemeral_key_entity_test;
@@ -29,6 +30,7 @@ Future<void> main() async {
   netsim_test.tests();
   custom_test.tests();
   readme_examples_test.tests();
+  secrets_test.tests();
   convert_entity_test.tests();
   embed_entity_test.tests();
   ephemeral_key_entity_test.tests();

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "target": "rust",
+  "scenarios": "unsupported",
+  "points": [
+    "POST /v1/convert",
+    "POST /v1/embed-bridge",
+    "POST /v1/ephemeral/convert",
+    "POST /v1/ephemeral/embed-bridge",
+    "POST /v1/embed",
+    "POST /v1/ephemeral/embed",
+    "POST /v1/ephemeral/key",
+    "GET /v1/models"
+  ],
+  "reason": "This target does not yet execute declarative live recipes. Its existing tests do not establish full operation coverage."
+}

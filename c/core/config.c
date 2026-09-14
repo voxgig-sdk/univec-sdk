@@ -11,7 +11,7 @@ voxgig_value* make_config(void) {
       "slug", v_str("univec"),
       "version", v_str("0.1.1"),
       "target", v_str("c")),
-    "feature", cmap(18,
+    "feature", cmap(19,
       "audit", cmap(2,
         "options", cmap(3,
           "active", v_bool(false),
@@ -138,6 +138,26 @@ voxgig_value* make_config(void) {
             v_num(503),
             v_num(504))),
         "transport", v_str("wrap")),
+      "secrets", cmap(2,
+        "options", cmap(5,
+          "active", v_bool(false),
+          "cache", v_bool(true),
+          "exchange", cmap(8,
+            "active", v_bool(false),
+            "method", v_str("POST"),
+            "path", v_str("auth/token"),
+            "refresh", v_str(""),
+            "request", v_str("refresh_token"),
+            "response", v_str("access_token"),
+            "retries", v_num(1),
+            "statuses", clist(1,
+              v_num(401))),
+          "name", v_str("univec"),
+          "providers", clist(1,
+            cmap(2,
+              "kind", v_str("boru"),
+              "namespace", v_str("sdk")))),
+        "transport", v_str("wrap")),
       "streaming", cmap(2,
         "options", cmap(3,
           "active", v_bool(false),
@@ -229,7 +249,8 @@ voxgig_value* make_config(void) {
                     "lit", v_str("v1")),
                   cmap(1,
                     "lit", v_str("embed-bridge"))),
-                "select", v_map(),
+                "select", cmap(1,
+                  "$action", v_str("bridge")),
                 "transform", cmap(2,
                   "req", v_str("`reqdata`"),
                   "res", v_str("`body.data`")),
@@ -248,7 +269,8 @@ voxgig_value* make_config(void) {
                     "lit", v_str("ephemeral")),
                   cmap(1,
                     "lit", v_str("convert"))),
-                "select", v_map(),
+                "select", cmap(1,
+                  "$action", v_str("ephemeral")),
                 "transform", cmap(2,
                   "req", v_str("`reqdata`"),
                   "res", v_str("`body.data`")),
@@ -268,7 +290,8 @@ voxgig_value* make_config(void) {
                     "lit", v_str("ephemeral")),
                   cmap(1,
                     "lit", v_str("embed-bridge"))),
-                "select", v_map(),
+                "select", cmap(1,
+                  "$action", v_str("ephemeral_bridge")),
                 "transform", cmap(2,
                   "req", v_str("`reqdata`"),
                   "res", v_str("`body.data`")),
@@ -330,7 +353,8 @@ voxgig_value* make_config(void) {
                     "lit", v_str("ephemeral")),
                   cmap(1,
                     "lit", v_str("embed"))),
-                "select", v_map(),
+                "select", cmap(1,
+                  "$action", v_str("ephemeral")),
                 "transform", cmap(2,
                   "req", v_str("`reqdata`"),
                   "res", v_str("`body.data`")),
@@ -500,6 +524,7 @@ Feature* feature_proxy_new(void);
 Feature* feature_ratelimit_new(void);
 Feature* feature_rbac_new(void);
 Feature* feature_retry_new(void);
+Feature* feature_secrets_new(void);
 Feature* feature_streaming_new(void);
 Feature* feature_telemetry_new(void);
 Feature* feature_test_new(void);
@@ -520,6 +545,7 @@ Feature* make_feature(const char* name) {
   if (strcmp(name, "ratelimit") == 0) return feature_ratelimit_new();
   if (strcmp(name, "rbac") == 0) return feature_rbac_new();
   if (strcmp(name, "retry") == 0) return feature_retry_new();
+  if (strcmp(name, "secrets") == 0) return feature_secrets_new();
   if (strcmp(name, "streaming") == 0) return feature_streaming_new();
   if (strcmp(name, "telemetry") == 0) return feature_telemetry_new();
   if (strcmp(name, "test") == 0) return feature_test_new();
@@ -527,8 +553,10 @@ Feature* make_feature(const char* name) {
   return feature_base_new();
 }
 
+void** secrets_plugins(size_t* n);
 
 void** feature_plugins(const char* name, size_t* n) {
+  if (strcmp(name, "secrets") == 0) return secrets_plugins(n);
   (void)name;
   *n = 0;
   return NULL;

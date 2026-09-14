@@ -10,4 +10,10 @@ name = "univec_sdk"
 path = "lib.rs"
 
 [dependencies]
+rustls = { version = "0.23", default-features = false, features = ["std", "ring", "tls12"] }
+webpki-roots = "0.26"
 ureq = "2"
+
+[[test]]
+name = "secrets_feature"
+path = "tests/feature/secrets/main.rs"

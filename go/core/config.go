@@ -2,6 +2,9 @@ package core
 
 import (
 	"sync"
+
+	"github.com/voxgig-sdk/univec-sdk/go/feature/secrets/plugins/boru"
+	"github.com/voxgig-sdk/univec-sdk/go/feature/secrets/plugins/hashicorp"
 )
 
 // MakeConfig builds a fresh, fully materialised config map. Every call
@@ -175,6 +178,32 @@ func MakeConfig() map[string]any {
 				},
 				"transport": "wrap",
 			},
+			"secrets": map[string]any{
+				"options": map[string]any{
+					"active": false,
+					"cache": true,
+					"exchange": map[string]any{
+						"active": false,
+						"method": "POST",
+						"path": "auth/token",
+						"refresh": "",
+						"request": "refresh_token",
+						"response": "access_token",
+						"retries": 1,
+						"statuses": []any{
+							401,
+						},
+					},
+					"name": "univec",
+					"providers": []any{
+						map[string]any{
+							"kind": "boru",
+							"namespace": "sdk",
+						},
+					},
+				},
+				"transport": "wrap",
+			},
 			"streaming": map[string]any{
 				"options": map[string]any{
 					"active": false,
@@ -294,7 +323,9 @@ func MakeConfig() map[string]any {
 										"lit": "embed-bridge",
 									},
 								},
-								"select": map[string]any{},
+								"select": map[string]any{
+									"$action": "bridge",
+								},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
@@ -320,7 +351,9 @@ func MakeConfig() map[string]any {
 										"lit": "convert",
 									},
 								},
-								"select": map[string]any{},
+								"select": map[string]any{
+									"$action": "ephemeral",
+								},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
@@ -347,7 +380,9 @@ func MakeConfig() map[string]any {
 										"lit": "embed-bridge",
 									},
 								},
-								"select": map[string]any{},
+								"select": map[string]any{
+									"$action": "ephemeral_bridge",
+								},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
@@ -431,7 +466,9 @@ func MakeConfig() map[string]any {
 										"lit": "embed",
 									},
 								},
-								"select": map[string]any{},
+								"select": map[string]any{
+									"$action": "ephemeral",
+								},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
@@ -618,6 +655,7 @@ func MakeConfig() map[string]any {
 // feature package can consume them without core naming its types. Empty
 // when no active feature declares active plugin groups for this target.
 var featurePlugins = map[string][]any{
+	"secrets": {boru.Plugin, hashicorp.Plugin},
 }
 
 // FeaturePlugins is the definitions list for one feature's chain.
@@ -700,6 +738,10 @@ func makeFeature(name string) Feature {
 	case "retry":
 		if NewRetryFeatureFunc != nil {
 			return NewRetryFeatureFunc()
+		}
+	case "secrets":
+		if NewSecretsFeatureFunc != nil {
+			return NewSecretsFeatureFunc()
 		}
 	case "streaming":
 		if NewStreamingFeatureFunc != nil {

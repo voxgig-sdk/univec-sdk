@@ -7,8 +7,15 @@
 -- built-in kinds (env, memory, dotenv, file) come with the core and never
 -- appear here.
 
+local plugin_boru = require("feature.secrets.sekreto.plugins.boru")
+local plugin_hashicorp = require("feature.secrets.sekreto.plugins.hashicorp")
+
 
 local FEATURE_PLUGINS = {
+  ["secrets"] = {
+    plugin_boru.boru,
+    plugin_hashicorp.hashicorp,
+  },
 }
 
 

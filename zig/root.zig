@@ -67,6 +67,7 @@ pub const RbacFeature = @import("feature/rbac.zig").RbacFeature;
 // vendored sekreto for `secrets`) that build.zig declares under the same
 // condition, so a static export here would name a module an inactive SDK
 // does not have. Filled by Main_zig from this marker.
+pub const SecretsFeature = @import("feature/secrets.zig").SecretsFeature;
 
 // Value helpers, re-exported so tests/consumers can build data.
 pub const h = helpers;

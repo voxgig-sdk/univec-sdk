@@ -350,6 +350,7 @@ The entity name.
 | `ratelimit` | 0.0.1 | Client-side rate limiting via a token bucket |
 | `rbac` | 0.0.1 | Client-side role/permission enforcement |
 | `retry` | 0.0.1 | Automatic retry of transient failures with exponential backoff |
+| `secrets` | 0.1.0 | Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens |
 | `streaming` | 0.0.1 | Incremental streaming of list results via async iteration |
 | `telemetry` | 0.0.1 | Distributed tracing spans with W3C trace-context propagation |
 | `test` | 0.0.1 | In-memory mock transport for testing without a live server |
@@ -375,6 +376,7 @@ Features are activated via the `feature` option:
     , ("ratelimit", active)
     , ("rbac", active)
     , ("retry", active)
+    , ("secrets", active)
     , ("streaming", active)
     , ("telemetry", active)
     , ("test", active)

@@ -17,18 +17,35 @@ let package = Package(
     // the macos CI leg.
     platforms: [.macOS(.v10_15)],
     products: [
-        .library(name: "UnivecSdk", targets: ["UnivecSdk"]),
+        .library(name: "UnivecSdk", targets: ["UnivecSdk", "Sekreto", "SekretoPlugins", "VoxgigPlugin"]),
     ],
     targets: [
         .target(
+            name: "VoxgigPlugin",
+            path: "Sources/UnivecSdk/feature/secrets/plugin"),
+        .target(
+            name: "Sekreto",
+            dependencies: ["VoxgigPlugin"],
+            path: "Sources/UnivecSdk/feature/secrets/sekreto"),
+        .target(
+            name: "SekretoPlugins",
+            dependencies: ["Sekreto", "VoxgigPlugin"],
+            path: "Sources/UnivecSdk/feature/secrets/plugins"),
+        .target(
             name: "UnivecSdk",
-            path: "Sources/UnivecSdk"),
+            dependencies: [
+                "Sekreto",
+                "SekretoPlugins",
+                "VoxgigPlugin",
+            ],
+            path: "Sources/UnivecSdk",
+            exclude: ["feature/secrets"]),
         .testTarget(
             name: "Omni",
             path: "Tests/vendor/omni"),
         .testTarget(
             name: "UnivecSdkTests",
-            dependencies: ["UnivecSdk", "Omni"],
+            dependencies: ["UnivecSdk", "Omni", "Sekreto", "VoxgigPlugin"],
             path: "Tests/UnivecSdkTests"),
     ]
 )

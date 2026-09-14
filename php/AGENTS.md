@@ -57,6 +57,7 @@ the runtime under `.sdk/tm/php/feature/` and regenerate.
 | **ratelimit** — Client-side rate limiting via a token bucket | `feature/RatelimitFeature.php` | — |
 | **rbac** — Client-side role/permission enforcement | `feature/RbacFeature.php` | `PrePoint` |
 | **retry** — Automatic retry of transient failures with exponential backoff | `feature/RetryFeature.php` | — |
+| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/SecretsFeature.php` | `PreSpec` |
 | **streaming** — Incremental streaming of list results via async iteration | `feature/StreamingFeature.php` | `PreResult` |
 | **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/TelemetryFeature.php` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
 | **test** — In-memory mock transport for testing without a live server | `feature/TestFeature.php` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |

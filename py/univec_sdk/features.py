@@ -15,6 +15,7 @@ from univec_sdk.feature.proxy_feature import UnivecProxyFeature
 from univec_sdk.feature.ratelimit_feature import UnivecRatelimitFeature
 from univec_sdk.feature.rbac_feature import UnivecRbacFeature
 from univec_sdk.feature.retry_feature import UnivecRetryFeature
+from univec_sdk.feature.secrets_feature import UnivecSecretsFeature
 from univec_sdk.feature.streaming_feature import UnivecStreamingFeature
 from univec_sdk.feature.telemetry_feature import UnivecTelemetryFeature
 from univec_sdk.feature.test_feature import UnivecTestFeature
@@ -37,6 +38,7 @@ _FEATURES = {
     "ratelimit": lambda: UnivecRatelimitFeature(),
     "rbac": lambda: UnivecRbacFeature(),
     "retry": lambda: UnivecRetryFeature(),
+    "secrets": lambda: UnivecSecretsFeature(),
     "streaming": lambda: UnivecStreamingFeature(),
     "telemetry": lambda: UnivecTelemetryFeature(),
     "test": lambda: UnivecTestFeature(),

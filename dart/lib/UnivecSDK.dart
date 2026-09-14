@@ -124,6 +124,24 @@ class UnivecSDK {
   }
 
 
+  // The live sekreto chain this SDK resolves its credential through, for
+  // callers who want arbitrary secrets or redaction:
+  //
+  //   await sdk.secrets().get('db.password')
+  //   sdk.secrets().redact(logline)
+  //
+  // Null before the secrets feature has initialised, and in an SDK where
+  // it is switched off.
+  dynamic secrets() {
+    for (final f in features) {
+      if ('secrets' == f.name) {
+        return f.sekreto();
+      }
+    }
+    return null;
+  }
+
+
   Future<dynamic> prepare([dynamic fetchargs]) async {
     final utility = _utility;
 
