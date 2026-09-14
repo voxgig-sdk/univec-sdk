@@ -32,7 +32,7 @@
     "@voxgig/apidef": "8.6.0",
     "@voxgig/docgen": "0.12.0",
     "@voxgig/model": ">=10.0",
-    "@voxgig/sdkgen": "4.17.1",
+    "@voxgig/sdkgen": "4.17.2",
     "@voxgig/sdkgen-langpack": "^0.0.3",
     "@voxgig/struct": ">=0.2",
     "@voxgig/util": ">=0.5",
