@@ -20,7 +20,7 @@
     "add-feature": "voxgig-sdkgen feature add",
     "dry-add-feature": "voxgig-sdkgen -y feature add",
     "add-edition": "voxgig-sdkgen edition add",
-    "generate:docs": "tsc --build src && voxgig-model model/sdk.aon --no-config && voxgig-docgen generate ..",
+    "generate:docs": "tsc --build src && voxgig-docgen generate ..",
     "text-qa": "cd .. && voxgig-docgen qa",
     "build:presentation": "npm --prefix ../docs/slidev run build",
     "status": "bash admin/status.sh"
