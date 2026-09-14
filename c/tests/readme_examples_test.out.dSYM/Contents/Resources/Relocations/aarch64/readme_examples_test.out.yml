@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     'tests/readme_examples_test.out'
-relocations:     []
-...

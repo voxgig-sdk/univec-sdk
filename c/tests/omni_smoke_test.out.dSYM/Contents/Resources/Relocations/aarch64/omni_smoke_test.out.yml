@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     'tests/omni_smoke_test.out'
-relocations:     []
-...

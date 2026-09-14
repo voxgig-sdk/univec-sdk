@@ -6,6 +6,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 
+## [release/v0.1.2] - 2026-09-14
+
+- Exclude macOS compiler debug bundles from the repository release.
+  SDK code, package versions, and documentation are unchanged.
+
 ## [0.0.1]
 
 - Initial generated release of the Univec SDK (TypeScript, Python, PHP, Go,
