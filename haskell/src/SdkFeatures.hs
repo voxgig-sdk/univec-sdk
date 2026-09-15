@@ -12,7 +12,7 @@ module SdkFeatures where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (throwIO, try)
-import Control.Monad (forM_, when)
+import Control.Monad (foldM, forM_, when)
 import Data.Bits ((.&.))
 import Data.IORef
 import Data.Maybe (isJust, isNothing)
@@ -956,8 +956,34 @@ netsimFeature = do
 testFeature :: IO Feature
 testFeature = do
   (active, fopts) <- featureBase
-  let respondM status dat extra = do
-        out <- jo [("status", vint status), ("statusText", VStr "OK"), ("json", jsonThunk dat), ("body", VStr "not-used")]
+  -- The mock's payload has to sit where the point's RESPONSE TRANSFORM will
+  -- look for it. A point declaring `transform: res: \`body.data\`` says the
+  -- real API wraps its payload in {data: ...}, and the pipeline unwraps that
+  -- on the way back in. A mock answering with the bare payload therefore
+  -- loses it: `body.data` resolves to nothing, the op yields an empty
+  -- result, and nothing reports an error - `ok` is still true.
+  --
+  -- That is what made `model.stream` return 0 items where the test wanted 3,
+  -- and it was invisible in `model.list`, whose assertion (`all id` over the
+  -- returned entities) is vacuously true on an empty list.
+  --
+  -- Wrap the payload in the same shape, one nested map per dotted segment.
+  -- MULTI-SEGMENT on purpose: a GraphQL op unwraps body.data.<field>, not
+  -- just one level. The go target's test feature does exactly this; haskell
+  -- was the target that never had it.
+  let envelopeM fctx dat =
+        if isNullish dat then pure dat else do
+          point <- readIORef (cPoint fctx)
+          tm <- getp point "transform"
+          resv <- getp tm "res"
+          case resv of
+            VStr r | 7 < length r, "`body." == take 6 r, '`' == last r ->
+              foldM (\acc seg -> jo [(seg, acc)]) dat
+                (reverse (filter (/= "") (splitOnChar '.' (drop 6 (init r)))))
+            _ -> pure dat
+      respondM fctx status dat extra = do
+        dat' <- envelopeM fctx dat
+        out <- jo [("status", vint status), ("statusText", VStr "OK"), ("json", jsonThunk dat'), ("body", VStr "not-used")]
         case extra of { Just e@(VMap _) -> do { ks <- keysof e; forM_ ks $ \k -> do { v <- getp e k; setp out k v } }; _ -> pure () }
         pure (out, Nothing)
       buildArgs fctx op args = do
@@ -1010,13 +1036,13 @@ testFeature = do
           "load" -> do
             rm <- readIORef (cReqmatch fctx); m <- resolveMatch fctx rm
             args <- buildArgs fctx op m; found <- select entmap args; ent <- getelem found (VNum 0)
-            if isNullish ent then respondM 404 VNoval . Just =<< jo [("statusText", VStr "Not found")]
-            else do delp ent "$KEY"; c <- clone ent; respondM 200 c Nothing
+            if isNullish ent then respondM fctx 404 VNoval . Just =<< jo [("statusText", VStr "Not found")]
+            else do delp ent "$KEY"; c <- clone ent; respondM fctx 200 c Nothing
           "list" -> do
             rm <- readIORef (cReqmatch fctx)
             args <- buildArgs fctx op rm; found <- select entmap args
-            if isNullish found then respondM 404 VNoval . Just =<< jo [("statusText", VStr "Not found")]
-            else do { case found of { VList _ -> do { its <- listItems found; forM_ its (\i -> delp i "$KEY") }; _ -> pure () }; c <- clone found; respondM 200 c Nothing }
+            if isNullish found then respondM fctx 404 VNoval . Just =<< jo [("statusText", VStr "Not found")]
+            else do { case found of { VList _ -> do { its <- listItems found; forM_ its (\i -> delp i "$KEY") }; _ -> pure () }; c <- clone found; respondM fctx 200 c Nothing }
           "update" -> do
             rd <- readIORef (cReqdata fctx)
             um0 <- emptyMap
@@ -1025,15 +1051,15 @@ testFeature = do
             um <- if umSz > 0 then pure um0 else do em <- emptyMap; resolveMatch fctx em
             args <- buildArgs fctx op um; found <- select entmap args; ent0 <- getelem found (VNum 0)
             ent <- if isNullish ent0 then entFallback entmap else pure ent0
-            if isNullish ent then respondM 404 VNoval . Just =<< jo [("statusText", VStr "Not found")]
+            if isNullish ent then respondM fctx 404 VNoval . Just =<< jo [("statusText", VStr "Not found")]
             else do
               case ent of { VMap _ -> case rd of { VMap _ -> do { ks <- keysof rd; forM_ ks (\k -> do { v <- getp rd k; setp ent k v }) }; _ -> pure () }; _ -> pure () }
-              delp ent "$KEY"; c <- clone ent; respondM 200 c Nothing
+              delp ent "$KEY"; c <- clone ent; respondM fctx 200 c Nothing
           "remove" -> do
             rm <- readIORef (cReqmatch fctx); m <- resolveMatch fctx rm
             args <- buildArgs fctx op m; found <- select entmap args; ent <- getelem found (VNum 0)
             case ent of VMap _ -> do { eid <- getp ent "id"; () <$ delprop entmap eid }; _ -> pure ()
-            respondM 200 VNoval Nothing
+            respondM fctx 200 VNoval Nothing
           "create" -> do
             rd <- readIORef (cReqdata fctx)
             _ <- buildArgs fctx op rd
@@ -1041,9 +1067,9 @@ testFeature = do
             eid <- if isNullish eidV then VStr <$> randId16 else pure eidV
             ent <- clone rd
             case ent of
-              VMap _ -> do { setp ent "id" eid; case eid of { VStr s -> setp entmap s ent; _ -> pure () }; delp ent "$KEY"; c <- clone ent; respondM 200 c Nothing }
-              _ -> respondM 200 ent Nothing
-          _ -> respondM 404 VNoval . Just =<< jo [("statusText", VStr "Unknown operation")]
+              VMap _ -> do { setp ent "id" eid; case eid of { VStr s -> setp entmap s ent; _ -> pure () }; delp ent "$KEY"; c <- clone ent; respondM fctx 200 c Nothing }
+              _ -> respondM fctx 200 ent Nothing
+          _ -> respondM fctx 404 VNoval . Just =<< jo [("statusText", VStr "Unknown operation")]
       makeNetsim net inner = do
         netcalls <- newIORef (0 :: Int)
         let pickLat = do
