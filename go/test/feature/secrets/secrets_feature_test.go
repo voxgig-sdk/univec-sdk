@@ -227,9 +227,7 @@ func driveEntityOpUntil(t *testing.T, client *sdk.UnivecSDK, what string, stop f
 	clientval := reflect.ValueOf(client)
 
 	for name := range entities {
-		runes := []rune(name)
-		runes[0] = unicode.ToUpper(runes[0])
-		accessor := clientval.MethodByName(string(runes))
+		accessor := clientval.MethodByName(exported(name))
 		if !accessor.IsValid() || 1 != accessor.Type().NumIn() {
 			continue
 		}
@@ -256,6 +254,96 @@ func driveEntityOpUntil(t *testing.T, client *sdk.UnivecSDK, what string, stop f
 	}
 
 	t.Fatalf("no entity operation %s - nothing to assert on", what)
+}
+
+// exported is the accessor name for an entity: the model spells entities in
+// lower case, the generated client exports them capitalised.
+func exported(name string) string {
+	runes := []rune(name)
+	if 0 < len(runes) {
+		runes[0] = unicode.ToUpper(runes[0])
+	}
+	return string(runes)
+}
+
+// routableOp names an entity operation that actually REACHES THE TRANSPORT.
+//
+// A generated entity exposes List, Load and Create whether or not the model
+// declares them, so "drive the first entity the map yields" drives a dead
+// end whenever the model does not declare that one. Go randomises map
+// iteration, so which entity that is changes per run, and a test asserting
+// on what reached the wire then passes or fails by lottery.
+//
+// Discover a real route ONCE, against a throwaway client whose provider
+// always succeeds so nothing gates it, and drive that everywhere a test
+// needs a request to come out.
+func routableOp(t *testing.T) (string, string) {
+	t.Helper()
+
+	w := makewire()
+	client := secretsClient(w, map[string]any{
+		"feature": map[string]any{"secrets": map[string]any{
+			"active": true,
+			"providers": []any{
+				&customProvider{
+					lookup: func(name string) (string, bool, error) { return "PROBE01", true, nil },
+				},
+			},
+		}},
+	})
+
+	entities, _ := client.OptionsMap()["entity"].(map[string]any)
+	clientval := reflect.ValueOf(client)
+
+	for name := range entities {
+		accessor := clientval.MethodByName(exported(name))
+		if !accessor.IsValid() || 1 != accessor.Type().NumIn() {
+			continue
+		}
+		ent := accessor.Call([]reflect.Value{reflect.Zero(accessor.Type().In(0))})[0]
+
+		for _, opname := range []string{"List", "Load"} {
+			op := ent.MethodByName(opname)
+			if !op.IsValid() {
+				continue
+			}
+			before := len(w.api())
+			in := make([]reflect.Value, op.Type().NumIn())
+			for i := range in {
+				in[i] = reflect.Zero(op.Type().In(i))
+			}
+			op.Call(in)
+			if before < len(w.api()) {
+				return name, opname
+			}
+		}
+	}
+
+	t.Fatal("no entity operation reaches the transport - nothing to assert on")
+	return "", ""
+}
+
+// driveNamedOp drives ONE operation already known to be routable.
+//
+// Safe to call from a spawned goroutine, unlike driveEntityOpUntil: it never
+// calls t.Fatal, which Go permits only from the test goroutine.
+func driveNamedOp(t *testing.T, client *sdk.UnivecSDK, entity string, opname string) {
+	t.Helper()
+
+	accessor := reflect.ValueOf(client).MethodByName(exported(entity))
+	if !accessor.IsValid() || 1 != accessor.Type().NumIn() {
+		return
+	}
+	ent := accessor.Call([]reflect.Value{reflect.Zero(accessor.Type().In(0))})[0]
+	op := ent.MethodByName(opname)
+	if !op.IsValid() {
+		return
+	}
+	in := make([]reflect.Value, op.Type().NumIn())
+	for i := range in {
+		in[i] = reflect.Zero(op.Type().In(i))
+	}
+	op.Call(in)
 }
 
 // driveEntityOp drives ops until one request reached the recorder.
@@ -975,6 +1063,8 @@ func TestSecretsMalformedProviderEntry(t *testing.T) {
 // SUCCEEDS reopens it and every waiting operation goes out with the FRESH
 // credential - never the stale pre-failure header, and never nothing.
 func TestSecretsGateRecovery(t *testing.T) {
+	entity, opname := routableOp(t)
+
 	var mu sync.Mutex
 	mode := "fail"
 	release := make(chan struct{})
@@ -1004,7 +1094,12 @@ func TestSecretsGateRecovery(t *testing.T) {
 	})
 
 	// 1. The failure closes the gate: nothing reaches the wire.
-	driveEntityOpUntil(t, client, "was refused by the gate", func() bool { return true })
+	//
+	// The operation is known to be routable, so an empty wire PROVES the gate
+	// refused it. Driving an arbitrary entity would pass here for the wrong
+	// reason: an operation the model never declared reaches no transport
+	// whether the gate is open or shut.
+	driveNamedOp(t, client, entity, opname)
 	if 0 != len(w.api()) {
 		t.Fatalf("a failed resolution must keep the wire silent, saw %d calls", len(w.api()))
 	}
@@ -1020,7 +1115,7 @@ func TestSecretsGateRecovery(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			driveEntityOpUntil(t, client, "recovered", func() bool { return true })
+			driveNamedOp(t, client, entity, opname)
 		}()
 	}
 	go func() {
@@ -1032,7 +1127,10 @@ func TestSecretsGateRecovery(t *testing.T) {
 	for _, call := range w.api() {
 		credentialIs(t, call.auth, "FRESH01")
 	}
-	if 0 == len(w.api()) {
-		t.Fatal("recovery must let the operations out")
+	// BOTH, not "at least one": the claim is that a concurrent retry serves
+	// every caller waiting on it, so one call reaching the wire while the
+	// other is dropped is exactly the failure this guards.
+	if 2 != len(w.api()) {
+		t.Fatalf("recovery must let both operations out, saw %d", len(w.api()))
 	}
 }
