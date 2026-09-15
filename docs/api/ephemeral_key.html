@@ -8,7 +8,7 @@
 <details open><summary>API</summary><a href="../api/index.html">API overview</a>
 <a href="../api/convert.html">Convert</a>
 <a href="../api/embed.html">Embed</a>
-<a aria-current="page" href="../api/ephemeral_key.html">EphemeralKey</a>
+<a aria-current="page" href="../api/ephemeral_key.html">EphemeralKey</a><div class="nav-sections"><a class="nav-section" href="#post-v1ephemeralkey">POST /v1/ephemeral/key</a></div>
 <a href="../api/model.html">Model</a></details>
 <details><summary>Guides</summary><a href="../guides/authentication.html">Authentication</a>
 <a href="../guides/first-call.html">Make your first API call</a>
@@ -59,6 +59,26 @@
 <a href="../features/telemetry.html">Distributed tracing spans with W3C trace-context propagation</a>
 <a href="../features/test.html">In-memory mock transport for testing without a live server</a>
 <a href="../features/timeout.html">Per-request timeout with transport abort</a></details></nav><main id="content"><div class="page-context"><span class="section-dot" aria-hidden="true"></span>API</div><h1 id="ephemeralkey">EphemeralKey</h1>
+<h2 id="operations">Operations</h2>
+<p>Every route this entity exposes. Each route links to its own reference on this page.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>SDK operation</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><a href="#post-v1ephemeralkey"><code>/v1/ephemeral/key</code></a></td>
+<td><code>create</code></td>
+<td>Issued key</td>
+</tr>
+</tbody>
+</table>
 <h2 id="fields">Fields</h2>
 <table>
 <thead>
@@ -97,64 +117,65 @@
 </tbody>
 </table>
 <h2 id="create">create</h2>
-<h3 id="post-v1ephemeralkey">POST /v1/ephemeral/key</h3>
+<h3 id="post-v1ephemeralkey" class="operation" data-method="post"><code>POST</code> /v1/ephemeral/key</h3>
+<p>Operation ID: <code>createEphemeralKey</code>.</p>
+<p>Authentication: not required.</p>
 <h4 id="request-body">Request body</h4>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;additionalProperties&quot;: false,
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<p>Example request:</p>
+<p>The request body is <code>object</code>.</p>
+<p>Example request body:</p>
 <pre><code class="language-json">{}
 </code></pre>
 <h4 id="responses">Responses</h4>
-<h5 id="200">200</h5>
-<p>Issued key</p>
+<h5 id="200-issued-key" class="status" data-status="2xx">200: Issued key</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;data&quot;: {
-      &quot;properties&quot;: {
-        &quot;dailyLimit&quot;: {
-          &quot;description&quot;: &quot;Calls permitted per day.&quot;,
-          &quot;type&quot;: &quot;integer&quot;
-        },
-        &quot;dailyUsed&quot;: {
-          &quot;description&quot;: &quot;Calls already used today.&quot;,
-          &quot;type&quot;: &quot;integer&quot;
-        },
-        &quot;key&quot;: {
-          &quot;description&quot;: &quot;The ephemeral API key, prefixed `eph_`.&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        },
-        &quot;resetsAt&quot;: {
-          &quot;description&quot;: &quot;When the daily allowance resets.&quot;,
-          &quot;format&quot;: &quot;date-time&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        }
-      },
-      &quot;required&quot;: [
-        &quot;key&quot;,
-        &quot;dailyLimit&quot;,
-        &quot;dailyUsed&quot;,
-        &quot;resetsAt&quot;
-      ],
-      &quot;type&quot;: &quot;object&quot;
-    },
-    &quot;success&quot;: {
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;data&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h4 id="security-requirements">Security requirements</h4>
-<pre><code class="language-json">[]
-</code></pre>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data</code></td>
+<td><code>object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data.dailyLimit</code></td>
+<td><code>integer</code></td>
+<td>Yes</td>
+<td>Calls permitted per day.</td>
+</tr>
+<tr>
+<td><code>data.dailyUsed</code></td>
+<td><code>integer</code></td>
+<td>Yes</td>
+<td>Calls already used today.</td>
+</tr>
+<tr>
+<td><code>data.key</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>The ephemeral API key, prefixed <code>eph_</code>.</td>
+</tr>
+<tr>
+<td><code>data.resetsAt</code></td>
+<td><code>string (date-time)</code></td>
+<td>Yes</td>
+<td>When the daily allowance resets.</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+</tbody>
+</table>
 </main></div>
 <script src="../assets/search.js" defer></script></body></html>

@@ -7,7 +7,8 @@
 <div class="shell"><nav class="site-nav" aria-label="Documentation"><div class="search"><label for="search">Search documentation</label><input id="search" type="search" data-base="../" placeholder="Find a guide or reference"><div id="results" aria-live="polite"></div></div><a class="presentation-link" href="../slidev/index.html">Presentation</a><details><summary>Overview</summary><a href="../index.html">UniVec API</a></details>
 <details open><summary>API</summary><a href="../api/index.html">API overview</a>
 <a href="../api/convert.html">Convert</a>
-<a aria-current="page" href="../api/embed.html">Embed</a>
+<a aria-current="page" href="../api/embed.html">Embed</a><div class="nav-sections"><a class="nav-section" href="#post-v1embed">POST /v1/embed</a>
+<a class="nav-section" href="#post-v1ephemeralembed">POST /v1/ephemeral/embed</a></div>
 <a href="../api/ephemeral_key.html">EphemeralKey</a>
 <a href="../api/model.html">Model</a></details>
 <details><summary>Guides</summary><a href="../guides/authentication.html">Authentication</a>
@@ -59,6 +60,32 @@
 <a href="../features/telemetry.html">Distributed tracing spans with W3C trace-context propagation</a>
 <a href="../features/test.html">In-memory mock transport for testing without a live server</a>
 <a href="../features/timeout.html">Per-request timeout with transport abort</a></details></nav><main id="content"><div class="page-context"><span class="section-dot" aria-hidden="true"></span>API</div><h1 id="embed">Embed</h1>
+<h2 id="operations">Operations</h2>
+<p>Every route this entity exposes. Each route links to its own reference on this page.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>SDK operation</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><a href="#post-v1embed"><code>/v1/embed</code></a></td>
+<td><code>create</code></td>
+<td>Generated embeddings</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><a href="#post-v1ephemeralembed"><code>/v1/ephemeral/embed</code></a></td>
+<td><code>create</code></td>
+<td>Generated embeddings</td>
+</tr>
+</tbody>
+</table>
 <h2 id="fields">Fields</h2>
 <table>
 <thead>
@@ -91,35 +118,36 @@
 </tbody>
 </table>
 <h2 id="create">create</h2>
-<h3 id="post-v1embed">POST /v1/embed</h3>
+<h3 id="post-v1embed" class="operation" data-method="post"><code>POST</code> /v1/embed</h3>
+<p>Operation ID: <code>createEmbedding</code>.</p>
+<p>Authentication: bearer token (<code>bearerAuth</code>).</p>
 <h4 id="request-body">Request body</h4>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;model&quot;: {
-      &quot;description&quot;: &quot;Name of an embed model, as returned by listModels.&quot;,
-      &quot;example&quot;: &quot;baai-bge-base-en-v1.5&quot;,
-      &quot;type&quot;: &quot;string&quot;
-    },
-    &quot;texts&quot;: {
-      &quot;description&quot;: &quot;Texts to embed. One vector is returned per text, in order.&quot;,
-      &quot;example&quot;: [
-        &quot;hello world&quot;
-      ],
-      &quot;items&quot;: {
-        &quot;type&quot;: &quot;string&quot;
-      },
-      &quot;type&quot;: &quot;array&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;model&quot;,
-    &quot;texts&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<p>Example request:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Name of an embed model, as returned by listModels.</td>
+</tr>
+<tr>
+<td><code>texts</code></td>
+<td><code>array of string</code></td>
+<td>Yes</td>
+<td>Texts to embed. One vector is returned per text, in order.</td>
+</tr>
+</tbody>
+</table>
+<p>Example request body:</p>
 <pre><code class="language-json">{
   &quot;model&quot;: &quot;baai-bge-base-en-v1.5&quot;,
   &quot;texts&quot;: [
@@ -128,141 +156,138 @@
 }
 </code></pre>
 <h4 id="responses">Responses</h4>
-<h5 id="200">200</h5>
-<p>Generated embeddings</p>
+<h5 id="200-generated-embeddings" class="status" data-status="2xx">200: Generated embeddings</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;data&quot;: {
-      &quot;properties&quot;: {
-        &quot;embeddings&quot;: {
-          &quot;description&quot;: &quot;One vector per input text, in input order.&quot;,
-          &quot;items&quot;: {
-            &quot;description&quot;: &quot;A single embedding vector.&quot;,
-            &quot;items&quot;: {
-              &quot;format&quot;: &quot;float&quot;,
-              &quot;type&quot;: &quot;number&quot;
-            },
-            &quot;type&quot;: &quot;array&quot;
-          },
-          &quot;type&quot;: &quot;array&quot;
-        },
-        &quot;model&quot;: {
-          &quot;description&quot;: &quot;Model that produced the vectors.&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        }
-      },
-      &quot;required&quot;: [
-        &quot;embeddings&quot;,
-        &quot;model&quot;
-      ],
-      &quot;type&quot;: &quot;object&quot;
-    },
-    &quot;success&quot;: {
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;data&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h5 id="401">401</h5>
-<p>Error</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data</code></td>
+<td><code>object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data.embeddings</code></td>
+<td><code>array of array of number (float)</code></td>
+<td>Yes</td>
+<td>One vector per input text, in input order.</td>
+</tr>
+<tr>
+<td><code>data.model</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Model that produced the vectors.</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h5 id="401-error" class="status" data-status="4xx">401: Error</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;error&quot;: {
-      &quot;properties&quot;: {
-        &quot;message&quot;: {
-          &quot;description&quot;: &quot;Human-readable error detail.&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        }
-      },
-      &quot;required&quot;: [
-        &quot;message&quot;
-      ],
-      &quot;type&quot;: &quot;object&quot;
-    },
-    &quot;success&quot;: {
-      &quot;description&quot;: &quot;Always false on an error.&quot;,
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;error&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h5 id="422">422</h5>
-<p>Error</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error</code></td>
+<td><code>object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>error.message</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Human-readable error detail.</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td>Always false on an error.</td>
+</tr>
+</tbody>
+</table>
+<h5 id="422-error" class="status" data-status="4xx">422: Error</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;error&quot;: {
-      &quot;properties&quot;: {
-        &quot;message&quot;: {
-          &quot;description&quot;: &quot;Human-readable error detail.&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        }
-      },
-      &quot;required&quot;: [
-        &quot;message&quot;
-      ],
-      &quot;type&quot;: &quot;object&quot;
-    },
-    &quot;success&quot;: {
-      &quot;description&quot;: &quot;Always false on an error.&quot;,
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;error&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h4 id="security-requirements">Security requirements</h4>
-<pre><code class="language-json">[
-  {
-    &quot;bearerAuth&quot;: []
-  }
-]
-</code></pre>
-<h3 id="post-v1ephemeralembed">POST /v1/ephemeral/embed</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error</code></td>
+<td><code>object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>error.message</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Human-readable error detail.</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td>Always false on an error.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="post-v1ephemeralembed" class="operation" data-method="post"><code>POST</code> /v1/ephemeral/embed</h3>
+<p>Operation ID: <code>createEphemeralEmbedding</code>.</p>
+<p>Authentication: bearer token (<code>bearerAuth</code>).</p>
 <h4 id="request-body-1">Request body</h4>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;model&quot;: {
-      &quot;description&quot;: &quot;Name of an embed model, as returned by listModels.&quot;,
-      &quot;example&quot;: &quot;baai-bge-base-en-v1.5&quot;,
-      &quot;type&quot;: &quot;string&quot;
-    },
-    &quot;texts&quot;: {
-      &quot;description&quot;: &quot;Texts to embed. One vector is returned per text, in order.&quot;,
-      &quot;example&quot;: [
-        &quot;hello world&quot;
-      ],
-      &quot;items&quot;: {
-        &quot;type&quot;: &quot;string&quot;
-      },
-      &quot;type&quot;: &quot;array&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;model&quot;,
-    &quot;texts&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<p>Example request:</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Name of an embed model, as returned by listModels.</td>
+</tr>
+<tr>
+<td><code>texts</code></td>
+<td><code>array of string</code></td>
+<td>Yes</td>
+<td>Texts to embed. One vector is returned per text, in order.</td>
+</tr>
+</tbody>
+</table>
+<p>Example request body:</p>
 <pre><code class="language-json">{
   &quot;model&quot;: &quot;baai-bge-base-en-v1.5&quot;,
   &quot;texts&quot;: [
@@ -271,140 +296,139 @@
 }
 </code></pre>
 <h4 id="responses-1">Responses</h4>
-<h5 id="200-1">200</h5>
-<p>Generated embeddings</p>
+<h5 id="200-generated-embeddings-1" class="status" data-status="2xx">200: Generated embeddings</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;data&quot;: {
-      &quot;properties&quot;: {
-        &quot;embeddings&quot;: {
-          &quot;description&quot;: &quot;One vector per input text, in input order.&quot;,
-          &quot;items&quot;: {
-            &quot;description&quot;: &quot;A single embedding vector.&quot;,
-            &quot;items&quot;: {
-              &quot;format&quot;: &quot;float&quot;,
-              &quot;type&quot;: &quot;number&quot;
-            },
-            &quot;type&quot;: &quot;array&quot;
-          },
-          &quot;type&quot;: &quot;array&quot;
-        },
-        &quot;model&quot;: {
-          &quot;description&quot;: &quot;Model that produced the vectors.&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        }
-      },
-      &quot;required&quot;: [
-        &quot;embeddings&quot;,
-        &quot;model&quot;
-      ],
-      &quot;type&quot;: &quot;object&quot;
-    },
-    &quot;success&quot;: {
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;data&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h5 id="401-1">401</h5>
-<p>Error</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data</code></td>
+<td><code>object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data.embeddings</code></td>
+<td><code>array of array of number (float)</code></td>
+<td>Yes</td>
+<td>One vector per input text, in input order.</td>
+</tr>
+<tr>
+<td><code>data.model</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Model that produced the vectors.</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h5 id="401-error-1" class="status" data-status="4xx">401: Error</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;error&quot;: {
-      &quot;properties&quot;: {
-        &quot;message&quot;: {
-          &quot;description&quot;: &quot;Human-readable error detail.&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        }
-      },
-      &quot;required&quot;: [
-        &quot;message&quot;
-      ],
-      &quot;type&quot;: &quot;object&quot;
-    },
-    &quot;success&quot;: {
-      &quot;description&quot;: &quot;Always false on an error.&quot;,
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;error&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h5 id="422-1">422</h5>
-<p>Error</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error</code></td>
+<td><code>object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>error.message</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Human-readable error detail.</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td>Always false on an error.</td>
+</tr>
+</tbody>
+</table>
+<h5 id="422-error-1" class="status" data-status="4xx">422: Error</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;error&quot;: {
-      &quot;properties&quot;: {
-        &quot;message&quot;: {
-          &quot;description&quot;: &quot;Human-readable error detail.&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        }
-      },
-      &quot;required&quot;: [
-        &quot;message&quot;
-      ],
-      &quot;type&quot;: &quot;object&quot;
-    },
-    &quot;success&quot;: {
-      &quot;description&quot;: &quot;Always false on an error.&quot;,
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;error&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h5 id="429">429</h5>
-<p>Error</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error</code></td>
+<td><code>object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>error.message</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Human-readable error detail.</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td>Always false on an error.</td>
+</tr>
+</tbody>
+</table>
+<h5 id="429-error" class="status" data-status="4xx">429: Error</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;error&quot;: {
-      &quot;properties&quot;: {
-        &quot;message&quot;: {
-          &quot;description&quot;: &quot;Human-readable error detail.&quot;,
-          &quot;type&quot;: &quot;string&quot;
-        }
-      },
-      &quot;required&quot;: [
-        &quot;message&quot;
-      ],
-      &quot;type&quot;: &quot;object&quot;
-    },
-    &quot;success&quot;: {
-      &quot;description&quot;: &quot;Always false on an error.&quot;,
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;error&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h4 id="security-requirements-1">Security requirements</h4>
-<pre><code class="language-json">[
-  {
-    &quot;bearerAuth&quot;: []
-  }
-]
-</code></pre>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>error</code></td>
+<td><code>object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>error.message</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Human-readable error detail.</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td>Always false on an error.</td>
+</tr>
+</tbody>
+</table>
 </main></div>
 <script src="../assets/search.js" defer></script></body></html>
