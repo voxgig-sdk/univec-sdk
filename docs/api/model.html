@@ -9,7 +9,7 @@
 <a href="../api/convert.html">Convert</a>
 <a href="../api/embed.html">Embed</a>
 <a href="../api/ephemeral_key.html">EphemeralKey</a>
-<a aria-current="page" href="../api/model.html">Model</a></details>
+<a aria-current="page" href="../api/model.html">Model</a><div class="nav-sections"><a class="nav-section" href="#get-v1models">GET /v1/models</a></div></details>
 <details><summary>Guides</summary><a href="../guides/authentication.html">Authentication</a>
 <a href="../guides/first-call.html">Make your first API call</a>
 <a href="../guides/errors.html">Handle errors</a>
@@ -59,6 +59,26 @@
 <a href="../features/telemetry.html">Distributed tracing spans with W3C trace-context propagation</a>
 <a href="../features/test.html">In-memory mock transport for testing without a live server</a>
 <a href="../features/timeout.html">Per-request timeout with transport abort</a></details></nav><main id="content"><div class="page-context"><span class="section-dot" aria-hidden="true"></span>API</div><h1 id="model">Model</h1>
+<h2 id="operations">Operations</h2>
+<p>Every route this entity exposes. Each route links to its own reference on this page.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>SDK operation</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><a href="#get-v1models"><code>/v1/models</code></a></td>
+<td><code>list</code></td>
+<td>Model list</td>
+</tr>
+</tbody>
+</table>
 <h2 id="fields">Fields</h2>
 <table>
 <thead>
@@ -133,157 +153,35 @@
 </tbody>
 </table>
 <h2 id="list">list</h2>
-<h3 id="get-v1models">GET /v1/models</h3>
+<h3 id="get-v1models" class="operation" data-method="get"><code>GET</code> /v1/models</h3>
+<p>Operation ID: <code>listModels</code>.</p>
+<p>Authentication: not required.</p>
 <h4 id="responses">Responses</h4>
-<h5 id="200">200</h5>
-<p>Model list</p>
+<h5 id="200-model-list" class="status" data-status="2xx">200: Model list</h5>
 <p><code>application/json</code></p>
-<pre><code class="language-json">{
-  &quot;properties&quot;: {
-    &quot;data&quot;: {
-      &quot;items&quot;: {
-        &quot;oneOf&quot;: [
-          {
-            &quot;properties&quot;: {
-              &quot;eval&quot;: {
-                &quot;description&quot;: &quot;Retrieval-fidelity metrics for a convert model.&quot;,
-                &quot;properties&quot;: {
-                  &quot;cosine_mean&quot;: {
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  },
-                  &quot;cosine_median&quot;: {
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  },
-                  &quot;cosine_std&quot;: {
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  },
-                  &quot;kendall_p_value&quot;: {
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  },
-                  &quot;kendall_tau&quot;: {
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  },
-                  &quot;mrr&quot;: {
-                    &quot;description&quot;: &quot;Mean reciprocal rank.&quot;,
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  },
-                  &quot;p_at_1&quot;: {
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  },
-                  &quot;p_at_10&quot;: {
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  },
-                  &quot;p_at_5&quot;: {
-                    &quot;format&quot;: &quot;float&quot;,
-                    &quot;type&quot;: &quot;number&quot;
-                  }
-                },
-                &quot;type&quot;: &quot;object&quot;
-              },
-              &quot;executionProvider&quot;: {
-                &quot;description&quot;: &quot;Hardware backend, e.g. `cpu`.&quot;,
-                &quot;type&quot;: &quot;string&quot;
-              },
-              &quot;modelCard&quot;: {
-                &quot;additionalProperties&quot;: true,
-                &quot;description&quot;: &quot;Convert models only: training provenance and architecture detail.&quot;,
-                &quot;type&quot;: &quot;object&quot;
-              },
-              &quot;modelType&quot;: {
-                &quot;description&quot;: &quot;`embed` for text-to-vector models, `convert` for space-translation models.&quot;,
-                &quot;enum&quot;: [
-                  &quot;embed&quot;,
-                  &quot;convert&quot;
-                ],
-                &quot;type&quot;: &quot;string&quot;
-              },
-              &quot;name&quot;: {
-                &quot;description&quot;: &quot;Model identifier used in requests.&quot;,
-                &quot;type&quot;: &quot;string&quot;
-              },
-              &quot;sequenceLen&quot;: {
-                &quot;description&quot;: &quot;Embed models only: maximum input sequence length.&quot;,
-                &quot;type&quot;: &quot;integer&quot;
-              },
-              &quot;sourceDim&quot;: {
-                &quot;description&quot;: &quot;Convert models only: source vector dimension.&quot;,
-                &quot;type&quot;: &quot;integer&quot;
-              },
-              &quot;sourceModel&quot;: {
-                &quot;description&quot;: &quot;Convert models only: the source model space.&quot;,
-                &quot;type&quot;: &quot;string&quot;
-              },
-              &quot;targetDim&quot;: {
-                &quot;description&quot;: &quot;Dimension of the produced vectors.&quot;,
-                &quot;type&quot;: &quot;integer&quot;
-              },
-              &quot;targetModel&quot;: {
-                &quot;description&quot;: &quot;The model space produced.&quot;,
-                &quot;type&quot;: &quot;string&quot;
-              }
-            },
-            &quot;required&quot;: [
-              &quot;name&quot;,
-              &quot;modelType&quot;,
-              &quot;targetModel&quot;,
-              &quot;targetDim&quot;
-            ],
-            &quot;type&quot;: &quot;object&quot;
-          },
-          {
-            &quot;properties&quot;: {
-              &quot;executionProvider&quot;: {
-                &quot;type&quot;: &quot;string&quot;
-              },
-              &quot;modelType&quot;: {
-                &quot;enum&quot;: [
-                  &quot;convert-bridge&quot;,
-                  &quot;embed-bridge&quot;
-                ],
-                &quot;type&quot;: &quot;string&quot;
-              },
-              &quot;name&quot;: {
-                &quot;type&quot;: &quot;string&quot;
-              },
-              &quot;restrictedTargets&quot;: {
-                &quot;items&quot;: {
-                  &quot;type&quot;: &quot;string&quot;
-                },
-                &quot;type&quot;: &quot;array&quot;
-              }
-            },
-            &quot;required&quot;: [
-              &quot;name&quot;,
-              &quot;modelType&quot;,
-              &quot;executionProvider&quot;
-            ],
-            &quot;type&quot;: &quot;object&quot;
-          }
-        ]
-      },
-      &quot;type&quot;: &quot;array&quot;
-    },
-    &quot;success&quot;: {
-      &quot;type&quot;: &quot;boolean&quot;
-    }
-  },
-  &quot;required&quot;: [
-    &quot;success&quot;,
-    &quot;data&quot;
-  ],
-  &quot;type&quot;: &quot;object&quot;
-}
-</code></pre>
-<h4 id="security-requirements">Security requirements</h4>
-<pre><code class="language-json">[]
-</code></pre>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data</code></td>
+<td><code>array of object or object</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>boolean</code></td>
+<td>Yes</td>
+<td></td>
+</tr>
+</tbody>
+</table>
 </main></div>
 <script src="../assets/search.js" defer></script></body></html>

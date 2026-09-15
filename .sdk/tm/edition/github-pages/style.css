@@ -12,6 +12,23 @@ a{color:var(--primary);text-underline-offset:.2em}a:focus-visible,input:focus-vi
 .provider-link,.repo-link{white-space:nowrap;font:500 .85rem {{mono}};text-decoration:none;border:1px solid color-mix(in srgb,var(--primary) 35%,transparent);padding:.65rem 1rem;border-radius:.65rem;background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 12%,transparent),color-mix(in srgb,var(--accent) 4%,transparent));box-shadow:0 3px 16px color-mix(in srgb,var(--primary) 7%,transparent)}.provider-link:hover,.repo-link:hover{background:color-mix(in srgb,var(--primary) 19%,transparent);border-color:var(--primary)}.repo-link{color:var(--text);border-color:color-mix(in srgb,var(--accent) 38%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 12%,transparent),color-mix(in srgb,var(--primary) 4%,transparent))}.logo{max-width:130px;max-height:36px;margin-right:1rem}
 .site-notice{padding:.8rem 3rem;font-size:.82rem;border-bottom:1px solid color-mix(in srgb,var(--text) 10%,transparent);background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 7%,transparent),transparent)}.site-notice:empty{display:none}
 .shell{display:grid;grid-template-columns:270px minmax(0,1fr);max-width:1500px;min-height:calc(100vh - 160px);margin:auto}
+/* API reference: a route heading wears its method as a badge, a response
+   heading its status class, and the sidebar lists the routes of the entity
+   being read. Colours are the conventional ones so the page reads like any
+   other API reference. */
+h3.operation{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:2.4rem}
+h3.operation code:first-child{font:700 .68rem {{mono}};letter-spacing:.07em;padding:.28rem .6rem;border-radius:.4rem;color:#fff;background:#495057}
+h3.operation[data-method="get"] code:first-child{background:#0b7285}
+h3.operation[data-method="post"] code:first-child{background:#2b8a3e}
+h3.operation[data-method="put"] code:first-child,h3.operation[data-method="patch"] code:first-child{background:#e8590c}
+h3.operation[data-method="delete"] code:first-child{background:#c92a2a}
+h5.status{font:600 .95rem {{mono}};padding-left:.7rem;border-left:3px solid color-mix(in srgb,var(--text) 30%,transparent)}
+h5.status[data-status="2xx"]{border-left-color:#2b8a3e}
+h5.status[data-status="4xx"]{border-left-color:#e8590c}
+h5.status[data-status="5xx"]{border-left-color:#c92a2a}
+.nav-sections{margin:.2rem 0 .7rem .75rem;border-left:1px solid color-mix(in srgb,var(--primary) 18%,transparent)}
+.site-nav .nav-sections a{font:500 .76rem {{mono}};padding:.22rem .6rem;margin:0;color:color-mix(in srgb,var(--text) 70%,var(--background))}
+.site-nav .nav-sections a:hover{color:var(--primary)}
 .site-nav{padding:2rem 1.3rem;font-size:.9rem;border-right:1px solid color-mix(in srgb,var(--primary) 10%,transparent)}.site-nav a{display:block;padding:.42rem .75rem;margin:.1rem 0;border:1px solid transparent;border-radius:.45rem;text-decoration:none;color:color-mix(in srgb,var(--text) 85%,var(--background))}.site-nav a:hover{color:var(--primary);background:color-mix(in srgb,var(--primary) 6%,transparent)}.site-nav [aria-current]{color:var(--primary);border-color:color-mix(in srgb,var(--primary) 24%,transparent);background:linear-gradient(100deg,color-mix(in srgb,var(--primary) 14%,transparent),color-mix(in srgb,var(--primary) 3%,transparent));box-shadow:inset 3px 0 var(--primary)}.site-nav details{margin-bottom:.9rem}.site-nav summary{cursor:pointer;font-weight:600;padding:.35rem .65rem}.site-nav details a{margin-left:.45rem}.site-nav .presentation-link{margin:.8rem 0 1.5rem;border-color:color-mix(in srgb,var(--accent) 30%,transparent);background:linear-gradient(110deg,color-mix(in srgb,var(--accent) 9%,transparent),transparent);color:var(--primary)}
 main{position:relative;margin:2rem;padding:2.2rem 3rem 4rem;max-width:1050px;min-width:0;border:1px solid color-mix(in srgb,var(--text) 11%,transparent);border-radius:1rem;background:radial-gradient(ellipse at 100% 0,color-mix(in srgb,var(--accent) 7%,transparent),transparent 35rem),linear-gradient(155deg,color-mix(in srgb,var(--primary) 5%,var(--background)),var(--background) 28rem);box-shadow:0 14px 50px #0000000c}
 .page-context{display:flex;align-items:center;gap:.6rem;font:500 .72rem {{mono}};letter-spacing:.08em;text-transform:uppercase;color:var(--primary)}.section-dot{width:.45rem;height:.45rem;border-radius:50%;background:var(--primary);box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 12%,transparent)}
