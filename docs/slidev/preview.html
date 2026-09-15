@@ -65,6 +65,17 @@ footer a { color: var(--primary); }
 </section>
 <section class="slide">
 <span class="n">Slide 2</span>
+<h2>What this SDK gives you</h2>
+<ul>
+<li>4 entities across 8 HTTP routes</li>
+<li>23 language SDKs and 3 companion tools</li>
+<li>19 optional features built in, all off until you enable them</li>
+</ul>
+<p>An entity groups related operations, and each operation may cover several routes. The SDK exposes both using the conventions of your language, so you write <code>client</code> calls rather than HTTP requests.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 3</span>
 <h2>API capabilities</h2>
 <ul>
 <li>Convert: <code>create</code></li>
@@ -75,33 +86,59 @@ footer a { color: var(--primary); }
 
 </section>
 <section class="slide">
-<span class="n">Slide 3</span>
-<h2>Authentication</h2>
-<p>Use <code>http</code> authentication. Configure credentials outside source control.</p>
-
-</section>
-<section class="slide">
 <span class="n">Slide 4</span>
-<h2>Make your first call</h2>
-<ol>
-<li>Install an SDK.</li>
-<li>Configure the server and credentials.</li>
-<li>Supply the operation’s required input.</li>
-<li>Inspect the response.</li>
-</ol>
+<h2>Authentication</h2>
+<p>The API uses <code>http</code> authentication. Pass the credential when you construct the client, and read it from the environment rather than from source.</p>
 
 </section>
 <section class="slide">
 <span class="n">Slide 5</span>
-<h2>Set up a client</h2>
-<pre><code class="language-ts">import { UnivecSDK } from '@voxgig-sdk/univec'
-
-const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
-</code></pre>
+<h2>Features come with the SDK</h2>
+<p>Retries, caching, paging, logging and the rest are compiled in and switched off. You turn on the ones your application needs in the client configuration, and pay for nothing you leave alone.</p>
 
 </section>
 <section class="slide">
 <span class="n">Slide 6</span>
+<h2>Built-in features 1 / 3</h2>
+<ul>
+<li>Structured audit trail of operations</li>
+<li>Response caching for safe read requests</li>
+<li>Client identity and per-request correlation headers</li>
+<li>Cost tracking and spend budget for API calls</li>
+<li>Request/response capture ring buffer for debugging</li>
+<li>Idempotency keys for safe retries of mutating operations</li>
+<li>Structured request and response logging</li>
+<li>Statistics capture: per-operation counters and latency</li>
+</ul>
+
+</section>
+<section class="slide">
+<span class="n">Slide 7</span>
+<h2>Built-in features 2 / 3</h2>
+<ul>
+<li>Network behaviour simulation for offline testing (latency, failures, outages)</li>
+<li>Pagination signals for list operations</li>
+<li>Outbound HTTP(S) proxy routing</li>
+<li>Client-side rate limiting via a token bucket</li>
+<li>Client-side role/permission enforcement</li>
+<li>Automatic retry of transient failures with exponential backoff</li>
+<li>Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens</li>
+<li>Incremental streaming of list results via async iteration</li>
+</ul>
+
+</section>
+<section class="slide">
+<span class="n">Slide 8</span>
+<h2>Built-in features 3 / 3</h2>
+<ul>
+<li>Distributed tracing spans with W3C trace-context propagation</li>
+<li>In-memory mock transport for testing without a live server</li>
+<li>Per-request timeout with transport abort</li>
+</ul>
+
+</section>
+<section class="slide">
+<span class="n">Slide 9</span>
 <h2>SDKs and tools 1 / 6</h2>
 <ul>
 <li>C: build from <code>c/</code></li>
@@ -113,7 +150,7 @@ const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
 
 </section>
 <section class="slide">
-<span class="n">Slide 7</span>
+<span class="n">Slide 10</span>
 <h2>SDKs and tools 2 / 6</h2>
 <ul>
 <li>Elixir: build from <code>elixir/</code></li>
@@ -125,7 +162,7 @@ const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
 
 </section>
 <section class="slide">
-<span class="n">Slide 8</span>
+<span class="n">Slide 11</span>
 <h2>SDKs and tools 3 / 6</h2>
 <ul>
 <li>Java: build from <code>java/</code></li>
@@ -137,7 +174,7 @@ const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
 
 </section>
 <section class="slide">
-<span class="n">Slide 9</span>
+<span class="n">Slide 12</span>
 <h2>SDKs and tools 4 / 6</h2>
 <ul>
 <li>OCaml: build from <code>ocaml/</code></li>
@@ -149,7 +186,7 @@ const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
 
 </section>
 <section class="slide">
-<span class="n">Slide 10</span>
+<span class="n">Slide 13</span>
 <h2>SDKs and tools 5 / 6</h2>
 <ul>
 <li>Ruby: build from <code>rb/</code></li>
@@ -161,7 +198,7 @@ const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
 
 </section>
 <section class="slide">
-<span class="n">Slide 11</span>
+<span class="n">Slide 14</span>
 <h2>SDKs and tools 6 / 6</h2>
 <ul>
 <li>Zig: build from <code>zig/</code></li>
@@ -169,12 +206,112 @@ const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
 
 </section>
 <section class="slide">
-<span class="n">Slide 12</span>
-<h2>Next steps</h2>
+<span class="n">Slide 15</span>
+<h2>Tutorial: your first call</h2>
+<p>Five steps, in TypeScript. Every other language in this repository follows the same shape.</p>
+<ol>
+<li>Install the SDK.</li>
+<li>Construct a client.</li>
+<li>Call an operation.</li>
+<li>Handle the failure.</li>
+<li>Turn on a feature.</li>
+</ol>
+
+</section>
+<section class="slide">
+<span class="n">Slide 16</span>
+<h2>Step 1: install</h2>
+<p>This target is not published yet. Build it from <code>ts/</code> in the repository.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 17</span>
+<h2>Step 2: construct a client</h2>
+<pre><code class="language-ts">import { UnivecSDK } from '@voxgig-sdk/univec'
+
+const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
+</code></pre>
+<p>The credential is read from the environment, so nothing secret reaches your source tree.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 18</span>
+<h2>Step 3: call an operation</h2>
+<pre><code class="language-ts">const result = await client.Convert().create({
+  // the input this operation requires
+})
+</code></pre>
+<p>That reaches <code>POST /v1/convert</code>. The reference page for Convert lists every field it expects.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 19</span>
+<h2>Step 4: handle the failure</h2>
+<pre><code class="language-ts">try {
+  const result = await client.Convert().create({ /* input */ })
+} catch (err) {
+  // authentication, validation, or the API itself
+}
+</code></pre>
+<p>Operations fail loudly rather than returning an empty result, so an error is never mistaken for no data.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 20</span>
+<h2>Step 5: turn on a feature</h2>
+<pre><code class="language-json">{ &quot;retry&quot;: { &quot;active&quot;: true } }
+</code></pre>
+<p>Pass that in the client configuration and automatic retry of transient failures with exponential backoff is live. The feature pages document every option and its default.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 21</span>
+<h2>This SDK is generated</h2>
+<p>Nothing here was written by hand. An API definition goes in, and every language, test suite and page of documentation comes out.</p>
+<p>So the useful question is not how to patch it. It is what to regenerate, and what survives when you do.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 22</span>
+<h2>Regenerate it</h2>
+<pre><code class="language-sh">npm run generate
+</code></pre>
+<p>Update the API definition in <code>.sdk/def/</code> and regenerate. New routes, new fields and new entities reach every target at once.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 23</span>
+<h2>Add a language</h2>
+<pre><code class="language-sh">voxgig-sdkgen target add &lt;language&gt;
+</code></pre>
+<p>This repository already builds 23 of them. A target added today is generated from the same model as the ones already here, so it arrives complete rather than as a stub.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 24</span>
+<h2>Add a feature</h2>
+<pre><code class="language-sh">voxgig-sdkgen feature add &lt;feature&gt;
+</code></pre>
+<p>A feature is behaviour around the call, not a change to it: retries, caching, audit trails, secret resolution. It lands in every target that supports it.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 25</span>
+<h2>What survives a regeneration</h2>
 <ul>
-<li>Follow the first-call guide.</li>
-<li>Read the API and SDK reference.</li>
-<li>Review the feature and tool documentation.</li>
+<li><code>.sdk/model/project.aon</code> is yours. Settings belong there.</li>
+<li>Everything generated is overwritten, every time.</li>
+</ul>
+<p>An edit to a generated file works until the next regeneration and then disappears without warning, which is the one failure mode worth knowing in advance.</p>
+
+</section>
+<section class="slide">
+<span class="n">Slide 26</span>
+<h2>Where to go next</h2>
+<ul>
+<li>Read the API reference for the operation you need.</li>
+<li>Pick a language and follow its installation page.</li>
+<li>Review the feature pages before enabling anything in production.</li>
 </ul>
 
 </section>
