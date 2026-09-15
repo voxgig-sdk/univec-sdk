@@ -108,8 +108,13 @@ ${basicFn} c = do
     ctrl <- emptyMap
     created <- eCreate ent d ctrl
     cd <- eDataGet created
-    cid <- getp cd "id"
-    pure (ismap cd && not (isNoval cid))
+    -- The create RESULT is a map. Deliberately NOT "and it carries an id":
+    -- a create response need not return one. univec's convert, embed and
+    -- ephemeral_key all answer {success, data:{...}} with no id, so this
+    -- target failed three entity tests the go target passes -- go asserts
+    -- only that the result is a map, and that is the assertion the model
+    -- actually supports.
+    pure (ismap cd)
 `
         }
         if (hasCreate && hasUpdate) {

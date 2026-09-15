@@ -77,8 +77,13 @@ convertBasicTest c = do
     ctrl <- emptyMap
     created <- eCreate ent d ctrl
     cd <- eDataGet created
-    cid <- getp cd "id"
-    pure (ismap cd && not (isNoval cid))
+    -- The create RESULT is a map. Deliberately NOT "and it carries an id":
+    -- a create response need not return one. univec's convert, embed and
+    -- ephemeral_key all answer {success, data:{...}} with no id, so this
+    -- target failed three entity tests the go target passes -- go asserts
+    -- only that the result is a map, and that is the assertion the model
+    -- actually supports.
+    pure (ismap cd)
 
 convertDirectTest :: Counters -> IO ()
 convertDirectTest c = runTest c "convert.direct" $ do
@@ -117,8 +122,13 @@ embedBasicTest c = do
     ctrl <- emptyMap
     created <- eCreate ent d ctrl
     cd <- eDataGet created
-    cid <- getp cd "id"
-    pure (ismap cd && not (isNoval cid))
+    -- The create RESULT is a map. Deliberately NOT "and it carries an id":
+    -- a create response need not return one. univec's convert, embed and
+    -- ephemeral_key all answer {success, data:{...}} with no id, so this
+    -- target failed three entity tests the go target passes -- go asserts
+    -- only that the result is a map, and that is the assertion the model
+    -- actually supports.
+    pure (ismap cd)
 
 embedDirectTest :: Counters -> IO ()
 embedDirectTest c = runTest c "embed.direct" $ do
@@ -157,8 +167,13 @@ ephemeral_keyBasicTest c = do
     ctrl <- emptyMap
     created <- eCreate ent d ctrl
     cd <- eDataGet created
-    cid <- getp cd "id"
-    pure (ismap cd && not (isNoval cid))
+    -- The create RESULT is a map. Deliberately NOT "and it carries an id":
+    -- a create response need not return one. univec's convert, embed and
+    -- ephemeral_key all answer {success, data:{...}} with no id, so this
+    -- target failed three entity tests the go target passes -- go asserts
+    -- only that the result is a map, and that is the assertion the model
+    -- actually supports.
+    pure (ismap cd)
 
 ephemeral_keyDirectTest :: Counters -> IO ()
 ephemeral_keyDirectTest c = runTest c "ephemeral_key.direct" $ do
