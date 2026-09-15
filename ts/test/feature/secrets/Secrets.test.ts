@@ -377,16 +377,45 @@ describe('secrets', () => {
     // Before any op, nothing has been resolved.
     assert.equal(sdk.options().apikey, '')
 
-    const name = names[0]
-    const accessor = name.charAt(0).toUpperCase() + name.slice(1)
-
-    // The op itself may fail (no seeded data, no live API) — irrelevant
-    // here. What matters is that the awaited PreSpec hook ran and the
-    // credential reached the live options before the spec was built.
-    try {
-      await sdk[accessor]().list()
+    // AN OP THAT EXISTS, not `list` on whichever entity comes first.
+    //
+    // A generated TS entity carries only the ops its model DECLARES, so
+    // `list` is absent from an entity declaring `create` alone — and
+    // calling it throws before the PreSpec hook can run, failing the
+    // assertion below for a reason that has nothing to do with secrets.
+    // univec-sdk hit exactly that: its first entity declares `create`
+    // only, so this test failed on every run while PreSpec worked
+    // perfectly. Any real op exercises the hook; `list` is not special.
+    //
+    // This file is a TEMPLATE, so no project's op names are known here
+    // either. Discover the first callable one rather than assuming.
+    let ran = false
+    for (const one of names) {
+      const acc = one.charAt(0).toUpperCase() + one.slice(1)
+      const ent = (sdk as any)[acc]?.()
+      if (null == ent) {
+        continue
+      }
+      const opname = ['list', 'load', 'create']
+        .find((o: string) => 'function' === typeof (ent as any)[o])
+      if (null == opname) {
+        continue
+      }
+      // The op itself may fail (no seeded data, no live API) — irrelevant
+      // here. What matters is that the awaited PreSpec hook ran and the
+      // credential reached the live options before the spec was built.
+      try {
+        await (ent as any)[opname]({})
+      }
+      catch (_err) { }
+      ran = true
+      break
     }
-    catch (_err) { }
+
+    if (!ran) {
+      // Entities, but not one callable op between them: no PreSpec path.
+      return
+    }
 
     assert.equal(sdk.options().apikey, 'ENVKEY02',
       'the entity op did not resolve the secret through PreSpec')
