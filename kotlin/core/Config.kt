@@ -69,7 +69,7 @@ object Config {
     b.append(" \"main\": {")
     b.append("  \"name\": \"Univec\",")
     b.append("  \"slug\": \"univec\",")
-    b.append("  \"version\": \"0.1.1\",")
+    b.append("  \"version\": \"0.1.2\",")
     b.append("  \"target\": \"kotlin\"")
     b.append(" },")
     b.append(" \"feature\": {")

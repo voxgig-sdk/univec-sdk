@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voxgig-sdk-univec"
-version = "0.1.1"
+version = "0.1.2"
 description = "Unofficial generated Python SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider."
 readme = "README.md"
 license = "MIT"

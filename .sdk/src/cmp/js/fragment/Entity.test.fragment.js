@@ -1,12 +1,14 @@
 
 const envlocal = __dirname + '/../../../.env.local'
-require('dotenv').config({ quiet: true, path: [envlocal] })
+require('../../utility').loadEnvLocal(envlocal)
 
 const Path = require('node:path')
 const Fs = require('node:fs')
 
 const { test, describe, afterEach } = require('node:test')
 const assert = require('node:assert')
+const { createLiveTransport } = require('../../live-runner')
+const { runLiveEntity } = require('../../live-entity')
 
 
 const { ProjectNameSDK, BaseFeature, stdutil, config } = require('../../..')
@@ -36,7 +38,7 @@ describe('EntityNameEntity', async () => {
   })
 
 
-  test('basic', async () => {
+  test('basic', async (t) => {
     // <[SLOT:basic]>
   })
 })

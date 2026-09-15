@@ -78,6 +78,7 @@
     "docs/slidev/assets/style.css",
     "docs/slidev/global-top.vue",
     "docs/slidev/package.json",
+    "docs/slidev/preview.html",
     "docs/slidev/public/assets/font.woff2.license.txt",
     "docs/slidev/public/assets/heading-font.woff2.license.txt",
     "docs/slidev/public/assets/mono-font.woff2.license.txt",

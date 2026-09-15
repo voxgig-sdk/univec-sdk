@@ -54,6 +54,7 @@
     "docs/sdks/ts.html",
     "docs/sdks/zig.html",
     "docs/slidev/global-top.vue",
+    "docs/slidev/preview.html",
     "docs/slidev/slides.md",
     "docs/tools/go-cli.html",
     "docs/tools/go-mcp.html",

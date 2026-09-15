@@ -9,7 +9,7 @@ import { createLiveTransport } from '../../live-runner'
 import { runLiveEntity } from '../../live-entity'
 
 
-import { UnivecSDK, BaseFeature, stdutil } from '../../..'
+import { ProjectNameSDK, BaseFeature, stdutil } from '../../..'
 
 import {
   envOverride,
@@ -35,11 +35,11 @@ loadEnvLocal(__dirname + '/../../../.env.local')
 describe('EntityNameEntity', async () => {
 
   // Per-test live pacing. Delay is read from sdk-test-control.json's
-  // `test.live.delayMs`; only sleeps when UNIVEC_TEST_LIVE=TRUE.
-  afterEach(liveDelay('UNIVEC_TEST_LIVE'))
+  // `test.live.delayMs`; only sleeps when PROJECTENV_TEST_LIVE=TRUE.
+  afterEach(liveDelay('PROJECTENV_TEST_LIVE'))
 
   test('instance', async () => {
-    const testsdk = UnivecSDK.test()
+    const testsdk = ProjectNameSDK.test()
     const ent = testsdk.EntityName()
     assert(null != ent)
   })

@@ -11,7 +11,7 @@ pub fn make_config() Value {
         .{ "main", h.jo(&.{
             .{ "name", h.vstr("Univec") },
             .{ "slug", h.vstr("univec") },
-            .{ "version", h.vstr("0.1.1") },
+            .{ "version", h.vstr("0.1.2") },
             .{ "target", h.vstr("zig") },
         }) },
         .{ "feature", h.jo(&.{

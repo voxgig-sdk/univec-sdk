@@ -96,6 +96,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
         Slot({ name: 'directSetup' }, () => {
           Content(`
+function liveScenariosActive() { return ${Object.values(model.main.kit.entity || {}).some((e: any) => Object.values(e.op || {}).some((o: any) => (o.points || []).some((p: any) => p.contract && JSON.parse(p.contract.json).live)))} && process.env.${PROJECTNAME}_TEST_LIVE === 'TRUE' }
 function directSetup(mockres) {
   const calls = []
 
@@ -220,7 +221,7 @@ ${listParamLines}
       assert(listResult.ok === true)
       const listData = listResult.data
       if (!Array.isArray(listData) || listData.length === 0) {
-        return // skip: no entities to load in live mode
+        throw new Error('Live load blocked: discovery returned no usable entities')
       }
       params.id = listData[0].id
 ${ancestorParamLines}
@@ -234,7 +235,8 @@ ${loadParams.map((p: any, i: number) => `      ${jsProp('params', p.name)} = 'di
   }
 
   Content(`
-  test('direct-load-${entity.name}', async () => {
+  test('direct-load-${entity.name}', async (t) => {
+    if (liveScenariosActive()) { t.skip('Covered by live operation scenarios'); return }
     const setup = directSetup({ id: 'direct01' })
     const { client, calls } = setup
 
@@ -248,7 +250,7 @@ ${liveParamsBlock}
     })
 
     assert(result.ok === true)
-    assert(result.status === 200)
+    assert(setup.live ? result.status >= 200 && result.status < 300 : result.status === 200)
     assert(null != result.data)
 
     if (!setup.live) {
@@ -308,7 +310,8 @@ ${mockLines}
   }
 
   Content(`
-  test('direct-list-${entity.name}', async () => {
+  test('direct-list-${entity.name}', async (t) => {
+    if (liveScenariosActive()) { t.skip('Covered by live operation scenarios'); return }
     const setup = directSetup([{ id: 'direct01' }, { id: 'direct02' }])
     const { client, calls } = setup
 
@@ -320,7 +323,7 @@ ${paramsBlock}
     })
 
     assert(result.ok === true)
-    assert(result.status === 200)
+    assert(setup.live ? result.status >= 200 && result.status < 300 : result.status === 200)
     assert(Array.isArray(result.data))
 
     if (!setup.live) {
@@ -359,7 +362,8 @@ function generateDirectGraphqlJs(
     '      assert(calls[0].init.body.includes(\'direct0' + (i + 1) + '\'))\n').join('')
 
   Content(`
-  test('direct-${opname}-${entity.name}', async () => {
+  test('direct-${opname}-${entity.name}', async (t) => {
+    if (liveScenariosActive()) { t.skip('Covered by live operation scenarios'); return }
     const setup = directSetup()
     const { client, calls } = setup
 
@@ -373,7 +377,7 @@ ${mockVarLines || '      // no variables'}
     const result = await client.graphql(${JSON.stringify(doc)}, variables)
 
     assert(result.ok === true)
-    assert(result.status === 200)
+    assert(setup.live ? result.status >= 200 && result.status < 300 : result.status === 200)
     assert(null != result.data)
 
     if (!setup.live) {

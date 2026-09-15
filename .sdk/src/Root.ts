@@ -56,13 +56,6 @@ const Root = cmp(function Root(props: any) {
   const feature = model.main[KIT].feature || {}
   const entity = model.main[KIT].entity || {}
 
-  // Keep the complete model for shared documentation, while allowing a
-  // single language to be regenerated without rewriting the other SDKs.
-  const selectedTarget = process.env.SDKGEN_TARGET
-  if (selectedTarget && !Object.prototype.hasOwnProperty.call(target, selectedTarget)) {
-    throw new Error('Unknown SDKGEN_TARGET: ' + selectedTarget)
-  }
-
   ctx$.log.debug({
     point: 'cmp-root', target, entity, feature, note: [
       '\ntarget: \n' + Object.keys(target).map(s => '  ' + s).join('\n'),
@@ -87,7 +80,6 @@ const Root = cmp(function Root(props: any) {
     BuildSDK({})
 
     each(target, (target: any) => {
-      if (selectedTarget && target.name !== selectedTarget) return
       names(target, target.name)
 
       Folder({ name: target.name }, () => {
@@ -286,3 +278,4 @@ export {
   KIT,
   Root,
 }
+

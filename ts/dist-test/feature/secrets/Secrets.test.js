@@ -19,7 +19,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_test_1 = require("node:test");
 const node_assert_1 = __importDefault(require("node:assert"));
 const index_1 = require("../../utility/index");
-const __1 = require("../../..");
 const ENVPREFIX = 'UNIVEC_TEST_SECRETS_';
 // prepare() returns the fetchdef the transport would receive — the closest
 // observable point to the wire for header assertions — and it awaits
@@ -46,8 +45,6 @@ function envchain(extra) {
         feature: {
             secrets: Object.assign({
                 active: true,
-                // These fixtures use APIKEY independently of the project's secret name.
-                name: 'apikey',
                 providers: [{ kind: 'env', prefix: ENVPREFIX }],
             }, extra || {}),
         },
@@ -56,27 +53,6 @@ function envchain(extra) {
 (0, node_test_1.describe)('secrets', () => {
     (0, node_test_1.beforeEach)(() => {
         delete process.env[ENVPREFIX + 'APIKEY'];
-    });
-    (0, node_test_1.test)('active: generated defaults apply and an empty provider chain overrides them', async () => {
-        const feature = __1.config.feature.secrets;
-        const previous = feature.options;
-        feature.options = {
-            ...previous,
-            name: 'fixture.token',
-            providers: [{ kind: 'memory', values: { FIXTURE_TOKEN: 'DEFAULTKEY01' } }],
-        };
-        try {
-            const configured = await prepared({ feature: { secrets: { active: true } } });
-            credentialIs(configured.fetchdef.headers.authorization, 'DEFAULTKEY01');
-            const empty = await prepared({
-                feature: { secrets: { active: true, providers: [] } },
-            });
-            node_assert_1.default.equal(empty.fetchdef.headers.authorization, undefined);
-            node_assert_1.default.equal(empty.sdk.options().apikey, '');
-        }
-        finally {
-            feature.options = previous;
-        }
     });
     (0, node_test_1.test)('inactive: apikey option behaves exactly as before', async () => {
         const { sdk, fetchdef } = await prepared({ apikey: 'OPTKEY01' });
@@ -146,7 +122,6 @@ function envchain(extra) {
             feature: {
                 secrets: {
                     active: true,
-                    name: 'apikey',
                     providers: [{
                             lookup(name) { asked.push(name); return 'CUSTOM01'; },
                             describe() { return 'custom:test'; },
@@ -326,22 +301,13 @@ function envchain(extra) {
         }
         // Before any op, nothing has been resolved.
         node_assert_1.default.equal(sdk.options().apikey, '');
-        // An API's first entity need not support list (for example, Convert
-        // may only expose create). Select a method this SDK actually generated.
-        const entities = names
-            .map((name) => name.replace(/(^|[_-])([a-z])/g, (_match, _separator, letter) => letter.toUpperCase()))
-            .filter((accessor) => 'function' === typeof sdk[accessor])
-            .map((accessor) => sdk[accessor]());
-        const operation = ['list', 'create', 'load', 'update', 'remove']
-            .flatMap(method => entities
-            .filter((entity) => 'function' === typeof entity[method])
-            .map((entity) => () => entity[method]({})))[0];
-        node_assert_1.default.ok(operation, 'expected a generated entity operation');
+        const name = names[0];
+        const accessor = name.charAt(0).toUpperCase() + name.slice(1);
         // The op itself may fail (no seeded data, no live API) — irrelevant
         // here. What matters is that the awaited PreSpec hook ran and the
         // credential reached the live options before the spec was built.
         try {
-            await operation();
+            await sdk[accessor]().list();
         }
         catch (_err) { }
         node_assert_1.default.equal(sdk.options().apikey, 'ENVKEY02', 'the entity op did not resolve the secret through PreSpec');

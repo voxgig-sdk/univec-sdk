@@ -61,16 +61,6 @@ class SecretsFeature extends BaseFeature_1.BaseFeature {
     init(ctx, fopts) {
         const client = ctx.client;
         const options = ctx.options;
-        // The constructor passes caller options, so apply the generated feature
-        // defaults here. Replace provider arrays wholesale: an explicit empty
-        // chain must not retain a default vault provider through a deep merge.
-        const defaults = ctx.utility.struct.clone(ctx.config.feature?.[this.name]?.options || {});
-        fopts = {
-            ...defaults,
-            ...fopts,
-            exchange: { ...defaults.exchange, ...fopts.exchange },
-        };
-        options.feature[this.name] = fopts;
         this._client = client;
         this._secretname = 'string' === typeof fopts.name &&
             '' !== fopts.name ? fopts.name : 'apikey';

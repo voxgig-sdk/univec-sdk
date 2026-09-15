@@ -10,7 +10,7 @@
     <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;CS1591</NoWarn>
 
     <!-- NuGet package metadata (publication pending; see Makefile). -->
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <PackageId>Univec.Sdk</PackageId>
     <Authors>Voxgig</Authors>
     <Description>Unofficial generated csharp SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.</Description>

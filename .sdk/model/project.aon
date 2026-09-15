@@ -22,35 +22,6 @@
 # A published package name that does not follow the derivation:
 #
 #   main: kit: target: ts: publish: registry: package: '@scope/name'
-# --- cedar: release version (written by cedar-regen.sh, do not hand-edit)
-# Per target, because sdkgen keys the version per target; identical across
-# them because cedar tags a repo at one version.
-main: kit: target: 'c': publish: version: '0.1.1'
-main: kit: target: 'clojure': publish: version: '0.1.1'
-main: kit: target: 'cpp': publish: version: '0.1.1'
-main: kit: target: 'csharp': publish: version: '0.1.1'
-main: kit: target: 'dart': publish: version: '0.1.1'
-main: kit: target: 'elixir': publish: version: '0.1.1'
-main: kit: target: 'go': publish: version: '0.1.1'
-main: kit: target: 'go-cli': publish: version: '0.1.1'
-main: kit: target: 'go-mcp': publish: version: '0.1.1'
-main: kit: target: 'java': publish: version: '0.1.1'
-main: kit: target: 'js': publish: version: '0.1.1'
-main: kit: target: 'kotlin': publish: version: '0.1.1'
-main: kit: target: 'lean': publish: version: '0.1.1'
-main: kit: target: 'lua': publish: version: '0.1.1'
-main: kit: target: 'ocaml': publish: version: '0.1.1'
-main: kit: target: 'perl': publish: version: '0.1.1'
-main: kit: target: 'php': publish: version: '0.1.1'
-main: kit: target: 'py': publish: version: '0.1.1'
-main: kit: target: 'py-data': publish: version: '0.1.1'
-main: kit: target: 'rb': publish: version: '0.1.1'
-main: kit: target: 'rust': publish: version: '0.1.1'
-main: kit: target: 'scala': publish: version: '0.1.1'
-main: kit: target: 'swift': publish: version: '0.1.1'
-main: kit: target: 'ts': publish: version: '0.1.1'
-main: kit: target: 'zig': publish: version: '0.1.1'
-# --- end cedar: release version
 
 # Record failed live requests while continuing the remaining test cases.
 # Keep this project choice explicit when updating the toolchain.
@@ -105,3 +76,32 @@ main: kit: doc: {
     presentation: output: path: 'docs/slidev'
   }
 }
+# --- cedar: release version (written by cedar-regen.sh, do not hand-edit)
+# Per target, because sdkgen keys the version per target; identical across
+# them because cedar tags a repo at one version.
+main: kit: target: 'c': publish: version: '0.1.2'
+main: kit: target: 'clojure': publish: version: '0.1.2'
+main: kit: target: 'cpp': publish: version: '0.1.2'
+main: kit: target: 'csharp': publish: version: '0.1.2'
+main: kit: target: 'dart': publish: version: '0.1.2'
+main: kit: target: 'elixir': publish: version: '0.1.2'
+main: kit: target: 'go': publish: version: '0.1.2'
+main: kit: target: 'go-cli': publish: version: '0.1.2'
+main: kit: target: 'go-mcp': publish: version: '0.1.2'
+main: kit: target: 'java': publish: version: '0.1.2'
+main: kit: target: 'js': publish: version: '0.1.2'
+main: kit: target: 'kotlin': publish: version: '0.1.2'
+main: kit: target: 'lean': publish: version: '0.1.2'
+main: kit: target: 'lua': publish: version: '0.1.2'
+main: kit: target: 'ocaml': publish: version: '0.1.2'
+main: kit: target: 'perl': publish: version: '0.1.2'
+main: kit: target: 'php': publish: version: '0.1.2'
+main: kit: target: 'py': publish: version: '0.1.2'
+main: kit: target: 'py-data': publish: version: '0.1.2'
+main: kit: target: 'rb': publish: version: '0.1.2'
+main: kit: target: 'rust': publish: version: '0.1.2'
+main: kit: target: 'scala': publish: version: '0.1.2'
+main: kit: target: 'swift': publish: version: '0.1.2'
+main: kit: target: 'ts': publish: version: '0.1.2'
+main: kit: target: 'zig': publish: version: '0.1.2'
+# --- end cedar: release version

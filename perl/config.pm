@@ -33,7 +33,7 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
   "main": {
     "name": "Univec",
     "slug": "univec",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "target": "perl"
   },
   "feature": {

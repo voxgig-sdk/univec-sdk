@@ -141,3 +141,4 @@ pub fn checkaddr(addr: &str) -> Answer<()> {
         safeaddr(addr)
     )))
 }
+

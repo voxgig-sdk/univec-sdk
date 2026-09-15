@@ -113,7 +113,7 @@ function makeEntityTestData(_model: Model, entity: ModelEntity) {
   makeEntityTestFields(entity, i++, ent)
   delete ent.id
 
-  // Request recipes remain separate from synthetic stored mock records.
+  // Request contracts are separate from synthetic stored mock records.
   data.requests = {}
   for (const op of Object.values(entity.op || {}) as any[]) for (const point of op.points || []) {
     if (point.contract) data.requests[point.contract.id] = {

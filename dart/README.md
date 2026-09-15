@@ -24,7 +24,7 @@ dependencies:
     git:
       url: https://github.com/voxgig-sdk/univec-sdk
       path: dart
-      ref: dart/v0.1.1
+      ref: dart/v0.1.2
 ```
 
 Or depend on a local source checkout:

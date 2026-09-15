@@ -171,7 +171,14 @@ function basicSetup(extra) {
 
   idmap = env['${PROJENVNAME}_TEST_${ENTENVNAME}_ENTID']
 
-  if ('TRUE' === env.${PROJENVNAME}_TEST_LIVE) {
+  const live = 'TRUE' === env.${PROJENVNAME}_TEST_LIVE
+  const transport = createLiveTransport()
+  if (live) {
+    const rawIds = process.env['${PROJENVNAME}_TEST_${ENTENVNAME}_ENTID']
+    idmap = rawIds && rawIds.trim() ? JSON.parse(rawIds) : {}
+    if (!idmap || Array.isArray(idmap) || typeof idmap !== 'object') {
+      throw new Error('Live ENTID must be a JSON object')
+    }
     client = new ${model.Name}SDK(merge([
       // FIRST, so the generated fields below win: sdk-test-control.json's
       // test.client.options adds to the live client, it does not redirect it.
@@ -182,7 +189,8 @@ function basicSetup(extra) {
       // the last entry is undefined, and basicSetup is normally called with no
       // argument at all - so a bare 'extra' silently discarded the apikey and
       // server values above and handed the SDK undefined.
-      extra || {}
+      extra || {},
+      { system: { fetch: transport.fetch } }
     ]))
   }
 
@@ -194,6 +202,8 @@ function basicSetup(extra) {
     struct,
     data: entityData,
     explain: 'TRUE' === env.${PROJENVNAME}_TEST_EXPLAIN,
+    live,
+    transport,
     now: Date.now(),
   }
 
@@ -209,7 +219,11 @@ function basicSetup(extra) {
           )
 
           Content(`
+    ${Object.values(model.main.kit.entity || {}).some((e: any) => Object.values(e.op || {}).some((o: any) => (o.points || []).some((p: any) => p.contract && JSON.parse(p.contract.json).live))) ? `if (process.env.${PROJENVNAME}_TEST_LIVE === 'TRUE') { t.skip('Covered by live operation scenarios'); return }` : ''}
     const setup = basicSetup()
+    if (setup.live) {
+      return runLiveEntity(setup, ${JSON.stringify(entity)}, ${JSON.stringify(basicflow)}, '${nom(entity, 'Name')}')
+    }
     const client = setup.client
     const struct = setup.struct
 

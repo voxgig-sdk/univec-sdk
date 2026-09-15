@@ -1,6 +1,6 @@
 {
   "name": "@voxgig-sdk/univec",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Unofficial generated TypeScript SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.",
   "keywords": [
     "voxgig",
@@ -26,9 +26,9 @@
     "src"
   ],
   "scripts": {
+    "test:live": "npm run build && UNIVEC_TEST_LIVE=TRUE node --test dist-test/live.test.js",
     "pretest": "npm run build",
     "test": "node --enable-source-maps --test-concurrency=1 --test 'dist-test/**/*.test.js'",
-    "test:live": "npm run build && UNIVEC_TEST_LIVE=TRUE node --enable-source-maps --test dist-test/live.test.js",
     "test-some": "node --enable-source-maps --experimental-test-isolation=none --test-name-pattern=\"$TEST_PATTERN\" --test 'dist-test/**/*.test.js'",
     "test-utility": "node --enable-source-maps --test test/utility/*.test.ts",
     "pretest-coverage": "npm run build",

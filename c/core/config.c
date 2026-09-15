@@ -9,7 +9,7 @@ voxgig_value* make_config(void) {
     "main", cmap(4,
       "name", v_str("Univec"),
       "slug", v_str("univec"),
-      "version", v_str("0.1.1"),
+      "version", v_str("0.1.2"),
       "target", v_str("c")),
     "feature", cmap(19,
       "audit", cmap(2,

@@ -475,7 +475,7 @@
       "name" "Univec"
       "slug" "univec"
       "target" "clojure"
-      "version" "0.1.1")
+      "version" "0.1.2")
     "options" (vs/jm
       "auth" (vs/jm
         "prefix" "Bearer")

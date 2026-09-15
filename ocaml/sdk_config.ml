@@ -13,7 +13,7 @@ let make_config () : value =
     ("main", (jo [
       ("name", (Str "Univec"));
       ("slug", (Str "univec"));
-      ("version", (Str "0.1.1"));
+      ("version", (Str "0.1.2"));
       ("target", (Str "ocaml")) ]));
     ("feature", (jo [
       ("audit", (jo [

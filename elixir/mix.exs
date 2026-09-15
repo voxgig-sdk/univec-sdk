@@ -4,7 +4,7 @@ defmodule Univec.MixProject do
   def project do
     [
       app: :univec,
-      version: "0.1.1",
+      version: "0.1.2",
       elixir: "~> 1.14",
       description: "Unofficial generated elixir SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.",
       elixirc_paths: elixirc_paths(Mix.env()),

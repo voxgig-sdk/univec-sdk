@@ -394,7 +394,7 @@ sub definition {
 
     if ( defined $plugin && !ref($plugin) && $plugin =~ /::/ ) {
         my $kind = lc( ( split( /::/, $plugin ) )[-1] );
-        fail(   'sekreto: not a plugin definition: the module '
+        fail(   'sekreto: not a plugin definition: the module ' 
               . $plugin
               . ' - call the definition it holds: use '
               . $plugin . ' qw('
@@ -423,12 +423,12 @@ sub unknownkind {
     my $shown = ( defined $kind && !ref($kind) ) ? $kind : '';
 
     my $message =
-        'sekreto: unknown provider kind: '
+        'sekreto: unknown provider kind: ' 
       . $shown
       . ' (available: '
       . join( ', ', @{ $catalog->names } ) . ')';
 
-    $message .= ' - '
+    $message .= ' - ' 
       . $shown
       . ' is a sekreto plugin, not built in: pass it in the plugins option'
       if grep { $_ eq $shown } @{ Voxgig::Sekreto::Providers::kinds()->{plugin} };

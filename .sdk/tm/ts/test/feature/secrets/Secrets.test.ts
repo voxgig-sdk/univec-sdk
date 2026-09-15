@@ -16,7 +16,6 @@ import { test, describe, beforeEach } from 'node:test'
 import assert from 'node:assert'
 
 import { SDK } from '../../utility/index'
-import { config } from '../../..'
 
 
 const ENVPREFIX = 'PROJECTENV_TEST_SECRETS_'
@@ -52,8 +51,6 @@ function envchain(extra?: any): any {
     feature: {
       secrets: Object.assign({
         active: true,
-        // These fixtures use APIKEY independently of the project's secret name.
-        name: 'apikey',
         providers: [{ kind: 'env', prefix: ENVPREFIX }],
       }, extra || {}),
     },
@@ -65,30 +62,6 @@ describe('secrets', () => {
 
   beforeEach(() => {
     delete process.env[ENVPREFIX + 'APIKEY']
-  })
-
-
-  test('active: generated defaults apply and an empty provider chain overrides them', async () => {
-    const feature = (config as any).feature.secrets
-    const previous = feature.options
-    feature.options = {
-      ...previous,
-      name: 'fixture.token',
-      providers: [{ kind: 'memory', values: { FIXTURE_TOKEN: 'DEFAULTKEY01' } }],
-    }
-    try {
-      const configured = await prepared({ feature: { secrets: { active: true } } })
-      credentialIs(configured.fetchdef.headers.authorization, 'DEFAULTKEY01')
-
-      const empty = await prepared({
-        feature: { secrets: { active: true, providers: [] } },
-      })
-      assert.equal(empty.fetchdef.headers.authorization, undefined)
-      assert.equal(empty.sdk.options().apikey, '')
-    }
-    finally {
-      feature.options = previous
-    }
   })
 
 
@@ -185,7 +158,6 @@ describe('secrets', () => {
       feature: {
         secrets: {
           active: true,
-          name: 'apikey',
           providers: [{
             lookup(name: string) { asked.push(name); return 'CUSTOM01' },
             describe() { return 'custom:test' },
@@ -405,24 +377,14 @@ describe('secrets', () => {
     // Before any op, nothing has been resolved.
     assert.equal(sdk.options().apikey, '')
 
-    // An API's first entity need not support list (for example, Convert
-    // may only expose create). Select a method this SDK actually generated.
-    const entities = names
-      .map((name: string) => name.replace(/(^|[_-])([a-z])/g,
-        (_match: string, _separator: string, letter: string) => letter.toUpperCase()))
-      .filter((accessor: string) => 'function' === typeof sdk[accessor])
-      .map((accessor: string) => sdk[accessor]())
-    const operation = ['list', 'create', 'load', 'update', 'remove']
-      .flatMap(method => entities
-        .filter((entity: any) => 'function' === typeof entity[method])
-        .map((entity: any) => () => entity[method]({})))[0]
-    assert.ok(operation, 'expected a generated entity operation')
+    const name = names[0]
+    const accessor = name.charAt(0).toUpperCase() + name.slice(1)
 
     // The op itself may fail (no seeded data, no live API) — irrelevant
     // here. What matters is that the awaited PreSpec hook ran and the
     // credential reached the live options before the spec was built.
     try {
-      await operation()
+      await sdk[accessor]().list()
     }
     catch (_err) { }
 

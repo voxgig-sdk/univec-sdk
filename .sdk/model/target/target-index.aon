@@ -1,13 +1,11 @@
 # SDK Targets.
 
 
-@"dart.aon"
-@"haskell.aon"
-@"lean.aon"
 @"c.aon"
 @"clojure.aon"
 @"cpp.aon"
 @"csharp.aon"
+@"dart.aon"
 @"elixir.aon"
 @"go.aon"
 @"go-cli.aon"
@@ -15,6 +13,7 @@
 @"java.aon"
 @"js.aon"
 @"kotlin.aon"
+@"lean.aon"
 @"lua.aon"
 @"ocaml.aon"
 @"perl.aon"
@@ -27,3 +26,5 @@
 @"swift.aon"
 @"ts.aon"
 @"zig.aon"
+
+@"haskell.aon"

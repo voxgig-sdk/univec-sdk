@@ -12,11 +12,8 @@ dist-test/
 *.tsbuildinfo
 
 # Generated logs
-/log/
+log/
 *.log
 
 # OS
 .DS_Store
-
-# Downloaded Vale rule package
-/doc/qa/styles/Google/

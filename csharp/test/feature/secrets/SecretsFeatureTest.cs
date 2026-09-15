@@ -1394,9 +1394,16 @@ public class SecretsFeatureTest
             Parallel.For(0, 4, i =>
                 client.Direct(new Dictionary<string, object?> { ["path"] = "/p" + i }));
 
+            // REPORTS WHAT WENT OUT, not just how many. This assertion failed
+            // once in CI and passed on re-run, and the count alone could not
+            // say which of two very different faults it was: several
+            // purchases (the coalescing missed) or none (the exchange never
+            // ran). By the time anyone looked, the re-run had replaced the
+            // job log and the number was gone. Report() exists for exactly
+            // this, and the sibling assertions already use it.
             Assert.True(1 == w.Token().Count,
-                "four operations at once must not open four token requests, saw " +
-                w.Token().Count);
+                "four operations at once must open exactly ONE token request, saw " +
+                w.Token().Count + " — calls: " + w.Report());
         }
         finally
         {

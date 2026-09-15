@@ -148,7 +148,91 @@ function liveDelay(liveEnvVar) {
   }
 }
 
+function isControlSkipped(kind, name, mode) {
+    const ctrl = loadTestControl();
+    const list = ctrl?.test?.skip?.[mode]?.[kind] ?? [];
+    for (const e of list) {
+        if (kind === 'direct' && e?.test === name) {
+            return { skip: true, reason: e.reason };
+        }
+        if (kind === 'entityOp') {
+            const key = (e?.entity ?? '') + '.' + (e?.op ?? '');
+            if (key === name)
+                return { skip: true, reason: e.reason };
+        }
+    }
+    return { skip: false };
+}
+function maybeSkipControl(t, kind, name, live) {
+    const decision = isControlSkipped(kind, name, live ? 'live' : 'unit');
+    if (decision.skip) {
+        t.skip(decision.reason || 'skipped via sdk-test-control.json');
+        return true;
+    }
+    return false;
+}
+function skipIfMissingIds(t, setup, requiredKeys) {
+    if (!setup.live)
+        return false;
+    const missing = requiredKeys.filter(k => null == setup.idmap?.[k]);
+    if (missing.length > 0) {
+        throw new Error(`Live test blocked: needs ${missing.join(', ')} via *_ENTID env var`);
+    }
+    return false;
+}
+function loadEnvLocal(file) {
+    let text;
+    try {
+        text = Fs.readFileSync(file, 'utf8');
+    }
+    catch (err) {
+        if ('ENOENT' === err.code) {
+            return;
+        }
+        throw err;
+    }
+    for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim();
+        // Blank and comment lines. A '#' INSIDE a value is not a comment.
+        if ('' === line || line.startsWith('#')) {
+            continue;
+        }
+        const eq = line.indexOf('=');
+        if (0 >= eq) {
+            continue;
+        }
+        const key = line.slice(0, eq).trim().replace(/^export\s+/, '');
+        let val = line.slice(eq + 1).trim();
+        const quote = ("'" === val[0] || '"' === val[0]) ? val[0] : '';
+        if ('' !== quote) {
+            // Quoted: the value runs to the CLOSING quote, and a '#' inside it is
+            // part of the value. Anything after the closing quote is a comment.
+            const close = val.indexOf(quote, 1);
+            val = 0 < close ? val.slice(1, close) : val.slice(1);
+        }
+        else {
+            // Unquoted: the first '#' starts an inline comment, with or without
+            // preceding whitespace — `A=a#b` is `a` to dotenv, not `a#b`.
+            // Dropping this made `KEY=secret # note` resolve to the whole string
+            // including the note, and a generated live test would then send that
+            // as the credential. Verified against dotenv's own parse().
+            const hash = val.indexOf('#');
+            if (0 <= hash) {
+                val = val.slice(0, hash);
+            }
+            val = val.trim();
+        }
+        if (undefined === process.env[key]) {
+            process.env[key] = val;
+        }
+    }
+}
+
 module.exports = {
+  isControlSkipped,
+  maybeSkipControl,
+  skipIfMissingIds,
+  loadEnvLocal,
   makeStepData,
   makeMatch,
   makeReqdata,

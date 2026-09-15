@@ -7,6 +7,7 @@ import { cmp, each, Folder, entityCollection,
   TestControl } from '@voxgig/sdkgen'
 
 
+import { TestLive } from './TestLive_js'
 import { TestDirect } from './TestDirect_js'
 import { TestEntity } from './TestEntity_js'
 
@@ -19,6 +20,7 @@ const Test = cmp(function Test(props: any) {
 
     // Write-once: a project's edited control file survives regeneration.
     TestControl({ target, dir: 'test' })
+    TestLive({ target })
 
     Folder({ name: 'entity' }, () => {
       const entity = each(entityCollection(model))

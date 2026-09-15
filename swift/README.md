@@ -23,7 +23,7 @@ your `Package.swift`:
 ```swift
 dependencies: [
     // From the git release tag:
-    .package(url: "<repo-url>", exact: "0.1.1"),
+    .package(url: "<repo-url>", exact: "0.1.2"),
 ],
 ```
 
