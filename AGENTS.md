@@ -78,6 +78,49 @@ npm run generate
 Note: the `voxgig-sdkgen` CLI only *scaffolds* (`target add` /
 `feature add`). Generation itself runs via `npm run generate` (backed by
 `@voxgig/model`) — there is no `generate` CLI subcommand.
+
+### Two silent failure modes
+
+Generation has two ways of going wrong that **nothing reports**. Neither
+breaks a build or a test; the only symptom is a tree that disagrees with the
+model, and that is easy to commit past.
+
+**`voxgig-model --no-config` writes a REDUCED model.** The `.model-config`
+build is what registers the generator actions — see
+`.sdk/model/.model-config/model-config.aon`:
+
+```
+sys: model: action: { apidef: load: 'build/apidef.js', sdkgen: load: 'build/sdkgen.js' }
+sys: model: order: action: 'apidef,sdkgen'
+```
+
+`--no-config` skips that build, so **apidef and sdkgen never run** — and the
+model build still *writes* `model/sdk.json`, now missing everything those
+actions contribute: the name case variants (`NAME`, `Name`, `name-`,
+`name_`, `name__orig`) and `main.api` / `main.custom`. Committing that
+result is how the committed model spent months alternating between two
+shapes. To inspect the model **without side effects**, use:
+
+```bash
+npm run dry-generate          # -y, writes nothing
+```
+
+Never `--no-config` in anything whose output might be committed.
+
+**Regeneration never DELETES.** A file the generator has stopped emitting
+stays in the tree. When the secrets plugin selection narrowed to the `vault`
+group, seven provider clients stayed behind in `scala/` and seven in `zig/`.
+The scala ones surfaced only because one test cross-checks the tree against
+the model; zig's were caught by nothing.
+
+Both are caught by:
+
+```bash
+cd .sdk && npm run check-drift
+```
+
+It deletes every target tree, regenerates, and reports what differs — which
+is the only way to see output the generator no longer emits.
 ## Adding a feature
 
 A **feature** is a pipeline extension: an object of hooks that fire at named
