@@ -12,20 +12,16 @@ import Foundation
 
 /// Convert is the typed data model for the convert entity.
 public struct Convert {
-  public var bridgeModel: String
   public var embeddings: [Value]
   public var sourceModel: String
   public var targetModel: String
-  public var texts: [Value]
 }
 
 /// ConvertCreateData is the typed request payload for Convert.create.
 public struct ConvertCreateData {
-  public var bridgeModel: String
   public var embeddings: [Value]
   public var sourceModel: String
   public var targetModel: String
-  public var texts: [Value]
 }
 
 /// Embed is the typed data model for the embed entity.

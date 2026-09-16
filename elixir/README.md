@@ -59,7 +59,7 @@ sdk = Univec.new(H.deep(%{"apikey" => System.get_env("UNIVEC_APIKEY")}))
 convert = Univec.convert(sdk)
 
 # Create — returns the bare created record
-created = Univec.Entity.Convert.create(convert, H.deep(%{"bridge_model" => "example_bridge_model", "embeddings" => [], "source_model" => "example_source_model", "target_model" => "example_target_model", "texts" => []}))
+created = Univec.Entity.Convert.create(convert, H.deep(%{"embeddings" => [], "source_model" => "example_source_model", "target_model" => "example_target_model"}))
 
 ```
 
@@ -273,11 +273,9 @@ On error, `ok` is `false` and `err` carries the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -349,22 +347,18 @@ Create a handle: `convert = Univec.convert(sdk)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String.t()` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `list()` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String.t()` | Model space the supplied vectors are currently in. |
 | `target_model` | `String.t()` | Model space to translate into. |
-| `texts` | `list()` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```elixir
 convert = Univec.convert(sdk)
 record = Univec.Entity.Convert.create(convert, Univec.Helpers.deep(%{
-  "bridge_model" => "example_bridge_model",  # String.t()
   "embeddings" => [],  # list()
   "source_model" => "example_source_model",  # String.t()
   "target_model" => "example_target_model",  # String.t()
-  "texts" => [],  # list()
 }))
 ```
 

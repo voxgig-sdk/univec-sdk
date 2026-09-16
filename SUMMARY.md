@@ -22,11 +22,9 @@ SDK operations: `create`.
 
 Key fields to recognise:
 
-- `bridge_model`: Embed model used to vectorise the text before translation.
 - `embeddings`: Translated vectors, in the target model&#39;s dimension.
 - `source_model`: Model space the supplied vectors are currently in.
 - `target_model`: Model space to translate into.
-- `texts`: Texts to embed and translate.
 
 ### [Embed](docs/api/embed.html)
 

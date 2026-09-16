@@ -59,7 +59,7 @@ to recover from failures.
 
 ```haskell
   createEnt <- Sdk.convert sdk VNoval
-  d <- jo [("bridge_model", VStr "example_bridge_model"), ("embeddings", VNoval), ("source_model", VStr "example_source_model"), ("target_model", VStr "example_target_model"), ("texts", VNoval)]
+  d <- jo [("embeddings", VNoval), ("source_model", VStr "example_source_model"), ("target_model", VStr "example_target_model")]
   cctrl <- emptyMap
   created <- Sdk.eCreate createEnt d cctrl
   print =<< Sdk.eDataGet created
@@ -296,11 +296,9 @@ On error, `ok` is `False` and `err` carries the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -369,22 +367,18 @@ Create an instance: `convert <- Sdk.convert sdk VNoval`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `[Value]` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String` | Model space the supplied vectors are currently in. |
 | `target_model` | `String` | Model space to translate into. |
-| `texts` | `[Value]` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```haskell
   ent <- Sdk.convert sdk VNoval
   d <- jo
-    [ ("bridge_model", VStr "example_bridge_model")   -- String
-    , ("embeddings", VNoval)   -- [Value]
+    [ ("embeddings", VNoval)   -- [Value]
     , ("source_model", VStr "example_source_model")   -- String
     , ("target_model", VStr "example_target_model")   -- String
-    , ("texts", VNoval)   -- [Value]
     ]
   ctrl <- emptyMap
   convert <- Sdk.eCreate ent d ctrl

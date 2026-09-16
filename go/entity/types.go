@@ -14,20 +14,16 @@ import (
 
 // Convert is the typed data model for the convert entity.
 type Convert struct {
-	BridgeModel string `json:"bridge_model"`
 	Embeddings []any `json:"embeddings"`
 	SourceModel string `json:"source_model"`
 	TargetModel string `json:"target_model"`
-	Texts []any `json:"texts"`
 }
 
 // ConvertCreateData is the typed request payload for Convert.CreateTyped.
 type ConvertCreateData struct {
-	BridgeModel string `json:"bridge_model"`
 	Embeddings []any `json:"embeddings"`
 	SourceModel string `json:"source_model"`
 	TargetModel string `json:"target_model"`
-	Texts []any `json:"texts"`
 }
 
 // Embed is the typed data model for the embed entity.

@@ -22,19 +22,15 @@ namespace sdk {
 namespace types {
 
 struct Convert {
-  std::string bridge_model;
   std::vector<Value> embeddings;
   std::string source_model;
   std::string target_model;
-  std::vector<Value> texts;
 };
 
 struct ConvertCreateData {
-  std::string bridge_model;
   std::vector<Value> embeddings;
   std::string source_model;
   std::string target_model;
-  std::vector<Value> texts;
 };
 
 struct Embed {

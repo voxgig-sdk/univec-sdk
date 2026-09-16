@@ -111,11 +111,9 @@ fmt.Println(convert.GetName()) // "convert"
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `bridge_model` | `string` | Yes | Embed model used to vectorise the text before translation. |
 | `embeddings` | `[]any` | Yes | Translated vectors, in the target model's dimension. |
 | `source_model` | `string` | Yes | Model space the supplied vectors are currently in. |
 | `target_model` | `string` | Yes | Model space to translate into. |
-| `texts` | `[]any` | Yes | Texts to embed and translate. |
 
 ### Operations
 
@@ -125,11 +123,9 @@ Create a new entity with the given data.
 
 ```go
 result, err := client.Convert(nil).Create(map[string]any{
-    "bridge_model": "example_bridge_model",
     "embeddings": []any{},
     "source_model": "example_source_model",
     "target_model": "example_target_model",
-    "texts": []any{},
 }, nil)
 if err != nil {
     panic(err)
@@ -427,6 +423,14 @@ Structured audit trail of operations.
 | `actor` | `'anonymous'` |
 | `max` | `1000` |
 
+| Option | Type |
+|---|---|
+| `now` | function |
+| `sink` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.audit.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -451,6 +455,13 @@ Response caching for safe read requests.
 | `methods` | `['GET']` |
 | `ttl` | `5000` |
 
+| Option | Type |
+|---|---|
+| `now` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.cache.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -472,6 +483,16 @@ Client identity and per-request correlation headers.
 |---|---|
 | `active` | `false` |
 | `clientVersion` | `'0.0.1'` |
+
+| Option | Type |
+|---|---|
+| `clientName` | string |
+| `headers` | map |
+| `idgen` | function |
+| `sessionId` | string |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
 
 **Usage**
 
@@ -502,6 +523,14 @@ Cost tracking and spend budget for API calls.
 | `rates` | `{}` |
 | `unit` | `0` |
 
+| Option | Type |
+|---|---|
+| `actor` | string |
+| `sink` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.cost.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -524,6 +553,14 @@ Request/response capture ring buffer for debugging.
 | `active` | `false` |
 | `max` | `100` |
 | `redact` | `['authorization', 'cookie', 'set-cookie', 'api-key', 'apikey', 'x-api-key', 'idempotency-key']` |
+
+| Option | Type |
+|---|---|
+| `now` | function |
+| `onEntry` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
 
 **Usage**
 
@@ -549,6 +586,13 @@ Idempotency keys for safe retries of mutating operations.
 | `methods` | `['POST', 'PUT', 'PATCH', 'DELETE']` |
 | `ops` | `['create', 'update', 'remove']` |
 
+| Option | Type |
+|---|---|
+| `keygen` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.idempotency.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -570,6 +614,14 @@ Structured request and response logging.
 |---|---|
 | `active` | `true` |
 
+| Option | Type |
+|---|---|
+| `level` | string |
+| `logger` | any |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.log.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -590,6 +642,13 @@ Statistics capture: per-operation counters and latency.
 | Option | Default |
 |---|---|
 | `active` | `false` |
+
+| Option | Type |
+|---|---|
+| `now` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
 
 **Usage**
 
@@ -622,6 +681,13 @@ Network behaviour simulation for offline testing (latency, failures, outages).
 | `retryAfter` | `0` |
 | `seed` | `1` |
 
+| Option | Type |
+|---|---|
+| `sleep` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.netsim.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -649,6 +715,14 @@ Pagination signals for list operations.
 | `pageParam` | `'page'` |
 | `startPage` | `1` |
 
+| Option | Type |
+|---|---|
+| `limit` | number |
+| `ops` | list |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.paging.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -673,6 +747,13 @@ Outbound HTTP(S) proxy routing.
 | `noProxy` | `[]` |
 | `url` | `''` |
 
+| Option | Type |
+|---|---|
+| `agent` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.proxy.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -695,6 +776,14 @@ Client-side rate limiting via a token bucket.
 | `active` | `false` |
 | `burst` | `5` |
 | `rate` | `5` |
+
+| Option | Type |
+|---|---|
+| `now` | function |
+| `sleep` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
 
 **Usage**
 
@@ -746,6 +835,14 @@ Automatic retry of transient failures with exponential backoff.
 | `retries` | `2` |
 | `statuses` | `[408, 425, 429, 500, 502, 503, 504]` |
 
+| Option | Type |
+|---|---|
+| `jitter` | boolean |
+| `sleep` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.retry.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -794,6 +891,14 @@ Incremental streaming of list results via async iteration.
 | `chunkDelay` | `0` |
 | `chunkSize` | `0` |
 
+| Option | Type |
+|---|---|
+| `ops` | list |
+| `sleep` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.streaming.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -815,6 +920,16 @@ Distributed tracing spans with W3C trace-context propagation.
 |---|---|
 | `active` | `false` |
 
+| Option | Type |
+|---|---|
+| `exporter` | function |
+| `headers` | map |
+| `idgen` | function |
+| `now` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
+
 **Usage**
 
 Set `feature.telemetry.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -835,6 +950,14 @@ In-memory mock transport for testing without a live server.
 | Option | Default |
 |---|---|
 | `active` | `false` |
+
+| Option | Type |
+|---|---|
+| `entity` | map |
+| `net` | map |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
 
 **Usage**
 
@@ -859,6 +982,14 @@ Per-request timeout with transport abort.
 |---|---|
 | `active` | `false` |
 | `ms` | `30000` |
+
+| Option | Type |
+|---|---|
+| `clearTimer` | function |
+| `setTimer` | function |
+
+These take no default: the feature behaves one way when you supply them and
+another when you do not.
 
 **Usage**
 

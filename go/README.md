@@ -54,7 +54,7 @@ func main() {
     })
 
     // Create a convert.
-    created, err := client.Convert(nil).Create(map[string]any{"bridge_model": "example_bridge_model", "embeddings": []any{}, "source_model": "example_source_model", "target_model": "example_target_model", "texts": []any{}}, nil)
+    created, err := client.Convert(nil).Create(map[string]any{"embeddings": []any{}, "source_model": "example_source_model", "target_model": "example_target_model"}, nil)
     if err != nil {
         panic(err)
     }
@@ -268,11 +268,9 @@ Only `Direct()` returns a response envelope — a `map[string]any` with
 
 | Field | Description |
 | --- | --- |
-| `"bridge_model"` | Embed model used to vectorise the text before translation. |
 | `"embeddings"` | Translated vectors, in the target model's dimension. |
 | `"source_model"` | Model space the supplied vectors are currently in. |
 | `"target_model"` | Model space to translate into. |
-| `"texts"` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -341,21 +339,17 @@ Create an instance: `convert := client.Convert(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `string` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `[]any` | Translated vectors, in the target model's dimension. |
 | `source_model` | `string` | Model space the supplied vectors are currently in. |
 | `target_model` | `string` | Model space to translate into. |
-| `texts` | `[]any` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```go
 result, err := client.Convert(nil).Create(map[string]any{
-    "bridge_model": "example_bridge_model",
     "embeddings": []any{},
     "source_model": "example_source_model",
     "target_model": "example_target_model",
-    "texts": []any{},
 }, nil)
 if err != nil {
     panic(err)

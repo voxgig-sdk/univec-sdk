@@ -6,12 +6,6 @@ main: kit: entity: convert: {
 
   fields: [
     {
-      name: "bridge_model"
-      req: true
-      short: "Embed model used to vectorise the text before translation."
-      type: "`$STRING`"
-    }
-    {
       name: "embeddings"
       req: true
       short: "Translated vectors, in the target model's dimension."
@@ -28,12 +22,6 @@ main: kit: entity: convert: {
       req: true
       short: "Model space to translate into."
       type: "`$STRING`"
-    }
-    {
-      name: "texts"
-      req: true
-      short: "Texts to embed and translate."
-      type: "`$ARRAY`"
     }
   ]
 

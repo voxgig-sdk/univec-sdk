@@ -16,20 +16,16 @@
 
 // Convert is the typed data model for the convert entity.
 typedef struct {
-  char*bridge_model;
   voxgig_value*embeddings;
   char*source_model;
   char*target_model;
-  voxgig_value*texts;
 } Convert;
 
 // ConvertCreateData is the typed request payload for Convert.create.
 typedef struct {
-  char*bridge_model;
   voxgig_value*embeddings;
   char*source_model;
   char*target_model;
-  voxgig_value*texts;
 } ConvertCreateData;
 
 // Embed is the typed data model for the embed entity.

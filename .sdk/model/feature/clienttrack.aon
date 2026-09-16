@@ -21,3 +21,24 @@ main: kit: feature: clienttrack: {
     PreRequest: active: true
   }
 }
+
+
+# TYPES for the options this feature reads but does not default.
+#
+# `config.options` is the defaults map — what happens when you say nothing —
+# so it can only describe an option that HAS a default. A callback has none,
+# and an option the caller either supplies or does not has none either. Left
+# undeclared these were invisible twice over: the generated option spec could
+# not type them, and the README's option table could not list them.
+main: kit: feature: clienttrack: config: optspec: {
+  # overrides the SDK name sent in the client header
+  clientName: '`$STRING`'
+  # overrides the SDK version sent with it
+  clientVersion: '`$STRING`'
+  # extra headers merged into every tracked request
+  headers: '`$MAP`'
+  # supplies session and request ids
+  idgen: '`$FUNCTION`'
+  # pins the session id instead of generating one
+  sessionId: '`$STRING`'
+}

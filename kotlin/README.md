@@ -42,7 +42,7 @@ val client = UnivecSDK(mutableMapOf<String, Any?>(
 
 ```kotlin
 // Create — returns the ENTITY (call data() for the record)
-val created = client.convert(null).create(mutableMapOf<String, Any?>("bridge_model" to "example_bridge_model", "embeddings" to listOf<Any?>(), "source_model" to "example_source_model", "target_model" to "example_target_model", "texts" to listOf<Any?>()), null)
+val created = client.convert(null).create(mutableMapOf<String, Any?>("embeddings" to listOf<Any?>(), "source_model" to "example_source_model", "target_model" to "example_target_model"), null)
 
 ```
 
@@ -242,11 +242,9 @@ On error, `ok` is `false` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: create.
 
@@ -315,21 +313,17 @@ Create an instance: `val convert = client.convert(null)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String?` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `List<Any?>?` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String?` | Model space the supplied vectors are currently in. |
 | `target_model` | `String?` | Model space to translate into. |
-| `texts` | `List<Any?>?` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```kotlin
 val convert = client.convert(null).create(mutableMapOf<String, Any?>(
-    "bridge_model" to "example_bridge_model",  // String?
     "embeddings" to listOf<Any?>(),  // List<Any?>?
     "source_model" to "example_source_model",  // String?
-    "target_model" to "example_target_model",  // String?
-    "texts" to listOf<Any?>()  // List<Any?>?
+    "target_model" to "example_target_model"  // String?
 ), null)
 ```
 

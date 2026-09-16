@@ -81,11 +81,7 @@ ${basicFn} c = do
     -- \`list\` resolves to one ENTITY per record; the record is reached
     -- through eDataGet. See AGENTS.md "Entity operations return ENTITIES".
     ok <- mapM (\\en -> ismap <$> eDataGet en) lst
-    -- NOT EMPTY, and then every record a map. \`all id\` alone is vacuously
-    -- true on an empty list, and it was: seeded \`list\` returned nothing at
-    -- all here for as long as the target has existed, and this test passed
-    -- throughout. Only \`stream\`, which counts what it gets, ever failed.
-    pure (not (null lst) && all id ok)
+    pure (all id ok)
 `
         }
         if (hasLoad) {

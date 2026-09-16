@@ -24,6 +24,7 @@ import {
 
 import { Package } from './Package_js'
 import { Config } from './Config_js'
+import { Schema } from './Schema_js'
 import { Gitignore } from './Gitignore_js'
 import { MainEntity } from './MainEntity_js'
 import { SdkError } from './SdkError_js'
@@ -193,6 +194,7 @@ if (fres instanceof Promise) { await fres }
     })
 
     Config({ target })
+    Schema({ target })
 
     EntityBase({ target })
 

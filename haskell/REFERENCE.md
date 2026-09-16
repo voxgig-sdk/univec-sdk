@@ -105,11 +105,9 @@ Prepare a fetch definition without sending. Returns the `fetchdef` and raises on
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `bridge_model` | `String` | Yes | Embed model used to vectorise the text before translation. |
 | `embeddings` | `[Value]` | Yes | Translated vectors, in the target model's dimension. |
 | `source_model` | `String` | Yes | Model space the supplied vectors are currently in. |
 | `target_model` | `String` | Yes | Model space to translate into. |
-| `texts` | `[Value]` | Yes | Texts to embed and translate. |
 
 ### Operations
 
@@ -120,11 +118,9 @@ Create a new entity with the given data. Resolves to the ENTITY (read the record
 ```haskell
   ent <- Sdk.convert sdk VNoval
   d <- jo
-    [ ("bridge_model", VStr "example_bridge_model")   -- String
-    , ("embeddings", VNoval)   -- [Value]
+    [ ("embeddings", VNoval)   -- [Value]
     , ("source_model", VStr "example_source_model")   -- String
     , ("target_model", VStr "example_target_model")   -- String
-    , ("texts", VNoval)   -- [Value]
     ]
   ctrl <- emptyMap
   result <- Sdk.eCreate ent d ctrl   -- the ENTITY

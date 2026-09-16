@@ -17,19 +17,15 @@ from typing import TypedDict, Any
 
 
 class Convert(TypedDict):
-    bridge_model: str
     embeddings: list
     source_model: str
     target_model: str
-    texts: list
 
 
 class ConvertCreateData(TypedDict):
-    bridge_model: str
     embeddings: list
     source_model: str
     target_model: str
-    texts: list
 
 
 class Embed(TypedDict):

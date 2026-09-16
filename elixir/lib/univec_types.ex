@@ -19,11 +19,9 @@ defmodule Univec.Types do
   Convert entity data model.
 
   Members:
-    * `"bridge_model"` — String.t() (required)
     * `"embeddings"` — list() (required)
     * `"source_model"` — String.t() (required)
     * `"target_model"` — String.t() (required)
-    * `"texts"` — list() (required)
   """
   @type convert :: %{optional(String.t()) => any()}
 
@@ -31,11 +29,9 @@ defmodule Univec.Types do
   Request payload for Convert create.
 
   Members:
-    * `"bridge_model"` — String.t() (required)
     * `"embeddings"` — list() (required)
     * `"source_model"` — String.t() (required)
     * `"target_model"` — String.t() (required)
-    * `"texts"` — list() (required)
   """
   @type convert_create_data :: %{optional(String.t()) => any()}
 

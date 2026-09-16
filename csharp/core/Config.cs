@@ -26,7 +26,11 @@ public static class SdkConfig
                         ["actor"] = "anonymous",
                         ["max"] = 1000,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["now"] = "`$FUNCTION`",
+                        ["sink"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -42,7 +46,10 @@ public static class SdkConfig
                         },
                         ["ttl"] = 5000,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["now"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "wrap",
                 },
@@ -53,7 +60,14 @@ public static class SdkConfig
                         ["active"] = false,
                         ["clientVersion"] = "0.0.1",
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["clientName"] = "`$STRING`",
+                        ["clientVersion"] = "`$STRING`",
+                        ["headers"] = "`$MAP`",
+                        ["idgen"] = "`$FUNCTION`",
+                        ["sessionId"] = "`$STRING`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -71,7 +85,11 @@ public static class SdkConfig
                         ["rates"] = new Dictionary<string, object?>(),
                         ["unit"] = 0,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["actor"] = "`$STRING`",
+                        ["sink"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "wrap",
                 },
@@ -92,7 +110,11 @@ public static class SdkConfig
                             "idempotency-key",
                         },
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["now"] = "`$FUNCTION`",
+                        ["onEntry"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -116,7 +138,10 @@ public static class SdkConfig
                             "remove",
                         },
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["keygen"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -126,7 +151,11 @@ public static class SdkConfig
                     {
                         ["active"] = true,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["level"] = "`$STRING`",
+                        ["logger"] = "`$ANY`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -136,7 +165,10 @@ public static class SdkConfig
                     {
                         ["active"] = false,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["now"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -156,7 +188,16 @@ public static class SdkConfig
                         ["retryAfter"] = 0,
                         ["seed"] = 1,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["latency"] = new List<object?>
+                        {
+                            "`$ONE`",
+                            "`$NUMBER`",
+                            "`$MAP`",
+                        },
+                        ["sleep"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "wrap",
                 },
@@ -172,7 +213,11 @@ public static class SdkConfig
                         ["pageParam"] = "page",
                         ["startPage"] = 1,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["limit"] = "`$NUMBER`",
+                        ["ops"] = "`$LIST`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -185,7 +230,10 @@ public static class SdkConfig
                         ["noProxy"] = new List<object?>(),
                         ["url"] = "",
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["agent"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "wrap",
                 },
@@ -197,7 +245,11 @@ public static class SdkConfig
                         ["burst"] = 5,
                         ["rate"] = 5,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["now"] = "`$FUNCTION`",
+                        ["sleep"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "wrap",
                 },
@@ -234,7 +286,11 @@ public static class SdkConfig
                             504,
                         },
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["jitter"] = "`$BOOLEAN`",
+                        ["sleep"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "wrap",
                 },
@@ -280,7 +336,11 @@ public static class SdkConfig
                         ["chunkDelay"] = 0,
                         ["chunkSize"] = 0,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["ops"] = "`$LIST`",
+                        ["sleep"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -290,7 +350,13 @@ public static class SdkConfig
                     {
                         ["active"] = false,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["exporter"] = "`$FUNCTION`",
+                        ["headers"] = "`$MAP`",
+                        ["idgen"] = "`$FUNCTION`",
+                        ["now"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "none",
                 },
@@ -300,7 +366,11 @@ public static class SdkConfig
                     {
                         ["active"] = false,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["entity"] = "`$MAP`",
+                        ["net"] = "`$MAP`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "base",
                 },
@@ -311,7 +381,11 @@ public static class SdkConfig
                         ["active"] = false,
                         ["ms"] = 30000,
                     },
-                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["optspec"] = new Dictionary<string, object?>
+                    {
+                        ["clearTimer"] = "`$FUNCTION`",
+                        ["setTimer"] = "`$FUNCTION`",
+                    },
                     ["strict"] = false,
                     ["transport"] = "wrap",
                 },
@@ -343,13 +417,6 @@ public static class SdkConfig
                     {
                         new Dictionary<string, object?>
                         {
-                            ["name"] = "bridge_model",
-                            ["req"] = true,
-                            ["short"] = "Embed model used to vectorise the text before translation.",
-                            ["type"] = "`$STRING`",
-                        },
-                        new Dictionary<string, object?>
-                        {
                             ["name"] = "embeddings",
                             ["req"] = true,
                             ["short"] = "Translated vectors, in the target model's dimension.",
@@ -368,13 +435,6 @@ public static class SdkConfig
                             ["req"] = true,
                             ["short"] = "Model space to translate into.",
                             ["type"] = "`$STRING`",
-                        },
-                        new Dictionary<string, object?>
-                        {
-                            ["name"] = "texts",
-                            ["req"] = true,
-                            ["short"] = "Texts to embed and translate.",
-                            ["type"] = "`$ARRAY`",
                         },
                     },
                     ["name"] = "convert",

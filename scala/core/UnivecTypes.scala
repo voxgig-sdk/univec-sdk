@@ -16,9 +16,9 @@ package voxgig.univecsdk.core
 
 object UnivecTypes {
 
-  final case class Convert(bridge_model: String, embeddings: java.util.List[Object], source_model: String, target_model: String, texts: java.util.List[Object])
+  final case class Convert(embeddings: java.util.List[Object], source_model: String, target_model: String)
 
-  final case class ConvertCreateData(bridge_model: String, embeddings: java.util.List[Object], source_model: String, target_model: String, texts: java.util.List[Object])
+  final case class ConvertCreateData(embeddings: java.util.List[Object], source_model: String, target_model: String)
 
   final case class Embed(embeddings: java.util.List[Object], model: String, texts: java.util.List[Object])
 

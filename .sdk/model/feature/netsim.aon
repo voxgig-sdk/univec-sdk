@@ -32,6 +32,20 @@ main: kit: feature: netsim: {
       # hard outage: every call fails at the transport level
       offline: false
     }
+
+    # TYPES for the options whose kind the default cannot state.
+    # `config.optspec` wins over `config.options` when a name is in both, so
+    # the default above still documents the value and this states what the
+    # feature actually accepts.
+    optspec: {
+      # `latency: 0` reads as "a number", but the feature also takes
+      # `{ min, max }` for a uniform sample — the comment above said so and
+      # the spec would have rejected it.
+      latency: ['`$ONE`', '`$NUMBER`', '`$MAP`']
+
+      # Injected clock, for tests that must not really wait.
+      sleep: '`$FUNCTION`'
+    }
   }
 
   # Netsim wraps the transport in init(); it dispatches no pipeline hooks.

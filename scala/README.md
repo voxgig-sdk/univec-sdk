@@ -44,7 +44,7 @@ val client = new UnivecSDK(options)
 
 ```scala
 // Create — returns the ENTITY (call data() for the record)
-val created = client.convert(null).create(java.util.Map.of("bridge_model", "example_bridge_model", "embeddings", java.util.List.of(), "source_model", "example_source_model", "target_model", "example_target_model", "texts", java.util.List.of()), null)
+val created = client.convert(null).create(java.util.Map.of("embeddings", java.util.List.of(), "source_model", "example_source_model", "target_model", "example_target_model"), null)
 
 ```
 
@@ -245,11 +245,9 @@ On error, `ok` is `false` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: create.
 
@@ -318,21 +316,17 @@ Create an instance: `val convert = client.convert(null)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `java.util.List[Object]` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String` | Model space the supplied vectors are currently in. |
 | `target_model` | `String` | Model space to translate into. |
-| `texts` | `java.util.List[Object]` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```scala
 val convert = client.convert(null).create(java.util.Map.of(
-    "bridge_model", "example_bridge_model",  // String
     "embeddings", java.util.List.of(),  // java.util.List[Object]
     "source_model", "example_source_model",  // String
-    "target_model", "example_target_model",  // String
-    "texts", java.util.List.of()  // java.util.List[Object]
+    "target_model", "example_target_model"  // String
 ), null)
 ```
 

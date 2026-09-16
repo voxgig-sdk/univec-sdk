@@ -39,7 +39,7 @@ local client = sdk.new({
 
 ```lua
 -- Create
-local created, err = client:Convert():create({ bridge_model = "example_bridge_model", embeddings = {}, source_model = "example_source_model", target_model = "example_target_model", texts = {} })
+local created, err = client:Convert():create({ embeddings = {}, source_model = "example_source_model", target_model = "example_target_model" })
 if err then error(err) end
 
 ```
@@ -235,11 +235,9 @@ Only `direct()` returns a response envelope — a `table` with `ok`,
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -308,21 +306,17 @@ Create an instance: `local convert = client:Convert(nil)`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `string` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `table` | Translated vectors, in the target model's dimension. |
 | `source_model` | `string` | Model space the supplied vectors are currently in. |
 | `target_model` | `string` | Model space to translate into. |
-| `texts` | `table` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```lua
 local convert, err = client:Convert():create({
-  bridge_model = "example_bridge_model", -- string
   embeddings = {}, -- table
   source_model = "example_source_model", -- string
   target_model = "example_target_model", -- string
-  texts = {}, -- table
 })
 ```
 

@@ -15,21 +15,17 @@ declare(strict_types=1);
 /** Convert entity data model. */
 class Convert
 {
-    public string $bridge_model;
     public array $embeddings;
     public string $source_model;
     public string $target_model;
-    public array $texts;
 }
 
 /** Request payload for Convert#create. */
 class ConvertCreateData
 {
-    public string $bridge_model;
     public array $embeddings;
     public string $source_model;
     public string $target_model;
-    public array $texts;
 }
 
 /** Embed entity data model. */

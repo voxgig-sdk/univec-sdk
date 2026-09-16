@@ -42,7 +42,7 @@ UnivecSDK client = new UnivecSDK(options);
 
 ```java
 // Create — returns the ENTITY (call data() for the record)
-Object created = client.convert(null).create(Map.of("bridge_model", "example_bridge_model", "embeddings", List.of(), "source_model", "example_source_model", "target_model", "example_target_model", "texts", List.of()), null);
+Object created = client.convert(null).create(Map.of("embeddings", List.of(), "source_model", "example_source_model", "target_model", "example_target_model"), null);
 
 ```
 
@@ -244,11 +244,9 @@ On error, `ok` is `false` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: create.
 
@@ -317,21 +315,17 @@ Create an instance: `SdkEntity convert = client.convert(null);`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `List<Object>` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String` | Model space the supplied vectors are currently in. |
 | `target_model` | `String` | Model space to translate into. |
-| `texts` | `List<Object>` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```java
 Object convert = client.convert(null).create(Map.of(
-    "bridge_model", "example_bridge_model",  // String
     "embeddings", List.of(),  // List<Object>
     "source_model", "example_source_model",  // String
-    "target_model", "example_target_model",  // String
-    "texts", List.of()  // List<Object>
+    "target_model", "example_target_model"  // String
 ), null);
 ```
 

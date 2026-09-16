@@ -16,9 +16,9 @@ package voxgig.univecsdk.core
 @Suppress("unused")
 object UnivecTypes {
 
-  data class Convert(val bridge_model: String?, val embeddings: List<Any?>?, val source_model: String?, val target_model: String?, val texts: List<Any?>?)
+  data class Convert(val embeddings: List<Any?>?, val source_model: String?, val target_model: String?)
 
-  data class ConvertCreateData(val bridge_model: String?, val embeddings: List<Any?>?, val source_model: String?, val target_model: String?, val texts: List<Any?>?)
+  data class ConvertCreateData(val embeddings: List<Any?>?, val source_model: String?, val target_model: String?)
 
   data class Embed(val embeddings: List<Any?>?, val model: String?, val texts: List<Any?>?)
 

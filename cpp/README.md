@@ -62,7 +62,7 @@ auto client = std::make_shared<UnivecSDK>(vmap({
 
 ```cpp
 // Create — returns the bare created record.
-Value created = client->convert()->create(vmap({{"bridge_model", Value("example_bridge_model")}, {"embeddings", vlist()}, {"source_model", Value("example_source_model")}, {"target_model", Value("example_target_model")}, {"texts", vlist()}}), Value::undef());
+Value created = client->convert()->create(vmap({{"embeddings", vlist()}, {"source_model", Value("example_source_model")}, {"target_model", Value("example_target_model")}}), Value::undef());
 
 ```
 
@@ -255,11 +255,9 @@ On error, `ok` is `false` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -328,21 +326,17 @@ Create an instance: `auto convert = client->convert();`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `std::string` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `std::vector<Value>` | Translated vectors, in the target model's dimension. |
 | `source_model` | `std::string` | Model space the supplied vectors are currently in. |
 | `target_model` | `std::string` | Model space to translate into. |
-| `texts` | `std::vector<Value>` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```cpp
 Value convert = client->convert()->create(vmap({
-    {"bridge_model", Value("example_bridge_model")},  // std::string
     {"embeddings", vlist()},  // std::vector<Value>
     {"source_model", Value("example_source_model")},  // std::string
     {"target_model", Value("example_target_model")},  // std::string
-    {"texts", vlist()},  // std::vector<Value>
 }), Value::undef());
 ```
 

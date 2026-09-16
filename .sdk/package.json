@@ -21,8 +21,7 @@
     "add-edition": "voxgig-sdkgen edition add",
     "text-qa": "cd .. && voxgig-docgen qa",
     "postinstall": "node build/docgen.js",
-    "status": "bash admin/status.sh",
-    "check-drift": "bash admin/check-drift.sh"
+    "status": "bash admin/status.sh"
   },
   "author": "Univec",
   "license": "MIT",
@@ -32,7 +31,7 @@
     "@voxgig/docgen": ">=0.10.1",
     "@voxgig/model": ">=10.0",
     "@voxgig/sdkgen": ">=4.17.0",
-    "@voxgig/sdkgen-langpack": "^0.0.4",
+    "@voxgig/sdkgen-langpack": "0.0.4",
     "@voxgig/struct": ">=0.2",
     "@voxgig/util": ">=0.5",
     "aontu": ">=0.52",

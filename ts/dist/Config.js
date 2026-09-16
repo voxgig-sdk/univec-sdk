@@ -79,6 +79,11 @@ class Config {
                 "actor": "anonymous",
                 "max": 1000
             },
+            "optspec": {
+                "now": "`$FUNCTION`",
+                "sink": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "none"
         },
         cache: {
@@ -90,6 +95,10 @@ class Config {
                 ],
                 "ttl": 5000
             },
+            "optspec": {
+                "now": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "wrap"
         },
         clienttrack: {
@@ -97,6 +106,14 @@ class Config {
                 "active": false,
                 "clientVersion": "0.0.1"
             },
+            "optspec": {
+                "clientName": "`$STRING`",
+                "clientVersion": "`$STRING`",
+                "headers": "`$MAP`",
+                "idgen": "`$FUNCTION`",
+                "sessionId": "`$STRING`"
+            },
+            "strict": false,
             "transport": "none"
         },
         cost: {
@@ -111,6 +128,11 @@ class Config {
                 "rates": {},
                 "unit": 0
             },
+            "optspec": {
+                "actor": "`$STRING`",
+                "sink": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "wrap"
         },
         debug: {
@@ -127,6 +149,11 @@ class Config {
                     "idempotency-key"
                 ]
             },
+            "optspec": {
+                "now": "`$FUNCTION`",
+                "onEntry": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "none"
         },
         idempotency: {
@@ -145,18 +172,31 @@ class Config {
                     "remove"
                 ]
             },
+            "optspec": {
+                "keygen": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "none"
         },
         log: {
             "options": {
                 "active": true
             },
+            "optspec": {
+                "level": "`$STRING`",
+                "logger": "`$ANY`"
+            },
+            "strict": false,
             "transport": "none"
         },
         metrics: {
             "options": {
                 "active": false
             },
+            "optspec": {
+                "now": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "none"
         },
         netsim: {
@@ -173,6 +213,15 @@ class Config {
                 "retryAfter": 0,
                 "seed": 1
             },
+            "optspec": {
+                "latency": [
+                    "`$ONE`",
+                    "`$NUMBER`",
+                    "`$MAP`"
+                ],
+                "sleep": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "wrap"
         },
         paging: {
@@ -185,6 +234,11 @@ class Config {
                 "pageParam": "page",
                 "startPage": 1
             },
+            "optspec": {
+                "limit": "`$NUMBER`",
+                "ops": "`$LIST`"
+            },
+            "strict": false,
             "transport": "none"
         },
         proxy: {
@@ -194,6 +248,10 @@ class Config {
                 "noProxy": [],
                 "url": ""
             },
+            "optspec": {
+                "agent": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "wrap"
         },
         ratelimit: {
@@ -202,6 +260,11 @@ class Config {
                 "burst": 5,
                 "rate": 5
             },
+            "optspec": {
+                "now": "`$FUNCTION`",
+                "sleep": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "wrap"
         },
         rbac: {
@@ -211,6 +274,8 @@ class Config {
                 "permissions": [],
                 "rules": {}
             },
+            "optspec": {},
+            "strict": false,
             "transport": "none"
         },
         retry: {
@@ -230,6 +295,11 @@ class Config {
                     504
                 ]
             },
+            "optspec": {
+                "jitter": "`$BOOLEAN`",
+                "sleep": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "wrap"
         },
         secrets: {
@@ -256,6 +326,8 @@ class Config {
                     }
                 ]
             },
+            "optspec": {},
+            "strict": false,
             "transport": "wrap"
         },
         streaming: {
@@ -264,18 +336,35 @@ class Config {
                 "chunkDelay": 0,
                 "chunkSize": 0
             },
+            "optspec": {
+                "ops": "`$LIST`",
+                "sleep": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "none"
         },
         telemetry: {
             "options": {
                 "active": false
             },
+            "optspec": {
+                "exporter": "`$FUNCTION`",
+                "headers": "`$MAP`",
+                "idgen": "`$FUNCTION`",
+                "now": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "none"
         },
         test: {
             "options": {
                 "active": false
             },
+            "optspec": {
+                "entity": "`$MAP`",
+                "net": "`$MAP`"
+            },
+            "strict": false,
             "transport": "base"
         },
         timeout: {
@@ -283,6 +372,11 @@ class Config {
                 "active": false,
                 "ms": 30000
             },
+            "optspec": {
+                "clearTimer": "`$FUNCTION`",
+                "setTimer": "`$FUNCTION`"
+            },
+            "strict": false,
             "transport": "wrap"
         },
     };
@@ -305,12 +399,6 @@ class Config {
         "convert": {
             "fields": [
                 {
-                    "name": "bridge_model",
-                    "req": true,
-                    "short": "Embed model used to vectorise the text before translation.",
-                    "type": "`$STRING`"
-                },
-                {
                     "name": "embeddings",
                     "req": true,
                     "short": "Translated vectors, in the target model's dimension.",
@@ -327,12 +415,6 @@ class Config {
                     "req": true,
                     "short": "Model space to translate into.",
                     "type": "`$STRING`"
-                },
-                {
-                    "name": "texts",
-                    "req": true,
-                    "short": "Texts to embed and translate.",
-                    "type": "`$ARRAY`"
                 }
             ],
             "name": "convert",

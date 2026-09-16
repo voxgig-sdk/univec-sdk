@@ -43,7 +43,7 @@ client = UnivecSDK({
 
 ```python
 # Create — returns the ENTITY (call data_get() for the record)
-created = client.Convert().create({"bridge_model": "example_bridge_model", "embeddings": [], "source_model": "example_source_model", "target_model": "example_target_model", "texts": []})
+created = client.Convert().create({"embeddings": [], "source_model": "example_source_model", "target_model": "example_target_model"})
 
 ```
 
@@ -246,11 +246,9 @@ On error, `ok` is `False` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -319,21 +317,17 @@ Create an instance: `convert = client.Convert()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `str` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `list` | Translated vectors, in the target model's dimension. |
 | `source_model` | `str` | Model space the supplied vectors are currently in. |
 | `target_model` | `str` | Model space to translate into. |
-| `texts` | `list` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```python
 convert = client.Convert().create({
-    "bridge_model": "example_bridge_model",  # str
     "embeddings": [],  # list
     "source_model": "example_source_model",  # str
     "target_model": "example_target_model",  # str
-    "texts": [],  # list
 })
 ```
 

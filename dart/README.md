@@ -56,7 +56,7 @@ final client = UnivecSDK({
 
 ```dart
 // Create — returns the ENTITY (call data() for the record)
-final created = await client.Convert().create({'bridge_model': 'example_bridge_model', 'embeddings': <dynamic>[], 'source_model': 'example_source_model', 'target_model': 'example_target_model', 'texts': <dynamic>[]});
+final created = await client.Convert().create({'embeddings': <dynamic>[], 'source_model': 'example_source_model', 'target_model': 'example_target_model'});
 
 ```
 
@@ -263,11 +263,9 @@ On error, `ok` is `false` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -336,21 +334,17 @@ Create an instance: `final convert = client.Convert();`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `List<dynamic>` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String` | Model space the supplied vectors are currently in. |
 | `target_model` | `String` | Model space to translate into. |
-| `texts` | `List<dynamic>` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```dart
 final convert = await client.Convert().create({
-  'bridge_model': 'example_bridge_model',  // String
   'embeddings': <dynamic>[],  // List<dynamic>
   'source_model': 'example_source_model',  // String
   'target_model': 'example_target_model',  // String
-  'texts': <dynamic>[],  // List<dynamic>
 });
 ```
 

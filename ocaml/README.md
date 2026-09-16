@@ -44,7 +44,7 @@ let client = Sdk_client.make (jo [("apikey", Str (Sys.getenv "UNIVEC_APIKEY"))])
 
 ```ocaml
 (* Create — resolves to the ENTITY; e_data_get gives the record *)
-let created = (Sdk_client.convert client Noval).e_create (jo [("bridge_model", (Str "example_bridge_model")); ("embeddings", (empty_list ())); ("source_model", (Str "example_source_model")); ("target_model", (Str "example_target_model")); ("texts", (empty_list ()))]) Noval in
+let created = (Sdk_client.convert client Noval).e_create (jo [("embeddings", (empty_list ())); ("source_model", (Str "example_source_model")); ("target_model", (Str "example_target_model"))]) Noval in
 print_endline (stringify (created.e_data_get ()));
 
 ```
@@ -246,11 +246,9 @@ On error, `ok` is `Bool false` and `err` carries the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -319,21 +317,17 @@ Create an instance: `let convert = Sdk_client.convert client Noval`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `string` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `value list` | Translated vectors, in the target model's dimension. |
 | `source_model` | `string` | Model space the supplied vectors are currently in. |
 | `target_model` | `string` | Model space to translate into. |
-| `texts` | `value list` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```ocaml
 let convert = (Sdk_client.convert client Noval).e_create (jo [
-    ("bridge_model", (Str "example_bridge_model"));  (* string *)
     ("embeddings", (empty_list ()));  (* value list *)
     ("source_model", (Str "example_source_model"));  (* string *)
     ("target_model", (Str "example_target_model"));  (* string *)
-    ("texts", (empty_list ()));  (* value list *)
 ]) Noval
 let convert_data = convert.e_data_get ()
 ```

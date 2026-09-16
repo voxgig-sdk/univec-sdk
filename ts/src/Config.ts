@@ -93,7 +93,10 @@ class Config {
         "actor": "anonymous",
         "max": 1000
       },
-      "optspec": {},
+      "optspec": {
+        "now": "`$FUNCTION`",
+        "sink": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -106,7 +109,9 @@ class Config {
         ],
         "ttl": 5000
       },
-      "optspec": {},
+      "optspec": {
+        "now": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "wrap"
     },
@@ -115,7 +120,13 @@ class Config {
         "active": false,
         "clientVersion": "0.0.1"
       },
-      "optspec": {},
+      "optspec": {
+        "clientName": "`$STRING`",
+        "clientVersion": "`$STRING`",
+        "headers": "`$MAP`",
+        "idgen": "`$FUNCTION`",
+        "sessionId": "`$STRING`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -131,7 +142,10 @@ class Config {
         "rates": {},
         "unit": 0
       },
-      "optspec": {},
+      "optspec": {
+        "actor": "`$STRING`",
+        "sink": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "wrap"
     },
@@ -149,7 +163,10 @@ class Config {
           "idempotency-key"
         ]
       },
-      "optspec": {},
+      "optspec": {
+        "now": "`$FUNCTION`",
+        "onEntry": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -169,7 +186,9 @@ class Config {
           "remove"
         ]
       },
-      "optspec": {},
+      "optspec": {
+        "keygen": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -177,7 +196,10 @@ class Config {
       "options": {
         "active": true
       },
-      "optspec": {},
+      "optspec": {
+        "level": "`$STRING`",
+        "logger": "`$ANY`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -185,7 +207,9 @@ class Config {
       "options": {
         "active": false
       },
-      "optspec": {},
+      "optspec": {
+        "now": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -203,7 +227,14 @@ class Config {
         "retryAfter": 0,
         "seed": 1
       },
-      "optspec": {},
+      "optspec": {
+        "latency": [
+          "`$ONE`",
+          "`$NUMBER`",
+          "`$MAP`"
+        ],
+        "sleep": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "wrap"
     },
@@ -217,7 +248,10 @@ class Config {
         "pageParam": "page",
         "startPage": 1
       },
-      "optspec": {},
+      "optspec": {
+        "limit": "`$NUMBER`",
+        "ops": "`$LIST`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -228,7 +262,9 @@ class Config {
         "noProxy": [],
         "url": ""
       },
-      "optspec": {},
+      "optspec": {
+        "agent": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "wrap"
     },
@@ -238,7 +274,10 @@ class Config {
         "burst": 5,
         "rate": 5
       },
-      "optspec": {},
+      "optspec": {
+        "now": "`$FUNCTION`",
+        "sleep": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "wrap"
     },
@@ -270,7 +309,10 @@ class Config {
           504
         ]
       },
-      "optspec": {},
+      "optspec": {
+        "jitter": "`$BOOLEAN`",
+        "sleep": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "wrap"
     },
@@ -308,7 +350,10 @@ class Config {
         "chunkDelay": 0,
         "chunkSize": 0
       },
-      "optspec": {},
+      "optspec": {
+        "ops": "`$LIST`",
+        "sleep": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -316,7 +361,12 @@ class Config {
       "options": {
         "active": false
       },
-      "optspec": {},
+      "optspec": {
+        "exporter": "`$FUNCTION`",
+        "headers": "`$MAP`",
+        "idgen": "`$FUNCTION`",
+        "now": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "none"
     },
@@ -324,7 +374,10 @@ class Config {
       "options": {
         "active": false
       },
-      "optspec": {},
+      "optspec": {
+        "entity": "`$MAP`",
+        "net": "`$MAP`"
+      },
       "strict": false,
       "transport": "base"
     },
@@ -333,7 +386,10 @@ class Config {
         "active": false,
         "ms": 30000
       },
-      "optspec": {},
+      "optspec": {
+        "clearTimer": "`$FUNCTION`",
+        "setTimer": "`$FUNCTION`"
+      },
       "strict": false,
       "transport": "wrap"
     },
@@ -354,18 +410,18 @@ class Config {
 
     entity: {
       
-      convert: {
-      },
-
-      embed: {
-      },
-
-      ephemeral_key: {
-      },
-
-      model: {
-      },
-
+        convert: {
+        },
+  
+        embed: {
+        },
+  
+        ephemeral_key: {
+        },
+  
+        model: {
+        },
+  
     }
   }
 
@@ -373,12 +429,6 @@ class Config {
   entity = {
     "convert": {
       "fields": [
-        {
-          "name": "bridge_model",
-          "req": true,
-          "short": "Embed model used to vectorise the text before translation.",
-          "type": "`$STRING`"
-        },
         {
           "name": "embeddings",
           "req": true,
@@ -396,12 +446,6 @@ class Config {
           "req": true,
           "short": "Model space to translate into.",
           "type": "`$STRING`"
-        },
-        {
-          "name": "texts",
-          "req": true,
-          "short": "Texts to embed and translate.",
-          "type": "`$ARRAY`"
         }
       ],
       "name": "convert",

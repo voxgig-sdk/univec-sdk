@@ -54,7 +54,7 @@ let client = UnivecSDK(options)
 
 ```swift
 // Create — returns the ENTITY (call data() for the record)
-let created = try client.Convert().create(VMap([("bridge_model", .string("example_bridge_model")), ("embeddings", .list([])), ("source_model", .string("example_source_model")), ("target_model", .string("example_target_model")), ("texts", .list([]))]), nil)
+let created = try client.Convert().create(VMap([("embeddings", .list([])), ("source_model", .string("example_source_model")), ("target_model", .string("example_target_model"))]), nil)
 
 ```
 
@@ -258,11 +258,9 @@ On error, `ok` is `false` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -331,21 +329,17 @@ Create an instance: `let convert = client.Convert()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `[Value]` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String` | Model space the supplied vectors are currently in. |
 | `target_model` | `String` | Model space to translate into. |
-| `texts` | `[Value]` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```swift
 let convert = try client.Convert().create(VMap([
-    ("bridge_model", .string("example_bridge_model")),  // String
     ("embeddings", .list([])),  // [Value]
     ("source_model", .string("example_source_model")),  // String
-    ("target_model", .string("example_target_model")),  // String
-    ("texts", .list([]))  // [Value]
+    ("target_model", .string("example_target_model"))  // String
 ]), nil)
 ```
 

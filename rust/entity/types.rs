@@ -14,21 +14,17 @@ use crate::utility::voxgigstruct::Value;
 /// Convert is the typed data model for the convert entity.
 #[derive(Debug, Clone)]
 pub struct Convert {
-    pub bridge_model: String,
     pub embeddings: Vec<Value>,
     pub source_model: String,
     pub target_model: String,
-    pub texts: Vec<Value>,
 }
 
 /// ConvertCreateData is the typed request payload for Convert.create.
 #[derive(Debug, Clone)]
 pub struct ConvertCreateData {
-    pub bridge_model: String,
     pub embeddings: Vec<Value>,
     pub source_model: String,
     pub target_model: String,
-    pub texts: Vec<Value>,
 }
 
 /// Embed is the typed data model for the embed entity.

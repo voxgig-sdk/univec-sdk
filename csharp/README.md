@@ -43,7 +43,7 @@ var client = new UnivecSDK(new Dictionary<string, object?>
 
 ```csharp
 // Create — returns the bare created record (as object?)
-var created = client.Convert().Create(new Dictionary<string, object?> { ["bridge_model"] = "example_bridge_model", ["embeddings"] = new List<object?>(), ["source_model"] = "example_source_model", ["target_model"] = "example_target_model", ["texts"] = new List<object?>() });
+var created = client.Convert().Create(new Dictionary<string, object?> { ["embeddings"] = new List<object?>(), ["source_model"] = "example_source_model", ["target_model"] = "example_target_model" });
 
 ```
 
@@ -256,11 +256,9 @@ On error, `ok` is `false` and `err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -329,22 +327,18 @@ Create an instance: `var convert = client.Convert();`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `string` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `List<object?>` | Translated vectors, in the target model's dimension. |
 | `source_model` | `string` | Model space the supplied vectors are currently in. |
 | `target_model` | `string` | Model space to translate into. |
-| `texts` | `List<object?>` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```csharp
 var convert = client.Convert().Create(new Dictionary<string, object?>
 {
-    ["bridge_model"] = "example_bridge_model",  // string
     ["embeddings"] = new List<object?>(),  // List<object?>
     ["source_model"] = "example_source_model",  // string
     ["target_model"] = "example_target_model",  // string
-    ["texts"] = new List<object?>(),  // List<object?>
 });
 ```
 

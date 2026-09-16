@@ -21,7 +21,9 @@ let make_config () : value =
           ("active", (Bool false));
           ("actor", (Str "anonymous"));
           ("max", (Num (1000.))) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("now", (Str "`$FUNCTION`"));
+          ("sink", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("cache", (jo [
@@ -31,14 +33,20 @@ let make_config () : value =
           ("methods", (ja [
             (Str "GET") ]));
           ("ttl", (Num (5000.))) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("now", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("clienttrack", (jo [
         ("options", (jo [
           ("active", (Bool false));
           ("clientVersion", (Str "0.0.1")) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("clientName", (Str "`$STRING`"));
+          ("clientVersion", (Str "`$STRING`"));
+          ("headers", (Str "`$MAP`"));
+          ("idgen", (Str "`$FUNCTION`"));
+          ("sessionId", (Str "`$STRING`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("cost", (jo [
@@ -52,7 +60,9 @@ let make_config () : value =
           ("perUnit", (Num (0.)));
           ("rates", (empty_map ()));
           ("unit", (Num (0.))) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("actor", (Str "`$STRING`"));
+          ("sink", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("debug", (jo [
@@ -67,7 +77,9 @@ let make_config () : value =
             (Str "apikey");
             (Str "x-api-key");
             (Str "idempotency-key") ])) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("now", (Str "`$FUNCTION`"));
+          ("onEntry", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("idempotency", (jo [
@@ -83,19 +95,23 @@ let make_config () : value =
             (Str "create");
             (Str "update");
             (Str "remove") ])) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("keygen", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("log", (jo [
         ("options", (jo [
           ("active", (Bool true)) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("level", (Str "`$STRING`"));
+          ("logger", (Str "`$ANY`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("metrics", (jo [
         ("options", (jo [
           ("active", (Bool false)) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("now", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("netsim", (jo [
@@ -111,7 +127,12 @@ let make_config () : value =
           ("rateLimitTimes", (Num (0.)));
           ("retryAfter", (Num (0.)));
           ("seed", (Num (1.))) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("latency", (ja [
+            (Str "`$ONE`");
+            (Str "`$NUMBER`");
+            (Str "`$MAP`") ]));
+          ("sleep", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("paging", (jo [
@@ -123,7 +144,9 @@ let make_config () : value =
           ("limitParam", (Str "limit"));
           ("pageParam", (Str "page"));
           ("startPage", (Num (1.))) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("limit", (Str "`$NUMBER`"));
+          ("ops", (Str "`$LIST`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("proxy", (jo [
@@ -132,7 +155,8 @@ let make_config () : value =
           ("fromEnv", (Bool false));
           ("noProxy", (empty_list ()));
           ("url", (Str "")) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("agent", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("ratelimit", (jo [
@@ -140,7 +164,9 @@ let make_config () : value =
           ("active", (Bool false));
           ("burst", (Num (5.)));
           ("rate", (Num (5.))) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("now", (Str "`$FUNCTION`"));
+          ("sleep", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("rbac", (jo [
@@ -167,7 +193,9 @@ let make_config () : value =
             (Num (502.));
             (Num (503.));
             (Num (504.)) ])) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("jitter", (Str "`$BOOLEAN`"));
+          ("sleep", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("secrets", (jo [
@@ -197,26 +225,36 @@ let make_config () : value =
           ("active", (Bool false));
           ("chunkDelay", (Num (0.)));
           ("chunkSize", (Num (0.))) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("ops", (Str "`$LIST`"));
+          ("sleep", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("telemetry", (jo [
         ("options", (jo [
           ("active", (Bool false)) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("exporter", (Str "`$FUNCTION`"));
+          ("headers", (Str "`$MAP`"));
+          ("idgen", (Str "`$FUNCTION`"));
+          ("now", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("test", (jo [
         ("options", (jo [
           ("active", (Bool false)) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("entity", (Str "`$MAP`"));
+          ("net", (Str "`$MAP`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "base")) ]));
       ("timeout", (jo [
         ("options", (jo [
           ("active", (Bool false));
           ("ms", (Num (30000.))) ]));
-        ("optspec", (empty_map ()));
+        ("optspec", (jo [
+          ("clearTimer", (Str "`$FUNCTION`"));
+          ("setTimer", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "wrap")) ])) ]));
     ("options", (jo [
@@ -234,11 +272,6 @@ let make_config () : value =
       ("convert", (jo [
         ("fields", (ja [
           (jo [
-            ("name", (Str "bridge_model"));
-            ("req", (Bool true));
-            ("short", (Str "Embed model used to vectorise the text before translation."));
-            ("type", (Str "`$STRING`")) ]);
-          (jo [
             ("name", (Str "embeddings"));
             ("req", (Bool true));
             ("short", (Str "Translated vectors, in the target model's dimension."));
@@ -252,12 +285,7 @@ let make_config () : value =
             ("name", (Str "target_model"));
             ("req", (Bool true));
             ("short", (Str "Model space to translate into."));
-            ("type", (Str "`$STRING`")) ]);
-          (jo [
-            ("name", (Str "texts"));
-            ("req", (Bool true));
-            ("short", (Str "Texts to embed and translate."));
-            ("type", (Str "`$ARRAY`")) ]) ]));
+            ("type", (Str "`$STRING`")) ]) ]));
         ("name", (Str "convert"));
         ("op", (jo [
           ("create", (jo [

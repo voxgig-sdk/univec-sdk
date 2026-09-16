@@ -56,7 +56,7 @@ const client = sdk.UnivecSDK.new(h.jo(&.{
 
 ```zig
 // Create — .ok carries the created record
-switch (client.convert(h.vnull()).create(h.jo(&.{.{ "bridge_model", h.vstr("example_bridge_model") }, .{ "embeddings", h.olist() }, .{ "source_model", h.vstr("example_source_model") }, .{ "target_model", h.vstr("example_target_model") }, .{ "texts", h.olist() }}), h.vnull())) {
+switch (client.convert(h.vnull()).create(h.jo(&.{.{ "embeddings", h.olist() }, .{ "source_model", h.vstr("example_source_model") }, .{ "target_model", h.vstr("example_target_model") }}), h.vnull())) {
     .ok => |created| std.debug.print("{s}\n", .{h.stringify(created)}),
     .err => |e| std.debug.print("create failed: {s}\n", .{e.msg}),
 }
@@ -254,11 +254,9 @@ On error, `ok` is `false` and `err` carries the error message.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -330,21 +328,17 @@ carries the result `Value`, `.err => |e|` carries the branded error.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `[]const u8` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `Value (array)` | Translated vectors, in the target model's dimension. |
 | `source_model` | `[]const u8` | Model space the supplied vectors are currently in. |
 | `target_model` | `[]const u8` | Model space to translate into. |
-| `texts` | `Value (array)` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```zig
 switch (client.convert(h.vnull()).create(h.jo(&.{
-    .{ "bridge_model", h.vstr("example_bridge_model") }, // []const u8
     .{ "embeddings", h.olist() }, // Value (array)
     .{ "source_model", h.vstr("example_source_model") }, // []const u8
     .{ "target_model", h.vstr("example_target_model") }, // []const u8
-    .{ "texts", h.olist() }, // Value (array)
 }), h.vnull())) {
     .ok => |convert| std.debug.print("{s}\n", .{h.stringify(convert)}),
     .err => |e| std.debug.print("create failed: {s}\n", .{e.msg}),

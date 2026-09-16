@@ -22,3 +22,22 @@ main: kit: feature: telemetry: {
     PreUnexpected: active: true
   }
 }
+
+
+# TYPES for the options this feature reads but does not default.
+#
+# `config.options` is the defaults map — what happens when you say nothing —
+# so it can only describe an option that HAS a default. A callback has none,
+# and an option the caller either supplies or does not has none either. Left
+# undeclared these were invisible twice over: the generated option spec could
+# not type them, and the README's option table could not list them.
+main: kit: feature: telemetry: config: optspec: {
+  # receives each finished span
+  exporter: '`$FUNCTION`'
+  # extra headers merged into the propagated context
+  headers: '`$MAP`'
+  # supplies trace and span ids
+  idgen: '`$FUNCTION`'
+  # injected clock
+  now: '`$FUNCTION`'
+}

@@ -53,7 +53,7 @@ PNError* err = NULL;
 ```c
 Entity* convert = univec_convert(client, NULL);
 // Create — returns the bare created record
-voxgig_value* created = convert->vt->create(convert, cmap(5, "bridge_model", v_str("example_bridge_model"), "embeddings", v_list(), "source_model", v_str("example_source_model"), "target_model", v_str("example_target_model"), "texts", v_list()), NULL, &err);
+voxgig_value* created = convert->vt->create(convert, cmap(3, "embeddings", v_list(), "source_model", v_str("example_source_model"), "target_model", v_str("example_target_model")), NULL, &err);
 
 ```
 
@@ -266,11 +266,9 @@ On error, `ok` is `false` and `err` carries the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -339,22 +337,18 @@ Create an instance: `Entity* convert = univec_convert(client, NULL);`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `char*` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `voxgig_value* (list)` | Translated vectors, in the target model's dimension. |
 | `source_model` | `char*` | Model space the supplied vectors are currently in. |
 | `target_model` | `char*` | Model space to translate into. |
-| `texts` | `voxgig_value* (list)` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```c
 Entity* convert = univec_convert(client, NULL);
-voxgig_value* convert_rec = convert->vt->create(convert, cmap(5,
-    "bridge_model", v_str("example_bridge_model"),  // char*
+voxgig_value* convert_rec = convert->vt->create(convert, cmap(3,
     "embeddings", v_list(),  // voxgig_value* (list)
     "source_model", v_str("example_source_model"),  // char*
-    "target_model", v_str("example_target_model"),  // char*
-    "texts", v_list())  // voxgig_value* (list)
+    "target_model", v_str("example_target_model"))  // char*
 , NULL, &err);
 ```
 

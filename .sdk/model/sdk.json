@@ -157,13 +157,6 @@
           "fields": [
             {
               "active": true,
-              "name": "bridge_model",
-              "req": true,
-              "short": "Embed model used to vectorise the text before translation.",
-              "type": "`$STRING`"
-            },
-            {
-              "active": true,
               "name": "embeddings",
               "req": true,
               "short": "Translated vectors, in the target model's dimension.",
@@ -182,13 +175,6 @@
               "req": true,
               "short": "Model space to translate into.",
               "type": "`$STRING`"
-            },
-            {
-              "active": true,
-              "name": "texts",
-              "req": true,
-              "short": "Texts to embed and translate.",
-              "type": "`$ARRAY`"
             }
           ],
           "name": "convert",
@@ -623,7 +609,10 @@
               "actor": "anonymous",
               "max": 1000
             },
-            "optspec": {},
+            "optspec": {
+              "now": "`$FUNCTION`",
+              "sink": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -782,7 +771,9 @@
               ],
               "ttl": 5000
             },
-            "optspec": {},
+            "optspec": {
+              "now": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -929,7 +920,13 @@
               "active": false,
               "clientVersion": "0.0.1"
             },
-            "optspec": {},
+            "optspec": {
+              "clientName": "`$STRING`",
+              "clientVersion": "`$STRING`",
+              "headers": "`$MAP`",
+              "idgen": "`$FUNCTION`",
+              "sessionId": "`$STRING`"
+            },
             "strict": false
           },
           "hook": {
@@ -1083,7 +1080,10 @@
               "rates": {},
               "unit": 0
             },
-            "optspec": {},
+            "optspec": {
+              "actor": "`$STRING`",
+              "sink": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -1251,7 +1251,10 @@
                 "idempotency-key"
               ]
             },
-            "optspec": {},
+            "optspec": {
+              "now": "`$FUNCTION`",
+              "onEntry": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -1417,7 +1420,9 @@
                 "remove"
               ]
             },
-            "optspec": {},
+            "optspec": {
+              "keygen": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -1563,7 +1568,10 @@
             "options": {
               "active": true
             },
-            "optspec": {},
+            "optspec": {
+              "level": "`$STRING`",
+              "logger": "`$ANY`"
+            },
             "strict": false
           },
           "deps": {
@@ -1743,7 +1751,9 @@
             "options": {
               "active": false
             },
-            "optspec": {},
+            "optspec": {
+              "now": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -1911,7 +1921,14 @@
               "retryAfter": 0,
               "seed": 1
             },
-            "optspec": {},
+            "optspec": {
+              "latency": [
+                "`$ONE`",
+                "`$NUMBER`",
+                "`$MAP`"
+              ],
+              "sleep": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -2063,7 +2080,10 @@
               "pageParam": "page",
               "startPage": 1
             },
-            "optspec": {},
+            "optspec": {
+              "limit": "`$NUMBER`",
+              "ops": "`$LIST`"
+            },
             "strict": false
           },
           "hook": {
@@ -2212,7 +2232,9 @@
               "noProxy": [],
               "url": ""
             },
-            "optspec": {},
+            "optspec": {
+              "agent": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -2360,7 +2382,10 @@
               "burst": 5,
               "rate": 5
             },
-            "optspec": {},
+            "optspec": {
+              "now": "`$FUNCTION`",
+              "sleep": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -2672,7 +2697,10 @@
                 504
               ]
             },
-            "optspec": {},
+            "optspec": {
+              "jitter": "`$BOOLEAN`",
+              "sleep": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -3745,7 +3773,10 @@
               "chunkDelay": 0,
               "chunkSize": 0
             },
-            "optspec": {},
+            "optspec": {
+              "ops": "`$LIST`",
+              "sleep": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -3891,7 +3922,12 @@
             "options": {
               "active": false
             },
-            "optspec": {},
+            "optspec": {
+              "exporter": "`$FUNCTION`",
+              "headers": "`$MAP`",
+              "idgen": "`$FUNCTION`",
+              "now": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -4049,7 +4085,10 @@
             "options": {
               "active": false
             },
-            "optspec": {},
+            "optspec": {
+              "entity": "`$MAP`",
+              "net": "`$MAP`"
+            },
             "strict": false
           },
           "hook": {
@@ -4204,7 +4243,10 @@
               "active": false,
               "ms": 30000
             },
-            "optspec": {},
+            "optspec": {
+              "clearTimer": "`$FUNCTION`",
+              "setTimer": "`$FUNCTION`"
+            },
             "strict": false
           },
           "hook": {
@@ -5309,6 +5351,7 @@
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6227,6 +6270,7 @@
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {

@@ -1,16 +1,12 @@
 export interface Convert {
-    bridge_model: string;
     embeddings: any[];
     source_model: string;
     target_model: string;
-    texts: any[];
 }
 export interface ConvertCreateData {
-    bridge_model: string;
     embeddings: any[];
     source_model: string;
     target_model: string;
-    texts: any[];
     $action?: string;
     [action: string]: any;
 }

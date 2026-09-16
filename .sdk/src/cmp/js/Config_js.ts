@@ -103,9 +103,11 @@ const Config = cmp(async function Config(props: any) {
             pluginImports(feature)
           },
 
-          '// #FeatureClasses': () => each(feature, (f: any) => {
-            Line(` ${f.name}: ${nom(f, 'Name')}Feature,`)
-          }),
+          '// #FeatureClasses': () => {
+            each(feature, (f: any) => {
+              Line(` ${f.name}: ${nom(f, 'Name')}Feature,`)
+            })
+          },
 
           '// #FeaturePlugins': () => pluginDefs(feature),
 
@@ -147,28 +149,34 @@ const Config = cmp(async function Config(props: any) {
           Line(`    target: ${JSON.stringify(configDef.main.target)},`)
         },
 
-        '// #FeatureClasses': () => each(feature, (f: any) => {
-          // Trailing comma: the map has one entry per feature, so entries
-          // must be comma-separated (a single feature hid this until now).
-          Line(` ${f.name}: ${nom(f, 'Name')}Feature,`)
-        }),
+        '// #FeatureClasses': () => {
+          each(feature, (f: any) => {
+            // Trailing comma: the map has one entry per feature, so entries
+            // must be comma-separated (a single feature hid this until now).
+            Line(` ${f.name}: ${nom(f, 'Name')}Feature,`)
+          })
+        },
 
         '// #FeaturePlugins': () => pluginDefs(feature),
 
         // Rendered from configDefinition's def, not from f.config, so the
         // literal carries the feature's `transport` role (station design
         // §8.4) beside its options and cannot drift from the data rep.
-        '// #FeatureConfigs': () => each(feature, (f: any) => {
-          Line(` ${f.name}: ${formatJson(configDef.feature[f.name], { margin: 4 })},`)
-        }),
+        '// #FeatureConfigs': () => {
+          each(feature, (f: any) => {
+            Line(` ${f.name}: ${formatJson(configDef.feature[f.name], { margin: 4 })},`)
+          })
+        },
 
 
-        '// #EntityConfigs': () => each(entity, (entity: any) => {
-          Content(`
-      ${entity.name}: {
-      },
-`)
-        }),
+        '// #EntityConfigs': () => {
+          each(entity, (entity: any) => {
+            Content(`
+        ${entity.name}: {
+        },
+  `)
+          })
+        },
 
         // configDefinition's `def.entity` verbatim, NOT rebuilt here. This
         // reduce was a second copy of that function's entityDefs loop, and

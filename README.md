@@ -26,11 +26,9 @@ support (`list`, `create`):
 ```ts
 const client = new UnivecSDK()
 const convert = await client.Convert().create({
-  bridge_model: 'example',
   embeddings: [],
   source_model: 'example',
   target_model: 'example',
-  texts: [],
 })
 ```
 

@@ -36,7 +36,7 @@ client = UnivecSDK.new({
 
 ```ruby
 # create returns the ENTITY — call data_get for the created Convert record.
-created = client.Convert.create({ "bridge_model" => "example_bridge_model", "embeddings" => [], "source_model" => "example_source_model", "target_model" => "example_target_model", "texts" => [] })
+created = client.Convert.create({ "embeddings" => [], "source_model" => "example_source_model", "target_model" => "example_target_model" })
 
 ```
 
@@ -239,11 +239,9 @@ returns a result `Hash` with these keys:
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -312,21 +310,17 @@ Create an instance: `convert = client.Convert`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `Array` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String` | Model space the supplied vectors are currently in. |
 | `target_model` | `String` | Model space to translate into. |
-| `texts` | `Array` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```ruby
 convert = client.Convert.create({
-  "bridge_model" => "example_bridge_model", # String
   "embeddings" => [], # Array
   "source_model" => "example_source_model", # String
   "target_model" => "example_target_model", # String
-  "texts" => [], # Array
 })
 ```
 

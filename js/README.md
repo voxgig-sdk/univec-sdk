@@ -37,11 +37,9 @@ const client = new UnivecSDK({
 
 ```js
 const created = await client.Convert().create({
-  bridge_model: 'example_bridge_model',
   embeddings: [],
   source_model: 'example_source_model',
   target_model: 'example_target_model',
-  texts: [],
 })
 console.log(created)
 ```
@@ -304,11 +302,9 @@ The `prepare()` method returns:
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: create.
 
@@ -377,21 +373,17 @@ Create an instance: `const convert = client.Convert()`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `string` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `Array` | Translated vectors, in the target model's dimension. |
 | `source_model` | `string` | Model space the supplied vectors are currently in. |
 | `target_model` | `string` | Model space to translate into. |
-| `texts` | `Array` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```ts
 const convert = await client.Convert().create({
-  bridge_model: 'example_bridge_model',
   embeddings: [],
   source_model: 'example_source_model',
   target_model: 'example_target_model',
-  texts: [],
 })
 ```
 

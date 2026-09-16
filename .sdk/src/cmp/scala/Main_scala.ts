@@ -86,6 +86,35 @@ const Main = cmp(async function Main(props: any) {
     }
   }
 
+  // THE FEATURE THE MODEL NEVER MENTIONS AT ALL.
+  //
+  // inactivePluginExcludes above walks the model's DECLARED features and skips
+  // the active ones, which covers `secrets: { active: false }`. It cannot cover
+  // the case that actually shipped: a model that does not mention secrets
+  // anywhere. Then `main.kit.feature` has no `secrets` key, the loop never sees
+  // it, nothing is excluded, and all nine provider clients are copied and
+  // compiled — which is what `vocabulary.off.notrimmed` reports, and it failed
+  // on 12 of the 68 cedar SDKs.
+  //
+  // PRECISE, NOT THE WHOLE TREE. The first cut of this excluded
+  // `feature/<inactive>/` wholesale and broke the build: SecretsFeature.scala
+  // ships to every scala SDK regardless (this target's feature trim is off) and
+  // imports `com.voxgig.sekreto` and `voxgig.plugin`, so removing the vendored
+  // cores left it uncompilable — "value voxgig is not a member of com".
+  //
+  // What may go is exactly the nine provider clients under sekreto/plugins.
+  // Httpjson.scala and Sigv4.scala live there too and must STAY: both belong to
+  // no group and are shared, which model/feature/secrets.aon documents at
+  // length after a cloud-only trim once deleted Sigv4 and scalac failed with
+  // four "Not found: uriescape".
+  const SHARED_SEKRETO_PLUGINS = ['Httpjson.scala', 'Sigv4.scala']
+  const pluginDirExcludes: RegExp[] = []
+  if (null == (feature as any).secrets) {
+    pluginDirExcludes.push(new RegExp(
+      '(^|/)feature/secrets/sekreto/plugins/(?!' +
+      SHARED_SEKRETO_PLUGINS.map((f) => esc(f)).join('|') + ')[^/]+$'))
+  }
+
   Package({ target })
 
   Gitignore({})
@@ -119,6 +148,7 @@ const Main = cmp(async function Main(props: any) {
       TEST_CONTROL_EXCLUDE,
       ...pluginExcludes(model),
       ...inactivePluginExcludes,
+      ...pluginDirExcludes,
     ],
     replace: {
       ...props.ctx$.stdrep,

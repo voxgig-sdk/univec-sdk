@@ -47,7 +47,7 @@ let client = UnivecSDK::new(jo(vec![
 
 ```rust
 // Create — returns the bare created record
-let created = client.convert(Value::Noval).create(jo(vec![("bridge_model", Value::str("example_bridge_model")), ("embeddings", Value::empty_list()), ("source_model", Value::str("example_source_model")), ("target_model", Value::str("example_target_model")), ("texts", Value::empty_list())]), Value::Noval).unwrap();
+let created = client.convert(Value::Noval).create(jo(vec![("embeddings", Value::empty_list()), ("source_model", Value::str("example_source_model")), ("target_model", Value::str("example_target_model"))]), Value::Noval).unwrap();
 
 ```
 
@@ -240,11 +240,9 @@ On error, `ok` is `false` and `err` carries the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -313,21 +311,17 @@ Create an instance: `let convert = client.convert(Value::Noval);`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `String` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `Vec<Value>` | Translated vectors, in the target model's dimension. |
 | `source_model` | `String` | Model space the supplied vectors are currently in. |
 | `target_model` | `String` | Model space to translate into. |
-| `texts` | `Vec<Value>` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```rust
 let convert = client.convert(Value::Noval).create(jo(vec![
-    ("bridge_model", Value::str("example_bridge_model")),  // String
     ("embeddings", Value::empty_list()),  // Vec<Value>
     ("source_model", Value::str("example_source_model")),  // String
     ("target_model", Value::str("example_target_model")),  // String
-    ("texts", Value::empty_list()),  // Vec<Value>
 ]), Value::Noval).unwrap();
 ```
 

@@ -8,20 +8,16 @@
 
 /**
  * @typedef {Object} Convert
- * @property {string} bridge_model
  * @property {Array} embeddings
  * @property {string} source_model
  * @property {string} target_model
- * @property {Array} texts
  */
 
 /**
  * @typedef {Object} ConvertCreateData
- * @property {string} bridge_model
  * @property {Array} embeddings
  * @property {string} source_model
  * @property {string} target_model
- * @property {Array} texts
  */
 
 /**

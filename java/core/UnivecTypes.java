@@ -20,9 +20,9 @@ public final class UnivecTypes {
 
   private UnivecTypes() {}
 
-  public record Convert(String bridge_model, List<Object> embeddings, String source_model, String target_model, List<Object> texts) {}
+  public record Convert(List<Object> embeddings, String source_model, String target_model) {}
 
-  public record ConvertCreateData(String bridge_model, List<Object> embeddings, String source_model, String target_model, List<Object> texts) {}
+  public record ConvertCreateData(List<Object> embeddings, String source_model, String target_model) {}
 
   public record Embed(List<Object> embeddings, String model, List<Object> texts) {}
 

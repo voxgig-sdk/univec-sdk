@@ -7,18 +7,14 @@
 -- edit by hand.
 
 ---@class Convert
----@field bridge_model string
 ---@field embeddings table
 ---@field source_model string
 ---@field target_model string
----@field texts table
 
 ---@class ConvertCreateData
----@field bridge_model string
 ---@field embeddings table
 ---@field source_model string
 ---@field target_model string
----@field texts table
 
 ---@class Embed
 ---@field embeddings table

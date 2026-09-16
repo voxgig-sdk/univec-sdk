@@ -37,7 +37,7 @@ $client = new UnivecSDK([
 
 ```php
 // create() returns the ENTITY — call data_get() for the created Convert record.
-$created = $client->Convert()->create(["bridge_model" => "example_bridge_model", "embeddings" => [], "source_model" => "example_source_model", "target_model" => "example_target_model", "texts" => []]);
+$created = $client->Convert()->create(["embeddings" => [], "source_model" => "example_source_model", "target_model" => "example_target_model"]);
 
 ```
 
@@ -249,11 +249,9 @@ On error, `ok` is `false` and `$err` contains the error value.
 
 | Field | Description |
 | --- | --- |
-| `bridge_model` | Embed model used to vectorise the text before translation. |
 | `embeddings` | Translated vectors, in the target model's dimension. |
 | `source_model` | Model space the supplied vectors are currently in. |
 | `target_model` | Model space to translate into. |
-| `texts` | Texts to embed and translate. |
 
 Operations: Create.
 
@@ -322,21 +320,17 @@ Create an instance: `$convert = $client->Convert();`
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `bridge_model` | `string` | Embed model used to vectorise the text before translation. |
 | `embeddings` | `array` | Translated vectors, in the target model's dimension. |
 | `source_model` | `string` | Model space the supplied vectors are currently in. |
 | `target_model` | `string` | Model space to translate into. |
-| `texts` | `array` | Texts to embed and translate. |
 
 #### Example: Create
 
 ```php
 $convert = $client->Convert()->create([
-    "bridge_model" => null, // string
     "embeddings" => null, // array
     "source_model" => null, // string
     "target_model" => null, // string
-    "texts" => null, // array
 ]);
 ```
 

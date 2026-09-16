@@ -15,20 +15,16 @@ namespace UnivecSdk.Types;
 
 public record Convert
 {
-    public string bridge_model { get; init; }
     public List<object?> embeddings { get; init; }
     public string source_model { get; init; }
     public string target_model { get; init; }
-    public List<object?> texts { get; init; }
 }
 
 public record ConvertCreateData
 {
-    public string bridge_model { get; init; }
     public List<object?> embeddings { get; init; }
     public string source_model { get; init; }
     public string target_model { get; init; }
-    public List<object?> texts { get; init; }
 }
 
 public record Embed

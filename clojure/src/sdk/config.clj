@@ -11,11 +11,6 @@
       "convert" (vs/jm
         "fields" (vs/jt
           (vs/jm
-            "name" "bridge_model"
-            "req" true
-            "short" "Embed model used to vectorise the text before translation."
-            "type" "`$STRING`")
-          (vs/jm
             "name" "embeddings"
             "req" true
             "short" "Translated vectors, in the target model's dimension."
@@ -29,12 +24,7 @@
             "name" "target_model"
             "req" true
             "short" "Model space to translate into."
-            "type" "`$STRING`")
-          (vs/jm
-            "name" "texts"
-            "req" true
-            "short" "Texts to embed and translate."
-            "type" "`$ARRAY`"))
+            "type" "`$STRING`"))
         "name" "convert"
         "op" (vs/jm
           "create" (vs/jm
@@ -311,7 +301,9 @@
           "active" false
           "actor" "anonymous"
           "max" 1000)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "now" "`$FUNCTION`"
+          "sink" "`$FUNCTION`")
         "strict" false
         "transport" "none")
       "cache" (vs/jm
@@ -321,14 +313,20 @@
           "methods" (vs/jt
             "GET")
           "ttl" 5000)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "now" "`$FUNCTION`")
         "strict" false
         "transport" "wrap")
       "clienttrack" (vs/jm
         "options" (vs/jm
           "active" false
           "clientVersion" "0.0.1")
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "clientName" "`$STRING`"
+          "clientVersion" "`$STRING`"
+          "headers" "`$MAP`"
+          "idgen" "`$FUNCTION`"
+          "sessionId" "`$STRING`")
         "strict" false
         "transport" "none")
       "cost" (vs/jm
@@ -342,7 +340,9 @@
           "perUnit" 0
           "rates" (vs/jm)
           "unit" 0)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "actor" "`$STRING`"
+          "sink" "`$FUNCTION`")
         "strict" false
         "transport" "wrap")
       "debug" (vs/jm
@@ -357,7 +357,9 @@
             "apikey"
             "x-api-key"
             "idempotency-key"))
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "now" "`$FUNCTION`"
+          "onEntry" "`$FUNCTION`")
         "strict" false
         "transport" "none")
       "idempotency" (vs/jm
@@ -373,19 +375,23 @@
             "create"
             "update"
             "remove"))
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "keygen" "`$FUNCTION`")
         "strict" false
         "transport" "none")
       "log" (vs/jm
         "options" (vs/jm
           "active" true)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "level" "`$STRING`"
+          "logger" "`$ANY`")
         "strict" false
         "transport" "none")
       "metrics" (vs/jm
         "options" (vs/jm
           "active" false)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "now" "`$FUNCTION`")
         "strict" false
         "transport" "none")
       "netsim" (vs/jm
@@ -401,7 +407,12 @@
           "rateLimitTimes" 0
           "retryAfter" 0
           "seed" 1)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "latency" (vs/jt
+            "`$ONE`"
+            "`$NUMBER`"
+            "`$MAP`")
+          "sleep" "`$FUNCTION`")
         "strict" false
         "transport" "wrap")
       "paging" (vs/jm
@@ -413,7 +424,9 @@
           "limitParam" "limit"
           "pageParam" "page"
           "startPage" 1)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "limit" "`$NUMBER`"
+          "ops" "`$LIST`")
         "strict" false
         "transport" "none")
       "proxy" (vs/jm
@@ -422,7 +435,8 @@
           "fromEnv" false
           "noProxy" (vs/jt)
           "url" "")
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "agent" "`$FUNCTION`")
         "strict" false
         "transport" "wrap")
       "ratelimit" (vs/jm
@@ -430,7 +444,9 @@
           "active" false
           "burst" 5
           "rate" 5)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "now" "`$FUNCTION`"
+          "sleep" "`$FUNCTION`")
         "strict" false
         "transport" "wrap")
       "rbac" (vs/jm
@@ -457,7 +473,9 @@
             502
             503
             504))
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "jitter" "`$BOOLEAN`"
+          "sleep" "`$FUNCTION`")
         "strict" false
         "transport" "wrap")
       "secrets" (vs/jm
@@ -487,26 +505,36 @@
           "active" false
           "chunkDelay" 0
           "chunkSize" 0)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "ops" "`$LIST`"
+          "sleep" "`$FUNCTION`")
         "strict" false
         "transport" "none")
       "telemetry" (vs/jm
         "options" (vs/jm
           "active" false)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "exporter" "`$FUNCTION`"
+          "headers" "`$MAP`"
+          "idgen" "`$FUNCTION`"
+          "now" "`$FUNCTION`")
         "strict" false
         "transport" "none")
       "test" (vs/jm
         "options" (vs/jm
           "active" false)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "entity" "`$MAP`"
+          "net" "`$MAP`")
         "strict" false
         "transport" "base")
       "timeout" (vs/jm
         "options" (vs/jm
           "active" false
           "ms" 30000)
-        "optspec" (vs/jm)
+        "optspec" (vs/jm
+          "clearTimer" "`$FUNCTION`"
+          "setTimer" "`$FUNCTION`")
         "strict" false
         "transport" "wrap"))
     "main" (vs/jm

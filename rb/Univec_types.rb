@@ -10,9 +10,6 @@
 
 # Convert entity data model.
 #
-# @!attribute [rw] bridge_model
-#   @return [String]
-#
 # @!attribute [rw] embeddings
 #   @return [Array]
 #
@@ -21,23 +18,15 @@
 #
 # @!attribute [rw] target_model
 #   @return [String]
-#
-# @!attribute [rw] texts
-#   @return [Array]
 Convert = Struct.new(
-  :bridge_model,
   :embeddings,
   :source_model,
   :target_model,
-  :texts,
   keyword_init: true
 )
 
 # Request payload for Convert#create.
 #
-# @!attribute [rw] bridge_model
-#   @return [String]
-#
 # @!attribute [rw] embeddings
 #   @return [Array]
 #
@@ -46,15 +35,10 @@ Convert = Struct.new(
 #
 # @!attribute [rw] target_model
 #   @return [String]
-#
-# @!attribute [rw] texts
-#   @return [Array]
 ConvertCreateData = Struct.new(
-  :bridge_model,
   :embeddings,
   :source_model,
   :target_model,
-  :texts,
   keyword_init: true
 )
 

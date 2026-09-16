@@ -6,19 +6,15 @@
 // @voxgig/apidef VALID_CANON). Do not edit by hand.
 
 export interface Convert {
-  bridge_model: string
   embeddings: any[]
   source_model: string
   target_model: string
-  texts: any[]
 }
 
 export interface ConvertCreateData {
-  bridge_model: string
   embeddings: any[]
   source_model: string
   target_model: string
-  texts: any[]
 
   // Selects a custom action instead of the plain create:
   //   'bridge' | 'ephemeral' | 'ephemeral_bridge'

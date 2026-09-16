@@ -9,38 +9,27 @@
 // convertible view: `Univec.fromMap(ent.data())` / `model.toMap()`.
 
 class Convert {
-  /// STRING (required at the API)
-  String? bridge_model;
   /// ARRAY (required at the API)
   List<dynamic>? embeddings;
   /// STRING (required at the API)
   String? source_model;
   /// STRING (required at the API)
   String? target_model;
-  /// ARRAY (required at the API)
-  List<dynamic>? texts;
 
   Convert({
-    this.bridge_model,
     this.embeddings,
     this.source_model,
     this.target_model,
-    this.texts,
   });
 
   factory Convert.fromMap(Map<String, dynamic> m) => Convert(
-        bridge_model: m['bridge_model'] is String ? m['bridge_model'] : null,
         embeddings: m['embeddings'] is List<dynamic> ? m['embeddings'] : null,
         source_model: m['source_model'] is String ? m['source_model'] : null,
         target_model: m['target_model'] is String ? m['target_model'] : null,
-        texts: m['texts'] is List<dynamic> ? m['texts'] : null,
       );
 
   Map<String, dynamic> toMap() {
     final m = <String, dynamic>{};
-    if (null != bridge_model) {
-      m['bridge_model'] = bridge_model;
-    }
     if (null != embeddings) {
       m['embeddings'] = embeddings;
     }
@@ -49,47 +38,33 @@ class Convert {
     }
     if (null != target_model) {
       m['target_model'] = target_model;
-    }
-    if (null != texts) {
-      m['texts'] = texts;
     }
     return m;
   }
 }
 
 class ConvertCreateData {
-  /// STRING (required at the API)
-  String? bridge_model;
   /// ARRAY (required at the API)
   List<dynamic>? embeddings;
   /// STRING (required at the API)
   String? source_model;
   /// STRING (required at the API)
   String? target_model;
-  /// ARRAY (required at the API)
-  List<dynamic>? texts;
 
   ConvertCreateData({
-    this.bridge_model,
     this.embeddings,
     this.source_model,
     this.target_model,
-    this.texts,
   });
 
   factory ConvertCreateData.fromMap(Map<String, dynamic> m) => ConvertCreateData(
-        bridge_model: m['bridge_model'] is String ? m['bridge_model'] : null,
         embeddings: m['embeddings'] is List<dynamic> ? m['embeddings'] : null,
         source_model: m['source_model'] is String ? m['source_model'] : null,
         target_model: m['target_model'] is String ? m['target_model'] : null,
-        texts: m['texts'] is List<dynamic> ? m['texts'] : null,
       );
 
   Map<String, dynamic> toMap() {
     final m = <String, dynamic>{};
-    if (null != bridge_model) {
-      m['bridge_model'] = bridge_model;
-    }
     if (null != embeddings) {
       m['embeddings'] = embeddings;
     }
@@ -98,9 +73,6 @@ class ConvertCreateData {
     }
     if (null != target_model) {
       m['target_model'] = target_model;
-    }
-    if (null != texts) {
-      m['texts'] = texts;
     }
     return m;
   }
