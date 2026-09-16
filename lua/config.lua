@@ -18,6 +18,8 @@ local function make_config()
           ["actor"] = "anonymous",
           ["max"] = 1000,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["cache"] = {
@@ -29,6 +31,8 @@ local function make_config()
           },
           ["ttl"] = 5000,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "wrap",
       },
       ["clienttrack"] = {
@@ -36,6 +40,8 @@ local function make_config()
           ["active"] = false,
           ["clientVersion"] = "0.0.1",
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["cost"] = {
@@ -50,6 +56,8 @@ local function make_config()
           ["rates"] = {},
           ["unit"] = 0,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "wrap",
       },
       ["debug"] = {
@@ -66,6 +74,8 @@ local function make_config()
             "idempotency-key",
           },
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["idempotency"] = {
@@ -84,18 +94,24 @@ local function make_config()
             "remove",
           },
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["log"] = {
         ["options"] = {
           ["active"] = true,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["metrics"] = {
         ["options"] = {
           ["active"] = false,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["netsim"] = {
@@ -112,6 +128,8 @@ local function make_config()
           ["retryAfter"] = 0,
           ["seed"] = 1,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "wrap",
       },
       ["paging"] = {
@@ -124,6 +142,8 @@ local function make_config()
           ["pageParam"] = "page",
           ["startPage"] = 1,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["proxy"] = {
@@ -133,6 +153,8 @@ local function make_config()
           ["noProxy"] = {},
           ["url"] = "",
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "wrap",
       },
       ["ratelimit"] = {
@@ -141,6 +163,8 @@ local function make_config()
           ["burst"] = 5,
           ["rate"] = 5,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "wrap",
       },
       ["rbac"] = {
@@ -150,6 +174,8 @@ local function make_config()
           ["permissions"] = {},
           ["rules"] = {},
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["retry"] = {
@@ -169,6 +195,8 @@ local function make_config()
             504,
           },
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "wrap",
       },
       ["secrets"] = {
@@ -195,6 +223,8 @@ local function make_config()
             },
           },
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "wrap",
       },
       ["streaming"] = {
@@ -203,18 +233,24 @@ local function make_config()
           ["chunkDelay"] = 0,
           ["chunkSize"] = 0,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["telemetry"] = {
         ["options"] = {
           ["active"] = false,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "none",
       },
       ["test"] = {
         ["options"] = {
           ["active"] = false,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "base",
       },
       ["timeout"] = {
@@ -222,6 +258,8 @@ local function make_config()
           ["active"] = false,
           ["ms"] = 30000,
         },
+        ["optspec"] = {},
+        ["strict"] = false,
         ["transport"] = "wrap",
       },
     },

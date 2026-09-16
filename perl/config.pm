@@ -43,6 +43,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "actor": "anonymous",
         "max": 1000
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "cache": {
@@ -54,6 +56,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         ],
         "ttl": 5000
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
     "clienttrack": {
@@ -61,6 +65,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "active": false,
         "clientVersion": "0.0.1"
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "cost": {
@@ -75,6 +81,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "rates": {},
         "unit": 0
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
     "debug": {
@@ -91,6 +99,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
           "idempotency-key"
         ]
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "idempotency": {
@@ -109,18 +119,24 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
           "remove"
         ]
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "log": {
       "options": {
         "active": true
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "metrics": {
       "options": {
         "active": false
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "netsim": {
@@ -137,6 +153,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "retryAfter": 0,
         "seed": 1
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
     "paging": {
@@ -149,6 +167,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "pageParam": "page",
         "startPage": 1
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "proxy": {
@@ -158,6 +178,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "noProxy": [],
         "url": ""
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
     "ratelimit": {
@@ -166,6 +188,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "burst": 5,
         "rate": 5
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
     "rbac": {
@@ -175,6 +199,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "permissions": [],
         "rules": {}
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "retry": {
@@ -194,6 +220,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
           504
         ]
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
     "secrets": {
@@ -220,6 +248,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
           }
         ]
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
     "streaming": {
@@ -228,18 +258,24 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "chunkDelay": 0,
         "chunkSize": 0
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "telemetry": {
       "options": {
         "active": false
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
     "test": {
       "options": {
         "active": false
       },
+      "optspec": {},
+      "strict": false,
       "transport": "base"
     },
     "timeout": {
@@ -247,6 +283,8 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
         "active": false,
         "ms": 30000
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     }
   },

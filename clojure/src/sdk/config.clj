@@ -311,6 +311,8 @@
           "active" false
           "actor" "anonymous"
           "max" 1000)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "cache" (vs/jm
         "options" (vs/jm
@@ -319,11 +321,15 @@
           "methods" (vs/jt
             "GET")
           "ttl" 5000)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "wrap")
       "clienttrack" (vs/jm
         "options" (vs/jm
           "active" false
           "clientVersion" "0.0.1")
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "cost" (vs/jm
         "options" (vs/jm
@@ -336,6 +342,8 @@
           "perUnit" 0
           "rates" (vs/jm)
           "unit" 0)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "wrap")
       "debug" (vs/jm
         "options" (vs/jm
@@ -349,6 +357,8 @@
             "apikey"
             "x-api-key"
             "idempotency-key"))
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "idempotency" (vs/jm
         "options" (vs/jm
@@ -363,14 +373,20 @@
             "create"
             "update"
             "remove"))
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "log" (vs/jm
         "options" (vs/jm
           "active" true)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "metrics" (vs/jm
         "options" (vs/jm
           "active" false)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "netsim" (vs/jm
         "options" (vs/jm
@@ -385,6 +401,8 @@
           "rateLimitTimes" 0
           "retryAfter" 0
           "seed" 1)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "wrap")
       "paging" (vs/jm
         "options" (vs/jm
@@ -395,6 +413,8 @@
           "limitParam" "limit"
           "pageParam" "page"
           "startPage" 1)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "proxy" (vs/jm
         "options" (vs/jm
@@ -402,12 +422,16 @@
           "fromEnv" false
           "noProxy" (vs/jt)
           "url" "")
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "wrap")
       "ratelimit" (vs/jm
         "options" (vs/jm
           "active" false
           "burst" 5
           "rate" 5)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "wrap")
       "rbac" (vs/jm
         "options" (vs/jm
@@ -415,6 +439,8 @@
           "deny" false
           "permissions" (vs/jt)
           "rules" (vs/jm))
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "retry" (vs/jm
         "options" (vs/jm
@@ -431,6 +457,8 @@
             502
             503
             504))
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "wrap")
       "secrets" (vs/jm
         "options" (vs/jm
@@ -451,25 +479,35 @@
             (vs/jm
               "kind" "boru"
               "namespace" "sdk")))
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "wrap")
       "streaming" (vs/jm
         "options" (vs/jm
           "active" false
           "chunkDelay" 0
           "chunkSize" 0)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "telemetry" (vs/jm
         "options" (vs/jm
           "active" false)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "none")
       "test" (vs/jm
         "options" (vs/jm
           "active" false)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "base")
       "timeout" (vs/jm
         "options" (vs/jm
           "active" false
           "ms" 30000)
+        "optspec" (vs/jm)
+        "strict" false
         "transport" "wrap"))
     "main" (vs/jm
       "name" "Univec"

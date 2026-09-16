@@ -21,6 +21,8 @@ pub fn make_config() Value {
                     .{ "actor", h.vstr("anonymous") },
                     .{ "max", h.vnum(1000) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "cache", h.jo(&.{
@@ -32,6 +34,8 @@ pub fn make_config() Value {
                     }) },
                     .{ "ttl", h.vnum(5000) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("wrap") },
             }) },
             .{ "clienttrack", h.jo(&.{
@@ -39,6 +43,8 @@ pub fn make_config() Value {
                     .{ "active", h.vbool(false) },
                     .{ "clientVersion", h.vstr("0.0.1") },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "cost", h.jo(&.{
@@ -53,6 +59,8 @@ pub fn make_config() Value {
                     .{ "rates", h.omap() },
                     .{ "unit", h.vnum(0) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("wrap") },
             }) },
             .{ "debug", h.jo(&.{
@@ -69,6 +77,8 @@ pub fn make_config() Value {
                         h.vstr("idempotency-key"),
                     }) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "idempotency", h.jo(&.{
@@ -87,18 +97,24 @@ pub fn make_config() Value {
                         h.vstr("remove"),
                     }) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "log", h.jo(&.{
                 .{ "options", h.jo(&.{
                     .{ "active", h.vbool(true) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "metrics", h.jo(&.{
                 .{ "options", h.jo(&.{
                     .{ "active", h.vbool(false) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "netsim", h.jo(&.{
@@ -115,6 +131,8 @@ pub fn make_config() Value {
                     .{ "retryAfter", h.vnum(0) },
                     .{ "seed", h.vnum(1) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("wrap") },
             }) },
             .{ "paging", h.jo(&.{
@@ -127,6 +145,8 @@ pub fn make_config() Value {
                     .{ "pageParam", h.vstr("page") },
                     .{ "startPage", h.vnum(1) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "proxy", h.jo(&.{
@@ -136,6 +156,8 @@ pub fn make_config() Value {
                     .{ "noProxy", h.olist() },
                     .{ "url", h.vstr("") },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("wrap") },
             }) },
             .{ "ratelimit", h.jo(&.{
@@ -144,6 +166,8 @@ pub fn make_config() Value {
                     .{ "burst", h.vnum(5) },
                     .{ "rate", h.vnum(5) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("wrap") },
             }) },
             .{ "rbac", h.jo(&.{
@@ -153,6 +177,8 @@ pub fn make_config() Value {
                     .{ "permissions", h.olist() },
                     .{ "rules", h.omap() },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "retry", h.jo(&.{
@@ -172,6 +198,8 @@ pub fn make_config() Value {
                         h.vnum(504),
                     }) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("wrap") },
             }) },
             .{ "secrets", h.jo(&.{
@@ -198,6 +226,8 @@ pub fn make_config() Value {
                         }),
                     }) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("wrap") },
             }) },
             .{ "streaming", h.jo(&.{
@@ -206,18 +236,24 @@ pub fn make_config() Value {
                     .{ "chunkDelay", h.vnum(0) },
                     .{ "chunkSize", h.vnum(0) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "telemetry", h.jo(&.{
                 .{ "options", h.jo(&.{
                     .{ "active", h.vbool(false) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("none") },
             }) },
             .{ "test", h.jo(&.{
                 .{ "options", h.jo(&.{
                     .{ "active", h.vbool(false) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("base") },
             }) },
             .{ "timeout", h.jo(&.{
@@ -225,6 +261,8 @@ pub fn make_config() Value {
                     .{ "active", h.vbool(false) },
                     .{ "ms", h.vnum(30000) },
                 }) },
+                .{ "optspec", h.omap() },
+                .{ "strict", h.vbool(false) },
                 .{ "transport", h.vstr("wrap") },
             }) },
         }) },

@@ -44,6 +44,8 @@ class UnivecConfig
             'actor' => 'anonymous',
             'max' => 1000,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "cache" => [
@@ -55,6 +57,8 @@ class UnivecConfig
             ],
             'ttl' => 5000,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'wrap',
         ],
                 "clienttrack" => [
@@ -62,6 +66,8 @@ class UnivecConfig
             'active' => false,
             'clientVersion' => '0.0.1',
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "cost" => [
@@ -76,6 +82,8 @@ class UnivecConfig
             'rates' => [],
             'unit' => 0,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'wrap',
         ],
                 "debug" => [
@@ -92,6 +100,8 @@ class UnivecConfig
               'idempotency-key',
             ],
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "idempotency" => [
@@ -110,18 +120,24 @@ class UnivecConfig
               'remove',
             ],
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "log" => [
           'options' => [
             'active' => true,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "metrics" => [
           'options' => [
             'active' => false,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "netsim" => [
@@ -138,6 +154,8 @@ class UnivecConfig
             'retryAfter' => 0,
             'seed' => 1,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'wrap',
         ],
                 "paging" => [
@@ -150,6 +168,8 @@ class UnivecConfig
             'pageParam' => 'page',
             'startPage' => 1,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "proxy" => [
@@ -159,6 +179,8 @@ class UnivecConfig
             'noProxy' => [],
             'url' => '',
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'wrap',
         ],
                 "ratelimit" => [
@@ -167,6 +189,8 @@ class UnivecConfig
             'burst' => 5,
             'rate' => 5,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'wrap',
         ],
                 "rbac" => [
@@ -176,6 +200,8 @@ class UnivecConfig
             'permissions' => [],
             'rules' => [],
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "retry" => [
@@ -195,6 +221,8 @@ class UnivecConfig
               504,
             ],
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'wrap',
         ],
                 "secrets" => [
@@ -221,6 +249,8 @@ class UnivecConfig
               ],
             ],
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'wrap',
         ],
                 "streaming" => [
@@ -229,18 +259,24 @@ class UnivecConfig
             'chunkDelay' => 0,
             'chunkSize' => 0,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "telemetry" => [
           'options' => [
             'active' => false,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'none',
         ],
                 "test" => [
           'options' => [
             'active' => false,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'base',
         ],
                 "timeout" => [
@@ -248,6 +284,8 @@ class UnivecConfig
             'active' => false,
             'ms' => 30000,
           ],
+          'optspec' => [],
+          'strict' => false,
           'transport' => 'wrap',
         ],
             ],

@@ -21,6 +21,8 @@ let make_config () : value =
           ("active", (Bool false));
           ("actor", (Str "anonymous"));
           ("max", (Num (1000.))) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("cache", (jo [
         ("options", (jo [
@@ -29,11 +31,15 @@ let make_config () : value =
           ("methods", (ja [
             (Str "GET") ]));
           ("ttl", (Num (5000.))) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("clienttrack", (jo [
         ("options", (jo [
           ("active", (Bool false));
           ("clientVersion", (Str "0.0.1")) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("cost", (jo [
         ("options", (jo [
@@ -46,6 +52,8 @@ let make_config () : value =
           ("perUnit", (Num (0.)));
           ("rates", (empty_map ()));
           ("unit", (Num (0.))) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("debug", (jo [
         ("options", (jo [
@@ -59,6 +67,8 @@ let make_config () : value =
             (Str "apikey");
             (Str "x-api-key");
             (Str "idempotency-key") ])) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("idempotency", (jo [
         ("options", (jo [
@@ -73,14 +83,20 @@ let make_config () : value =
             (Str "create");
             (Str "update");
             (Str "remove") ])) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("log", (jo [
         ("options", (jo [
           ("active", (Bool true)) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("metrics", (jo [
         ("options", (jo [
           ("active", (Bool false)) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("netsim", (jo [
         ("options", (jo [
@@ -95,6 +111,8 @@ let make_config () : value =
           ("rateLimitTimes", (Num (0.)));
           ("retryAfter", (Num (0.)));
           ("seed", (Num (1.))) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("paging", (jo [
         ("options", (jo [
@@ -105,6 +123,8 @@ let make_config () : value =
           ("limitParam", (Str "limit"));
           ("pageParam", (Str "page"));
           ("startPage", (Num (1.))) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("proxy", (jo [
         ("options", (jo [
@@ -112,12 +132,16 @@ let make_config () : value =
           ("fromEnv", (Bool false));
           ("noProxy", (empty_list ()));
           ("url", (Str "")) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("ratelimit", (jo [
         ("options", (jo [
           ("active", (Bool false));
           ("burst", (Num (5.)));
           ("rate", (Num (5.))) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("rbac", (jo [
         ("options", (jo [
@@ -125,6 +149,8 @@ let make_config () : value =
           ("deny", (Bool false));
           ("permissions", (empty_list ()));
           ("rules", (empty_map ())) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("retry", (jo [
         ("options", (jo [
@@ -141,6 +167,8 @@ let make_config () : value =
             (Num (502.));
             (Num (503.));
             (Num (504.)) ])) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("secrets", (jo [
         ("options", (jo [
@@ -161,25 +189,35 @@ let make_config () : value =
             (jo [
               ("kind", (Str "boru"));
               ("namespace", (Str "sdk")) ]) ])) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "wrap")) ]));
       ("streaming", (jo [
         ("options", (jo [
           ("active", (Bool false));
           ("chunkDelay", (Num (0.)));
           ("chunkSize", (Num (0.))) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("telemetry", (jo [
         ("options", (jo [
           ("active", (Bool false)) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "none")) ]));
       ("test", (jo [
         ("options", (jo [
           ("active", (Bool false)) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "base")) ]));
       ("timeout", (jo [
         ("options", (jo [
           ("active", (Bool false));
           ("ms", (Num (30000.))) ]));
+        ("optspec", (empty_map ()));
+        ("strict", (Bool false));
         ("transport", (Str "wrap")) ])) ]));
     ("options", (jo [
       ("base", (Str "https://api.univec.ai"));

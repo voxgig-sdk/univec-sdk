@@ -96,6 +96,8 @@ class Config {
         'actor': 'anonymous',
         'max': 1000,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'cache': <String, dynamic>{
@@ -107,6 +109,8 @@ class Config {
         ],
         'ttl': 5000,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'wrap',
     },
     'clienttrack': <String, dynamic>{
@@ -114,6 +118,8 @@ class Config {
         'active': false,
         'clientVersion': '0.0.1',
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'cost': <String, dynamic>{
@@ -128,6 +134,8 @@ class Config {
         'rates': <String, dynamic>{},
         'unit': 0,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'wrap',
     },
     'debug': <String, dynamic>{
@@ -144,6 +152,8 @@ class Config {
           'idempotency-key',
         ],
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'idempotency': <String, dynamic>{
@@ -162,18 +172,24 @@ class Config {
           'remove',
         ],
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'log': <String, dynamic>{
       'options': <String, dynamic>{
         'active': true,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'metrics': <String, dynamic>{
       'options': <String, dynamic>{
         'active': false,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'netsim': <String, dynamic>{
@@ -190,6 +206,8 @@ class Config {
         'retryAfter': 0,
         'seed': 1,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'wrap',
     },
     'paging': <String, dynamic>{
@@ -202,6 +220,8 @@ class Config {
         'pageParam': 'page',
         'startPage': 1,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'proxy': <String, dynamic>{
@@ -211,6 +231,8 @@ class Config {
         'noProxy': <dynamic>[],
         'url': '',
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'wrap',
     },
     'ratelimit': <String, dynamic>{
@@ -219,6 +241,8 @@ class Config {
         'burst': 5,
         'rate': 5,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'wrap',
     },
     'rbac': <String, dynamic>{
@@ -228,6 +252,8 @@ class Config {
         'permissions': <dynamic>[],
         'rules': <String, dynamic>{},
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'retry': <String, dynamic>{
@@ -247,6 +273,8 @@ class Config {
           504,
         ],
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'wrap',
     },
     'secrets': <String, dynamic>{
@@ -273,6 +301,8 @@ class Config {
           },
         ],
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'wrap',
     },
     'streaming': <String, dynamic>{
@@ -281,18 +311,24 @@ class Config {
         'chunkDelay': 0,
         'chunkSize': 0,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'telemetry': <String, dynamic>{
       'options': <String, dynamic>{
         'active': false,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'none',
     },
     'test': <String, dynamic>{
       'options': <String, dynamic>{
         'active': false,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'base',
     },
     'timeout': <String, dynamic>{
@@ -300,6 +336,8 @@ class Config {
         'active': false,
         'ms': 30000,
       },
+      'optspec': <String, dynamic>{},
+      'strict': false,
       'transport': 'wrap',
     },
 

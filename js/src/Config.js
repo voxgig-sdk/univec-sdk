@@ -98,6 +98,8 @@ class Config {
         "actor": "anonymous",
         "max": 1000
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  cache:     {
@@ -109,6 +111,8 @@ class Config {
         ],
         "ttl": 5000
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
  clienttrack:     {
@@ -116,6 +120,8 @@ class Config {
         "active": false,
         "clientVersion": "0.0.1"
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  cost:     {
@@ -130,6 +136,8 @@ class Config {
         "rates": {},
         "unit": 0
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
  debug:     {
@@ -146,6 +154,8 @@ class Config {
           "idempotency-key"
         ]
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  idempotency:     {
@@ -164,18 +174,24 @@ class Config {
           "remove"
         ]
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  log:     {
       "options": {
         "active": true
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  metrics:     {
       "options": {
         "active": false
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  netsim:     {
@@ -192,6 +208,8 @@ class Config {
         "retryAfter": 0,
         "seed": 1
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
  paging:     {
@@ -204,6 +222,8 @@ class Config {
         "pageParam": "page",
         "startPage": 1
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  proxy:     {
@@ -213,6 +233,8 @@ class Config {
         "noProxy": [],
         "url": ""
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
  ratelimit:     {
@@ -221,6 +243,8 @@ class Config {
         "burst": 5,
         "rate": 5
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
  rbac:     {
@@ -230,6 +254,8 @@ class Config {
         "permissions": [],
         "rules": {}
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  retry:     {
@@ -249,6 +275,8 @@ class Config {
           504
         ]
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
  secrets:     {
@@ -275,6 +303,8 @@ class Config {
           }
         ]
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
  streaming:     {
@@ -283,18 +313,24 @@ class Config {
         "chunkDelay": 0,
         "chunkSize": 0
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  telemetry:     {
       "options": {
         "active": false
       },
+      "optspec": {},
+      "strict": false,
       "transport": "none"
     },
  test:     {
       "options": {
         "active": false
       },
+      "optspec": {},
+      "strict": false,
       "transport": "base"
     },
  timeout:     {
@@ -302,6 +338,8 @@ class Config {
         "active": false,
         "ms": 30000
       },
+      "optspec": {},
+      "strict": false,
       "transport": "wrap"
     },
 
