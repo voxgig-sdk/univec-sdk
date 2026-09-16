@@ -8,6 +8,19 @@ Run these scripts from any working directory:
 .sdk/admin/status.sh --github
 ```
 
+```sh
+.sdk/admin/check-drift.sh
+```
+
+`check-drift.sh` answers whether the committed tree is what the generator
+actually produces. It refuses to run on a dirty tree, regenerates every
+target, and reports anything that differs: a `D` is output the generator no
+longer emits and should be deleted, an `M` or `??` is output that changed
+and should be committed. It is a DETECTOR, not a guard - run it before a
+release, or after changing the model or the toolchain. Both problems it
+looks for are silent: nothing fails when a generated file goes stale, and
+nothing fails when the committed model drifts from the build.
+
 `status.sh` reads the compiled SDK model, repository state, target directories,
 publication settings, tool versions, and documentation outputs. It does not run
 builds or tests, contact package registries, fetch Git refs, or change files.
