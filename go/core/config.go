@@ -25,6 +25,8 @@ func MakeConfig() map[string]any {
 					"actor": "anonymous",
 					"max": 1000,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"cache": map[string]any{
@@ -36,6 +38,8 @@ func MakeConfig() map[string]any {
 					},
 					"ttl": 5000,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "wrap",
 			},
 			"clienttrack": map[string]any{
@@ -43,6 +47,8 @@ func MakeConfig() map[string]any {
 					"active": false,
 					"clientVersion": "0.0.1",
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"cost": map[string]any{
@@ -57,6 +63,8 @@ func MakeConfig() map[string]any {
 					"rates": map[string]any{},
 					"unit": 0,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "wrap",
 			},
 			"debug": map[string]any{
@@ -73,6 +81,8 @@ func MakeConfig() map[string]any {
 						"idempotency-key",
 					},
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"idempotency": map[string]any{
@@ -91,18 +101,24 @@ func MakeConfig() map[string]any {
 						"remove",
 					},
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"log": map[string]any{
 				"options": map[string]any{
 					"active": true,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"metrics": map[string]any{
 				"options": map[string]any{
 					"active": false,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"netsim": map[string]any{
@@ -119,6 +135,8 @@ func MakeConfig() map[string]any {
 					"retryAfter": 0,
 					"seed": 1,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "wrap",
 			},
 			"paging": map[string]any{
@@ -131,6 +149,8 @@ func MakeConfig() map[string]any {
 					"pageParam": "page",
 					"startPage": 1,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"proxy": map[string]any{
@@ -140,6 +160,8 @@ func MakeConfig() map[string]any {
 					"noProxy": []any{},
 					"url": "",
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "wrap",
 			},
 			"ratelimit": map[string]any{
@@ -148,6 +170,8 @@ func MakeConfig() map[string]any {
 					"burst": 5,
 					"rate": 5,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "wrap",
 			},
 			"rbac": map[string]any{
@@ -157,6 +181,8 @@ func MakeConfig() map[string]any {
 					"permissions": []any{},
 					"rules": map[string]any{},
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"retry": map[string]any{
@@ -176,6 +202,8 @@ func MakeConfig() map[string]any {
 						504,
 					},
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "wrap",
 			},
 			"secrets": map[string]any{
@@ -202,6 +230,8 @@ func MakeConfig() map[string]any {
 						},
 					},
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "wrap",
 			},
 			"streaming": map[string]any{
@@ -210,18 +240,24 @@ func MakeConfig() map[string]any {
 					"chunkDelay": 0,
 					"chunkSize": 0,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"telemetry": map[string]any{
 				"options": map[string]any{
 					"active": false,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "none",
 			},
 			"test": map[string]any{
 				"options": map[string]any{
 					"active": false,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "base",
 			},
 			"timeout": map[string]any{
@@ -229,6 +265,8 @@ func MakeConfig() map[string]any {
 					"active": false,
 					"ms": 30000,
 				},
+				"optspec": map[string]any{},
+				"strict": false,
 				"transport": "wrap",
 			},
 		},

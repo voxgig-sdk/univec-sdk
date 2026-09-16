@@ -50,6 +50,8 @@ def make_config():
           "actor": "anonymous",
           "max": 1000,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "cache": {
@@ -61,6 +63,8 @@ def make_config():
           ],
           "ttl": 5000,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "wrap",
       },
             "clienttrack": {
@@ -68,6 +72,8 @@ def make_config():
           "active": False,
           "clientVersion": "0.0.1",
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "cost": {
@@ -82,6 +88,8 @@ def make_config():
           "rates": {},
           "unit": 0,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "wrap",
       },
             "debug": {
@@ -98,6 +106,8 @@ def make_config():
             "idempotency-key",
           ],
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "idempotency": {
@@ -116,18 +126,24 @@ def make_config():
             "remove",
           ],
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "log": {
         "options": {
           "active": True,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "metrics": {
         "options": {
           "active": False,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "netsim": {
@@ -144,6 +160,8 @@ def make_config():
           "retryAfter": 0,
           "seed": 1,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "wrap",
       },
             "paging": {
@@ -156,6 +174,8 @@ def make_config():
           "pageParam": "page",
           "startPage": 1,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "proxy": {
@@ -165,6 +185,8 @@ def make_config():
           "noProxy": [],
           "url": "",
         },
+        "optspec": {},
+        "strict": False,
         "transport": "wrap",
       },
             "ratelimit": {
@@ -173,6 +195,8 @@ def make_config():
           "burst": 5,
           "rate": 5,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "wrap",
       },
             "rbac": {
@@ -182,6 +206,8 @@ def make_config():
           "permissions": [],
           "rules": {},
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "retry": {
@@ -201,6 +227,8 @@ def make_config():
             504,
           ],
         },
+        "optspec": {},
+        "strict": False,
         "transport": "wrap",
       },
             "secrets": {
@@ -227,6 +255,8 @@ def make_config():
             },
           ],
         },
+        "optspec": {},
+        "strict": False,
         "transport": "wrap",
       },
             "streaming": {
@@ -235,18 +265,24 @@ def make_config():
           "chunkDelay": 0,
           "chunkSize": 0,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "telemetry": {
         "options": {
           "active": False,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "none",
       },
             "test": {
         "options": {
           "active": False,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "base",
       },
             "timeout": {
@@ -254,6 +290,8 @@ def make_config():
           "active": False,
           "ms": 30000,
         },
+        "optspec": {},
+        "strict": False,
         "transport": "wrap",
       },
         },

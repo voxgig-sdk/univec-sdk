@@ -622,7 +622,9 @@
               "active": false,
               "actor": "anonymous",
               "max": 1000
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -779,7 +781,9 @@
                 "GET"
               ],
               "ttl": 5000
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -924,7 +928,9 @@
             "options": {
               "active": false,
               "clientVersion": "0.0.1"
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -1076,7 +1082,9 @@
               "perUnit": 0,
               "rates": {},
               "unit": 0
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -1242,7 +1250,9 @@
                 "x-api-key",
                 "idempotency-key"
               ]
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -1406,7 +1416,9 @@
                 "update",
                 "remove"
               ]
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -1550,7 +1562,9 @@
           "config": {
             "options": {
               "active": true
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "deps": {
             "js": {
@@ -1728,7 +1742,9 @@
           "config": {
             "options": {
               "active": false
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -1894,7 +1910,9 @@
               "rateLimitTimes": 0,
               "retryAfter": 0,
               "seed": 1
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -2044,7 +2062,9 @@
               "limitParam": "limit",
               "pageParam": "page",
               "startPage": 1
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -2191,7 +2211,9 @@
               "fromEnv": false,
               "noProxy": [],
               "url": ""
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -2337,7 +2359,9 @@
               "active": false,
               "burst": 5,
               "rate": 5
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -2484,7 +2508,9 @@
               "deny": false,
               "permissions": [],
               "rules": {}
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -2645,7 +2671,9 @@
                 503,
                 504
               ]
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -2809,7 +2837,9 @@
                   "namespace": "sdk"
                 }
               ]
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "deps": {
             "rust": {
@@ -3714,7 +3744,9 @@
               "active": false,
               "chunkDelay": 0,
               "chunkSize": 0
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -3858,7 +3890,9 @@
           "config": {
             "options": {
               "active": false
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -4014,7 +4048,9 @@
           "config": {
             "options": {
               "active": false
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -4167,7 +4203,9 @@
             "options": {
               "active": false,
               "ms": 30000
-            }
+            },
+            "optspec": {},
+            "strict": false
           },
           "hook": {
             "GetData": {
@@ -4422,6 +4460,48 @@
         "website": "https://univec.ai"
       },
       "option": {},
+      "optspec": {
+        "allow": {
+          "method": "GET,PUT,POST,PATCH,DELETE,OPTIONS",
+          "op": "create,update,load,list,remove,command,direct,graphql"
+        },
+        "apikey": "",
+        "auth": {
+          "basic": false,
+          "prefix": ""
+        },
+        "base": "http://localhost:8000",
+        "clean": {
+          "keys": "key,token,id"
+        },
+        "entity": {
+          "`$CHILD`": {
+            "`$OPEN`": true,
+            "active": false,
+            "alias": {}
+          }
+        },
+        "extend": "`$ANY`",
+        "headers": {
+          "`$CHILD`": "`$STRING`"
+        },
+        "prefix": "",
+        "secret": "",
+        "server": {
+          "`$CHILD`": ""
+        },
+        "suffix": "",
+        "system": {
+          "fetch": "`$ANY`"
+        },
+        "test": {
+          "active": false,
+          "entity": {
+            "`$OPEN`": true
+          }
+        },
+        "utility": {}
+      },
       "repo": {
         "host": "github.com",
         "path": ""

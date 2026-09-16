@@ -19,6 +19,8 @@ defmodule Univec.Config do
             "actor" => "anonymous",
             "max" => 1000
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "cache" => %{
@@ -30,6 +32,8 @@ defmodule Univec.Config do
             ],
             "ttl" => 5000
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "wrap"
         },
         "clienttrack" => %{
@@ -37,6 +41,8 @@ defmodule Univec.Config do
             "active" => false,
             "clientVersion" => "0.0.1"
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "cost" => %{
@@ -51,6 +57,8 @@ defmodule Univec.Config do
             "rates" => %{},
             "unit" => 0
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "wrap"
         },
         "debug" => %{
@@ -67,6 +75,8 @@ defmodule Univec.Config do
               "idempotency-key"
             ]
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "idempotency" => %{
@@ -85,18 +95,24 @@ defmodule Univec.Config do
               "remove"
             ]
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "log" => %{
           "options" => %{
             "active" => true
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "metrics" => %{
           "options" => %{
             "active" => false
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "netsim" => %{
@@ -113,6 +129,8 @@ defmodule Univec.Config do
             "retryAfter" => 0,
             "seed" => 1
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "wrap"
         },
         "paging" => %{
@@ -125,6 +143,8 @@ defmodule Univec.Config do
             "pageParam" => "page",
             "startPage" => 1
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "proxy" => %{
@@ -134,6 +154,8 @@ defmodule Univec.Config do
             "noProxy" => [],
             "url" => ""
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "wrap"
         },
         "ratelimit" => %{
@@ -142,6 +164,8 @@ defmodule Univec.Config do
             "burst" => 5,
             "rate" => 5
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "wrap"
         },
         "rbac" => %{
@@ -151,6 +175,8 @@ defmodule Univec.Config do
             "permissions" => [],
             "rules" => %{}
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "retry" => %{
@@ -170,6 +196,8 @@ defmodule Univec.Config do
               504
             ]
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "wrap"
         },
         "secrets" => %{
@@ -196,6 +224,8 @@ defmodule Univec.Config do
               }
             ]
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "wrap"
         },
         "streaming" => %{
@@ -204,18 +234,24 @@ defmodule Univec.Config do
             "chunkDelay" => 0,
             "chunkSize" => 0
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "telemetry" => %{
           "options" => %{
             "active" => false
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "none"
         },
         "test" => %{
           "options" => %{
             "active" => false
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "base"
         },
         "timeout" => %{
@@ -223,6 +259,8 @@ defmodule Univec.Config do
             "active" => false,
             "ms" => 30000
           },
+          "optspec" => %{},
+          "strict" => false,
           "transport" => "wrap"
         },
       },

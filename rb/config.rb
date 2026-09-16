@@ -42,6 +42,8 @@ module UnivecConfig
             "actor" => "anonymous",
             "max" => 1000,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "cache" => {
@@ -53,6 +55,8 @@ module UnivecConfig
             ],
             "ttl" => 5000,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "wrap",
         },
         "clienttrack" => {
@@ -60,6 +64,8 @@ module UnivecConfig
             "active" => false,
             "clientVersion" => "0.0.1",
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "cost" => {
@@ -74,6 +80,8 @@ module UnivecConfig
             "rates" => {},
             "unit" => 0,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "wrap",
         },
         "debug" => {
@@ -90,6 +98,8 @@ module UnivecConfig
               "idempotency-key",
             ],
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "idempotency" => {
@@ -108,18 +118,24 @@ module UnivecConfig
               "remove",
             ],
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "log" => {
           "options" => {
             "active" => true,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "metrics" => {
           "options" => {
             "active" => false,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "netsim" => {
@@ -136,6 +152,8 @@ module UnivecConfig
             "retryAfter" => 0,
             "seed" => 1,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "wrap",
         },
         "paging" => {
@@ -148,6 +166,8 @@ module UnivecConfig
             "pageParam" => "page",
             "startPage" => 1,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "proxy" => {
@@ -157,6 +177,8 @@ module UnivecConfig
             "noProxy" => [],
             "url" => "",
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "wrap",
         },
         "ratelimit" => {
@@ -165,6 +187,8 @@ module UnivecConfig
             "burst" => 5,
             "rate" => 5,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "wrap",
         },
         "rbac" => {
@@ -174,6 +198,8 @@ module UnivecConfig
             "permissions" => [],
             "rules" => {},
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "retry" => {
@@ -193,6 +219,8 @@ module UnivecConfig
               504,
             ],
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "wrap",
         },
         "secrets" => {
@@ -219,6 +247,8 @@ module UnivecConfig
               },
             ],
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "wrap",
         },
         "streaming" => {
@@ -227,18 +257,24 @@ module UnivecConfig
             "chunkDelay" => 0,
             "chunkSize" => 0,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "telemetry" => {
           "options" => {
             "active" => false,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "none",
         },
         "test" => {
           "options" => {
             "active" => false,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "base",
         },
         "timeout" => {
@@ -246,6 +282,8 @@ module UnivecConfig
             "active" => false,
             "ms" => 30000,
           },
+          "optspec" => {},
+          "strict" => false,
           "transport" => "wrap",
         },
       },

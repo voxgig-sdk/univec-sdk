@@ -26,6 +26,8 @@ public static class SdkConfig
                         ["actor"] = "anonymous",
                         ["max"] = 1000,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["cache"] = new Dictionary<string, object?>
@@ -40,6 +42,8 @@ public static class SdkConfig
                         },
                         ["ttl"] = 5000,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "wrap",
                 },
                 ["clienttrack"] = new Dictionary<string, object?>
@@ -49,6 +53,8 @@ public static class SdkConfig
                         ["active"] = false,
                         ["clientVersion"] = "0.0.1",
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["cost"] = new Dictionary<string, object?>
@@ -65,6 +71,8 @@ public static class SdkConfig
                         ["rates"] = new Dictionary<string, object?>(),
                         ["unit"] = 0,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "wrap",
                 },
                 ["debug"] = new Dictionary<string, object?>
@@ -84,6 +92,8 @@ public static class SdkConfig
                             "idempotency-key",
                         },
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["idempotency"] = new Dictionary<string, object?>
@@ -106,6 +116,8 @@ public static class SdkConfig
                             "remove",
                         },
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["log"] = new Dictionary<string, object?>
@@ -114,6 +126,8 @@ public static class SdkConfig
                     {
                         ["active"] = true,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["metrics"] = new Dictionary<string, object?>
@@ -122,6 +136,8 @@ public static class SdkConfig
                     {
                         ["active"] = false,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["netsim"] = new Dictionary<string, object?>
@@ -140,6 +156,8 @@ public static class SdkConfig
                         ["retryAfter"] = 0,
                         ["seed"] = 1,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "wrap",
                 },
                 ["paging"] = new Dictionary<string, object?>
@@ -154,6 +172,8 @@ public static class SdkConfig
                         ["pageParam"] = "page",
                         ["startPage"] = 1,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["proxy"] = new Dictionary<string, object?>
@@ -165,6 +185,8 @@ public static class SdkConfig
                         ["noProxy"] = new List<object?>(),
                         ["url"] = "",
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "wrap",
                 },
                 ["ratelimit"] = new Dictionary<string, object?>
@@ -175,6 +197,8 @@ public static class SdkConfig
                         ["burst"] = 5,
                         ["rate"] = 5,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "wrap",
                 },
                 ["rbac"] = new Dictionary<string, object?>
@@ -186,6 +210,8 @@ public static class SdkConfig
                         ["permissions"] = new List<object?>(),
                         ["rules"] = new Dictionary<string, object?>(),
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["retry"] = new Dictionary<string, object?>
@@ -208,6 +234,8 @@ public static class SdkConfig
                             504,
                         },
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "wrap",
                 },
                 ["secrets"] = new Dictionary<string, object?>
@@ -240,6 +268,8 @@ public static class SdkConfig
                             },
                         },
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "wrap",
                 },
                 ["streaming"] = new Dictionary<string, object?>
@@ -250,6 +280,8 @@ public static class SdkConfig
                         ["chunkDelay"] = 0,
                         ["chunkSize"] = 0,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["telemetry"] = new Dictionary<string, object?>
@@ -258,6 +290,8 @@ public static class SdkConfig
                     {
                         ["active"] = false,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "none",
                 },
                 ["test"] = new Dictionary<string, object?>
@@ -266,6 +300,8 @@ public static class SdkConfig
                     {
                         ["active"] = false,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "base",
                 },
                 ["timeout"] = new Dictionary<string, object?>
@@ -275,6 +311,8 @@ public static class SdkConfig
                         ["active"] = false,
                         ["ms"] = 30000,
                     },
+                    ["optspec"] = new Dictionary<string, object?>(),
+                    ["strict"] = false,
                     ["transport"] = "wrap",
                 },
             },

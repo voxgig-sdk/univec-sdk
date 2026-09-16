@@ -427,11 +427,6 @@ Structured audit trail of operations.
 | `actor` | `'anonymous'` |
 | `max` | `1000` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.audit.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -456,11 +451,6 @@ Response caching for safe read requests.
 | `methods` | `['GET']` |
 | `ttl` | `5000` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.cache.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -482,11 +472,6 @@ Client identity and per-request correlation headers.
 |---|---|
 | `active` | `false` |
 | `clientVersion` | `'0.0.1'` |
-
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
 
 **Usage**
 
@@ -517,11 +502,6 @@ Cost tracking and spend budget for API calls.
 | `rates` | `{}` |
 | `unit` | `0` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.cost.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -544,11 +524,6 @@ Request/response capture ring buffer for debugging.
 | `active` | `false` |
 | `max` | `100` |
 | `redact` | `['authorization', 'cookie', 'set-cookie', 'api-key', 'apikey', 'x-api-key', 'idempotency-key']` |
-
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
 
 **Usage**
 
@@ -574,11 +549,6 @@ Idempotency keys for safe retries of mutating operations.
 | `methods` | `['POST', 'PUT', 'PATCH', 'DELETE']` |
 | `ops` | `['create', 'update', 'remove']` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.idempotency.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -600,11 +570,6 @@ Structured request and response logging.
 |---|---|
 | `active` | `true` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.log.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -625,11 +590,6 @@ Statistics capture: per-operation counters and latency.
 | Option | Default |
 |---|---|
 | `active` | `false` |
-
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
 
 **Usage**
 
@@ -662,11 +622,6 @@ Network behaviour simulation for offline testing (latency, failures, outages).
 | `retryAfter` | `0` |
 | `seed` | `1` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.netsim.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -694,11 +649,6 @@ Pagination signals for list operations.
 | `pageParam` | `'page'` |
 | `startPage` | `1` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.paging.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -723,11 +673,6 @@ Outbound HTTP(S) proxy routing.
 | `noProxy` | `[]` |
 | `url` | `''` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.proxy.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -750,11 +695,6 @@ Client-side rate limiting via a token bucket.
 | `active` | `false` |
 | `burst` | `5` |
 | `rate` | `5` |
-
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
 
 **Usage**
 
@@ -779,11 +719,6 @@ Client-side role/permission enforcement.
 | `deny` | `false` |
 | `permissions` | `[]` |
 | `rules` | `{}` |
-
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
 
 **Usage**
 
@@ -811,11 +746,6 @@ Automatic retry of transient failures with exponential backoff.
 | `retries` | `2` |
 | `statuses` | `[408, 425, 429, 500, 502, 503, 504]` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.retry.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -841,11 +771,6 @@ Secret access: resolve the API credential through a provider chain, and exchange
 | `name` | `'univec'` |
 | `providers` | `[{kind: 'boru', namespace: 'sdk'}]` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.secrets.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -869,11 +794,6 @@ Incremental streaming of list results via async iteration.
 | `chunkDelay` | `0` |
 | `chunkSize` | `0` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.streaming.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -895,11 +815,6 @@ Distributed tracing spans with W3C trace-context propagation.
 |---|---|
 | `active` | `false` |
 
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
-
 **Usage**
 
 Set `feature.telemetry.active` to true in the client options, and override any option above in the same entry. Every option keeps
@@ -920,11 +835,6 @@ In-memory mock transport for testing without a live server.
 | Option | Default |
 |---|---|
 | `active` | `false` |
-
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
 
 **Usage**
 
@@ -949,11 +859,6 @@ Per-request timeout with transport abort.
 |---|---|
 | `active` | `false` |
 | `ms` | `30000` |
-
-Options above are those the model carries a default for. A feature may
-also accept callback options — a `sink` to receive each record, for
-instance — which have no default and are covered in the full feature
-reference.
 
 **Usage**
 

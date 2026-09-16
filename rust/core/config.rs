@@ -21,6 +21,8 @@ pub fn make_config() -> Value {
                     ("actor".to_string(), Value::str("anonymous")),
                     ("max".to_string(), Value::Num(1000f64)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("cache".to_string(), Value::map_of([
@@ -32,6 +34,8 @@ pub fn make_config() -> Value {
                     ])),
                     ("ttl".to_string(), Value::Num(5000f64)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
             ("clienttrack".to_string(), Value::map_of([
@@ -39,6 +43,8 @@ pub fn make_config() -> Value {
                     ("active".to_string(), Value::Bool(false)),
                     ("clientVersion".to_string(), Value::str("0.0.1")),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("cost".to_string(), Value::map_of([
@@ -53,6 +59,8 @@ pub fn make_config() -> Value {
                     ("rates".to_string(), Value::empty_map()),
                     ("unit".to_string(), Value::Num(0f64)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
             ("debug".to_string(), Value::map_of([
@@ -69,6 +77,8 @@ pub fn make_config() -> Value {
                         Value::str("idempotency-key"),
                     ])),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("idempotency".to_string(), Value::map_of([
@@ -87,18 +97,24 @@ pub fn make_config() -> Value {
                         Value::str("remove"),
                     ])),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("log".to_string(), Value::map_of([
                 ("options".to_string(), Value::map_of([
                     ("active".to_string(), Value::Bool(true)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("metrics".to_string(), Value::map_of([
                 ("options".to_string(), Value::map_of([
                     ("active".to_string(), Value::Bool(false)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("netsim".to_string(), Value::map_of([
@@ -115,6 +131,8 @@ pub fn make_config() -> Value {
                     ("retryAfter".to_string(), Value::Num(0f64)),
                     ("seed".to_string(), Value::Num(1f64)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
             ("paging".to_string(), Value::map_of([
@@ -127,6 +145,8 @@ pub fn make_config() -> Value {
                     ("pageParam".to_string(), Value::str("page")),
                     ("startPage".to_string(), Value::Num(1f64)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("proxy".to_string(), Value::map_of([
@@ -136,6 +156,8 @@ pub fn make_config() -> Value {
                     ("noProxy".to_string(), Value::empty_list()),
                     ("url".to_string(), Value::str("")),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
             ("ratelimit".to_string(), Value::map_of([
@@ -144,6 +166,8 @@ pub fn make_config() -> Value {
                     ("burst".to_string(), Value::Num(5f64)),
                     ("rate".to_string(), Value::Num(5f64)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
             ("rbac".to_string(), Value::map_of([
@@ -153,6 +177,8 @@ pub fn make_config() -> Value {
                     ("permissions".to_string(), Value::empty_list()),
                     ("rules".to_string(), Value::empty_map()),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("retry".to_string(), Value::map_of([
@@ -172,6 +198,8 @@ pub fn make_config() -> Value {
                         Value::Num(504f64),
                     ])),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
             ("secrets".to_string(), Value::map_of([
@@ -198,6 +226,8 @@ pub fn make_config() -> Value {
                         ]),
                     ])),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
             ("streaming".to_string(), Value::map_of([
@@ -206,18 +236,24 @@ pub fn make_config() -> Value {
                     ("chunkDelay".to_string(), Value::Num(0f64)),
                     ("chunkSize".to_string(), Value::Num(0f64)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("telemetry".to_string(), Value::map_of([
                 ("options".to_string(), Value::map_of([
                     ("active".to_string(), Value::Bool(false)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("none")),
             ])),
             ("test".to_string(), Value::map_of([
                 ("options".to_string(), Value::map_of([
                     ("active".to_string(), Value::Bool(false)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("base")),
             ])),
             ("timeout".to_string(), Value::map_of([
@@ -225,6 +261,8 @@ pub fn make_config() -> Value {
                     ("active".to_string(), Value::Bool(false)),
                     ("ms".to_string(), Value::Num(30000f64)),
                 ])),
+                ("optspec".to_string(), Value::empty_map()),
+                ("strict".to_string(), Value::Bool(false)),
                 ("transport".to_string(), Value::str("wrap")),
             ])),
         ])),
