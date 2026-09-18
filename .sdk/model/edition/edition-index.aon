@@ -1,5 +1,5 @@
 # Documentation editions.
 
-@"github-pages.aon"
-@"presentation.aon"
-@"summary.aon"
+@"./github-pages.aon"
+@"./presentation.aon"
+@"./summary.aon"

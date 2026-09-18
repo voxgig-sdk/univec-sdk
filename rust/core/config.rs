@@ -368,6 +368,99 @@ pub fn make_config() -> Value {
                             Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("equal".to_string(), Value::map_of([
+                                            ("source_model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("sourceModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("target_model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("targetModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                        ])),
+                                        ("vectors".to_string(), Value::map_of([
+                                            ("count".to_string(), Value::Num(1f64)),
+                                            ("dimension".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("targetDim")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("path".to_string(), Value::str("embeddings")),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("account")),
+                                    ("id".to_string(), Value::str("account-convert")),
+                                    ("input".to_string(), Value::map_of([
+                                        ("embeddings".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("account-embed")),
+                                            ("path".to_string(), Value::str("embeddings")),
+                                        ])),
+                                        ("source_model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("sourceModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                        ("target_model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("targetModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                    ])),
+                                ])),
                                 ("method".to_string(), Value::str("POST")),
                                 ("orig".to_string(), Value::str("/v1/convert")),
                                 ("segments".to_string(), Value::list(vec![
@@ -391,6 +484,98 @@ pub fn make_config() -> Value {
                             Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("equal".to_string(), Value::map_of([
+                                            ("bridge_model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("sourceModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("target_model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("targetModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                        ])),
+                                        ("vectors".to_string(), Value::map_of([
+                                            ("count".to_string(), Value::Num(1f64)),
+                                            ("dimension".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("targetDim")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("path".to_string(), Value::str("embeddings")),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("account")),
+                                    ("id".to_string(), Value::str("account-embed-bridge")),
+                                    ("input".to_string(), Value::map_of([
+                                        ("bridge_model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("sourceModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                        ("target_model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("targetModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                        ("texts".to_string(), Value::list(vec![
+                                            Value::str("SDK live coverage test."),
+                                        ])),
+                                    ])),
+                                ])),
                                 ("method".to_string(), Value::str("POST")),
                                 ("orig".to_string(), Value::str("/v1/embed-bridge")),
                                 ("segments".to_string(), Value::list(vec![
@@ -416,6 +601,103 @@ pub fn make_config() -> Value {
                             Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("equal".to_string(), Value::map_of([
+                                            ("source_model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("sourceModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("target_model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("targetModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                        ])),
+                                        ("vectors".to_string(), Value::map_of([
+                                            ("count".to_string(), Value::Num(1f64)),
+                                            ("dimension".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("targetDim")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("path".to_string(), Value::str("embeddings")),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("issued")),
+                                    ("credential".to_string(), Value::map_of([
+                                        ("from".to_string(), Value::str("key")),
+                                        ("path".to_string(), Value::str("key")),
+                                    ])),
+                                    ("id".to_string(), Value::str("ephemeral-convert")),
+                                    ("input".to_string(), Value::map_of([
+                                        ("embeddings".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("ephemeral-embed")),
+                                            ("path".to_string(), Value::str("embeddings")),
+                                        ])),
+                                        ("source_model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("sourceModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                        ("target_model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("targetModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                    ])),
+                                ])),
                                 ("method".to_string(), Value::str("POST")),
                                 ("orig".to_string(), Value::str("/v1/ephemeral/convert")),
                                 ("segments".to_string(), Value::list(vec![
@@ -445,6 +727,102 @@ pub fn make_config() -> Value {
                             Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("equal".to_string(), Value::map_of([
+                                            ("bridge_model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("sourceModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("target_model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("targetModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                        ])),
+                                        ("vectors".to_string(), Value::map_of([
+                                            ("count".to_string(), Value::Num(1f64)),
+                                            ("dimension".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("targetDim")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("path".to_string(), Value::str("embeddings")),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("issued")),
+                                    ("credential".to_string(), Value::map_of([
+                                        ("from".to_string(), Value::str("key")),
+                                        ("path".to_string(), Value::str("key")),
+                                    ])),
+                                    ("id".to_string(), Value::str("ephemeral-embed-bridge")),
+                                    ("input".to_string(), Value::map_of([
+                                        ("bridge_model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("sourceModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                        ("target_model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("targetModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                        ("texts".to_string(), Value::list(vec![
+                                            Value::str("SDK live coverage test."),
+                                        ])),
+                                    ])),
+                                ])),
                                 ("method".to_string(), Value::str("POST")),
                                 ("orig".to_string(), Value::str("/v1/ephemeral/embed-bridge")),
                                 ("segments".to_string(), Value::list(vec![
@@ -508,6 +886,68 @@ pub fn make_config() -> Value {
                             Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("equal".to_string(), Value::map_of([
+                                            ("model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("sourceModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                        ])),
+                                        ("vectors".to_string(), Value::map_of([
+                                            ("count".to_string(), Value::Num(1f64)),
+                                            ("dimension".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("sourceDim")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("path".to_string(), Value::str("embeddings")),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("account")),
+                                    ("id".to_string(), Value::str("account-embed")),
+                                    ("input".to_string(), Value::map_of([
+                                        ("model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("sourceModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                        ("texts".to_string(), Value::list(vec![
+                                            Value::str("SDK live coverage test."),
+                                        ])),
+                                    ])),
+                                ])),
                                 ("method".to_string(), Value::str("POST")),
                                 ("orig".to_string(), Value::str("/v1/embed")),
                                 ("segments".to_string(), Value::list(vec![
@@ -531,6 +971,72 @@ pub fn make_config() -> Value {
                             Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("equal".to_string(), Value::map_of([
+                                            ("model".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("sourceModel")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                        ])),
+                                        ("vectors".to_string(), Value::map_of([
+                                            ("count".to_string(), Value::Num(1f64)),
+                                            ("dimension".to_string(), Value::map_of([
+                                                ("from".to_string(), Value::str("models")),
+                                                ("path".to_string(), Value::str("sourceDim")),
+                                                ("related".to_string(), Value::map_of([
+                                                    ("foreign".to_string(), Value::str("name")),
+                                                    ("from".to_string(), Value::str("models")),
+                                                    ("local".to_string(), Value::str("sourceModel")),
+                                                    ("where".to_string(), Value::map_of([
+                                                        ("modelType".to_string(), Value::str("embed")),
+                                                    ])),
+                                                ])),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("convert")),
+                                                ])),
+                                            ])),
+                                            ("path".to_string(), Value::str("embeddings")),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("issued")),
+                                    ("credential".to_string(), Value::map_of([
+                                        ("from".to_string(), Value::str("key")),
+                                        ("path".to_string(), Value::str("key")),
+                                    ])),
+                                    ("id".to_string(), Value::str("ephemeral-embed")),
+                                    ("input".to_string(), Value::map_of([
+                                        ("model".to_string(), Value::map_of([
+                                            ("from".to_string(), Value::str("models")),
+                                            ("path".to_string(), Value::str("sourceModel")),
+                                            ("related".to_string(), Value::map_of([
+                                                ("foreign".to_string(), Value::str("name")),
+                                                ("from".to_string(), Value::str("models")),
+                                                ("local".to_string(), Value::str("sourceModel")),
+                                                ("where".to_string(), Value::map_of([
+                                                    ("modelType".to_string(), Value::str("embed")),
+                                                ])),
+                                            ])),
+                                            ("where".to_string(), Value::map_of([
+                                                ("modelType".to_string(), Value::str("convert")),
+                                            ])),
+                                        ])),
+                                        ("texts".to_string(), Value::list(vec![
+                                            Value::str("SDK live coverage test."),
+                                        ])),
+                                    ])),
+                                ])),
                                 ("method".to_string(), Value::str("POST")),
                                 ("orig".to_string(), Value::str("/v1/ephemeral/embed")),
                                 ("segments".to_string(), Value::list(vec![
@@ -601,6 +1107,16 @@ pub fn make_config() -> Value {
                             Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("nonempty".to_string(), Value::list(vec![
+                                            Value::str("key"),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("public")),
+                                    ("id".to_string(), Value::str("key")),
+                                    ("retention".to_string(), Value::str("No deletion endpoint; issued key is subject to the service daily allowance")),
+                                ])),
                                 ("method".to_string(), Value::str("POST")),
                                 ("orig".to_string(), Value::str("/v1/ephemeral/key")),
                                 ("segments".to_string(), Value::list(vec![
@@ -698,6 +1214,15 @@ pub fn make_config() -> Value {
                             Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("nonempty".to_string(), Value::list(vec![
+                                            Value::str(""),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("public")),
+                                    ("id".to_string(), Value::str("models")),
+                                ])),
                                 ("method".to_string(), Value::str("GET")),
                                 ("orig".to_string(), Value::str("/v1/models")),
                                 ("segments".to_string(), Value::list(vec![

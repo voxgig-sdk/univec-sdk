@@ -113,11 +113,14 @@ function makeEntityTestData(_model: Model, entity: ModelEntity) {
   makeEntityTestFields(entity, i++, ent)
   delete ent.id
 
-  // Request contracts are separate from synthetic stored mock records.
+  // WHICH operations this entity exposes, not what the specification says
+  // about them. The facts are apidef's resolved definition, and copying them
+  // here made the test data a second copy of the model's own copy of them.
   data.requests = {}
   for (const op of Object.values(entity.op || {}) as any[]) for (const point of op.points || []) {
     if (point.contract) data.requests[point.contract.id] = {
-      provenance: 'operation-contract', contract: JSON.parse(point.contract.json),
+      provenance: 'operation-contract', version: point.contract.version,
+      source: point.contract.source,
     }
   }
   return data

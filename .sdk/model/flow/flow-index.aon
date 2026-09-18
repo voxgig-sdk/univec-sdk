@@ -1,6 +1,6 @@
 # Flows
 
-@"BasicConvertFlow.aon"
-@"BasicEmbedFlow.aon"
-@"BasicEphemeralKeyFlow.aon"
-@"BasicModelFlow.aon"
+@"./BasicConvertFlow.aon"
+@"./BasicEmbedFlow.aon"
+@"./BasicEphemeralKeyFlow.aon"
+@"./BasicModelFlow.aon"

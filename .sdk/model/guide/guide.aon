@@ -1,6 +1,6 @@
 # Guide corrections and live recipes. The definition remains unchanged.
 @"@voxgig/apidef/model/guide.aon"
-@"base-guide.aon"
+@"./base-guide.aon"
 guide: entity: {
   "model": {
     "path": {

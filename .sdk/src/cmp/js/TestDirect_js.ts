@@ -22,6 +22,7 @@ import {
   jsProp, envName, envToken,
   jsKey,
   pointParts,
+  hasLiveScenarios,
 } from '@voxgig/sdkgen'
 
 
@@ -52,16 +53,6 @@ const TestDirect = cmp(function TestDirect(props: any) {
       apikey: env.${PROJECTNAME}_APIKEY,`
     : ''
 
-  // A templated server URL (OpenAPI server variables) makes a LIVE client
-  // impossible to construct without values: makeOptions raises rather than
-  // request a URL with a literal `{account_id}` in it. Taken from the
-  // environment, the same way the apikey is.
-  //
-  // Keys are quoted and the env read is bracketed via jsKey/jsProp: a server
-  // variable name is spec-derived and need not be a JS identifier — the URL
-  // grammar admits a leading digit ({2fa}), and a declared-but-unreferenced
-  // variable ({edge-zone}) is not constrained at all. Bare `name:` and
-  // `env.PROJ_SERVER_EDGE-ZONE` are both syntax errors.
   const svars = serverVariables(model)
   const serverEnvEntry = svars
     .map((v: any) => `\n    '${serverVarEnv(PROJECTNAME, v.name)}': ${JSON.stringify(v.dflt)},`).join('')
@@ -96,7 +87,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
         Slot({ name: 'directSetup' }, () => {
           Content(`
-function liveScenariosActive() { return ${Object.values(model.main.kit.entity || {}).some((e: any) => Object.values(e.op || {}).some((o: any) => (o.points || []).some((p: any) => p.contract && JSON.parse(p.contract.json).live)))} && process.env.${PROJECTNAME}_TEST_LIVE === 'TRUE' }
+function liveScenariosActive() { return ${hasLiveScenarios(model)} && process.env.${PROJECTNAME}_TEST_LIVE === 'TRUE' }
 function directSetup(mockres) {
   const calls = []
 
@@ -389,11 +380,6 @@ ${varAsserts}    }
 }
 
 
-// Replace raw OpenAPI parameter names in path parts with model parameter names.
-// Path parts may have e.g. {subBreed} while model params use sub_breed.
-// When a rename mapping exists (e.g. closureId -> id), path parts contain the
-// renamed form {id} but params still use the original name closure_id.
-// The rename mapping is used to reverse-lookup the original param name.
 function normalizePathParams(
   parts: string[],
   params: any[],

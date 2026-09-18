@@ -368,6 +368,99 @@ pub fn make_config() Value {
                             h.jo(&.{
                                 .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "equal", h.jo(&.{
+                                            .{ "source_model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("sourceModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "target_model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("targetModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                        }) },
+                                        .{ "vectors", h.jo(&.{
+                                            .{ "count", h.vnum(1) },
+                                            .{ "dimension", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("targetDim") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "path", h.vstr("embeddings") },
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("account") },
+                                    .{ "id", h.vstr("account-convert") },
+                                    .{ "input", h.jo(&.{
+                                        .{ "embeddings", h.jo(&.{
+                                            .{ "from", h.vstr("account-embed") },
+                                            .{ "path", h.vstr("embeddings") },
+                                        }) },
+                                        .{ "source_model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("sourceModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                        .{ "target_model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("targetModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                    }) },
+                                }) },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/convert") },
                                 .{ "segments", h.ja(&.{
@@ -391,6 +484,98 @@ pub fn make_config() Value {
                             h.jo(&.{
                                 .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "equal", h.jo(&.{
+                                            .{ "bridge_model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("sourceModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "target_model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("targetModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                        }) },
+                                        .{ "vectors", h.jo(&.{
+                                            .{ "count", h.vnum(1) },
+                                            .{ "dimension", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("targetDim") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "path", h.vstr("embeddings") },
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("account") },
+                                    .{ "id", h.vstr("account-embed-bridge") },
+                                    .{ "input", h.jo(&.{
+                                        .{ "bridge_model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("sourceModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                        .{ "target_model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("targetModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                        .{ "texts", h.ja(&.{
+                                            h.vstr("SDK live coverage test."),
+                                        }) },
+                                    }) },
+                                }) },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/embed-bridge") },
                                 .{ "segments", h.ja(&.{
@@ -416,6 +601,103 @@ pub fn make_config() Value {
                             h.jo(&.{
                                 .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "equal", h.jo(&.{
+                                            .{ "source_model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("sourceModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "target_model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("targetModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                        }) },
+                                        .{ "vectors", h.jo(&.{
+                                            .{ "count", h.vnum(1) },
+                                            .{ "dimension", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("targetDim") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "path", h.vstr("embeddings") },
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("issued") },
+                                    .{ "credential", h.jo(&.{
+                                        .{ "from", h.vstr("key") },
+                                        .{ "path", h.vstr("key") },
+                                    }) },
+                                    .{ "id", h.vstr("ephemeral-convert") },
+                                    .{ "input", h.jo(&.{
+                                        .{ "embeddings", h.jo(&.{
+                                            .{ "from", h.vstr("ephemeral-embed") },
+                                            .{ "path", h.vstr("embeddings") },
+                                        }) },
+                                        .{ "source_model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("sourceModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                        .{ "target_model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("targetModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                    }) },
+                                }) },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/convert") },
                                 .{ "segments", h.ja(&.{
@@ -445,6 +727,102 @@ pub fn make_config() Value {
                             h.jo(&.{
                                 .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "equal", h.jo(&.{
+                                            .{ "bridge_model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("sourceModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "target_model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("targetModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                        }) },
+                                        .{ "vectors", h.jo(&.{
+                                            .{ "count", h.vnum(1) },
+                                            .{ "dimension", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("targetDim") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "path", h.vstr("embeddings") },
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("issued") },
+                                    .{ "credential", h.jo(&.{
+                                        .{ "from", h.vstr("key") },
+                                        .{ "path", h.vstr("key") },
+                                    }) },
+                                    .{ "id", h.vstr("ephemeral-embed-bridge") },
+                                    .{ "input", h.jo(&.{
+                                        .{ "bridge_model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("sourceModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                        .{ "target_model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("targetModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                        .{ "texts", h.ja(&.{
+                                            h.vstr("SDK live coverage test."),
+                                        }) },
+                                    }) },
+                                }) },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/embed-bridge") },
                                 .{ "segments", h.ja(&.{
@@ -508,6 +886,68 @@ pub fn make_config() Value {
                             h.jo(&.{
                                 .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "equal", h.jo(&.{
+                                            .{ "model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("sourceModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                        }) },
+                                        .{ "vectors", h.jo(&.{
+                                            .{ "count", h.vnum(1) },
+                                            .{ "dimension", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("sourceDim") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "path", h.vstr("embeddings") },
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("account") },
+                                    .{ "id", h.vstr("account-embed") },
+                                    .{ "input", h.jo(&.{
+                                        .{ "model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("sourceModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                        .{ "texts", h.ja(&.{
+                                            h.vstr("SDK live coverage test."),
+                                        }) },
+                                    }) },
+                                }) },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/embed") },
                                 .{ "segments", h.ja(&.{
@@ -531,6 +971,72 @@ pub fn make_config() Value {
                             h.jo(&.{
                                 .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "equal", h.jo(&.{
+                                            .{ "model", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("sourceModel") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                        }) },
+                                        .{ "vectors", h.jo(&.{
+                                            .{ "count", h.vnum(1) },
+                                            .{ "dimension", h.jo(&.{
+                                                .{ "from", h.vstr("models") },
+                                                .{ "path", h.vstr("sourceDim") },
+                                                .{ "related", h.jo(&.{
+                                                    .{ "foreign", h.vstr("name") },
+                                                    .{ "from", h.vstr("models") },
+                                                    .{ "local", h.vstr("sourceModel") },
+                                                    .{ "where", h.jo(&.{
+                                                        .{ "modelType", h.vstr("embed") },
+                                                    }) },
+                                                }) },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("convert") },
+                                                }) },
+                                            }) },
+                                            .{ "path", h.vstr("embeddings") },
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("issued") },
+                                    .{ "credential", h.jo(&.{
+                                        .{ "from", h.vstr("key") },
+                                        .{ "path", h.vstr("key") },
+                                    }) },
+                                    .{ "id", h.vstr("ephemeral-embed") },
+                                    .{ "input", h.jo(&.{
+                                        .{ "model", h.jo(&.{
+                                            .{ "from", h.vstr("models") },
+                                            .{ "path", h.vstr("sourceModel") },
+                                            .{ "related", h.jo(&.{
+                                                .{ "foreign", h.vstr("name") },
+                                                .{ "from", h.vstr("models") },
+                                                .{ "local", h.vstr("sourceModel") },
+                                                .{ "where", h.jo(&.{
+                                                    .{ "modelType", h.vstr("embed") },
+                                                }) },
+                                            }) },
+                                            .{ "where", h.jo(&.{
+                                                .{ "modelType", h.vstr("convert") },
+                                            }) },
+                                        }) },
+                                        .{ "texts", h.ja(&.{
+                                            h.vstr("SDK live coverage test."),
+                                        }) },
+                                    }) },
+                                }) },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/embed") },
                                 .{ "segments", h.ja(&.{
@@ -601,6 +1107,16 @@ pub fn make_config() Value {
                             h.jo(&.{
                                 .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "nonempty", h.ja(&.{
+                                            h.vstr("key"),
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("public") },
+                                    .{ "id", h.vstr("key") },
+                                    .{ "retention", h.vstr("No deletion endpoint; issued key is subject to the service daily allowance") },
+                                }) },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/key") },
                                 .{ "segments", h.ja(&.{
@@ -698,6 +1214,15 @@ pub fn make_config() Value {
                             h.jo(&.{
                                 .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "nonempty", h.ja(&.{
+                                            h.vstr(""),
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("public") },
+                                    .{ "id", h.vstr("models") },
+                                }) },
                                 .{ "method", h.vstr("GET") },
                                 .{ "orig", h.vstr("/v1/models") },
                                 .{ "segments", h.ja(&.{

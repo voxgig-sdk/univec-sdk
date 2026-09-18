@@ -451,6 +451,99 @@ class Config {
             <String, dynamic>{
               'args': <String, dynamic>{},
               'kind': 'http',
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'equal': <String, dynamic>{
+                    'source_model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'sourceModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'target_model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'targetModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                  },
+                  'vectors': <String, dynamic>{
+                    'count': 1,
+                    'dimension': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'targetDim',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'path': 'embeddings',
+                  },
+                },
+                'auth': 'account',
+                'id': 'account-convert',
+                'input': <String, dynamic>{
+                  'embeddings': <String, dynamic>{
+                    'from': 'account-embed',
+                    'path': 'embeddings',
+                  },
+                  'source_model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'sourceModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                  'target_model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'targetModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                },
+              },
               'method': 'POST',
               'orig': '/v1/convert',
               'segments': <dynamic>[
@@ -474,6 +567,98 @@ class Config {
             <String, dynamic>{
               'args': <String, dynamic>{},
               'kind': 'http',
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'equal': <String, dynamic>{
+                    'bridge_model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'sourceModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'target_model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'targetModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                  },
+                  'vectors': <String, dynamic>{
+                    'count': 1,
+                    'dimension': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'targetDim',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'path': 'embeddings',
+                  },
+                },
+                'auth': 'account',
+                'id': 'account-embed-bridge',
+                'input': <String, dynamic>{
+                  'bridge_model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'sourceModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                  'target_model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'targetModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                  'texts': <dynamic>[
+                    'SDK live coverage test.',
+                  ],
+                },
+              },
               'method': 'POST',
               'orig': '/v1/embed-bridge',
               'segments': <dynamic>[
@@ -499,6 +684,103 @@ class Config {
             <String, dynamic>{
               'args': <String, dynamic>{},
               'kind': 'http',
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'equal': <String, dynamic>{
+                    'source_model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'sourceModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'target_model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'targetModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                  },
+                  'vectors': <String, dynamic>{
+                    'count': 1,
+                    'dimension': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'targetDim',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'path': 'embeddings',
+                  },
+                },
+                'auth': 'issued',
+                'credential': <String, dynamic>{
+                  'from': 'key',
+                  'path': 'key',
+                },
+                'id': 'ephemeral-convert',
+                'input': <String, dynamic>{
+                  'embeddings': <String, dynamic>{
+                    'from': 'ephemeral-embed',
+                    'path': 'embeddings',
+                  },
+                  'source_model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'sourceModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                  'target_model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'targetModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                },
+              },
               'method': 'POST',
               'orig': '/v1/ephemeral/convert',
               'segments': <dynamic>[
@@ -528,6 +810,102 @@ class Config {
             <String, dynamic>{
               'args': <String, dynamic>{},
               'kind': 'http',
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'equal': <String, dynamic>{
+                    'bridge_model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'sourceModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'target_model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'targetModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                  },
+                  'vectors': <String, dynamic>{
+                    'count': 1,
+                    'dimension': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'targetDim',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'path': 'embeddings',
+                  },
+                },
+                'auth': 'issued',
+                'credential': <String, dynamic>{
+                  'from': 'key',
+                  'path': 'key',
+                },
+                'id': 'ephemeral-embed-bridge',
+                'input': <String, dynamic>{
+                  'bridge_model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'sourceModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                  'target_model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'targetModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                  'texts': <dynamic>[
+                    'SDK live coverage test.',
+                  ],
+                },
+              },
               'method': 'POST',
               'orig': '/v1/ephemeral/embed-bridge',
               'segments': <dynamic>[
@@ -591,6 +969,68 @@ class Config {
             <String, dynamic>{
               'args': <String, dynamic>{},
               'kind': 'http',
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'equal': <String, dynamic>{
+                    'model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'sourceModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                  },
+                  'vectors': <String, dynamic>{
+                    'count': 1,
+                    'dimension': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'sourceDim',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'path': 'embeddings',
+                  },
+                },
+                'auth': 'account',
+                'id': 'account-embed',
+                'input': <String, dynamic>{
+                  'model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'sourceModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                  'texts': <dynamic>[
+                    'SDK live coverage test.',
+                  ],
+                },
+              },
               'method': 'POST',
               'orig': '/v1/embed',
               'segments': <dynamic>[
@@ -614,6 +1054,72 @@ class Config {
             <String, dynamic>{
               'args': <String, dynamic>{},
               'kind': 'http',
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'equal': <String, dynamic>{
+                    'model': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'sourceModel',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                  },
+                  'vectors': <String, dynamic>{
+                    'count': 1,
+                    'dimension': <String, dynamic>{
+                      'from': 'models',
+                      'path': 'sourceDim',
+                      'related': <String, dynamic>{
+                        'foreign': 'name',
+                        'from': 'models',
+                        'local': 'sourceModel',
+                        'where': <String, dynamic>{
+                          'modelType': 'embed',
+                        },
+                      },
+                      'where': <String, dynamic>{
+                        'modelType': 'convert',
+                      },
+                    },
+                    'path': 'embeddings',
+                  },
+                },
+                'auth': 'issued',
+                'credential': <String, dynamic>{
+                  'from': 'key',
+                  'path': 'key',
+                },
+                'id': 'ephemeral-embed',
+                'input': <String, dynamic>{
+                  'model': <String, dynamic>{
+                    'from': 'models',
+                    'path': 'sourceModel',
+                    'related': <String, dynamic>{
+                      'foreign': 'name',
+                      'from': 'models',
+                      'local': 'sourceModel',
+                      'where': <String, dynamic>{
+                        'modelType': 'embed',
+                      },
+                    },
+                    'where': <String, dynamic>{
+                      'modelType': 'convert',
+                    },
+                  },
+                  'texts': <dynamic>[
+                    'SDK live coverage test.',
+                  ],
+                },
+              },
               'method': 'POST',
               'orig': '/v1/ephemeral/embed',
               'segments': <dynamic>[
@@ -684,6 +1190,16 @@ class Config {
             <String, dynamic>{
               'args': <String, dynamic>{},
               'kind': 'http',
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'nonempty': <dynamic>[
+                    'key',
+                  ],
+                },
+                'auth': 'public',
+                'id': 'key',
+                'retention': 'No deletion endpoint; issued key is subject to the service daily allowance',
+              },
               'method': 'POST',
               'orig': '/v1/ephemeral/key',
               'segments': <dynamic>[
@@ -781,6 +1297,15 @@ class Config {
             <String, dynamic>{
               'args': <String, dynamic>{},
               'kind': 'http',
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'nonempty': <dynamic>[
+                    '',
+                  ],
+                },
+                'auth': 'public',
+                'id': 'models',
+              },
               'method': 'GET',
               'orig': '/v1/models',
               'segments': <dynamic>[

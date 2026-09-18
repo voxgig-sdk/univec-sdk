@@ -372,6 +372,99 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"args": map[string]any{},
 								"kind": "http",
+								"live": map[string]any{
+									"assert": map[string]any{
+										"equal": map[string]any{
+											"source_model": map[string]any{
+												"from": "models",
+												"path": "sourceModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"target_model": map[string]any{
+												"from": "models",
+												"path": "targetModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+										},
+										"vectors": map[string]any{
+											"count": 1,
+											"dimension": map[string]any{
+												"from": "models",
+												"path": "targetDim",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"path": "embeddings",
+										},
+									},
+									"auth": "account",
+									"id": "account-convert",
+									"input": map[string]any{
+										"embeddings": map[string]any{
+											"from": "account-embed",
+											"path": "embeddings",
+										},
+										"source_model": map[string]any{
+											"from": "models",
+											"path": "sourceModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+										"target_model": map[string]any{
+											"from": "models",
+											"path": "targetModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+									},
+								},
 								"method": "POST",
 								"orig": "/v1/convert",
 								"segments": []any{
@@ -395,6 +488,98 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"args": map[string]any{},
 								"kind": "http",
+								"live": map[string]any{
+									"assert": map[string]any{
+										"equal": map[string]any{
+											"bridge_model": map[string]any{
+												"from": "models",
+												"path": "sourceModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"target_model": map[string]any{
+												"from": "models",
+												"path": "targetModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+										},
+										"vectors": map[string]any{
+											"count": 1,
+											"dimension": map[string]any{
+												"from": "models",
+												"path": "targetDim",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"path": "embeddings",
+										},
+									},
+									"auth": "account",
+									"id": "account-embed-bridge",
+									"input": map[string]any{
+										"bridge_model": map[string]any{
+											"from": "models",
+											"path": "sourceModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+										"target_model": map[string]any{
+											"from": "models",
+											"path": "targetModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+										"texts": []any{
+											"SDK live coverage test.",
+										},
+									},
+								},
 								"method": "POST",
 								"orig": "/v1/embed-bridge",
 								"segments": []any{
@@ -420,6 +605,103 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"args": map[string]any{},
 								"kind": "http",
+								"live": map[string]any{
+									"assert": map[string]any{
+										"equal": map[string]any{
+											"source_model": map[string]any{
+												"from": "models",
+												"path": "sourceModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"target_model": map[string]any{
+												"from": "models",
+												"path": "targetModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+										},
+										"vectors": map[string]any{
+											"count": 1,
+											"dimension": map[string]any{
+												"from": "models",
+												"path": "targetDim",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"path": "embeddings",
+										},
+									},
+									"auth": "issued",
+									"credential": map[string]any{
+										"from": "key",
+										"path": "key",
+									},
+									"id": "ephemeral-convert",
+									"input": map[string]any{
+										"embeddings": map[string]any{
+											"from": "ephemeral-embed",
+											"path": "embeddings",
+										},
+										"source_model": map[string]any{
+											"from": "models",
+											"path": "sourceModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+										"target_model": map[string]any{
+											"from": "models",
+											"path": "targetModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+									},
+								},
 								"method": "POST",
 								"orig": "/v1/ephemeral/convert",
 								"segments": []any{
@@ -449,6 +731,102 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"args": map[string]any{},
 								"kind": "http",
+								"live": map[string]any{
+									"assert": map[string]any{
+										"equal": map[string]any{
+											"bridge_model": map[string]any{
+												"from": "models",
+												"path": "sourceModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"target_model": map[string]any{
+												"from": "models",
+												"path": "targetModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+										},
+										"vectors": map[string]any{
+											"count": 1,
+											"dimension": map[string]any{
+												"from": "models",
+												"path": "targetDim",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"path": "embeddings",
+										},
+									},
+									"auth": "issued",
+									"credential": map[string]any{
+										"from": "key",
+										"path": "key",
+									},
+									"id": "ephemeral-embed-bridge",
+									"input": map[string]any{
+										"bridge_model": map[string]any{
+											"from": "models",
+											"path": "sourceModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+										"target_model": map[string]any{
+											"from": "models",
+											"path": "targetModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+										"texts": []any{
+											"SDK live coverage test.",
+										},
+									},
+								},
 								"method": "POST",
 								"orig": "/v1/ephemeral/embed-bridge",
 								"segments": []any{
@@ -512,6 +890,68 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"args": map[string]any{},
 								"kind": "http",
+								"live": map[string]any{
+									"assert": map[string]any{
+										"equal": map[string]any{
+											"model": map[string]any{
+												"from": "models",
+												"path": "sourceModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+										},
+										"vectors": map[string]any{
+											"count": 1,
+											"dimension": map[string]any{
+												"from": "models",
+												"path": "sourceDim",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"path": "embeddings",
+										},
+									},
+									"auth": "account",
+									"id": "account-embed",
+									"input": map[string]any{
+										"model": map[string]any{
+											"from": "models",
+											"path": "sourceModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+										"texts": []any{
+											"SDK live coverage test.",
+										},
+									},
+								},
 								"method": "POST",
 								"orig": "/v1/embed",
 								"segments": []any{
@@ -535,6 +975,72 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"args": map[string]any{},
 								"kind": "http",
+								"live": map[string]any{
+									"assert": map[string]any{
+										"equal": map[string]any{
+											"model": map[string]any{
+												"from": "models",
+												"path": "sourceModel",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+										},
+										"vectors": map[string]any{
+											"count": 1,
+											"dimension": map[string]any{
+												"from": "models",
+												"path": "sourceDim",
+												"related": map[string]any{
+													"foreign": "name",
+													"from": "models",
+													"local": "sourceModel",
+													"where": map[string]any{
+														"modelType": "embed",
+													},
+												},
+												"where": map[string]any{
+													"modelType": "convert",
+												},
+											},
+											"path": "embeddings",
+										},
+									},
+									"auth": "issued",
+									"credential": map[string]any{
+										"from": "key",
+										"path": "key",
+									},
+									"id": "ephemeral-embed",
+									"input": map[string]any{
+										"model": map[string]any{
+											"from": "models",
+											"path": "sourceModel",
+											"related": map[string]any{
+												"foreign": "name",
+												"from": "models",
+												"local": "sourceModel",
+												"where": map[string]any{
+													"modelType": "embed",
+												},
+											},
+											"where": map[string]any{
+												"modelType": "convert",
+											},
+										},
+										"texts": []any{
+											"SDK live coverage test.",
+										},
+									},
+								},
 								"method": "POST",
 								"orig": "/v1/ephemeral/embed",
 								"segments": []any{
@@ -605,6 +1111,16 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"args": map[string]any{},
 								"kind": "http",
+								"live": map[string]any{
+									"assert": map[string]any{
+										"nonempty": []any{
+											"key",
+										},
+									},
+									"auth": "public",
+									"id": "key",
+									"retention": "No deletion endpoint; issued key is subject to the service daily allowance",
+								},
 								"method": "POST",
 								"orig": "/v1/ephemeral/key",
 								"segments": []any{
@@ -702,6 +1218,15 @@ func MakeConfig() map[string]any {
 							map[string]any{
 								"args": map[string]any{},
 								"kind": "http",
+								"live": map[string]any{
+									"assert": map[string]any{
+										"nonempty": []any{
+											"",
+										},
+									},
+									"auth": "public",
+									"id": "models",
+								},
 								"method": "GET",
 								"orig": "/v1/models",
 								"segments": []any{

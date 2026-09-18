@@ -171,9 +171,123 @@
 <tbody>
 <tr>
 <td><code>data</code></td>
-<td><code>array of object or object</code></td>
+<td><code>array of object</code></td>
 <td>Yes</td>
 <td></td>
+</tr>
+<tr>
+<td><code>data[].eval</code></td>
+<td><code>object</code></td>
+<td>No</td>
+<td>Retrieval-fidelity metrics for a convert model.</td>
+</tr>
+<tr>
+<td><code>data[].eval.cosine_mean</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data[].eval.cosine_median</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data[].eval.cosine_std</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data[].eval.kendall_p_value</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data[].eval.kendall_tau</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data[].eval.mrr</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td>Mean reciprocal rank.</td>
+</tr>
+<tr>
+<td><code>data[].eval.p_at_1</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data[].eval.p_at_10</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data[].eval.p_at_5</code></td>
+<td><code>number (float)</code></td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>data[].executionProvider</code></td>
+<td><code>string</code></td>
+<td>No</td>
+<td>Hardware backend, for example <code>cpu</code>.</td>
+</tr>
+<tr>
+<td><code>data[].modelCard</code></td>
+<td><code>object</code></td>
+<td>No</td>
+<td>Convert models only: training provenance and architecture detail.</td>
+</tr>
+<tr>
+<td><code>data[].modelType</code></td>
+<td><code>enum: embed, convert</code></td>
+<td>Yes</td>
+<td><code>embed</code> for text-to-vector models, <code>convert</code> for space-translation models.</td>
+</tr>
+<tr>
+<td><code>data[].name</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>Model identifier used in requests.</td>
+</tr>
+<tr>
+<td><code>data[].sequenceLen</code></td>
+<td><code>integer</code></td>
+<td>No</td>
+<td>Embed models only: maximum input sequence length.</td>
+</tr>
+<tr>
+<td><code>data[].sourceDim</code></td>
+<td><code>integer</code></td>
+<td>No</td>
+<td>Convert models only: source vector dimension.</td>
+</tr>
+<tr>
+<td><code>data[].sourceModel</code></td>
+<td><code>string</code></td>
+<td>No</td>
+<td>Convert models only: the source model space.</td>
+</tr>
+<tr>
+<td><code>data[].targetDim</code></td>
+<td><code>integer</code></td>
+<td>Yes</td>
+<td>Dimension of the produced vectors.</td>
+</tr>
+<tr>
+<td><code>data[].targetModel</code></td>
+<td><code>string</code></td>
+<td>Yes</td>
+<td>The model space produced.</td>
 </tr>
 <tr>
 <td><code>success</code></td>

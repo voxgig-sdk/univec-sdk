@@ -295,6 +295,73 @@ let make_config () : value =
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("equal", (jo [
+                      ("source_model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "sourceModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("target_model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "targetModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ])) ]));
+                    ("vectors", (jo [
+                      ("count", (Num (1.)));
+                      ("dimension", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "targetDim"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("path", (Str "embeddings")) ])) ]));
+                  ("auth", (Str "account"));
+                  ("id", (Str "account-convert"));
+                  ("input", (jo [
+                    ("embeddings", (jo [
+                      ("from", (Str "account-embed"));
+                      ("path", (Str "embeddings")) ]));
+                    ("source_model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "sourceModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ]));
+                    ("target_model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "targetModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ])) ])) ]));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/convert"));
                 ("segments", (ja [
@@ -312,6 +379,72 @@ let make_config () : value =
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("equal", (jo [
+                      ("bridge_model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "sourceModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("target_model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "targetModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ])) ]));
+                    ("vectors", (jo [
+                      ("count", (Num (1.)));
+                      ("dimension", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "targetDim"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("path", (Str "embeddings")) ])) ]));
+                  ("auth", (Str "account"));
+                  ("id", (Str "account-embed-bridge"));
+                  ("input", (jo [
+                    ("bridge_model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "sourceModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ]));
+                    ("target_model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "targetModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ]));
+                    ("texts", (ja [
+                      (Str "SDK live coverage test.") ])) ])) ]));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/embed-bridge"));
                 ("segments", (ja [
@@ -330,6 +463,76 @@ let make_config () : value =
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("equal", (jo [
+                      ("source_model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "sourceModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("target_model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "targetModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ])) ]));
+                    ("vectors", (jo [
+                      ("count", (Num (1.)));
+                      ("dimension", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "targetDim"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("path", (Str "embeddings")) ])) ]));
+                  ("auth", (Str "issued"));
+                  ("credential", (jo [
+                    ("from", (Str "key"));
+                    ("path", (Str "key")) ]));
+                  ("id", (Str "ephemeral-convert"));
+                  ("input", (jo [
+                    ("embeddings", (jo [
+                      ("from", (Str "ephemeral-embed"));
+                      ("path", (Str "embeddings")) ]));
+                    ("source_model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "sourceModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ]));
+                    ("target_model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "targetModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ])) ])) ]));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/convert"));
                 ("segments", (ja [
@@ -351,6 +554,75 @@ let make_config () : value =
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("equal", (jo [
+                      ("bridge_model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "sourceModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("target_model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "targetModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ])) ]));
+                    ("vectors", (jo [
+                      ("count", (Num (1.)));
+                      ("dimension", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "targetDim"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("path", (Str "embeddings")) ])) ]));
+                  ("auth", (Str "issued"));
+                  ("credential", (jo [
+                    ("from", (Str "key"));
+                    ("path", (Str "key")) ]));
+                  ("id", (Str "ephemeral-embed-bridge"));
+                  ("input", (jo [
+                    ("bridge_model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "sourceModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ]));
+                    ("target_model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "targetModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ]));
+                    ("texts", (ja [
+                      (Str "SDK live coverage test.") ])) ])) ]));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/embed-bridge"));
                 ("segments", (ja [
@@ -397,6 +669,50 @@ let make_config () : value =
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("equal", (jo [
+                      ("model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "sourceModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ])) ]));
+                    ("vectors", (jo [
+                      ("count", (Num (1.)));
+                      ("dimension", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "sourceDim"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("path", (Str "embeddings")) ])) ]));
+                  ("auth", (Str "account"));
+                  ("id", (Str "account-embed"));
+                  ("input", (jo [
+                    ("model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "sourceModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ]));
+                    ("texts", (ja [
+                      (Str "SDK live coverage test.") ])) ])) ]));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/embed"));
                 ("segments", (ja [
@@ -414,6 +730,53 @@ let make_config () : value =
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("equal", (jo [
+                      ("model", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "sourceModel"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ])) ]));
+                    ("vectors", (jo [
+                      ("count", (Num (1.)));
+                      ("dimension", (jo [
+                        ("from", (Str "models"));
+                        ("path", (Str "sourceDim"));
+                        ("related", (jo [
+                          ("foreign", (Str "name"));
+                          ("from", (Str "models"));
+                          ("local", (Str "sourceModel"));
+                          ("where", (jo [
+                            ("modelType", (Str "embed")) ])) ]));
+                        ("where", (jo [
+                          ("modelType", (Str "convert")) ])) ]));
+                      ("path", (Str "embeddings")) ])) ]));
+                  ("auth", (Str "issued"));
+                  ("credential", (jo [
+                    ("from", (Str "key"));
+                    ("path", (Str "key")) ]));
+                  ("id", (Str "ephemeral-embed"));
+                  ("input", (jo [
+                    ("model", (jo [
+                      ("from", (Str "models"));
+                      ("path", (Str "sourceModel"));
+                      ("related", (jo [
+                        ("foreign", (Str "name"));
+                        ("from", (Str "models"));
+                        ("local", (Str "sourceModel"));
+                        ("where", (jo [
+                          ("modelType", (Str "embed")) ])) ]));
+                      ("where", (jo [
+                        ("modelType", (Str "convert")) ])) ]));
+                    ("texts", (ja [
+                      (Str "SDK live coverage test.") ])) ])) ]));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/embed"));
                 ("segments", (ja [
@@ -466,6 +829,13 @@ let make_config () : value =
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("nonempty", (ja [
+                      (Str "key") ])) ]));
+                  ("auth", (Str "public"));
+                  ("id", (Str "key"));
+                  ("retention", (Str "No deletion endpoint; issued key is subject to the service daily allowance")) ]));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/key"));
                 ("segments", (ja [
@@ -540,6 +910,12 @@ let make_config () : value =
               (jo [
                 ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("nonempty", (ja [
+                      (Str "") ])) ]));
+                  ("auth", (Str "public"));
+                  ("id", (Str "models")) ]));
                 ("method", (Str "GET"));
                 ("orig", (Str "/v1/models"));
                 ("segments", (ja [

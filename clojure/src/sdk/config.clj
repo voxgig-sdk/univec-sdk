@@ -34,6 +34,73 @@
               (vs/jm
                 "args" (vs/jm)
                 "kind" "http"
+                "live" (vs/jm
+                  "assert" (vs/jm
+                    "equal" (vs/jm
+                      "source_model" (vs/jm
+                        "from" "models"
+                        "path" "sourceModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "target_model" (vs/jm
+                        "from" "models"
+                        "path" "targetModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert")))
+                    "vectors" (vs/jm
+                      "count" 1
+                      "dimension" (vs/jm
+                        "from" "models"
+                        "path" "targetDim"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "path" "embeddings"))
+                  "auth" "account"
+                  "id" "account-convert"
+                  "input" (vs/jm
+                    "embeddings" (vs/jm
+                      "from" "account-embed"
+                      "path" "embeddings")
+                    "source_model" (vs/jm
+                      "from" "models"
+                      "path" "sourceModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))
+                    "target_model" (vs/jm
+                      "from" "models"
+                      "path" "targetModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))))
                 "method" "POST"
                 "orig" "/v1/convert"
                 "parts" (vs/jt
@@ -51,6 +118,72 @@
               (vs/jm
                 "args" (vs/jm)
                 "kind" "http"
+                "live" (vs/jm
+                  "assert" (vs/jm
+                    "equal" (vs/jm
+                      "bridge_model" (vs/jm
+                        "from" "models"
+                        "path" "sourceModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "target_model" (vs/jm
+                        "from" "models"
+                        "path" "targetModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert")))
+                    "vectors" (vs/jm
+                      "count" 1
+                      "dimension" (vs/jm
+                        "from" "models"
+                        "path" "targetDim"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "path" "embeddings"))
+                  "auth" "account"
+                  "id" "account-embed-bridge"
+                  "input" (vs/jm
+                    "bridge_model" (vs/jm
+                      "from" "models"
+                      "path" "sourceModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))
+                    "target_model" (vs/jm
+                      "from" "models"
+                      "path" "targetModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))
+                    "texts" (vs/jt
+                      "SDK live coverage test.")))
                 "method" "POST"
                 "orig" "/v1/embed-bridge"
                 "parts" (vs/jt
@@ -69,6 +202,76 @@
               (vs/jm
                 "args" (vs/jm)
                 "kind" "http"
+                "live" (vs/jm
+                  "assert" (vs/jm
+                    "equal" (vs/jm
+                      "source_model" (vs/jm
+                        "from" "models"
+                        "path" "sourceModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "target_model" (vs/jm
+                        "from" "models"
+                        "path" "targetModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert")))
+                    "vectors" (vs/jm
+                      "count" 1
+                      "dimension" (vs/jm
+                        "from" "models"
+                        "path" "targetDim"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "path" "embeddings"))
+                  "auth" "issued"
+                  "credential" (vs/jm
+                    "from" "key"
+                    "path" "key")
+                  "id" "ephemeral-convert"
+                  "input" (vs/jm
+                    "embeddings" (vs/jm
+                      "from" "ephemeral-embed"
+                      "path" "embeddings")
+                    "source_model" (vs/jm
+                      "from" "models"
+                      "path" "sourceModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))
+                    "target_model" (vs/jm
+                      "from" "models"
+                      "path" "targetModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))))
                 "method" "POST"
                 "orig" "/v1/ephemeral/convert"
                 "parts" (vs/jt
@@ -90,6 +293,75 @@
               (vs/jm
                 "args" (vs/jm)
                 "kind" "http"
+                "live" (vs/jm
+                  "assert" (vs/jm
+                    "equal" (vs/jm
+                      "bridge_model" (vs/jm
+                        "from" "models"
+                        "path" "sourceModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "target_model" (vs/jm
+                        "from" "models"
+                        "path" "targetModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert")))
+                    "vectors" (vs/jm
+                      "count" 1
+                      "dimension" (vs/jm
+                        "from" "models"
+                        "path" "targetDim"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "path" "embeddings"))
+                  "auth" "issued"
+                  "credential" (vs/jm
+                    "from" "key"
+                    "path" "key")
+                  "id" "ephemeral-embed-bridge"
+                  "input" (vs/jm
+                    "bridge_model" (vs/jm
+                      "from" "models"
+                      "path" "sourceModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))
+                    "target_model" (vs/jm
+                      "from" "models"
+                      "path" "targetModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))
+                    "texts" (vs/jt
+                      "SDK live coverage test.")))
                 "method" "POST"
                 "orig" "/v1/ephemeral/embed-bridge"
                 "parts" (vs/jt
@@ -136,6 +408,50 @@
               (vs/jm
                 "args" (vs/jm)
                 "kind" "http"
+                "live" (vs/jm
+                  "assert" (vs/jm
+                    "equal" (vs/jm
+                      "model" (vs/jm
+                        "from" "models"
+                        "path" "sourceModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert")))
+                    "vectors" (vs/jm
+                      "count" 1
+                      "dimension" (vs/jm
+                        "from" "models"
+                        "path" "sourceDim"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "path" "embeddings"))
+                  "auth" "account"
+                  "id" "account-embed"
+                  "input" (vs/jm
+                    "model" (vs/jm
+                      "from" "models"
+                      "path" "sourceModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))
+                    "texts" (vs/jt
+                      "SDK live coverage test.")))
                 "method" "POST"
                 "orig" "/v1/embed"
                 "parts" (vs/jt
@@ -153,6 +469,53 @@
               (vs/jm
                 "args" (vs/jm)
                 "kind" "http"
+                "live" (vs/jm
+                  "assert" (vs/jm
+                    "equal" (vs/jm
+                      "model" (vs/jm
+                        "from" "models"
+                        "path" "sourceModel"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert")))
+                    "vectors" (vs/jm
+                      "count" 1
+                      "dimension" (vs/jm
+                        "from" "models"
+                        "path" "sourceDim"
+                        "related" (vs/jm
+                          "foreign" "name"
+                          "from" "models"
+                          "local" "sourceModel"
+                          "where" (vs/jm
+                            "modelType" "embed"))
+                        "where" (vs/jm
+                          "modelType" "convert"))
+                      "path" "embeddings"))
+                  "auth" "issued"
+                  "credential" (vs/jm
+                    "from" "key"
+                    "path" "key")
+                  "id" "ephemeral-embed"
+                  "input" (vs/jm
+                    "model" (vs/jm
+                      "from" "models"
+                      "path" "sourceModel"
+                      "related" (vs/jm
+                        "foreign" "name"
+                        "from" "models"
+                        "local" "sourceModel"
+                        "where" (vs/jm
+                          "modelType" "embed"))
+                      "where" (vs/jm
+                        "modelType" "convert"))
+                    "texts" (vs/jt
+                      "SDK live coverage test.")))
                 "method" "POST"
                 "orig" "/v1/ephemeral/embed"
                 "parts" (vs/jt
@@ -205,6 +568,13 @@
               (vs/jm
                 "args" (vs/jm)
                 "kind" "http"
+                "live" (vs/jm
+                  "assert" (vs/jm
+                    "nonempty" (vs/jt
+                      "key"))
+                  "auth" "public"
+                  "id" "key"
+                  "retention" "No deletion endpoint; issued key is subject to the service daily allowance")
                 "method" "POST"
                 "orig" "/v1/ephemeral/key"
                 "parts" (vs/jt
@@ -279,6 +649,12 @@
               (vs/jm
                 "args" (vs/jm)
                 "kind" "http"
+                "live" (vs/jm
+                  "assert" (vs/jm
+                    "nonempty" (vs/jt
+                      ""))
+                  "auth" "public"
+                  "id" "models")
                 "method" "GET"
                 "orig" "/v1/models"
                 "parts" (vs/jt

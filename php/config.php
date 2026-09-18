@@ -391,6 +391,99 @@ class UnivecConfig
                 [
                   'args' => [],
                   'kind' => 'http',
+                  'live' => [
+                    'assert' => [
+                      'equal' => [
+                        'source_model' => [
+                          'from' => 'models',
+                          'path' => 'sourceModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'target_model' => [
+                          'from' => 'models',
+                          'path' => 'targetModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                      ],
+                      'vectors' => [
+                        'count' => 1,
+                        'dimension' => [
+                          'from' => 'models',
+                          'path' => 'targetDim',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'path' => 'embeddings',
+                      ],
+                    ],
+                    'auth' => 'account',
+                    'id' => 'account-convert',
+                    'input' => [
+                      'embeddings' => [
+                        'from' => 'account-embed',
+                        'path' => 'embeddings',
+                      ],
+                      'source_model' => [
+                        'from' => 'models',
+                        'path' => 'sourceModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                      'target_model' => [
+                        'from' => 'models',
+                        'path' => 'targetModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                    ],
+                  ],
                   'method' => 'POST',
                   'orig' => '/v1/convert',
                   'segments' => [
@@ -414,6 +507,98 @@ class UnivecConfig
                 [
                   'args' => [],
                   'kind' => 'http',
+                  'live' => [
+                    'assert' => [
+                      'equal' => [
+                        'bridge_model' => [
+                          'from' => 'models',
+                          'path' => 'sourceModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'target_model' => [
+                          'from' => 'models',
+                          'path' => 'targetModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                      ],
+                      'vectors' => [
+                        'count' => 1,
+                        'dimension' => [
+                          'from' => 'models',
+                          'path' => 'targetDim',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'path' => 'embeddings',
+                      ],
+                    ],
+                    'auth' => 'account',
+                    'id' => 'account-embed-bridge',
+                    'input' => [
+                      'bridge_model' => [
+                        'from' => 'models',
+                        'path' => 'sourceModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                      'target_model' => [
+                        'from' => 'models',
+                        'path' => 'targetModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                      'texts' => [
+                        'SDK live coverage test.',
+                      ],
+                    ],
+                  ],
                   'method' => 'POST',
                   'orig' => '/v1/embed-bridge',
                   'segments' => [
@@ -439,6 +624,103 @@ class UnivecConfig
                 [
                   'args' => [],
                   'kind' => 'http',
+                  'live' => [
+                    'assert' => [
+                      'equal' => [
+                        'source_model' => [
+                          'from' => 'models',
+                          'path' => 'sourceModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'target_model' => [
+                          'from' => 'models',
+                          'path' => 'targetModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                      ],
+                      'vectors' => [
+                        'count' => 1,
+                        'dimension' => [
+                          'from' => 'models',
+                          'path' => 'targetDim',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'path' => 'embeddings',
+                      ],
+                    ],
+                    'auth' => 'issued',
+                    'credential' => [
+                      'from' => 'key',
+                      'path' => 'key',
+                    ],
+                    'id' => 'ephemeral-convert',
+                    'input' => [
+                      'embeddings' => [
+                        'from' => 'ephemeral-embed',
+                        'path' => 'embeddings',
+                      ],
+                      'source_model' => [
+                        'from' => 'models',
+                        'path' => 'sourceModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                      'target_model' => [
+                        'from' => 'models',
+                        'path' => 'targetModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                    ],
+                  ],
                   'method' => 'POST',
                   'orig' => '/v1/ephemeral/convert',
                   'segments' => [
@@ -468,6 +750,102 @@ class UnivecConfig
                 [
                   'args' => [],
                   'kind' => 'http',
+                  'live' => [
+                    'assert' => [
+                      'equal' => [
+                        'bridge_model' => [
+                          'from' => 'models',
+                          'path' => 'sourceModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'target_model' => [
+                          'from' => 'models',
+                          'path' => 'targetModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                      ],
+                      'vectors' => [
+                        'count' => 1,
+                        'dimension' => [
+                          'from' => 'models',
+                          'path' => 'targetDim',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'path' => 'embeddings',
+                      ],
+                    ],
+                    'auth' => 'issued',
+                    'credential' => [
+                      'from' => 'key',
+                      'path' => 'key',
+                    ],
+                    'id' => 'ephemeral-embed-bridge',
+                    'input' => [
+                      'bridge_model' => [
+                        'from' => 'models',
+                        'path' => 'sourceModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                      'target_model' => [
+                        'from' => 'models',
+                        'path' => 'targetModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                      'texts' => [
+                        'SDK live coverage test.',
+                      ],
+                    ],
+                  ],
                   'method' => 'POST',
                   'orig' => '/v1/ephemeral/embed-bridge',
                   'segments' => [
@@ -531,6 +909,68 @@ class UnivecConfig
                 [
                   'args' => [],
                   'kind' => 'http',
+                  'live' => [
+                    'assert' => [
+                      'equal' => [
+                        'model' => [
+                          'from' => 'models',
+                          'path' => 'sourceModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                      ],
+                      'vectors' => [
+                        'count' => 1,
+                        'dimension' => [
+                          'from' => 'models',
+                          'path' => 'sourceDim',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'path' => 'embeddings',
+                      ],
+                    ],
+                    'auth' => 'account',
+                    'id' => 'account-embed',
+                    'input' => [
+                      'model' => [
+                        'from' => 'models',
+                        'path' => 'sourceModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                      'texts' => [
+                        'SDK live coverage test.',
+                      ],
+                    ],
+                  ],
                   'method' => 'POST',
                   'orig' => '/v1/embed',
                   'segments' => [
@@ -554,6 +994,72 @@ class UnivecConfig
                 [
                   'args' => [],
                   'kind' => 'http',
+                  'live' => [
+                    'assert' => [
+                      'equal' => [
+                        'model' => [
+                          'from' => 'models',
+                          'path' => 'sourceModel',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                      ],
+                      'vectors' => [
+                        'count' => 1,
+                        'dimension' => [
+                          'from' => 'models',
+                          'path' => 'sourceDim',
+                          'related' => [
+                            'foreign' => 'name',
+                            'from' => 'models',
+                            'local' => 'sourceModel',
+                            'where' => [
+                              'modelType' => 'embed',
+                            ],
+                          ],
+                          'where' => [
+                            'modelType' => 'convert',
+                          ],
+                        ],
+                        'path' => 'embeddings',
+                      ],
+                    ],
+                    'auth' => 'issued',
+                    'credential' => [
+                      'from' => 'key',
+                      'path' => 'key',
+                    ],
+                    'id' => 'ephemeral-embed',
+                    'input' => [
+                      'model' => [
+                        'from' => 'models',
+                        'path' => 'sourceModel',
+                        'related' => [
+                          'foreign' => 'name',
+                          'from' => 'models',
+                          'local' => 'sourceModel',
+                          'where' => [
+                            'modelType' => 'embed',
+                          ],
+                        ],
+                        'where' => [
+                          'modelType' => 'convert',
+                        ],
+                      ],
+                      'texts' => [
+                        'SDK live coverage test.',
+                      ],
+                    ],
+                  ],
                   'method' => 'POST',
                   'orig' => '/v1/ephemeral/embed',
                   'segments' => [
@@ -624,6 +1130,16 @@ class UnivecConfig
                 [
                   'args' => [],
                   'kind' => 'http',
+                  'live' => [
+                    'assert' => [
+                      'nonempty' => [
+                        'key',
+                      ],
+                    ],
+                    'auth' => 'public',
+                    'id' => 'key',
+                    'retention' => 'No deletion endpoint; issued key is subject to the service daily allowance',
+                  ],
                   'method' => 'POST',
                   'orig' => '/v1/ephemeral/key',
                   'segments' => [
@@ -721,6 +1237,15 @@ class UnivecConfig
                 [
                   'args' => [],
                   'kind' => 'http',
+                  'live' => [
+                    'assert' => [
+                      'nonempty' => [
+                        '',
+                      ],
+                    ],
+                    'auth' => 'public',
+                    'id' => 'models',
+                  ],
                   'method' => 'GET',
                   'orig' => '/v1/models',
                   'segments' => [

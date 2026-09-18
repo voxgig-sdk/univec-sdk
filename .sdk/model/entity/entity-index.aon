@@ -1,6 +1,6 @@
 # Entity Models
 
-@"convert.aon"
-@"embed.aon"
-@"ephemeral_key.aon"
-@"model.aon"
+@"./convert.aon"
+@"./embed.aon"
+@"./ephemeral_key.aon"
+@"./model.aon"

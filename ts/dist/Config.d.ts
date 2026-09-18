@@ -313,6 +313,103 @@ declare class Config {
                     points: ({
                         args: {};
                         kind: string;
+                        live: {
+                            assert: {
+                                equal: {
+                                    source_model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    target_model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    bridge_model?: undefined;
+                                };
+                                vectors: {
+                                    count: number;
+                                    dimension: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    path: string;
+                                };
+                            };
+                            auth: string;
+                            id: string;
+                            input: {
+                                embeddings: {
+                                    from: string;
+                                    path: string;
+                                };
+                                source_model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                target_model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                bridge_model?: undefined;
+                                texts?: undefined;
+                            };
+                            credential?: undefined;
+                        };
                         method: string;
                         orig: string;
                         segments: {
@@ -329,6 +426,329 @@ declare class Config {
                     } | {
                         args: {};
                         kind: string;
+                        live: {
+                            assert: {
+                                equal: {
+                                    bridge_model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    target_model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    source_model?: undefined;
+                                };
+                                vectors: {
+                                    count: number;
+                                    dimension: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    path: string;
+                                };
+                            };
+                            auth: string;
+                            id: string;
+                            input: {
+                                bridge_model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                target_model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                texts: string[];
+                                embeddings?: undefined;
+                                source_model?: undefined;
+                            };
+                            credential?: undefined;
+                        };
+                        method: string;
+                        orig: string;
+                        segments: {
+                            lit: string;
+                        }[];
+                        select: {
+                            $action: string;
+                        };
+                        transform: {
+                            req: string;
+                            res: string;
+                        };
+                        parts: string[];
+                    } | {
+                        args: {};
+                        kind: string;
+                        live: {
+                            assert: {
+                                equal: {
+                                    source_model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    target_model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    bridge_model?: undefined;
+                                };
+                                vectors: {
+                                    count: number;
+                                    dimension: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    path: string;
+                                };
+                            };
+                            auth: string;
+                            credential: {
+                                from: string;
+                                path: string;
+                            };
+                            id: string;
+                            input: {
+                                embeddings: {
+                                    from: string;
+                                    path: string;
+                                };
+                                source_model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                target_model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                bridge_model?: undefined;
+                                texts?: undefined;
+                            };
+                        };
+                        method: string;
+                        orig: string;
+                        segments: {
+                            lit: string;
+                        }[];
+                        select: {
+                            $action: string;
+                        };
+                        transform: {
+                            req: string;
+                            res: string;
+                        };
+                        parts: string[];
+                    } | {
+                        args: {};
+                        kind: string;
+                        live: {
+                            assert: {
+                                equal: {
+                                    bridge_model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    target_model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    source_model?: undefined;
+                                };
+                                vectors: {
+                                    count: number;
+                                    dimension: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    path: string;
+                                };
+                            };
+                            auth: string;
+                            credential: {
+                                from: string;
+                                path: string;
+                            };
+                            id: string;
+                            input: {
+                                bridge_model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                target_model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                texts: string[];
+                                embeddings?: undefined;
+                                source_model?: undefined;
+                            };
+                        };
                         method: string;
                         orig: string;
                         segments: {
@@ -364,6 +784,67 @@ declare class Config {
                     points: ({
                         args: {};
                         kind: string;
+                        live: {
+                            assert: {
+                                equal: {
+                                    model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                };
+                                vectors: {
+                                    count: number;
+                                    dimension: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    path: string;
+                                };
+                            };
+                            auth: string;
+                            id: string;
+                            input: {
+                                model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                texts: string[];
+                            };
+                            credential?: undefined;
+                        };
                         method: string;
                         orig: string;
                         segments: {
@@ -380,6 +861,70 @@ declare class Config {
                     } | {
                         args: {};
                         kind: string;
+                        live: {
+                            assert: {
+                                equal: {
+                                    model: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                };
+                                vectors: {
+                                    count: number;
+                                    dimension: {
+                                        from: string;
+                                        path: string;
+                                        related: {
+                                            foreign: string;
+                                            from: string;
+                                            local: string;
+                                            where: {
+                                                modelType: string;
+                                            };
+                                        };
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    path: string;
+                                };
+                            };
+                            auth: string;
+                            credential: {
+                                from: string;
+                                path: string;
+                            };
+                            id: string;
+                            input: {
+                                model: {
+                                    from: string;
+                                    path: string;
+                                    related: {
+                                        foreign: string;
+                                        from: string;
+                                        local: string;
+                                        where: {
+                                            modelType: string;
+                                        };
+                                    };
+                                    where: {
+                                        modelType: string;
+                                    };
+                                };
+                                texts: string[];
+                            };
+                        };
                         method: string;
                         orig: string;
                         segments: {
@@ -422,6 +967,14 @@ declare class Config {
                     points: {
                         args: {};
                         kind: string;
+                        live: {
+                            assert: {
+                                nonempty: string[];
+                            };
+                            auth: string;
+                            id: string;
+                            retention: string;
+                        };
                         method: string;
                         orig: string;
                         segments: {
@@ -460,6 +1013,13 @@ declare class Config {
                     points: {
                         args: {};
                         kind: string;
+                        live: {
+                            assert: {
+                                nonempty: string[];
+                            };
+                            auth: string;
+                            id: string;
+                        };
                         method: string;
                         orig: string;
                         segments: {

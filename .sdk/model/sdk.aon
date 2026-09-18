@@ -11,34 +11,34 @@ def: 'univec-openapi.json'
 
 
 # API Information
-@"api/api-info.aon"
+@"./api/api-info.aon"
 
 
 # SDK Configuration.
-@"config.aon"
+@"./config.aon"
 
 
 # SDK Entities
-@"entity/entity-index.aon"
+@"./entity/entity-index.aon"
 
 
 # SDK Features.
-@"feature/feature-index.aon"
+@"./feature/feature-index.aon"
  
 
 # SDK Targets.
-@"target/target-index.aon"
+@"./target/target-index.aon"
 
 
 # Operation workflows.
-@"flow/flow-index.aon"
+@"./flow/flow-index.aon"
 
 
 # Project overlay — user-owned, created once and never overwritten.
 #
 # LAST, deliberately: it may refine main.kit.target.<t>, and a target can only
 # be refined after target-index.aon has defined it.
-@"project.aon"
+@"./project.aon"
 
 # Documentation editions. Settings belong in project.aon.
-@"edition/edition-index.aon"
+@"./edition/edition-index.aon"

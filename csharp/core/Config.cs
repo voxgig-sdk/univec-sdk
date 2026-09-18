@@ -450,6 +450,125 @@ public static class SdkConfig
                                 {
                                     ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["equal"] = new Dictionary<string, object?>
+                                            {
+                                                ["source_model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "sourceModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["target_model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "targetModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                            },
+                                            ["vectors"] = new Dictionary<string, object?>
+                                            {
+                                                ["count"] = 1,
+                                                ["dimension"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "targetDim",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["path"] = "embeddings",
+                                            },
+                                        },
+                                        ["auth"] = "account",
+                                        ["id"] = "account-convert",
+                                        ["input"] = new Dictionary<string, object?>
+                                        {
+                                            ["embeddings"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "account-embed",
+                                                ["path"] = "embeddings",
+                                            },
+                                            ["source_model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "sourceModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                            ["target_model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "targetModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                        },
+                                    },
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/convert",
                                     ["segments"] = new List<object?>
@@ -479,6 +598,124 @@ public static class SdkConfig
                                 {
                                     ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["equal"] = new Dictionary<string, object?>
+                                            {
+                                                ["bridge_model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "sourceModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["target_model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "targetModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                            },
+                                            ["vectors"] = new Dictionary<string, object?>
+                                            {
+                                                ["count"] = 1,
+                                                ["dimension"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "targetDim",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["path"] = "embeddings",
+                                            },
+                                        },
+                                        ["auth"] = "account",
+                                        ["id"] = "account-embed-bridge",
+                                        ["input"] = new Dictionary<string, object?>
+                                        {
+                                            ["bridge_model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "sourceModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                            ["target_model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "targetModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                            ["texts"] = new List<object?>
+                                            {
+                                                "SDK live coverage test.",
+                                            },
+                                        },
+                                    },
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/embed-bridge",
                                     ["segments"] = new List<object?>
@@ -511,6 +748,130 @@ public static class SdkConfig
                                 {
                                     ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["equal"] = new Dictionary<string, object?>
+                                            {
+                                                ["source_model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "sourceModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["target_model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "targetModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                            },
+                                            ["vectors"] = new Dictionary<string, object?>
+                                            {
+                                                ["count"] = 1,
+                                                ["dimension"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "targetDim",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["path"] = "embeddings",
+                                            },
+                                        },
+                                        ["auth"] = "issued",
+                                        ["credential"] = new Dictionary<string, object?>
+                                        {
+                                            ["from"] = "key",
+                                            ["path"] = "key",
+                                        },
+                                        ["id"] = "ephemeral-convert",
+                                        ["input"] = new Dictionary<string, object?>
+                                        {
+                                            ["embeddings"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "ephemeral-embed",
+                                                ["path"] = "embeddings",
+                                            },
+                                            ["source_model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "sourceModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                            ["target_model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "targetModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                        },
+                                    },
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/convert",
                                     ["segments"] = new List<object?>
@@ -548,6 +909,129 @@ public static class SdkConfig
                                 {
                                     ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["equal"] = new Dictionary<string, object?>
+                                            {
+                                                ["bridge_model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "sourceModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["target_model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "targetModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                            },
+                                            ["vectors"] = new Dictionary<string, object?>
+                                            {
+                                                ["count"] = 1,
+                                                ["dimension"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "targetDim",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["path"] = "embeddings",
+                                            },
+                                        },
+                                        ["auth"] = "issued",
+                                        ["credential"] = new Dictionary<string, object?>
+                                        {
+                                            ["from"] = "key",
+                                            ["path"] = "key",
+                                        },
+                                        ["id"] = "ephemeral-embed-bridge",
+                                        ["input"] = new Dictionary<string, object?>
+                                        {
+                                            ["bridge_model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "sourceModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                            ["target_model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "targetModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                            ["texts"] = new List<object?>
+                                            {
+                                                "SDK live coverage test.",
+                                            },
+                                        },
+                                    },
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/embed-bridge",
                                     ["segments"] = new List<object?>
@@ -628,6 +1112,86 @@ public static class SdkConfig
                                 {
                                     ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["equal"] = new Dictionary<string, object?>
+                                            {
+                                                ["model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "sourceModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                            },
+                                            ["vectors"] = new Dictionary<string, object?>
+                                            {
+                                                ["count"] = 1,
+                                                ["dimension"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "sourceDim",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["path"] = "embeddings",
+                                            },
+                                        },
+                                        ["auth"] = "account",
+                                        ["id"] = "account-embed",
+                                        ["input"] = new Dictionary<string, object?>
+                                        {
+                                            ["model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "sourceModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                            ["texts"] = new List<object?>
+                                            {
+                                                "SDK live coverage test.",
+                                            },
+                                        },
+                                    },
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/embed",
                                     ["segments"] = new List<object?>
@@ -657,6 +1221,91 @@ public static class SdkConfig
                                 {
                                     ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["equal"] = new Dictionary<string, object?>
+                                            {
+                                                ["model"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "sourceModel",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                            },
+                                            ["vectors"] = new Dictionary<string, object?>
+                                            {
+                                                ["count"] = 1,
+                                                ["dimension"] = new Dictionary<string, object?>
+                                                {
+                                                    ["from"] = "models",
+                                                    ["path"] = "sourceDim",
+                                                    ["related"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["foreign"] = "name",
+                                                        ["from"] = "models",
+                                                        ["local"] = "sourceModel",
+                                                        ["where"] = new Dictionary<string, object?>
+                                                        {
+                                                            ["modelType"] = "embed",
+                                                        },
+                                                    },
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "convert",
+                                                    },
+                                                },
+                                                ["path"] = "embeddings",
+                                            },
+                                        },
+                                        ["auth"] = "issued",
+                                        ["credential"] = new Dictionary<string, object?>
+                                        {
+                                            ["from"] = "key",
+                                            ["path"] = "key",
+                                        },
+                                        ["id"] = "ephemeral-embed",
+                                        ["input"] = new Dictionary<string, object?>
+                                        {
+                                            ["model"] = new Dictionary<string, object?>
+                                            {
+                                                ["from"] = "models",
+                                                ["path"] = "sourceModel",
+                                                ["related"] = new Dictionary<string, object?>
+                                                {
+                                                    ["foreign"] = "name",
+                                                    ["from"] = "models",
+                                                    ["local"] = "sourceModel",
+                                                    ["where"] = new Dictionary<string, object?>
+                                                    {
+                                                        ["modelType"] = "embed",
+                                                    },
+                                                },
+                                                ["where"] = new Dictionary<string, object?>
+                                                {
+                                                    ["modelType"] = "convert",
+                                                },
+                                            },
+                                            ["texts"] = new List<object?>
+                                            {
+                                                "SDK live coverage test.",
+                                            },
+                                        },
+                                    },
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/embed",
                                     ["segments"] = new List<object?>
@@ -745,6 +1394,19 @@ public static class SdkConfig
                                 {
                                     ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["nonempty"] = new List<object?>
+                                            {
+                                                "key",
+                                            },
+                                        },
+                                        ["auth"] = "public",
+                                        ["id"] = "key",
+                                        ["retention"] = "No deletion endpoint; issued key is subject to the service daily allowance",
+                                    },
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/key",
                                     ["segments"] = new List<object?>
@@ -865,6 +1527,18 @@ public static class SdkConfig
                                 {
                                     ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["nonempty"] = new List<object?>
+                                            {
+                                                "",
+                                            },
+                                        },
+                                        ["auth"] = "public",
+                                        ["id"] = "models",
+                                    },
                                     ["method"] = "GET",
                                     ["orig"] = "/v1/models",
                                     ["segments"] = new List<object?>

@@ -27,14 +27,14 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": ">=25.6",
-    "@voxgig/apidef": ">=8.6.0",
-    "@voxgig/docgen": ">=0.10.1",
+    "@voxgig/apidef": ">=8.12.1",
+    "@voxgig/docgen": ">=0.23.0",
     "@voxgig/model": ">=10.0",
-    "@voxgig/sdkgen": ">=4.17.0",
+    "@voxgig/sdkgen": ">=4.22.0",
     "@voxgig/sdkgen-langpack": "0.0.4",
     "@voxgig/struct": ">=0.2",
     "@voxgig/util": ">=0.5",
-    "aontu": ">=0.52",
+    "aontu": ">=0.68",
     "jostraca": ">=0.33.1",
     "typescript": ">=6.0"
   }
