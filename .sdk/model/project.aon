@@ -105,3 +105,8 @@ main: kit: target: 'swift': publish: version: '0.1.2'
 main: kit: target: 'ts': publish: version: '0.1.2'
 main: kit: target: 'zig': publish: version: '0.1.2'
 # --- end cedar: release version
+
+# GitHub Pages is enabled for this repository and serving the generated site,
+# so the README may link it. published, not active: active only means the
+# edition is generated, which every project does. See voxgig/sdkgen#203.
+main: kit: doc: edition: 'github-pages': published: true
