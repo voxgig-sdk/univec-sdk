@@ -8,6 +8,8 @@ import {
   each,
   isAuthActive,
   isConfigData,
+  resolveAuthIn,
+  resolveAuthName,
   resolveAuthPrefix,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -50,28 +52,31 @@ const Config = cmp(async function Config(props: any) {
   let baseUrl = ''
   try { baseUrl = getModelPath(model, `main.${KIT}.info.servers.0.url`) } catch (_e) { }
 
-  // The canonical config OBJECT and its JSON, from the shared helper. Both
-  // representations render from the same `def`, so they cannot describe
-  // different configs - and this target picks up `options.server` (the
-  // OpenAPI server-variable defaults), which the hand-rolled build here
-  // omitted entirely. Passing target.name opts into the main
-  // slug/version/target identity fields (station descriptor input, mirrors
-  // Config_ts) - both reps below render from this same def, so the data
-  // and literal branches pick the fields up together.
-  const { def: config, json: configJson } = configDefinition(model, target.name)
+  const { def: config, json: baseJson } = configDefinition(model, target.name)
+
+  const authIn = resolveAuthIn(model)
+  const authName = resolveAuthName(model)
+  let configJson = baseJson
+
+  if (authActive && null != config.options && null != config.options.auth) {
+    let changed = false
+    if ('header' !== authIn) {
+      config.options.auth.in = authIn
+      changed = true
+    }
+    if ('Authorization' !== authName) {
+      config.options.auth.name = authName
+      changed = true
+    }
+    if (changed) {
+      configJson = JSON.stringify(config)
+    }
+  }
+
   const asData = isConfigData(configJson, configReprSetting(model))
 
   File({ name: 'config.' + target.ext }, () => {
 
-    // ABOVE THE THRESHOLD: emit the model as DATA.
-    //
-    // The literal is one deeply nested expression. rustc type-checks and
-    // monomorphises it as a single item, so compile time and memory grow with
-    // the whole model at once; a string constant is one token, and json_parse
-    // builds the same Value tree at runtime.
-    //
-    // No number-type question here, unlike Go: `Value::Num` is f64 in both
-    // representations, so there is nothing for the two paths to disagree about.
     if (asData) {
       Content(`// Generated API configuration (mirrors go core/config.go).
 

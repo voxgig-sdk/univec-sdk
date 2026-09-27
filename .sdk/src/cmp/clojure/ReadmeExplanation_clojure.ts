@@ -23,6 +23,7 @@ ${target.name}/
 ├── src/sdk/api.clj        -- public API namespace (entity accessors)
 ├── src/sdk/client.clj     -- client constructors (make-sdk, test-sdk)
 ├── src/sdk/config.clj     -- generated configuration
+├── src/sdk/schema.clj     -- generated option + entity specs
 ├── src/sdk/core.clj       -- core types, context and pipeline
 ├── src/sdk/features.clj   -- feature factory
 ├── src/sdk/entity/        -- entity namespaces (one per entity)

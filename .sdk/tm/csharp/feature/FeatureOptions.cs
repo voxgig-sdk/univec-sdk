@@ -1,9 +1,6 @@
 // Univec SDK - shared option readers for the feature implementations.
-// Feature options arrive as Dictionary<string, object?> (from SDK options or
-// test harnesses), so numeric values may be int, long or double and
-// callbacks arrive as typed delegates. These helpers normalise access and
-// supply defaults, mirroring the `null == opts.x ? def : opts.x` pattern of
-// the ts features.
+// Options arrive as Dictionary<string, object?>, so a numeric value may be any
+// numeric type; `decimal` is what System.Text.Json yields through JsonElement.
 
 namespace UnivecSdk.Feature;
 
@@ -29,8 +26,17 @@ internal static class FeatureOptions
         {
             int n => n,
             long n => (int)n,
+            short n => n,
+            sbyte n => n,
+            uint n => (int)n,
+            ulong n => (int)n,
+            ushort n => n,
+            byte n => n,
             double n => (int)n,
             float n => (int)n,
+            // Via double: decimal->int is the one conversion C# range-checks
+            // even unchecked, and no other target throws on an oversized option.
+            decimal n => (int)(double)n,
             _ => def,
         };
     }
@@ -41,8 +47,15 @@ internal static class FeatureOptions
         {
             int n => n,
             long n => n,
+            short n => n,
+            sbyte n => n,
+            uint n => n,
+            ulong n => n,
+            ushort n => n,
+            byte n => n,
             double n => n,
             float n => n,
+            decimal n => (double)n,
             _ => def,
         };
     }

@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/omni sdk-20260908-1556-0 (c/src/omni.h)
-// Source: https://github.com/voxgig/omni @ 274708cc2d12b21707d975543953f845f8444be0  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/omni sdk-20260925-1316-0 (c/src/omni.h)
+// Source: https://github.com/voxgig/omni @ b909ff51fc644e4955c850e30cc65e74be076df2  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* Omni: the shared multi-language test runner (C port).
  *

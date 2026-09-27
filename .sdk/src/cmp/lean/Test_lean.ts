@@ -18,7 +18,7 @@ function hasParamFreePoint(op: any): boolean {
   if (null == op) return false
   const points = op.points || []
   for (const pt of points) {
-    const params = ((pt.args || {}).params) || []
+    const params = ((pt.g || {}).params) || []
     if (params.length === 0) return true
   }
   return false
@@ -33,20 +33,19 @@ function selectsByParams(op: any): boolean {
   if (null == op) return false
   const points = op.points || []
   for (const pt of points) {
-    const params = ((pt.args || {}).params) || []
+    const params = ((pt.g || {}).params) || []
     if (0 < params.length) return true
   }
   return false
 }
 
 
-// Synthesize a create payload from the entity's required non-id fields.
 function synthData(fields: any): any {
   const o: any = {}
   each(fields, (f: any) => {
-    if (f.req && f.name !== 'id') {
-      const t = String(f.type || '').toLowerCase()
-      o[f.name] =
+    if (f.r && f.n !== 'id') {
+      const t = String(f.t || '').toLowerCase()
+      o[f.n] =
         (t.includes('number') || t.includes('integer') || t.includes('decimal')) ? 42
           : t.includes('bool') ? true
             : 'leantest'
@@ -56,14 +55,6 @@ function synthData(fields: any): any {
 }
 
 
-// The generated `test/Runner.lean` exe runs TWO lanes:
-//
-//  - OFFLINE (always): a test-mode client seeded from the entity's generated
-//    `<Entity>TestData.json` answers operations from an in-memory store, so
-//    entity behaviour (list/load/create/load-back/remove) is verified with no
-//    server — the same guarantee the `test` feature gives the other targets.
-//  - LIVE (only when SDK_TEST_BASE is set): the same flow against a real
-//    server, exercising the curl transport end to end.
 const Test = cmp(async function Test(props: any) {
   const ctx$ = props.ctx$
   const target = props.target
@@ -72,7 +63,6 @@ const Test = cmp(async function Test(props: any) {
   const entity = each(entityCollection(model))
     .filter((e: any) => false !== e.active)
 
-  // Per-entity OFFLINE (test-mode) blocks: seeded store, no server.
   let offline = ''
   each(entity, (e: any) => {
     const ns = e.name.charAt(0).toUpperCase() + e.name.slice(1)
@@ -80,12 +70,6 @@ const Test = cmp(async function Test(props: any) {
     const ops = e.op || {}
     if (!ops.list && !ops.load) return
 
-    // Only call the ops the entity actually declares. `Entity.create` is not
-    // generated for a load-only entity, so emitting the create/remove block
-    // unconditionally fails the build with "Unknown identifier X.create".
-    // Value's constructors are spelled out (`Value.list`, not `.list`) — the
-    // expected type is not known at the match scrutinee, and Lean reports the
-    // dotted form as ambiguous against Std's own `.list`.
     let body = ''
 
     if (ops.list) {
@@ -108,12 +92,6 @@ const Test = cmp(async function Test(props: any) {
           else fail s!"${e.name}.load offline: got {gid}, want {wid}"
 `
     }
-    // A singleton load (`/current`, `/slack`) is deliberately NOT asserted
-    // here. The offline lane answers from a store keyed by entity id, so a
-    // load carrying no id has nothing to look up — the only honest assertion
-    // would need the model-driven match data the other targets build in their
-    // TestEntity components. Until this lane is model-driven too, such an
-    // entity contributes no offline block rather than a misleading one.
 
     if (ops.create && ops.load && ops.remove) {
       body += `        -- create -> load back -> remove, all in the store
@@ -137,8 +115,6 @@ const Test = cmp(async function Test(props: any) {
 `
     }
 
-    // Nothing to assert (an entity whose only op needs path params we cannot
-    // synthesise) — skip the block rather than emit an empty `do`.
     if ('' === body) return
 
     offline += `    -- ${e.name}: offline (test-mode) entity behaviour
@@ -155,7 +131,6 @@ ${body})
 `
   })
 
-  // Per-entity LIVE test blocks.
   let blocks = ''
   each(entity, (e: any) => {
     const ns = e.name.charAt(0).toUpperCase() + e.name.slice(1)
@@ -173,8 +148,6 @@ ${body})
 `
     }
 
-    // Round-trip when create is param-free (creatable without an id); load and
-    // remove then use the id returned by create.
     const loadOp = (e.op || {}).load
     if (hasParamFreePoint(createOp) && loadOp && removeOp) {
       const data = JSON.stringify(synthData(e.fields))
@@ -195,7 +168,6 @@ ${body})
     }
   })
 
-  // The live lane nests two levels deeper than the offline lane.
   const liveBlocks = blocks.split('\n').map((l) => l ? '  ' + l : l).join('\n')
 
   // A `do` block whose last statement is a `let` is a type error in Lean

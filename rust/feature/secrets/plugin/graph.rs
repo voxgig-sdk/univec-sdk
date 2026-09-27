@@ -1,23 +1,6 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (rust/src/graph.rs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (rust/src/graph.rs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! Whole-graph resolution (§11.4) - a phase, not a discovery.
-//!
-//! "Activate, and wait in `pending` if you must" is correct and, on its
-//! own, produces a terrible experience: apply twenty instances against a
-//! registry missing one thing and you get NINETEEN pending rows and no
-//! statement of what is actually wrong.
-//!
-//! `resolve_graph` is a PURE FUNCTION of the registry and the intended
-//! activation set. No callbacks run, no state changes, nothing is touched.
-//! It answers for the whole graph at once which instances can be live, and
-//! for each blocked one THE SPECIFIC REQUIREMENT that is unmet, and why.
-//!
-//! The failure mode being designed against is a famous one: OSGi's
-//! resolver is correct and its diagnostics are legendarily unusable. A
-//! resolver that says "blocked" without saying WHY has moved the problem
-//! rather than solved it, so `why` is part of the contract and the corpus
-//! pins its shape.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -36,10 +19,6 @@ pub fn resolve_graph(nodes: &Value) -> Value {
     let mut resolved: BTreeSet<String> = BTreeSet::new();
     let mut blocked: BTreeMap<String, Value> = BTreeMap::new();
 
-    // Fixed point: a node resolves when every mandatory requirement is met
-    // by an ALREADY-RESOLVED provider. Iterating to a fixed point is what
-    // makes a provider that is itself blocked propagate, rather than each
-    // node being judged against the raw registry.
     let mut moved = true;
     while moved {
         moved = false;
@@ -78,10 +57,6 @@ pub fn resolve_graph(nodes: &Value) -> Value {
     out
 }
 
-/// The FIRST unmet requirement, with the most specific explanation
-/// available. Order matters: "no provider at all" and "a provider at the
-/// wrong version" are different problems and a reader must not have to
-/// guess which they have.
 fn firstunmet(
     node: &Value,
     byref: &BTreeMap<String, Value>,

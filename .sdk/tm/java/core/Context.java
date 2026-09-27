@@ -82,7 +82,8 @@ public class Context {
         this.ctrl = (Control) cv;
       }
     }
-    else if (basectx != null && basectx.ctrl != null) {
+    else if (basectx != null && basectx.ctrl != null
+        && Helpers.getCtxProp(ctxmap, "opname") == null) {
       this.ctrl = basectx.ctrl;
     }
 

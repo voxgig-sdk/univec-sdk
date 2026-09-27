@@ -58,21 +58,36 @@ fun resultHeaders(ctx: Context): KOTLINPACKAGE.core.Result {
   return result!!
 }
 
+// `$action` selects the point (see makePoint); it is never an API field, so
+// the body is a copy without it. The caller's map is left untouched.
+private fun stripAction(reqdata: Any?): Any? {
+  if (reqdata !is Map<*, *> || !reqdata.containsKey("\$action")) {
+    return reqdata
+  }
+  val body = linkedMapOf<String, Any?>()
+  for ((k, v) in reqdata) {
+    if ("\$action" != k) {
+      body[k.toString()] = v
+    }
+  }
+  return body
+}
+
 fun transformRequest(ctx: Context): Any? {
   if (ctx.spec != null) {
     ctx.spec!!.step = "reqform"
   }
 
   val transform = Helpers.toMapAny(Struct.getprop(ctx.point, "transform"))
-    ?: return ctx.reqdata
+    ?: return stripAction(ctx.reqdata)
 
   val reqform = Struct.getprop(transform, "req", null)
-    ?: return ctx.reqdata
+    ?: return stripAction(ctx.reqdata)
 
   val data = linkedMapOf<String, Any?>()
   data["reqdata"] = ctx.reqdata
 
-  return Struct.transform(data, reqform)
+  return stripAction(Struct.transform(data, reqform))
 }
 
 fun transformResponse(ctx: Context): Any? {

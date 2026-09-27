@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "voxgig-sdk-univec-data"
+name = "voxgig-sdk-univec-sdk-data"
 version = "0.1.2"
 description = "Unofficial generated Python Data SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider."
 readme = "README.md"
@@ -11,7 +11,7 @@ license = "MIT"
 requires-python = ">=3.9"
 keywords = ["voxgig", "sdk", "generated-sdk", "openapi", "api-client", "univec", "pandas", "dataframe", "notebook", "colab"]
 dependencies = [
-    "voxgig-sdk-univec",
+    "voxgig-sdk-univec-sdk",
     "pandas>=2.0",
 ]
 

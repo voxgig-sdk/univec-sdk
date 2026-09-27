@@ -5,13 +5,6 @@ import type { UnivecSDK } from '../../UnivecSDK'
 import { BaseFeature } from '../base/BaseFeature'
 
 
-// Audit trail. Emits a structured record for every operation — who (actor),
-// what (entity + op), the outcome, and a correlation id — suitable for
-// compliance logging. Records accumulate on `client._audit.records`
-// (bounded by `max`) and, when a `sink` callback is supplied, are also
-// pushed to it (e.g. to forward to a SIEM). The actor is taken from options
-// (`actor`) or a per-call `ctrl.actor`. Timestamps use the injectable
-// `now` clock so tests stay deterministic.
 class AuditFeature extends BaseFeature {
   version = '0.0.1'
   name = 'audit'

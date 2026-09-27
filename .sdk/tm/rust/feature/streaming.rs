@@ -1,10 +1,3 @@
-// Streaming result support (mirrors go feature/streaming_feature.go,
-// adapted to a synchronous runtime). For list-style operations it attaches
-// a `result.stream` producer so callers can consume items incrementally
-// with `for item in (result.stream)()` instead of materialising the whole
-// list themselves. A `chunkSize` groups items into list batches when set;
-// a `chunkDelay` (ms) paces delivery via the injectable `sleep` for
-// offline tests.
 
 use std::rc::Rc;
 

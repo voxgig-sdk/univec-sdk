@@ -45,7 +45,8 @@ sub new {
     $self->{ctrl}{actor} = $ctrl_raw->{actor} if exists $ctrl_raw->{actor};
     $self->{ctrl}{paging} = $ctrl_raw->{paging} if Voxgig::Struct::ismap($ctrl_raw->{paging});
   }
-  elsif ($basectx && $basectx->{ctrl}) {
+  elsif ($basectx && $basectx->{ctrl}
+      && !defined UnivecHelpers::get_ctx_prop($ctxmap, 'opname')) {
     $self->{ctrl} = $basectx->{ctrl};
   }
 

@@ -1,5 +1,3 @@
-// Custom utility overrides (mirrors tm/go/test/custom_utility_test.go):
-// caller-supplied callables in options.utility land on utility.custom.
 
 use RUSTCRATE::core::helpers::{call_vfn, getp, jo, vfn};
 use RUSTCRATE::{test_sdk, Value};

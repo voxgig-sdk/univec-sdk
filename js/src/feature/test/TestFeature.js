@@ -4,6 +4,17 @@ const { BaseFeature } = require('../base/BaseFeature')
 
 const S_NOT_FOUND = 'Not found'
 
+// The `%04x%04x%04x%04x` every other target mints, so the id's shape does not
+// depend on which language answered.
+function mintId() {
+  let out = ''
+  for (let i = 0; i < 4; i++) {
+    out += ((Math.random() * 0x10000) | 0).toString(16).padStart(4, '0')
+  }
+  return out
+}
+
+
 
 class TestFeature extends BaseFeature {
   version = '0.0.1'
@@ -137,6 +148,7 @@ class TestFeature extends BaseFeature {
         const found = select(entmap, args)
         const ent = getelem(found, 0)
         if (null == ent) {
+          // update miss: 404, never another record
           return respond(404, undefined, { statusText: S_NOT_FOUND })
         }
         else {
@@ -150,22 +162,18 @@ class TestFeature extends BaseFeature {
         const args = self.buildArgs(ctx, op, ctx.reqmatch)
         const found = select(entmap, args)
         const ent = getelem(found, 0)
-        if (null == ent) {
-          return respond(404, undefined, { statusText: S_NOT_FOUND })
-        }
-        else {
+        // Remove only the first matched entity. If nothing matches,
+        // succeed as a no-op rather than erroring.
+        if (null != ent) {
           delprop(entmap, getprop(ent, 'id'))
-          return respond(200)
         }
+        return respond(200)
       }
       else if ('create' === op.name) {
         const args = self.buildArgs(ctx, op, ctx.reqdata)
         let id = param(ctx, 'id')
         if (null == id) {
-          id = ((1e4 * Math.random() | 0).toString(16) +
-            (1e4 * Math.random() | 0).toString(16) +
-            (1e4 * Math.random() | 0).toString(16) +
-            (1e4 * Math.random() | 0).toString(16)).padEnd(16, '0')
+          id = mintId()
         }
 
         const ent = clone(ctx.reqdata)
@@ -175,6 +183,8 @@ class TestFeature extends BaseFeature {
         const out = clone(ent)
         return respond(200, out)
       }
+
+      return respond(404, undefined, { statusText: 'Unknown operation' })
     }
 
     // Optional network behaviour simulation over the mock transport. Enable

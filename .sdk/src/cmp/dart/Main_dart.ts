@@ -50,30 +50,8 @@ const Main = cmp(async function Main(props: any) {
 
   Gitignore({})
 
-  // Copy tm/dart files with replacements. The src/feature/* dirs exist only
-  // for the feature-add copy mechanism (real feature sources live under
-  // lib/feature/), so they are excluded from the generated package.
   Copy({
     from: 'tm/' + target.name,
-    // pluginExcludes: the generate-time plugin trim (an INACTIVE plugin
-    // group's declared files stay out of the tree - the model's `path`
-    // entries are target-root-relative, which is this Copy's root). The
-    // FEATURE-level trim for dart stays an add-time concern (vendor-tag
-    // rollout, Decision 5), exactly as for go and py.
-    //
-    // It must be EXACT for dart in a way it need not be elsewhere:
-    // `dart analyze` walks the whole package, so a group `path` list that
-    // omits a file another vendored file imports is a hard build failure
-    // rather than a silent runtime miss.
-    //
-    // `^src/`, ANCHORED, and the anchor is load-bearing. CopyOp seeds its
-    // walk with an empty path, so an exclude names paths within the copied
-    // tree - and the unanchored `/src\//` this used to be matched ANY path
-    // with a `src/` segment. The vendored sekreto port keeps upstream's
-    // layout, which is `sekreto/src/*.dart`, so the whole secrets core was
-    // silently dropped from the generated package while the plugins beside
-    // it survived: nine undefined-symbol errors from `dart analyze` and no
-    // clue in the copy that anything had been excluded.
     exclude: [/^src\//, TEST_CONTROL_EXCLUDE, ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
@@ -109,29 +87,6 @@ const Main = cmp(async function Main(props: any) {
           replace: {
             ...props.ctx$.stdrep,
 
-            // SECRETS. Emitted only when the feature applies to this target
-            // AND the model activates it. An unconditional edit here would
-            // land in every generated SDK and break the inactive-output
-            // gate: a model without the feature must generate exactly as it
-            // did before the migration.
-            //
-            // The accessor finds the feature BY NAME in the public
-            // `features` list rather than through a planted `_secrets`
-            // field, which is what ts and js use: a leading underscore is
-            // LIBRARY-private in Dart, so a feature in its own library
-            // cannot write one on the SDK at all (see the note in
-            // SecretsFeature.dart).
-            //
-            // The LIVE Sekreto, never a clone: it holds provider and cache
-            // state, so a copy would resolve into something the transport
-            // never sees.
-            // Indentation is baked into the string, and the marker sits at
-            // column 0 in the fragment: jostraca hands the marker's own
-            // indent to the handler but does not re-indent a multi-line
-            // Content, so an indented marker emitted an unindented method
-            // body AND left the indent behind as trailing whitespace when
-            // the slot was empty. At column 0 an inactive SDK gains one
-            // blank line and nothing else.
             '// #SecretsAccessor': () => secrets ?
               Content(`
   // The live sekreto chain this SDK resolves its credential through, for

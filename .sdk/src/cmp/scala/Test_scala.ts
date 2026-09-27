@@ -62,9 +62,6 @@ const Test = cmp(function Test(props: any) {
       }
     })
 
-    // Documentation scala-examples presence + structure gate over the root
-    // README, scala/README.md and scala/REFERENCE.md. Driven through the same
-    // shared report by the SdkEntityTestMain aggregator below.
     ReadmeExamplesTest({ target, scalapackage })
 
     // Aggregating main: run every generated per-entity test through one

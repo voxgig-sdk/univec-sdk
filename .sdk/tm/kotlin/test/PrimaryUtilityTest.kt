@@ -39,7 +39,7 @@ class PrimaryUtilityTest {
     const val TEST_JSON_FILE = "../.sdk/test/test.json"
 
     // PENDING sections are the ones deliberately left empty in the shared
-    // corpus (.sdk/test/primary/<name>.aon). Everything else MUST
+    // corpus (.sdk/test/primary/<name>.aontu). Everything else MUST
     // contribute cases.
     val PENDING = setOf(
       "fetcher", "makeFetchDef", "makeResult",

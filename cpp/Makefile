@@ -11,7 +11,7 @@
 CXX ?= g++
 CXXFLAGS ?= -std=c++17 -O0 -g -Wall -Wextra -Wno-unused-parameter -pthread
 
-# ---- gated feature payloads (model/feature/<name>.aon plugin groups) --------
+# ---- gated feature payloads (model/feature/<name>.aontu plugin groups) --------
 #
 # A gated feature's vendored payload sits two levels under feature/
 # (feature/<name>/<lib>/*.cpp), as .cpp/.hpp pairs that cannot ride inside

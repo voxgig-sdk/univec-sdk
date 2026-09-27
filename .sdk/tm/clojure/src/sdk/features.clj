@@ -124,11 +124,13 @@
                        (let [envelope (fn [data]
                                         (let [tm (vs/getprop (core/oget fctx :point) "transform")
                                               spec (vs/getprop tm "res")]
-                                          ;; Exactly `body.<key>`; a deeper path is not an
-                                          ;; envelope this mock can synthesise.
+                                          ;; Rebuild whatever nesting the transform unwraps;
+                                          ;; GraphQL ops unwrap `body.data.<field>`.
                                           (if (and (some? data) (string? spec))
-                                            (if-let [m (re-matches #"`body\.([^`.]+)`" spec)]
-                                              (vs/jm (second m) data)
+                                            (if-let [m (re-matches #"`body\.(.+)`" spec)]
+                                              (reduce (fn [out seg] (vs/jm seg out))
+                                                      data
+                                                      (reverse (str/split (second m) #"\." -1)))
                                               data)
                                             data)))
                              respond (fn [status data extra]
@@ -175,14 +177,11 @@
                              (let [update-match (if (zero? (vs/size update-match)) (resolve-match (vs/jm)) update-match)
                                    args (test-build-args fctx op update-match)
                                    found (vs/select entmap args)
-                                   ent0 (vs/getelem found 0)
-                                   ent (if (and (nil? ent0) (vs/ismap entmap) (pos? (vs/size entmap)))
-                                         (first (filter vs/ismap (map #(vs/getprop entmap %) (vs/keysof entmap))))
-                                         ent0)]
+                                   ent (vs/getelem found 0)]
+                               ;; update miss: 404, never another record
                                (if (nil? ent) (respond 404 nil (vs/jm "statusText" "Not found"))
-                                   (do (when (and (vs/ismap ent) reqdata)
-                                         (doseq [item (or (vs/items reqdata) [])]
-                                           (.put ^java.util.Map ent (vs/getprop item 0) (vs/getprop item 1))))
+                                   (do (when (and (vs/ismap ent) (vs/ismap reqdata))
+                                         (vs/merge (vs/jt ent reqdata)))
                                        (vs/delprop ent "$KEY")
                                        (respond 200 (vs/clone ent) nil)))))
                            (= opn "remove")
@@ -208,20 +207,47 @@
                              (if (nil? net) test-fetcher (make-netsim fa net test-fetcher)))))))
     fa))
 
+(defn- point-terminal? [p]
+  (let [parts (vs/getprop p "parts")
+        n (if (vs/islist parts) (vs/size parts) 0)
+        last-part (when (pos? n) (vs/getelem parts (dec n)))]
+    (and (string? last-part) (str/starts-with? last-part "{"))))
+
+(defn- point-depth [p]
+  (let [parts (vs/getprop p "parts")]
+    (if (vs/islist parts) (vs/size parts) 0)))
+
+;; The entity's own endpoint: a terminal `{param}` marks a record route, and
+;; among equals the shallower path wins (the same rule as make-point).
+(defn- pick-point [points]
+  (when (and (vs/islist points) (pos? (vs/size points)))
+    (reduce (fn [point cand]
+              (cond
+                (not= (point-terminal? cand) (point-terminal? point)) (if (point-terminal? cand) cand point)
+                (< (point-depth cand) (point-depth point)) cand
+                :else point))
+            (vs/getelem points 0)
+            (map #(vs/getelem points %) (range 1 (vs/size points))))))
+
+(defn- reqd-names [point kind]
+  (vs/transform (vs/select (vs/getpath point (str "args." kind)) (vs/jm "reqd" true))
+                (vs/jt "`$EACH`" "" "`$KEY.name`")))
+
 (defn- test-build-args [ctx op args]
   (let [opname (core/op-name op)
         points (vs/getpath (core/oget ctx :config)
                            (str "entity." (core/entity-get-name (core/oget ctx :entity)) ".op." opname ".points"))
-        point (vs/getelem points -1)
-        params-path (vs/getpath point "args.params")
-        reqd-params (vs/select params-path (vs/jm "reqd" true))
-        reqd (vs/transform reqd-params (vs/jt "`$EACH`" "" "`$KEY.name`"))
+        point (pick-point points)
+        ;; Path AND query: a path-only read misses a query-addressed record
+        ;; (e.g. GET /result?trace_id=), which has no path param at all.
+        reqd-params (reqd-names point "params")
+        reqd-query (reqd-names point "query")
         qand (vs/jt)]
     (when args
       (doseq [key (or (vs/keysof args) [])]
         (let [is-id (= key "id")
-              selected (vs/select reqd key)
-              is-reqd (not (vs/isempty selected))]
+              is-reqd (or (not (vs/isempty (vs/select reqd-params key)))
+                          (not (vs/isempty (vs/select reqd-query key))))]
           (when (or is-id is-reqd)
             (let [v ((core/uget ctx :param) ctx key)
                   ka (when (core/op-alias op) (vs/getprop (core/op-alias op) key))
@@ -562,7 +588,14 @@
                          (cond
                            (some? (mget paging "cursor")) (.put ^java.util.Map q cursor-param (mget paging "cursor"))
                            (nil? (mget q page-param))
-                           (.put ^java.util.Map q page-param (if (nil? (mget paging "page")) (opt fa "startPage" 1) (mget paging "page"))))
+                           ;; A record written back by PreResult holds the page
+                           ;; just fetched as `page` and the one to fetch as
+                           ;; `nextPage`, so nextPage wins.
+                           (.put ^java.util.Map q page-param
+                                 (cond
+                                   (some? (mget paging "nextPage")) (mget paging "nextPage")
+                                   (some? (mget paging "page")) (mget paging "page")
+                                   :else (opt fa "startPage" 1))))
                          (when (and (some? (opt fa "limit")) (nil? (mget q limit-param)))
                            (.put ^java.util.Map q limit-param (opt fa "limit"))))))))))
            "PreResult"
@@ -607,12 +640,21 @@
                                  (reset! explicit-more true))))))
                        (when (vs/ismap body)
                          (when (some? (mget body "next")) (when (nil? (mget paging "next")) (.put ^java.util.Map paging "next" (mget body "next"))))
+                         ;; Both spellings, camelCase last so it wins when a
+                         ;; body carries the two.
+                         (when (some? (mget body "next_cursor")) (.put ^java.util.Map paging "cursor" (mget body "next_cursor")))
                          (when (some? (mget body "cursor")) (.put ^java.util.Map paging "cursor" (mget body "cursor")))
                          (when (some? (mget body "nextCursor")) (.put ^java.util.Map paging "cursor" (mget body "nextCursor")))
-                         (let [hm (mget body "hasMore")]
-                           (when (or (= hm true) (= hm false))
-                             (.put ^java.util.Map paging "hasMore" hm)
-                             (reset! explicit-more true))))
+                         (when (nil? (mget paging "nextPage"))
+                           (let [np (if (some? (mget body "nextPage"))
+                                      (mget body "nextPage") (mget body "next_page"))]
+                             (when (or (number? np) (string? np))
+                               (.put ^java.util.Map paging "nextPage" np))))
+                         (doseq [k ["has_more" "hasMore"]]
+                           (let [hm (mget body k)]
+                             (when (or (= hm true) (= hm false))
+                               (.put ^java.util.Map paging "hasMore" hm)
+                               (reset! explicit-more true)))))
                        ;; Cursor presence only INFERS another page. When the
                        ;; server stated the answer outright — relay's
                        ;; `hasNextPage: false`, or a body `hasMore` — that
@@ -625,6 +667,16 @@
                                (boolean (or (mget paging "hasMore") (some? (mget paging "next"))
                                             (some? (mget paging "cursor")) (some? (mget paging "nextPage")))))))
                      (core/oset! result :paging paging)
+                     (when-let [ctrl (core/oget ctx :ctrl)]
+                       (let [held (core/oget ctrl :paging)]
+                         (if (vs/ismap held)
+                           ;; The caller holds this map, so refill it in place
+                           ;; as the other typed ports do; a fresh map on ctrl
+                           ;; would never reach them. Every key of the record
+                           ;; is written, so no key of an earlier page lives on.
+                           (doseq [k (vec (vs/keysof paging))]
+                             (.put ^java.util.Map held k (mget paging k)))
+                           (core/oset! ctrl :paging paging))))
                      (track-set! fa "_paging" (vs/jm "last" paging)))))))
            )
     fa))
@@ -634,7 +686,7 @@
 ;; ---------------------------------------------------------------------------
 ;; Prices every transport ATTEMPT and commits the spend once per OPERATION.
 ;; Mirrors tm/ts/src/feature/cost/CostFeature.ts; the cases are
-;; .sdk/test/feature/cost.aon.
+;; .sdk/test/feature/cost.aontu.
 ;;
 ;; ORDER MATTERS. Cost must sit INSIDE the cache, or a response served from
 ;; cache is charged for money that was never spent. Activate in list form with
@@ -1272,6 +1324,207 @@
 ;; Factory
 ;; ---------------------------------------------------------------------------
 
+;; ---------------------------------------------------------------------------
+;; validate — payload validation against the model's own field types.
+;;
+;; The specs are NOT written here and not written in the model either: every
+;; entity field already carries a canonical type sentinel (`$STRING`,
+;; `$INTEGER`, the `$ONE` union for an OpenAPI multi-type), which is the same
+;; vocabulary vs/validate speaks. The generator maps them once
+;; (helpers/canonSpec) and emits sdk.schema's entityspec-data, so a field
+;; whose type changes in the API spec changes what this feature enforces with
+;; no edit anywhere.
+;;
+;; WHAT IS CHECKED
+;;   outbound (PreSpec)  the payload the caller asked to send, against
+;;                       spec.op[<opname>] — the operation's request shape.
+;;   inbound  (PreDone)  each record the operation returned, against
+;;                       spec.data — the entity's own field types.
+;;
+;; WHAT IS NOT. The model carries no array element types, no nested object
+;; schemas, no enums, formats or bounds, so this checks the shape the model
+;; knows and nothing more.
+;; ---------------------------------------------------------------------------
+
+;; Built rather than written, so the backticks cannot be lost in an edit.
+(def ^:private validate-open (str (char 96) "$OPEN" (char 96)))
+
+;; The spec tree with every `$OPEN` marker removed, so an undeclared key is an
+;; error rather than a pass. Rebuilt rather than mutated: core/entityspec is
+;; parsed once and shared by every client in the process.
+(defn- validate-close [node]
+  (cond
+    (vs/islist node) (let [out (vs/jt)]
+                       (doseq [item (vec node)] (.add ^java.util.List out (validate-close item)))
+                       out)
+    (vs/ismap node) (let [out (vs/jm)]
+                      (doseq [k (vec (vs/keysof node))]
+                        (when (not= validate-open k)
+                          (.put ^java.util.Map out k (validate-close (mget node k)))))
+                      out)
+    :else node))
+
+;; A RESULT RECORD AS DATA.
+;;
+;; u-make-result turns every record of a LIST into an entity instance, so what
+;; reaches PreDone for a list is wrappers, not records — and a wrapper checked
+;; against a field spec fails on every required field while its actual data
+;; goes unchecked. A load returns the record itself, so this handles both.
+(defn- validate-unwrap [record]
+  (if (and (map? record) (:data-get record))
+    (or ((:data-get record)) record)
+    record))
+
+(defn validate-feature []
+  (let [fa (new-feature "validate" false "0.0.1")
+        entname (fn [ctx]
+                  (let [n (when (core/oget ctx :entity)
+                            (core/entity-get-name (core/oget ctx :entity)))]
+                    (cond
+                      (seq n) n
+                      (core/oget ctx :op) (core/op-entity (core/oget ctx :op))
+                      :else "")))
+        opname (fn [ctx] (if (core/oget ctx :op) (core/op-name (core/oget ctx :op)) ""))
+        espec (fn [ctx] (mget (:spec @fa) (entname ctx)))
+        ;; One validate call. Errors are COLLECTED, never thrown: vs/validate
+        ;; throws on the first failure unless given an `errs` list, and a
+        ;; caller fixing a payload wants every problem with it, not the first.
+        check (fn [ctx data spec direction]
+                (let [errs (vs/jt)]
+                  (try
+                    (vs/validate data spec (vs/jm "errs" errs))
+                    (catch RuntimeException e
+                      ;; A spec this port cannot run at all (rather than a
+                      ;; payload that fails it) must not take the operation
+                      ;; down with it: report it like any other failure and
+                      ;; let `mode` decide.
+                      (when (zero? (vs/size errs))
+                        (.add ^java.util.List errs (str (.getMessage e))))))
+                  (let [msgs (mapv str (vec errs))
+                        cb (opt fa "onInvalid")]
+                    (when (and (seq msgs) (fn? cb))
+                      ;; A callback receiving every failure, whatever `mode`
+                      ;; does with it, so a client can log or count invalid
+                      ;; payloads without changing what the SDK returns.
+                      (try
+                        (cb (vs/jm "entity" (entname ctx) "op" (opname ctx)
+                                   "direction" direction "errs" errs "data" data))
+                        (catch RuntimeException _e nil)))
+                    msgs)))
+        ;; The payload an operation is about to send.
+        ;;
+        ;; TWO SLOTS, AND THE OP PICKS. A body op (create/update/patch)
+        ;; carries the caller's argument in `reqdata` over the entity's
+        ;; `data`; a match op (load/list/remove) carries it in `reqmatch` over
+        ;; `match`. So reading `reqdata` for every op would check a
+        ;; `load({id})` against the entity's STALE stored match and reject it
+        ;; for the id the caller had just supplied.
+        payload (fn [ctx op]
+                  (let [body (contains? #{"create" "update" "patch"} op)
+                        base (core/oget ctx (if body :data :match))
+                        req (core/oget ctx (if body :reqdata :reqmatch))
+                        out (vs/jm)]
+                    (doseq [src [base req]]
+                      (when (vs/ismap src)
+                        (doseq [k (vec (vs/keysof src))]
+                          (.put ^java.util.Map out k (mget src k)))))
+                    ;; `$action` SELECTS A CUSTOM ENDPOINT; it is not a field
+                    ;; of the record, and under `strict` every custom-action
+                    ;; call would be rejected for the one key that made it
+                    ;; reachable.
+                    (.remove ^java.util.Map out "$action")
+                    out))]
+    (swap! fa assoc :spec (vs/jm) :request true :response false :mode "throw")
+    (swap! fa assoc
+           "init"
+           (fn [ctx options]
+             (swap! fa assoc :client (core/oget ctx :client)
+                    :options (if (vs/ismap options) options (vs/jm))
+                    :active (opts-active? options))
+             ;; DEFAULTS ARE APPLIED HERE, not by the option spec. The model's
+             ;; `config.options` documents them and types them; it does not
+             ;; inject them, because each feature entry in the spec is
+             ;; optional and struct fills in nothing through an optional
+             ;; union. So every feature resolves its own.
+             (swap! fa assoc
+                    :request (not= false (opt fa "request"))
+                    :response (= true (opt fa "response"))
+                    ;; FAIL CLOSED. Only the exact string "report" selects
+                    ;; report mode, so a typo still rejects rather than
+                    ;; silently turning enforcement off.
+                    :mode (if (= "report" (opt fa "mode")) "report" "throw")
+                    ;; `strict` is applied ONCE, here, rather than per call.
+                    :spec (if (= true (opt fa "strict"))
+                            (validate-close (core/entityspec))
+                            (core/entityspec))))
+
+           ;; Outbound. u-make-spec surfaces an SDK error left in out["spec"]
+           ;; before the request is built — the same seam rbac uses one stage
+           ;; earlier through out["point"].
+           "PreSpec"
+           (fn [ctx]
+             (when (and (active? fa) (:request @fa))
+               (let [op (opname ctx)
+                     opspec (mget (mget (espec ctx) "op") op)]
+                 (when (some? opspec)
+                   (let [errs (check ctx (payload ctx op) opspec "request")]
+                     (when (and (seq errs) (not= "report" (:mode @fa)))
+                       (let [err (core/ctx-error ctx "validate_failed"
+                                                 (str "Invalid " op " request for entity \""
+                                                      (entname ctx) "\": "
+                                                      (str/join "; " errs)))]
+                         (core/out-set! ctx "spec" err)
+                         err)))))))
+
+           ;; Inbound. PreDone rather than PreResult: the records are
+           ;; extracted from the response body by u-make-result, which runs
+           ;; between the two, so at PreResult there is nothing to check but
+           ;; the envelope.
+           ;;
+           ;; HOOK ORDER MATTERS HERE, and the default order is not the one
+           ;; you want. PreDone hooks fire in feature ADD order, which
+           ;; defaults to `test` first and then names sorted — and `validate`
+           ;; sorts last, after audit, cost, debug, metrics and telemetry.
+           ;; Activating features as an ORDERED LIST fixes it.
+           "PreDone"
+           (fn [ctx]
+             (when (and (active? fa) (:response @fa))
+               (let [dataspec (mget (espec ctx) "data")
+                     result (core/oget ctx :result)
+                     resdata (when result (core/oget result :resdata))]
+                 (when (and (some? dataspec) (some? resdata))
+                   (let [records (if (vs/islist resdata) (vec resdata) [resdata])
+                         errs (vec (mapcat
+                                    (fn [record]
+                                      (if (nil? record)
+                                        []
+                                        ;; A NON-OBJECT IS A FAILURE, not
+                                        ;; something to skip: a load that
+                                        ;; answered 42 where the entity's spec
+                                        ;; wants a record must not pass
+                                        ;; silently.
+                                        (check ctx (validate-unwrap record)
+                                               dataspec "response")))
+                                    records))]
+                     (when (and (seq errs) (not= "report" (:mode @fa)))
+                       (let [err (core/ctx-error ctx "validate_failed"
+                                                 (str "Invalid response for entity \""
+                                                      (entname ctx) "\": "
+                                                      (str/join "; " errs)))]
+                         ;; BOTH, and `ok` is the load-bearing half: done
+                         ;; returns resdata whenever result.ok is true and
+                         ;; never looks at err, so setting the error alone
+                         ;; would hand the caller the very records that failed
+                         ;; the spec.
+                         (core/oset! result :ok false)
+                         (core/oset! result :err err)
+                         ;; AND THE DATA GOES. The load/update paths copy
+                         ;; resdata into the entity's own state on any
+                         ;; non-nil value, BEFORE done raises.
+                         (core/oset! result :resdata nil)
+                         err))))))))
+    fa))
+
 (defn make-feature [name]
   (case name
     "base" (base-feature)
@@ -1291,6 +1544,7 @@
     "audit" (audit-feature)
     "clienttrack" (clienttrack-feature)
     "rbac" (rbac-feature)
+    "validate" (validate-feature)
     "netsim" (netsim-feature)
     "cost" (cost-feature)
     (if-let [ctor (get config/feature-extra name)]

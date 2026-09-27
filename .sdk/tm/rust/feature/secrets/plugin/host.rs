@@ -1,28 +1,6 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (rust/src/host.rs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (rust/src/host.rs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! The host: the lifecycle state machine (§5), extension points (§6), and
-//! resource capture (§8).
-//!
-//! TWO RULES SHAPE EVERY METHOD BELOW.
-//!
-//! Transitions are SEQUENTIAL (§5.2). One at a time, in call order, never
-//! interleaved; a transition triggered from inside a lifecycle callback is
-//! `plugin_reentrant`. A hard rule, because it is the only way the
-//! semantics can be identical in Go, in Rust and in single-threaded
-//! JavaScript.
-//!
-//! Reconciliation is EAGER (§18's portability budget). A transition
-//! settles by running the state machine to a fixed point, not by
-//! suspending on a promise.
-//!
-//! AND ONE RULE IS RUST'S OWN: NEVER HOLD A BORROW ACROSS A CALLBACK. A
-//! definition's `define` calls back into the host - `bind`, `export`,
-//! `acquire`, even `nest` - so every method here reads what it needs out
-//! of a `RefCell`, DROPS the borrow, and only then runs anything a plugin
-//! wrote. A held borrow does not produce a wrong answer, it panics, which
-//! is the one failure mode a conformance suite cannot report as a
-//! divergence.
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
@@ -55,11 +33,6 @@ pub struct Entry {
     pub order: Value,
     pub unmet: Vec<String>,
     pub scope: Vec<ScopeFn>,
-    /// §11.4's ALWAYS-RELUCTANT rebinding made concrete: the provider ref
-    /// this instance's activation actually chose, per requirement name.
-    /// Re-ranking on every question silently re-points a live consumer at
-    /// any better newcomer, and then losing the provider it was really
-    /// using does not restart it.
     pub selected: BTreeMap<String, String>,
     pub bindings: Vec<Bound>,
     pub exports: BTreeMap<String, Value>,
@@ -83,11 +56,6 @@ pub struct HostInner {
     seqn: Cell<f64>,
     open: Cell<i64>,
     transition: Cell<bool>,
-    /// WHICH callback is running, not merely that one is. §8.1 puts
-    /// resource capture in `activate` and 8.3 says `release` outside
-    /// `activate` is `plugin_release_scope` - and a bare flag cannot tell
-    /// `activate` from `define`, so it admitted an acquire in `define`
-    /// whose scope `unload` would never unwind.
     phase: RefCell<String>,
     /// Set for the duration of a bulk teardown, so `held` knows this is a
     /// coordinated operation rather than an ad-hoc deactivation.
@@ -158,8 +126,6 @@ impl Host {
 
     // --- observation ------------------------------------------------
 
-    /// Introspection NEVER advances the state (§5.2). A status page must
-    /// not be a way to accidentally import twenty packages.
     pub fn list(&self) -> Value {
         let mut out = Value::map();
         for (eref, entry) in self.0.inst.borrow().iter() {
@@ -269,11 +235,6 @@ impl Host {
 
         match outcome {
             Ok(()) => Ok(()),
-            // §12: `plugin_define_failed` and its three siblings are "a
-            // callback raised; wraps the cause". AN ERROR THAT ALREADY
-            // CARRIES A CODE KEEPS IT - the code is the error's identity,
-            // and a plugin raising `store_unreachable` must not have it
-            // rewritten. Only a code-less error is wrapped.
             Err(e) if !e.code.is_empty() => Err(e),
             Err(e) => fail(
                 &format!("plugin_{}_failed", at),
@@ -373,15 +334,6 @@ impl Host {
         Ok(entry)
     }
 
-    /// §9.1: a host that reserves a name MUST still be able to declare the
-    /// instance it reserved - "The host declares those instances itself,
-    /// after the user merge, and always wins."
-    ///
-    /// THE BOUNDARY IS BY METHOD, NOT BY CALLER, and that is a real limit:
-    /// no language here can tell the embedding host from a plugin holding
-    /// the same host object. What reservation protects is CONFIGURATION -
-    /// documents, overlays, `VOXGIG_PLUGIN_*`, construction options and
-    /// ordinary declare/load/options - and all of that still checks.
     pub fn hostdeclare(
         &self,
         eref: &Value,
@@ -414,11 +366,6 @@ impl Host {
         }
         entry.borrow_mut().status = "loaded".to_string();
 
-        // AT LOAD, and before anything runs: a cycle through
-        // restart-causing requirements does not settle, and the only safe
-        // time to report a non-terminating reconcile is before it starts
-        // (§11.3). `provides` is populated by `define`, which has just
-        // run, so this is the first moment the graph is complete.
         if let Err(e) = checkcycle(&self.graphnodes()) {
             entry.borrow_mut().status = "failed".to_string();
             return Err(e);
@@ -426,7 +373,6 @@ impl Host {
         Ok(entry)
     }
 
-    /// The requirement graph as plain data, for the pure detector.
     fn graphnodes(&self) -> Vec<Node> {
         let mut out = Vec::new();
         for (eref, entry) in self.0.inst.borrow().iter() {
@@ -476,8 +422,6 @@ impl Host {
             self.load(&Value::str(&myref), &Value::map())?;
         }
 
-        // A declared requirement that is not live means `pending`:
-        // activation is a STANDING REQUEST, not a one-shot event.
         let unmet = self.unmetof(&entry);
         if !unmet.is_empty() {
             let mut e = entry.borrow_mut();
@@ -525,12 +469,6 @@ impl Host {
         }
 
         if "pending" == status {
-            // DEACTIVATING A PENDING INSTANCE RUNS NO CALLBACK (§5.2). It
-            // never reached activate, so it holds no scope and no live
-            // bindings; running the definition's deactivate there would be
-            // teardown without matching setup, which plugins are not
-            // written to survive and which could fail an instance that had
-            // done nothing wrong. It cannot fail.
             let mut e = entry.borrow_mut();
             e.status = "loaded".to_string();
             e.unmet = Vec::new();
@@ -605,17 +543,6 @@ impl Host {
         self.activate(&Value::str(&r))
     }
 
-    /// Bindings go live only when activation succeeds (§8.1), so the
-    /// teardown is the exact inverse: reverse order, always. Returns the
-    /// errors the scope raised. §8.3: "A failing release does not stop the
-    /// rest. Every entry runs, in reverse order, whatever any of them
-    /// does; the errors are collected and raised as one
-    /// `plugin_release_failed`."
-    ///
-    /// A selection belongs to ONE activation (§11.4). Leaving `live` by
-    /// any door drops it, so the next activation ranks afresh - keeping it
-    /// would make a consumer prefer a provider it never actually ran
-    /// against.
     fn unwind(&self, entry: &Rc<RefCell<Entry>>) -> Vec<PluginError> {
         // TAKE the scope out under a short borrow: the closures below
         // reach back into this same entry (a foreign release records its
@@ -662,10 +589,6 @@ impl Host {
         )
     }
 
-    /// A REQUIREMENT IS ON A CAPABILITY, not on a ref (§11.1). A bare
-    /// string is shorthand for `{name}`. A ref satisfies too, because a
-    /// host that genuinely needs a specific instance should not have to
-    /// invent a capability for it.
     fn unmetof(&self, entry: &Rc<RefCell<Entry>>) -> Vec<String> {
         let reqs = requirements(&entry.borrow().options);
         reqs.iter()
@@ -675,13 +598,6 @@ impl Host {
             .collect()
     }
 
-    /// §11.4's always-reluctant selection, and the ONE place a provider is
-    /// picked for a live instance. If this instance already selected a
-    /// provider for `req` and that provider is STILL a candidate, it keeps
-    /// it - a better-ranked newcomer does not take it.
-    ///
-    /// `remember` is false for the questions asked ABOUT an instance
-    /// rather than BY it: introspection must not create a binding.
     fn chosen(&self, entry: &Rc<RefCell<Entry>>, req: &Value, remember: bool) -> Option<String> {
         let cands = self.providersof(req);
         if cands.is_empty() {
@@ -736,15 +652,6 @@ impl Host {
             .collect()
     }
 
-    /// §11.3's `hold` asks a DIFFERENT question from the cascade, and
-    /// reading it off `consumersof` answered the cascade's.
-    ///
-    /// The cascade wants the edges that RESTART - mandatory-static and
-    /// optional-static - because a restart is what it performs. `hold`
-    /// says "deactivating a REQUIRED instance is
-    /// `plugin_dependency_held`", and required is cardinality:
-    /// `gatesactivation`, not `restartsonloss`. The two sets differ in
-    /// both directions and each difference was a real bug.
     fn holdersof(&self, eref: &str) -> Vec<String> {
         let all: Vec<(String, Rc<RefCell<Entry>>)> = self
             .0
@@ -812,14 +719,6 @@ impl Host {
         resolve_capability(req, &cands)
     }
 
-    /// CONSUMERS GO DOWN FIRST, NOT AFTERWARDS (§11.3).
-    ///
-    /// The cascade is part of the provider's own deactivation and runs
-    /// BEFORE the provider's `deactivate` callback and scope unwind, so a
-    /// consumer's teardown can still call the thing it depends on -
-    /// flushing a buffer to the store it is about to lose is exactly what
-    /// a `deactivate` callback is for, and a cascade that fired after the
-    /// provider was already gone would make that impossible.
     fn cascade(&self, provider: &str, seen: &mut BTreeSet<String>) {
         if seen.contains(provider) {
             return;
@@ -882,10 +781,6 @@ impl Host {
         )
     }
 
-    /// EAGER reconciliation: run to a fixed point rather than scheduling.
-    ///
-    /// Two directions, and both are the reason `pending` exists.
-    /// Activation is a STANDING REQUEST, not a one-shot event.
     fn reconcile(&self) {
         let mut moved = true;
         let mut rounds = 0;
@@ -916,9 +811,6 @@ impl Host {
                 if lost.is_empty() {
                     continue;
                 }
-                // POLICY IS PER REQUIREMENT, not per instance (§11.3). A
-                // `dynamic` requirement whose provider is gone leaves the
-                // consumer LIVE and notified.
                 if !lost.iter().any(|q| restartsonloss(q)) {
                     continue;
                 }
@@ -969,13 +861,6 @@ impl Host {
     // --- ordering ---------------------------------------------------
 
     pub fn order(&self, point: Option<&str>) -> Result<Vec<String>, PluginError> {
-        // Sorted by declaration SEQUENCE, which is what makes the §7
-        // sort's fall-through deterministic in a language whose maps have
-        // no insertion order. §7 breaks ties by `pos`; two instances CAN
-        // share one - `declare` defaults `pos` to the registry size, so an
-        // unload followed by a fresh declare reuses a surviving
-        // instance's - and past that this was falling through to map
-        // order. `seq` is that order, made explicit.
         let mut live: Vec<Binding> = Vec::new();
         for entry in self.0.inst.borrow().values() {
             let e = entry.borrow();
@@ -1154,15 +1039,6 @@ impl Host {
 
     // --- documents --------------------------------------------------
 
-    /// §9.6: "load what is missing, UNLOAD WHAT IS GONE, patch what
-    /// changed, and move activation state to match", with the stated
-    /// ordering - "deactivations and unloads first (reverse load order),
-    /// then loads, then activations in load order".
-    ///
-    /// FOUR PHASES, NOT ONE INTERLEAVED LOOP. An earlier draft walked the
-    /// document once, which never looked at instances the new document had
-    /// DROPPED - so an integration removed from a config reload stayed live
-    /// with its bindings and resources.
     pub fn apply(&self, doc: &Value, profile: &Value) -> Result<(), PluginError> {
         self.guard()?;
         let profile = if profile.is_null() {
@@ -1251,9 +1127,6 @@ impl Host {
             e.pos = ent.get("pos").as_num().unwrap_or(0.0);
         }
 
-        // --- phase 3: loads, in load order -----------------------------
-        // ONLY THE EAGER, ACTIVE ONES: "a document of twenty lazy
-        // instances is twenty map entries and no executed code" (§9.6).
         for eref in want.iter() {
             if wantlive(eref) {
                 self.load(&Value::str(eref), &Value::map())?;
@@ -1321,9 +1194,6 @@ impl Host {
     }
 
     pub fn close(&self) -> Result<(), PluginError> {
-        // A bulk teardown removing the holders too, so `hold` is suspended
-        // for exactly those holders (§11.3) - while the consumers-first
-        // cascade still runs, which is the half that matters.
         self.0.coordinated.set(true);
         let refs: Vec<String> = self.0.inst.borrow().keys().rev().cloned().collect();
         let mut outcome = Ok(());
@@ -1339,8 +1209,6 @@ impl Host {
         outcome
     }
 
-    /// The same record §6.6 gives a plugin about itself, reachable from
-    /// outside for the corpus.
     pub fn positionof(&self, eref: &str, point: Option<&str>) -> Result<Value, PluginError> {
         let myref = canon(eref);
         let entry = self.0.inst.borrow().get(&myref).cloned();
@@ -1357,8 +1225,6 @@ impl Host {
         let mut out = Value::map();
         out.set("index", Value::Num(index as f64));
         out.set("count", Value::Num(ranked.len() as f64));
-        // §6.2 composes b1(b2(b3(base))) with the FIRST binding OUTERMOST,
-        // so these are not index 0 and index count-1 the other way round.
         out.set("outermost", Value::Bool(0 == index));
         out.set(
             "innermost",
@@ -1368,12 +1234,6 @@ impl Host {
     }
 }
 
-// ---------------------------------------------------------------------
-// Inst - what a definition's callbacks see
-// ---------------------------------------------------------------------
-//
-// Deliberately not the internal record: a plugin that could reach `status`
-// could also write it.
 
 #[derive(Clone)]
 pub struct Inst {
@@ -1416,12 +1276,6 @@ impl Inst {
         self.entry.borrow_mut().state.set(key, value);
     }
 
-    /// Foreign resources the host did not hand out are registered
-    /// explicitly (§8.3); host calls are recorded automatically.
-    ///
-    /// SYMMETRIC WITH `acquire`, and it has to be: `open` counts the
-    /// resources CURRENTLY HELD, so an entry that is registered and then
-    /// unwound must leave the count where it found it.
     pub fn release(
         &self,
         func: Rc<dyn Fn() -> Result<(), PluginError>>,
@@ -1452,12 +1306,6 @@ impl Inst {
         Ok(())
     }
 
-    /// The synthetic counter the driver owns, so "what is open" is data
-    /// rather than an assertion each port words differently.
-    ///
-    /// Returns its own release, so a plugin can hand one back early. The
-    /// scope still holds the entry and unwinding it twice is a no-op -
-    /// releasing early must not make teardown wrong.
     pub fn acquire(&self) -> Result<ScopeFn, PluginError> {
         // §8.1: resources are "acquired during `activate` - the scope's
         // actual job". Same reason as `release` above.
@@ -1483,19 +1331,12 @@ impl Inst {
         Ok(rel)
     }
 
-    /// Bind into a host point. Declared in `define`; the host inserts it
-    /// only after `activate` returns successfully (§8.1), which is why a
-    /// failing activate leaves no live binding behind.
     pub fn bind(
         &self,
         point: &str,
         func: super::point::BindFn,
         band: &Value,
     ) -> Result<(), PluginError> {
-        // §12 has carried `plugin_bind_scope` - "binding declared outside
-        // `define`" - since before anything raised it. §8.1 puts binding
-        // DECLARATION in `define` and INSERTION at a successful activate,
-        // and the guard was the half nobody wrote.
         if "define" != self.host.phase() {
             return fail(
                 "plugin_bind_scope",
@@ -1528,6 +1369,16 @@ impl Inst {
             .borrow_mut()
             .exports
             .insert(key.to_string(), value);
+    }
+
+    pub fn capability(&self, name: &str) -> Option<String> {
+        let reqs = requirements(&self.entry.borrow().options);
+        for req in reqs {
+            if req.get("name").as_str() == Some(name) {
+                return self.host.chosen(&self.entry, &req, true);
+            }
+        }
+        None
     }
 
     /// What this instance can do for others (§11.1).

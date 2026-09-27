@@ -1,10 +1,3 @@
-// Per-request timeout (mirrors go feature/timeout_feature.go, adapted to a
-// synchronous single-threaded transport like the ruby port). The active
-// transport is wrapped with a deadline of `ms` milliseconds (default
-// 30000; <= 0 disables). The transport is synchronous, so the elapsed
-// (injectable `now`) clock is checked around the inner call: when the call
-// took longer than the deadline its result is discarded and a `timeout`
-// error is returned instead.
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -36,7 +36,7 @@ final class TestInitFeature: BaseFeature {
 
 final class PrimaryUtilityTest: XCTestCase {
   // PENDING sections are the ones deliberately left EMPTY in the shared
-  // corpus (.sdk/test/primary/<name>.aon). Everything else MUST contribute
+  // corpus (.sdk/test/primary/<name>.aontu). Everything else MUST contribute
   // cases: a renamed section or a fixture that failed to compile used to
   // report PASS while running zero assertions.
   private static let PENDING: Set<String> = [
@@ -289,12 +289,12 @@ final class PrimaryUtilityTest: XCTestCase {
   // THE `extend` SEAM IS REAL. options.extend is the runtime
   // feature-injection seam the README documents, and the constructor reads
   // it - but only after makeOptions' validate, which used to REJECT the key
-  // because buildOptSpec never named it. The seam was dead: a caller could
+  // because the option spec never named it. The seam was dead: a caller could
   // not hand in a feature the model did not activate, and every suite that
   // adopts a feature through `extend` passed VACUOUSLY on a client that
   // never held it. Pinned here, in the ungated suite, so the seam is proven
-  // whatever features a project selects. Delete the `extend` optspec entry
-  // and this goes red.
+  // whatever features a project selects. Delete `extend` from
+  // `main.kit.optspec` and this goes red.
   func testExtendOptionInstallsAndInitialisesTheFeature() {
     var initCalled = false
     let feature = TestInitFeature()

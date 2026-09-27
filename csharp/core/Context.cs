@@ -78,7 +78,7 @@ public class Context
         {
             Ctrl = ctrl;
         }
-        else if (basectx?.Ctrl != null)
+        else if (basectx?.Ctrl != null && Helpers.GetCtxProp(ctxmap, "opname") == null)
         {
             Ctrl = basectx.Ctrl;
         }

@@ -1,20 +1,6 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (rust/src/config.rs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (rust/src/config.rs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! The declarative document (§9): normalization, and the ten-level
-//! precedence ladder.
-//!
-//! TWO FUNCTIONS, AND THE SPLIT BETWEEN THEM IS FORCED.
-//!
-//! `normalize_config` normalizes STRUCTURE and ENTRY KEYS. It does not
-//! merge options, and cannot: §9.4 makes merge behaviour a property of the
-//! definition's option SHAPE, which normalization has never seen. A
-//! normalizer that flattened the option layers would make `$MERGE: append`
-//! unimplementable at load time, because the layers it must concatenate
-//! would already be collapsed.
-//!
-//! `resolve_options` applies the ladder, and it is the only place that
-//! knows the shape.
 
 use std::collections::BTreeMap;
 
@@ -32,11 +18,6 @@ pub fn normalize_config(input: &Value) -> Result<Value, PluginError> {
     let reserved = input.get("reserved");
     let profile = input.get("profile");
 
-    // The rename is applied at TWO PLACES AND NO OTHERS: the document
-    // root, and every profile.<name> overlay root (§9.1). A rename applied
-    // only at the root would leave `profile.prod.sdk` untranslated and
-    // silently drop every environment override the host depends on.
-    // Recursing further would be worse: option data is the definition's.
     let baseinst = doc.get(&ikey);
     let basedef = doc.get(&dkey);
 
@@ -85,16 +66,10 @@ pub fn normalize_config(input: &Value) -> Result<Value, PluginError> {
         let b = base.0.get(eref);
         let o = over.0.get(eref);
 
-        // MERGE THE ENTRIES AS AUTHORED, THEN APPLY DEFAULTS TO THE RESULT
-        // (§9.3). A safety rule, not a tidiness one: if the overlay had
-        // its defaults filled in before merging it would carry a
-        // synthesized active:true and overwrite a base's false - silently
-        // re-enabling a deliberately disabled integration in production.
         let active = config_pick(o, "active", config_pick(b, "active", Value::Bool(true)));
         let start = config_pick(o, "start", config_pick(b, "start", Value::str("eager")));
         let block = config_pick(o, "order", config_pick(b, "order", Value::Null));
 
-        // Option layers, levels 3-6, IN LADDER ORDER. Never merged here.
         let nm = refname(eref);
         let mut layers: Vec<Value> = Vec::new();
         let bd = basedef.get(&nm);
@@ -205,9 +180,6 @@ fn config_pick(src: Option<&Value>, key: &str, dflt: Value) -> Value {
     }
 }
 
-// ---------------------------------------------------------------------
-// resolve_options - §9.3's ten levels, and 9.4's directives
-// ---------------------------------------------------------------------
 
 pub fn resolve_options(input: &Value) -> Result<Value, PluginError> {
     let shape = input.get("shape");
@@ -228,22 +200,17 @@ pub fn resolve_options(input: &Value) -> Result<Value, PluginError> {
         Value::map()
     };
 
-    // ONE ordered merge, lowest to highest. Levels 3-6 are not two
-    // namespaces collapsed separately and composed afterwards: that
-    // inverts the rule that PROFILE SPECIFICITY OUTRANKS DEFINITION
-    // SPECIFICITY, so a prod per-definition default would lose to a base
-    // instance value.
     let layers = [
-        config_defaultsof(&shape),                              // 1
-        input.get("hostdefaults"),                              // 2
-        config_optsof(&doc.get("default"), &name)?,             // 3
-        config_optsof(&doc.get("instance"), &eref)?,            // 4
-        config_optsof(&overlay.get("default"), &name)?,         // 5
-        config_optsof(&overlay.get("instance"), &eref)?,        // 6
-        input.get("env"),                                       // 7
-        input.get("hostoptions"),                               // 8
-        input.get("loadoptions"),                               // 9
-        input.get("patch"),                                     // 10
+        config_defaultsof(&shape),
+        input.get("hostdefaults"),
+        config_optsof(&doc.get("default"), &name)?,
+        config_optsof(&doc.get("instance"), &eref)?,
+        config_optsof(&overlay.get("default"), &name)?,
+        config_optsof(&overlay.get("instance"), &eref)?,
+        input.get("env"),
+        input.get("hostoptions"),
+        input.get("loadoptions"),
+        input.get("patch"),
     ];
 
     let mut out = Value::map();
@@ -256,7 +223,6 @@ pub fn resolve_options(input: &Value) -> Result<Value, PluginError> {
     Ok(out)
 }
 
-/// The shape's non-directive values are the level-1 defaults.
 fn config_defaultsof(shape: &Value) -> Value {
     let mut out = Value::map();
     for k in shape.keys() {
@@ -274,7 +240,6 @@ fn config_optsof(src: &Value, key: &str) -> Result<Value, PluginError> {
         return Ok(Value::Null);
     }
 
-    // The array form is equivalent to the map form (§9.1).
     if let Some(items) = src.as_list() {
         for item in items.iter() {
             if canon_ref(&item.get("ref"))? == key {
@@ -297,10 +262,6 @@ fn config_optsof(src: &Value, key: &str) -> Result<Value, PluginError> {
     Ok(Value::Null)
 }
 
-/// Merge ONE layer onto the accumulator, honouring the shape's directives.
-/// The directive holds at EVERY precedence level, not only between
-/// document levels - §9.4 makes it a property of the shape, which does not
-/// know which layer a value arrived from.
 fn config_mergeone(base: &Value, over: &Value, shape: &Value) -> Value {
     if over.is_null() {
         return base.clone();
@@ -344,7 +305,6 @@ fn config_mergeone(base: &Value, over: &Value, shape: &Value) -> Value {
     Value::Map(out)
 }
 
-/// Merge N levels below this key, replace below that.
 fn config_deepto(base: &Value, over: &Value, n: f64) -> Value {
     if n <= 0.0 {
         return over.clone();
@@ -361,11 +321,6 @@ fn config_deepto(base: &Value, over: &Value, n: f64) -> Value {
     Value::Map(out)
 }
 
-/// §9.4: N is an integer of at least 1, and everything else is an error.
-///
-/// `{"deep": 0}` is rejected DESPITE having an obvious reading, because
-/// "replace at this key" already has a spelling and two spellings for one
-/// behaviour is the defect class this repo exists to avoid.
 pub fn check_shape(shape: &Value) -> Result<(), PluginError> {
     if shape.as_map().is_none() {
         return Ok(());

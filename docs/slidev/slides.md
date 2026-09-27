@@ -51,35 +51,35 @@ Retries, caching, paging, logging and the rest are compiled in and switched off.
 
 # Built-in features 1 / 3
 
-- Structured audit trail of operations
-- Response caching for safe read requests
-- Client identity and per-request correlation headers
-- Cost tracking and spend budget for API calls
-- Request/response capture ring buffer for debugging
-- Idempotency keys for safe retries of mutating operations
-- Structured request and response logging
-- Statistics capture: per-operation counters and latency
+- Audit trail
+- Response cache
+- Client tracking
+- Cost tracking
+- Debug capture
+- Idempotency
+- Logging
+- Metrics
 
 ---
 
 # Built-in features 2 / 3
 
-- Network behaviour simulation for offline testing (latency, failures, outages)
-- Pagination signals for list operations
-- Outbound HTTP(S) proxy routing
-- Client-side rate limiting via a token bucket
-- Client-side role/permission enforcement
-- Automatic retry of transient failures with exponential backoff
-- Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens
-- Incremental streaming of list results via async iteration
+- Network simulation
+- Paging
+- Proxy
+- Rate limiting
+- Access control
+- Retry
+- Secrets
+- Streaming
 
 ---
 
 # Built-in features 3 / 3
 
-- Distributed tracing spans with W3C trace-context propagation
-- In-memory mock transport for testing without a live server
-- Per-request timeout with transport abort
+- Telemetry
+- Test transport
+- Timeout
 
 ---
 
@@ -160,7 +160,7 @@ This target is not published yet. Build it from `ts/` in the repository.
 # Step 2: construct a client
 
 ```ts
-import { UnivecSDK } from '@voxgig-sdk/univec'
+import { UnivecSDK } from '@voxgig-sdk/univec-sdk'
 
 const client = new UnivecSDK({ apikey: process.env.UNIVEC_APIKEY })
 ```
@@ -201,7 +201,7 @@ Operations fail loudly rather than returning an empty result, so an error is nev
 { "retry": { "active": true } }
 ```
 
-Pass that in the client configuration and automatic retry of transient failures with exponential backoff is live. The feature pages document every option and its default.
+Pass that in the client configuration and retry is live. The feature pages document every option and its default.
 
 ---
 
@@ -245,7 +245,7 @@ A feature is behaviour around the call, not a change to it: retries, caching, au
 
 # What survives a regeneration
 
-- `.sdk/model/project.aon` is yours. Settings belong there.
+- `.sdk/model/project.aontu` is yours. Settings belong there.
 - Everything generated is overwritten, every time.
 
 An edit to a generated file works until the next regeneration and then disappears without warning, which is the one failure mode worth knowing in advance.

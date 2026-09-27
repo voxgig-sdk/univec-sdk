@@ -70,6 +70,7 @@
               "path": "docs"
             },
             "package": "@voxgig/docgen",
+            "published": true,
             "site": {
               "active": true
             },
@@ -92,6 +93,7 @@
               "path": "docs/slidev"
             },
             "package": "@voxgig/docgen",
+            "published": false,
             "site": {
               "active": true
             },
@@ -114,6 +116,7 @@
               "path": "SUMMARY.md"
             },
             "package": "@voxgig/docgen",
+            "published": false,
             "site": {
               "active": true
             },
@@ -154,29 +157,32 @@
           "alias": {
             "field": {}
           },
-          "fields": [
-            {
-              "active": true,
-              "name": "embeddings",
-              "req": true,
-              "short": "Translated vectors, in the target model's dimension.",
-              "type": "`$ARRAY`"
+          "fields": {
+            "embeddings": {
+              "a": true,
+              "h": "Embeddings",
+              "n": "embeddings",
+              "r": true,
+              "sh": "Translated vectors, in the target model's dimension.",
+              "t": "`$ARRAY`"
             },
-            {
-              "active": true,
-              "name": "source_model",
-              "req": true,
-              "short": "Model space the supplied vectors are currently in.",
-              "type": "`$STRING`"
+            "source_model": {
+              "a": true,
+              "h": "Source Model",
+              "n": "source_model",
+              "r": true,
+              "sh": "Model space the supplied vectors are currently in.",
+              "t": "`$STRING`"
             },
-            {
-              "active": true,
-              "name": "target_model",
-              "req": true,
-              "short": "Model space to translate into.",
-              "type": "`$STRING`"
+            "target_model": {
+              "a": true,
+              "h": "Target Model",
+              "n": "target_model",
+              "r": true,
+              "sh": "Model space to translate into.",
+              "t": "`$STRING`"
             }
-          ],
+          },
           "name": "convert",
           "op": {
             "create": {
@@ -184,13 +190,15 @@
               "name": "create",
               "points": [
                 {
-                  "active": true,
-                  "args": {},
-                  "contract": {
-                    "id": "POST /v1/convert"
+                  "a": true,
+                  "co": {
+                    "id": "POST /v1/convert",
+                    "source": "openapi3",
+                    "version": 2
                   },
-                  "kind": "http",
-                  "live": {
+                  "g": {},
+                  "k": "http",
+                  "li": {
                     "assert": {
                       "equal": {
                         "source_model": {
@@ -283,9 +291,11 @@
                       }
                     }
                   },
-                  "method": "POST",
-                  "orig": "/v1/convert",
-                  "segments": [
+                  "m": "POST",
+                  "o": "/v1/convert",
+                  "q": {},
+                  "r": {},
+                  "s": [
                     {
                       "lit": "v1"
                     },
@@ -293,20 +303,21 @@
                       "lit": "convert"
                     }
                   ],
-                  "select": {},
-                  "transform": {
+                  "t": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
                   }
                 },
                 {
-                  "active": true,
-                  "args": {},
-                  "contract": {
-                    "id": "POST /v1/embed-bridge"
+                  "a": true,
+                  "co": {
+                    "id": "POST /v1/embed-bridge",
+                    "source": "openapi3",
+                    "version": 2
                   },
-                  "kind": "http",
-                  "live": {
+                  "g": {},
+                  "k": "http",
+                  "li": {
                     "assert": {
                       "equal": {
                         "bridge_model": {
@@ -398,9 +409,13 @@
                       ]
                     }
                   },
-                  "method": "POST",
-                  "orig": "/v1/embed-bridge",
-                  "segments": [
+                  "m": "POST",
+                  "o": "/v1/embed-bridge",
+                  "q": {
+                    "$action": "bridge"
+                  },
+                  "r": {},
+                  "s": [
                     {
                       "lit": "v1"
                     },
@@ -408,22 +423,21 @@
                       "lit": "embed-bridge"
                     }
                   ],
-                  "select": {
-                    "$action": "bridge"
-                  },
-                  "transform": {
+                  "t": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
                   }
                 },
                 {
-                  "active": true,
-                  "args": {},
-                  "contract": {
-                    "id": "POST /v1/ephemeral/convert"
+                  "a": true,
+                  "co": {
+                    "id": "POST /v1/ephemeral/convert",
+                    "source": "openapi3",
+                    "version": 2
                   },
-                  "kind": "http",
-                  "live": {
+                  "g": {},
+                  "k": "http",
+                  "li": {
                     "assert": {
                       "equal": {
                         "source_model": {
@@ -520,9 +534,13 @@
                       }
                     }
                   },
-                  "method": "POST",
-                  "orig": "/v1/ephemeral/convert",
-                  "segments": [
+                  "m": "POST",
+                  "o": "/v1/ephemeral/convert",
+                  "q": {
+                    "$action": "ephemeral"
+                  },
+                  "r": {},
+                  "s": [
                     {
                       "lit": "v1"
                     },
@@ -533,22 +551,21 @@
                       "lit": "convert"
                     }
                   ],
-                  "select": {
-                    "$action": "ephemeral"
-                  },
-                  "transform": {
+                  "t": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
                   }
                 },
                 {
-                  "active": true,
-                  "args": {},
-                  "contract": {
-                    "id": "POST /v1/ephemeral/embed-bridge"
+                  "a": true,
+                  "co": {
+                    "id": "POST /v1/ephemeral/embed-bridge",
+                    "source": "openapi3",
+                    "version": 2
                   },
-                  "kind": "http",
-                  "live": {
+                  "g": {},
+                  "k": "http",
+                  "li": {
                     "assert": {
                       "equal": {
                         "bridge_model": {
@@ -644,9 +661,13 @@
                       ]
                     }
                   },
-                  "method": "POST",
-                  "orig": "/v1/ephemeral/embed-bridge",
-                  "segments": [
+                  "m": "POST",
+                  "o": "/v1/ephemeral/embed-bridge",
+                  "q": {
+                    "$action": "ephemeral_bridge"
+                  },
+                  "r": {},
+                  "s": [
                     {
                       "lit": "v1"
                     },
@@ -657,10 +678,7 @@
                       "lit": "embed-bridge"
                     }
                   ],
-                  "select": {
-                    "$action": "ephemeral_bridge"
-                  },
-                  "transform": {
+                  "t": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
                   }
@@ -677,29 +695,32 @@
           "alias": {
             "field": {}
           },
-          "fields": [
-            {
-              "active": true,
-              "name": "embeddings",
-              "req": true,
-              "short": "One vector per input text, in input order.",
-              "type": "`$ARRAY`"
+          "fields": {
+            "embeddings": {
+              "a": true,
+              "h": "Embeddings",
+              "n": "embeddings",
+              "r": true,
+              "sh": "One vector per input text, in input order.",
+              "t": "`$ARRAY`"
             },
-            {
-              "active": true,
-              "name": "model",
-              "req": true,
-              "short": "Model that produced the vectors.",
-              "type": "`$STRING`"
+            "model": {
+              "a": true,
+              "h": "Model",
+              "n": "model",
+              "r": true,
+              "sh": "Model that produced the vectors.",
+              "t": "`$STRING`"
             },
-            {
-              "active": true,
-              "name": "texts",
-              "req": true,
-              "short": "Texts to embed.",
-              "type": "`$ARRAY`"
+            "texts": {
+              "a": true,
+              "h": "Texts",
+              "n": "texts",
+              "r": true,
+              "sh": "Texts to embed.",
+              "t": "`$ARRAY`"
             }
-          ],
+          },
           "name": "embed",
           "op": {
             "create": {
@@ -707,13 +728,15 @@
               "name": "create",
               "points": [
                 {
-                  "active": true,
-                  "args": {},
-                  "contract": {
-                    "id": "POST /v1/embed"
+                  "a": true,
+                  "co": {
+                    "id": "POST /v1/embed",
+                    "source": "openapi3",
+                    "version": 2
                   },
-                  "kind": "http",
-                  "live": {
+                  "g": {},
+                  "k": "http",
+                  "li": {
                     "assert": {
                       "equal": {
                         "model": {
@@ -775,9 +798,11 @@
                       ]
                     }
                   },
-                  "method": "POST",
-                  "orig": "/v1/embed",
-                  "segments": [
+                  "m": "POST",
+                  "o": "/v1/embed",
+                  "q": {},
+                  "r": {},
+                  "s": [
                     {
                       "lit": "v1"
                     },
@@ -785,20 +810,21 @@
                       "lit": "embed"
                     }
                   ],
-                  "select": {},
-                  "transform": {
+                  "t": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
                   }
                 },
                 {
-                  "active": true,
-                  "args": {},
-                  "contract": {
-                    "id": "POST /v1/ephemeral/embed"
+                  "a": true,
+                  "co": {
+                    "id": "POST /v1/ephemeral/embed",
+                    "source": "openapi3",
+                    "version": 2
                   },
-                  "kind": "http",
-                  "live": {
+                  "g": {},
+                  "k": "http",
+                  "li": {
                     "assert": {
                       "equal": {
                         "model": {
@@ -864,9 +890,13 @@
                       ]
                     }
                   },
-                  "method": "POST",
-                  "orig": "/v1/ephemeral/embed",
-                  "segments": [
+                  "m": "POST",
+                  "o": "/v1/ephemeral/embed",
+                  "q": {
+                    "$action": "ephemeral"
+                  },
+                  "r": {},
+                  "s": [
                     {
                       "lit": "v1"
                     },
@@ -877,10 +907,7 @@
                       "lit": "embed"
                     }
                   ],
-                  "select": {
-                    "$action": "ephemeral"
-                  },
-                  "transform": {
+                  "t": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
                   }
@@ -897,37 +924,41 @@
           "alias": {
             "field": {}
           },
-          "fields": [
-            {
-              "active": true,
-              "name": "dailyLimit",
-              "req": true,
-              "short": "Calls permitted per day.",
-              "type": "`$INTEGER`"
+          "fields": {
+            "dailyLimit": {
+              "a": true,
+              "h": "Daily Limit",
+              "n": "dailyLimit",
+              "r": true,
+              "sh": "Calls permitted per day.",
+              "t": "`$INTEGER`"
             },
-            {
-              "active": true,
-              "name": "dailyUsed",
-              "req": true,
-              "short": "Calls already used today.",
-              "type": "`$INTEGER`"
+            "dailyUsed": {
+              "a": true,
+              "h": "Daily Used",
+              "n": "dailyUsed",
+              "r": true,
+              "sh": "Calls already used today.",
+              "t": "`$INTEGER`"
             },
-            {
-              "active": true,
-              "name": "key",
-              "req": true,
-              "short": "The ephemeral API key, prefixed `eph_`.",
-              "type": "`$STRING`"
+            "key": {
+              "a": true,
+              "h": "Key",
+              "n": "key",
+              "r": true,
+              "sh": "The ephemeral API key, prefixed `eph_`.",
+              "t": "`$STRING`"
             },
-            {
-              "active": true,
-              "format": "date-time",
-              "name": "resetsAt",
-              "req": true,
-              "short": "When the daily allowance resets.",
-              "type": "`$STRING`"
+            "resetsAt": {
+              "a": true,
+              "fo": "date-time",
+              "h": "Resets At",
+              "n": "resetsAt",
+              "r": true,
+              "sh": "When the daily allowance resets.",
+              "t": "`$STRING`"
             }
-          ],
+          },
           "name": "ephemeral_key",
           "op": {
             "create": {
@@ -935,13 +966,15 @@
               "name": "create",
               "points": [
                 {
-                  "active": true,
-                  "args": {},
-                  "contract": {
-                    "id": "POST /v1/ephemeral/key"
+                  "a": true,
+                  "co": {
+                    "id": "POST /v1/ephemeral/key",
+                    "source": "openapi3",
+                    "version": 2
                   },
-                  "kind": "http",
-                  "live": {
+                  "g": {},
+                  "k": "http",
+                  "li": {
                     "assert": {
                       "nonempty": [
                         "key"
@@ -951,9 +984,11 @@
                     "id": "key",
                     "retention": "No deletion endpoint; issued key is subject to the service daily allowance"
                   },
-                  "method": "POST",
-                  "orig": "/v1/ephemeral/key",
-                  "segments": [
+                  "m": "POST",
+                  "o": "/v1/ephemeral/key",
+                  "q": {},
+                  "r": {},
+                  "s": [
                     {
                       "lit": "v1"
                     },
@@ -964,8 +999,7 @@
                       "lit": "key"
                     }
                   ],
-                  "select": {},
-                  "transform": {
+                  "t": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
                   }
@@ -982,78 +1016,88 @@
           "alias": {
             "field": {}
           },
-          "fields": [
-            {
-              "active": true,
-              "name": "eval",
-              "req": false,
-              "short": "Retrieval-fidelity metrics for a convert model.",
-              "type": "`$OBJECT`"
+          "fields": {
+            "eval": {
+              "a": true,
+              "h": "Eval",
+              "n": "eval",
+              "r": false,
+              "sh": "Retrieval-fidelity metrics for a convert model.",
+              "t": "`$OBJECT`"
             },
-            {
-              "active": true,
-              "name": "executionProvider",
-              "req": false,
-              "short": "Hardware backend, e.g.",
-              "type": "`$STRING`"
+            "executionProvider": {
+              "a": true,
+              "h": "Execution Provider",
+              "n": "executionProvider",
+              "r": false,
+              "sh": "Hardware backend, e.g.",
+              "t": "`$STRING`"
             },
-            {
-              "active": true,
-              "name": "modelCard",
-              "req": false,
-              "short": "Convert models only: training provenance and architecture detail.",
-              "type": "`$OBJECT`"
+            "modelCard": {
+              "a": true,
+              "h": "Model Card",
+              "n": "modelCard",
+              "r": false,
+              "sh": "Convert models only: training provenance and architecture detail.",
+              "t": "`$OBJECT`"
             },
-            {
-              "active": true,
-              "name": "modelType",
-              "req": true,
-              "short": "`embed` for text-to-vector models, `convert` for space-translation models.",
-              "type": "`$STRING`"
+            "modelType": {
+              "a": true,
+              "h": "Model Type",
+              "n": "modelType",
+              "r": true,
+              "sh": "`embed` for text-to-vector models, `convert` for space-translation models.",
+              "t": "`$STRING`"
             },
-            {
-              "active": true,
-              "name": "name",
-              "req": true,
-              "short": "Model identifier used in requests.",
-              "type": "`$STRING`"
+            "name": {
+              "a": true,
+              "h": "Name",
+              "n": "name",
+              "r": true,
+              "sh": "Model identifier used in requests.",
+              "t": "`$STRING`"
             },
-            {
-              "active": true,
-              "name": "sequenceLen",
-              "req": false,
-              "short": "Embed models only: maximum input sequence length.",
-              "type": "`$INTEGER`"
+            "sequenceLen": {
+              "a": true,
+              "h": "Sequence Len",
+              "n": "sequenceLen",
+              "r": false,
+              "sh": "Embed models only: maximum input sequence length.",
+              "t": "`$INTEGER`"
             },
-            {
-              "active": true,
-              "name": "sourceDim",
-              "req": false,
-              "short": "Convert models only: source vector dimension.",
-              "type": "`$INTEGER`"
+            "sourceDim": {
+              "a": true,
+              "h": "Source Dim",
+              "n": "sourceDim",
+              "r": false,
+              "sh": "Convert models only: source vector dimension.",
+              "t": "`$INTEGER`"
             },
-            {
-              "active": true,
-              "name": "sourceModel",
-              "req": false,
-              "short": "Convert models only: the source model space.",
-              "type": "`$STRING`"
+            "sourceModel": {
+              "a": true,
+              "h": "Source Model",
+              "n": "sourceModel",
+              "r": false,
+              "sh": "Convert models only: the source model space.",
+              "t": "`$STRING`"
             },
-            {
-              "active": true,
-              "name": "targetDim",
-              "req": true,
-              "short": "Dimension of the produced vectors.",
-              "type": "`$INTEGER`"
+            "targetDim": {
+              "a": true,
+              "h": "Target Dim",
+              "n": "targetDim",
+              "r": true,
+              "sh": "Dimension of the produced vectors.",
+              "t": "`$INTEGER`"
             },
-            {
-              "active": true,
-              "name": "targetModel",
-              "req": true,
-              "short": "The model space produced.",
-              "type": "`$STRING`"
+            "targetModel": {
+              "a": true,
+              "h": "Target Model",
+              "n": "targetModel",
+              "r": true,
+              "sh": "The model space produced.",
+              "t": "`$STRING`"
             }
-          ],
+          },
           "name": "model",
           "op": {
             "list": {
@@ -1061,13 +1105,15 @@
               "name": "list",
               "points": [
                 {
-                  "active": true,
-                  "args": {},
-                  "contract": {
-                    "id": "GET /v1/models"
+                  "a": true,
+                  "co": {
+                    "id": "GET /v1/models",
+                    "source": "openapi3",
+                    "version": 2
                   },
-                  "kind": "http",
-                  "live": {
+                  "g": {},
+                  "k": "http",
+                  "li": {
                     "assert": {
                       "nonempty": [
                         ""
@@ -1076,9 +1122,11 @@
                     "auth": "public",
                     "id": "models"
                   },
-                  "method": "GET",
-                  "orig": "/v1/models",
-                  "segments": [
+                  "m": "GET",
+                  "o": "/v1/models",
+                  "q": {},
+                  "r": {},
+                  "s": [
                     {
                       "lit": "v1"
                     },
@@ -1086,8 +1134,7 @@
                       "lit": "models"
                     }
                   ],
-                  "select": {},
-                  "transform": {
+                  "t": {
                     "req": "`reqdata`",
                     "res": "`body.data`"
                   }
@@ -1116,6 +1163,7 @@
             },
             "strict": false
           },
+          "description": "Structured audit trail of operations",
           "hook": {
             "GetData": {
               "active": false,
@@ -1256,7 +1304,7 @@
               "deps": {}
             }
           },
-          "title": "Structured audit trail of operations",
+          "title": "Audit trail",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -1277,6 +1325,7 @@
             },
             "strict": false
           },
+          "description": "Response caching for safe read requests",
           "hook": {
             "GetData": {
               "active": false,
@@ -1409,7 +1458,7 @@
               "deps": {}
             }
           },
-          "title": "Response caching for safe read requests",
+          "title": "Response cache",
           "transport": "wrap",
           "version": "0.0.1"
         },
@@ -1430,6 +1479,7 @@
             },
             "strict": false
           },
+          "description": "Client identity and per-request correlation headers",
           "hook": {
             "GetData": {
               "active": false,
@@ -1562,7 +1612,7 @@
               "deps": {}
             }
           },
-          "title": "Client identity and per-request correlation headers",
+          "title": "Client tracking",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -1587,6 +1637,7 @@
             },
             "strict": false
           },
+          "description": "Cost tracking and spend budget for API calls",
           "hook": {
             "GetData": {
               "active": false,
@@ -1731,7 +1782,7 @@
               "deps": {}
             }
           },
-          "title": "Cost tracking and spend budget for API calls",
+          "title": "Cost tracking",
           "transport": "wrap",
           "version": "0.0.1"
         },
@@ -1758,6 +1809,7 @@
             },
             "strict": false
           },
+          "description": "Request/response capture ring buffer for debugging",
           "hook": {
             "GetData": {
               "active": false,
@@ -1898,7 +1950,7 @@
               "deps": {}
             }
           },
-          "title": "Request/response capture ring buffer for debugging",
+          "title": "Debug capture",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -1926,6 +1978,7 @@
             },
             "strict": false
           },
+          "description": "Idempotency keys for safe retries of mutating operations",
           "hook": {
             "GetData": {
               "active": false,
@@ -2058,7 +2111,7 @@
               "deps": {}
             }
           },
-          "title": "Idempotency keys for safe retries of mutating operations",
+          "title": "Idempotency",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -2101,6 +2154,7 @@
               }
             }
           },
+          "description": "Structured request and response logging",
           "hook": {
             "GetData": {
               "active": true,
@@ -2241,7 +2295,7 @@
               "deps": {}
             }
           },
-          "title": "Structured request and response logging",
+          "title": "Logging",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -2257,6 +2311,7 @@
             },
             "strict": false
           },
+          "description": "Statistics capture: per-operation counters and latency",
           "hook": {
             "GetData": {
               "active": false,
@@ -2401,7 +2456,7 @@
               "deps": {}
             }
           },
-          "title": "Statistics capture: per-operation counters and latency",
+          "title": "Metrics",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -2432,6 +2487,7 @@
             },
             "strict": false
           },
+          "description": "Network behaviour simulation for offline testing (latency, failures, outages)",
           "hook": {
             "GetData": {
               "active": false,
@@ -2564,7 +2620,7 @@
               "deps": {}
             }
           },
-          "title": "Network behaviour simulation for offline testing (latency, failures, outages)",
+          "title": "Network simulation",
           "transport": "wrap",
           "version": "0.0.1"
         },
@@ -2587,6 +2643,7 @@
             },
             "strict": false
           },
+          "description": "Pagination signals for list operations",
           "hook": {
             "GetData": {
               "active": false,
@@ -2719,7 +2776,7 @@
               "deps": {}
             }
           },
-          "title": "Pagination signals for list operations",
+          "title": "Paging",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -2738,6 +2795,7 @@
             },
             "strict": false
           },
+          "description": "Outbound HTTP(S) proxy routing",
           "hook": {
             "GetData": {
               "active": false,
@@ -2870,7 +2928,7 @@
               "deps": {}
             }
           },
-          "title": "Outbound HTTP(S) proxy routing",
+          "title": "Proxy",
           "transport": "wrap",
           "version": "0.0.1"
         },
@@ -2889,6 +2947,7 @@
             },
             "strict": false
           },
+          "description": "Client-side rate limiting via a token bucket",
           "hook": {
             "GetData": {
               "active": false,
@@ -3021,7 +3080,7 @@
               "deps": {}
             }
           },
-          "title": "Client-side rate limiting via a token bucket",
+          "title": "Rate limiting",
           "transport": "wrap",
           "version": "0.0.1"
         },
@@ -3038,6 +3097,7 @@
             "optspec": {},
             "strict": false
           },
+          "description": "Client-side role/permission enforcement",
           "hook": {
             "GetData": {
               "active": false,
@@ -3174,7 +3234,7 @@
               "deps": {}
             }
           },
-          "title": "Client-side role/permission enforcement",
+          "title": "Access control",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -3204,6 +3264,7 @@
             },
             "strict": false
           },
+          "description": "Automatic retry of transient failures with exponential backoff",
           "hook": {
             "GetData": {
               "active": false,
@@ -3336,7 +3397,7 @@
               "deps": {}
             }
           },
-          "title": "Automatic retry of transient failures with exponential backoff",
+          "title": "Retry",
           "transport": "wrap",
           "version": "0.0.1"
         },
@@ -3390,6 +3451,7 @@
               }
             }
           },
+          "description": "Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens",
           "hook": {
             "GetData": {
               "active": false,
@@ -3741,6 +3803,116 @@
               ],
               "stub": {},
               "title": "GCP Secret Manager and Azure Key Vault"
+            },
+            "minivault": {
+              "active": false,
+              "def": {
+                "c": {
+                  "sek_plugin_minivault": "feature/secrets/plugins/minivault.c"
+                },
+                "clojure": {
+                  "voxgig.sekreto.plugins.minivault/minivault": "feature/secrets/voxgig/sekreto/plugins/minivault.clj"
+                },
+                "cpp": {
+                  "minivault": "feature/secrets/plugins/Minivault.cpp"
+                },
+                "csharp": {
+                  "MiniVault.Plugin": "feature/secrets/plugins/MiniVault.cs"
+                },
+                "elixir": {
+                  "Sekreto.Plugins.Minivault.minivault": "lib/projectname/feature/secrets/sekreto/plugins/minivault.ex"
+                },
+                "go": {
+                  "minivault.Plugin": "feature/secrets/plugins/minivault/minivault.go"
+                },
+                "java": {
+                  "Minivault.PLUGIN": "feature/secrets/sekreto/plugins/Minivault.java"
+                },
+                "js": {
+                  "minivault": "src/feature/secrets/sekreto/plugins/minivault.js"
+                },
+                "kotlin": {
+                  "minivault": "feature/secrets/sekreto/plugins/Minivault.kt"
+                },
+                "lua": {
+                  "minivault": "feature/secrets/sekreto/plugins/minivault.lua"
+                },
+                "ocaml": {
+                  "Minivault.plugin": "feature/secrets/plugins/minivault.ml"
+                },
+                "perl": {
+                  "minivault": "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Minivault.pm"
+                },
+                "php": {
+                  "minivault": "feature/secrets/sekreto/plugins/minivault.php"
+                },
+                "py": {
+                  "minivault": "pkg/feature/secrets/voxgig_sekreto/plugins/minivault.py"
+                },
+                "rb": {
+                  "VoxgigSekreto::Plugins::MINIVAULT": "feature/secrets/voxgig_sekreto/plugins/minivault.rb"
+                },
+                "rust": {
+                  "minivault::minivault": "feature/secrets/plugins/minivault.rs"
+                },
+                "scala": {
+                  "com.voxgig.sekreto.plugins.minivault": "feature/secrets/sekreto/plugins/Minivault.scala"
+                },
+                "ts": {
+                  "minivault": "src/feature/secrets/sekreto/plugins/minivault.ts"
+                },
+                "zig": {
+                  "minivault": "feature/secrets/plugins/minivault.zig"
+                }
+              },
+              "deps": {
+                "rust": {
+                  "ring": {
+                    "active": true,
+                    "version": "0.17"
+                  }
+                }
+              },
+              "name": "minivault",
+              "needs": {
+                "crypto": true,
+                "fs": true
+              },
+              "path": [
+                "src/feature/secrets/sekreto/plugins/minivault.ts",
+                "src/feature/secrets/sekreto/plugins/minivault.js",
+                "pkg/feature/secrets/voxgig_sekreto/plugins/minivault.py",
+                "feature/secrets/voxgig_sekreto/plugins/minivault.rb",
+                "feature/secrets/sekreto/plugins/minivault.php",
+                "feature/secrets/plugins/minivault/minivault.go",
+                "feature/secrets/plugins/minivault/format.go",
+                "feature/secrets/plugins/minivault.rs",
+                "feature/secrets/plugins/minivault/format.rs",
+                "feature/secrets/plugins/MiniVault.cs",
+                "feature/secrets/sekreto/plugins/Minivault.java",
+                "feature/secrets/sekreto/plugins/Minivault.scala",
+                "feature/secrets/sekreto/plugins/Minivault.kt",
+                "feature/secrets/plugins/Voxgig/Sekreto/Plugins/Minivault.pm",
+                "feature/secrets/plugins/minivault.c",
+                "feature/secrets/plugins/Minivault.cpp",
+                "feature/secrets/plugins/Minivault.hpp",
+                "feature/secrets/voxgig/sekreto/plugins/minivault.clj",
+                "lib/projectname/feature/secrets/sekreto/plugins/minivault.ex",
+                "feature/secrets/sekreto/plugins/minivault.lua",
+                "feature/secrets/native/sekretovault.c",
+                "feature/secrets/plugins/minivault.ml",
+                "feature/secrets/plugins/minivault_stubs.c",
+                "feature/secrets/plugins/minivault.zig"
+              ],
+              "stub": {
+                "lua": [
+                  "feature/secrets/native/sekretovault.c"
+                ],
+                "ocaml": [
+                  "feature/secrets/plugins/minivault_stubs.c"
+                ]
+              },
+              "title": "The local encrypted vault (AES-256-GCM, one file)"
             },
             "saas": {
               "active": false,
@@ -4271,7 +4443,7 @@
               "deps": {}
             }
           },
-          "title": "Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens",
+          "title": "Secrets",
           "transport": "wrap",
           "version": "0.1.0"
         },
@@ -4290,6 +4462,7 @@
             },
             "strict": false
           },
+          "description": "Incremental streaming of list results via async iteration",
           "hook": {
             "GetData": {
               "active": false,
@@ -4422,7 +4595,7 @@
               "deps": {}
             }
           },
-          "title": "Incremental streaming of list results via async iteration",
+          "title": "Streaming",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -4441,6 +4614,7 @@
             },
             "strict": false
           },
+          "description": "Distributed tracing spans with W3C trace-context propagation",
           "hook": {
             "GetData": {
               "active": false,
@@ -4585,7 +4759,7 @@
               "deps": {}
             }
           },
-          "title": "Distributed tracing spans with W3C trace-context propagation",
+          "title": "Telemetry",
           "transport": "none",
           "version": "0.0.1"
         },
@@ -4602,6 +4776,7 @@
             },
             "strict": false
           },
+          "description": "In-memory mock transport for testing without a live server",
           "hook": {
             "GetData": {
               "active": true,
@@ -4742,7 +4917,7 @@
               "deps": {}
             }
           },
-          "title": "In-memory mock transport for testing without a live server",
+          "title": "Test transport",
           "transport": "base",
           "version": "0.0.1"
         },
@@ -4760,6 +4935,7 @@
             },
             "strict": false
           },
+          "description": "Per-request timeout with transport abort",
           "hook": {
             "GetData": {
               "active": false,
@@ -4892,7 +5068,7 @@
               "deps": {}
             }
           },
-          "title": "Per-request timeout with transport abort",
+          "title": "Timeout",
           "transport": "wrap",
           "version": "0.0.1"
         }
@@ -4907,15 +5083,15 @@
           "param": {},
           "step": [
             {
-              "active": true,
-              "data": {},
-              "input": {
+              "a": true,
+              "d": {},
+              "i": {
                 "ref": "convert_ref01"
               },
-              "match": {},
-              "op": "create",
-              "spec": [],
-              "valid": []
+              "m": {},
+              "o": "create",
+              "s": [],
+              "v": []
             }
           ]
         },
@@ -4928,15 +5104,15 @@
           "param": {},
           "step": [
             {
-              "active": true,
-              "data": {},
-              "input": {
+              "a": true,
+              "d": {},
+              "i": {
                 "ref": "embed_ref01"
               },
-              "match": {},
-              "op": "create",
-              "spec": [],
-              "valid": []
+              "m": {},
+              "o": "create",
+              "s": [],
+              "v": []
             }
           ]
         },
@@ -4949,15 +5125,15 @@
           "param": {},
           "step": [
             {
-              "active": true,
-              "data": {},
-              "input": {
+              "a": true,
+              "d": {},
+              "i": {
                 "ref": "ephemeral_key_ref01"
               },
-              "match": {},
-              "op": "create",
-              "spec": [],
-              "valid": []
+              "m": {},
+              "o": "create",
+              "s": [],
+              "v": []
             }
           ]
         },
@@ -4970,13 +5146,13 @@
           "param": {},
           "step": [
             {
-              "active": true,
-              "data": {},
-              "input": {},
-              "match": {},
-              "op": "list",
-              "spec": [],
-              "valid": [
+              "a": true,
+              "d": {},
+              "i": {},
+              "m": {},
+              "o": "list",
+              "s": [],
+              "v": [
                 {
                   "apply": "ItemExists",
                   "def": {
@@ -5057,6 +5233,14 @@
         },
         "utility": {}
       },
+      "phase": {
+        "build": {
+          "active": true
+        },
+        "top": {
+          "active": true
+        }
+      },
       "repo": {
         "host": "github.com",
         "path": ""
@@ -5094,10 +5278,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -5159,10 +5345,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -5224,10 +5412,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -5291,10 +5481,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -5356,6 +5548,7 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen-langpack",
@@ -5422,10 +5615,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -5489,10 +5684,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -5555,6 +5752,7 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
@@ -5632,6 +5830,7 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
@@ -5709,6 +5908,7 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen-langpack",
@@ -5789,10 +5989,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -5860,6 +6062,7 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
@@ -5927,10 +6130,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -5992,6 +6197,7 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen-langpack",
@@ -6012,7 +6218,9 @@
               "active": true
             }
           },
-          "provides": {},
+          "provides": {
+            "sekreto": true
+          },
           "publish": {
             "registry": {
               "active": false,
@@ -6076,10 +6284,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6141,10 +6351,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6206,10 +6418,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6271,10 +6485,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6342,10 +6558,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6413,6 +6631,7 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
@@ -6476,12 +6695,7 @@
             "json": {
               "active": true,
               "kind": "prod",
-              "version": "0"
-            },
-            "voxgig-struct": {
-              "active": true,
-              "kind": "prod",
-              "version": "0.0.10"
+              "version": "*"
             }
           },
           "ext": "rb",
@@ -6502,10 +6716,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6575,10 +6791,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6640,10 +6858,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6705,10 +6925,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {
@@ -6779,6 +7001,7 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
@@ -6849,10 +7072,12 @@
             "create": true,
             "path": "",
             "repo": "",
+            "root": false,
             "sdkrel": ""
           },
           "package": "@voxgig/sdkgen",
           "provides": {
+            "schema": true,
             "sekreto": true
           },
           "publish": {

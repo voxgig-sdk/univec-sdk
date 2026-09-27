@@ -8,6 +8,14 @@
 Spec* make_spec_util(Context* ctx, PNError** err) {
   *err = NULL;
 
+  /* A PreSpec feature hook (e.g. validate) may short-circuit by storing an
+   * error; surface it before the request is built, the same way make_point
+   * surfaces out_point_err. */
+  if (ctx->out_spec_err) {
+    *err = ctx->out_spec_err;
+    return NULL;
+  }
+
   if (ctx->out_spec) {
     ctx->spec = ctx->out_spec;
     return ctx->out_spec;

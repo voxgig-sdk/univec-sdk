@@ -1,6 +1,6 @@
 # TestFeature — Agent Guide
 
-In-memory mock transport for testing without a live server (v0.0.1).
+Test transport (v0.0.1).
 
 A **feature** is a pipeline extension: an object of hooks that fire at named
 stages of every entity operation (load, list, create, update, remove) and of
@@ -33,8 +33,8 @@ later feature can override an earlier one.
 
 | Part | Path |
 | --- | --- |
-| Model definition | `.sdk/model/feature/test.aon` (name, title, version, `config.options.active`, the `hook` map, per-language `deps`) |
-| Registered in | `.sdk/model/feature/feature-index.aon` (`@"test.aon"`) |
+| Model definition | `.sdk/model/feature/test.aontu` (name, title, version, `config.options.active`, the `hook` map, per-language `deps`) |
+| Registered in | `.sdk/model/feature/feature-index.aontu` (`@"test.aontu"`) |
 | Runtime template | `.sdk/tm/js/src/feature/test/` (copied here on `generate`; `FEATURE_Name`/`FEATURE_VERSION` substituted) |
 
 (Paths are relative to the **project root** — four levels up from here.)
@@ -42,7 +42,7 @@ later feature can override an earlier one.
 ## Customising this feature
 
 - **Turn hooks on/off**: edit the `hook` map in
-  `.sdk/model/feature/test.aon` (`<Stage>: active: true|false`).
+  `.sdk/model/feature/test.aontu` (`<Stage>: active: true|false`).
 - **Change default activation**: set `config.options.active` in the same file.
 - **Dependencies**: edit `deps.<lang>` in the same file.
 - **Behaviour**: edit the runtime template under

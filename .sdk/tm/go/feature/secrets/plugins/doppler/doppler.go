@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (go/plugins/doppler/doppler.go)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (go/plugins/doppler/doppler.go)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 // The doppler plugin: Doppler, one bulk download per config. Needs
 // HTTPS. A port of typescript/plugins/doppler.ts.
@@ -15,12 +15,6 @@ import (
 	"GOMODULE/feature/secrets/sekreto"
 )
 
-// Provider reads Doppler.
-//
-// The whole config is downloaded once - Doppler's own bulk endpoint - and
-// answered from memory, like a remote .env: api.token is the API_TOKEN
-// entry. A service token is config-scoped, so project and config are only
-// needed with broader tokens.
 type Provider struct {
 	Token   string
 	Project string

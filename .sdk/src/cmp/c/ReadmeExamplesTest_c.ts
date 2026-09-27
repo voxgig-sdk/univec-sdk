@@ -2,26 +2,6 @@
 import { cmp, Content, File } from '@voxgig/sdkgen'
 
 
-// Emits tests/readme_examples_test.c — a structural gate over every ```c
-// fenced block in the docs that ship C examples:
-//   - the root README.md          (top-level, multi-language quick start)
-//   - the per-language c/README.md
-//   - the per-language c/REFERENCE.md
-//
-// DESIGN NOTE vs the go gate (ReadmeExamplesTest_go.ts): the go version shells
-// out to `go build`/`go run` to COMPILE and RUN every block. A faithful C port
-// would extract each snippet, wrap it in a translation unit, and drive the
-// bundled Makefile / cc against the generated libsdk.a — a large,
-// environment-sensitive harness that cannot be authored safely without a build
-// to validate it. This C gate instead validates that every documented C block
-// is PRESENT and STRUCTURALLY well-formed (balanced ()[]{}, non-empty). It is a
-// real, always-passing test that keeps the docs honest about block structure;
-// upgrading it to a true compile gate is left as a follow-up. Missing docs are
-// tolerated (a run may generate a subset of phases).
-//
-// The test binary runs with the C project root as its working directory (the
-// Makefile invokes `./tests/<name>.out` from there), so the doc paths resolve
-// as "README.md", "REFERENCE.md", and "../README.md".
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { model } = props.ctx$
 

@@ -3,6 +3,11 @@ name = "voxgig-univec-sdk"
 version = "0.1.2"
 defaultTargets = ["SdkClient"]
 
+# SECRETS FFI (see Makefile): the plugin groups this model selected bind
+# libcurl through src/feature/secrets/ffi/*.c. `make ffi` compiles them and
+# writes link.rsp; build and run through make, which also sets LEAN_CC.
+moreLinkArgs = ["@src/feature/secrets/ffi/link.rsp"]
+
 [[lean_lib]]
 name = "Vregex"
 srcDir = "src"
@@ -38,6 +43,36 @@ srcDir = "src"
 [[lean_lib]]
 name = "SdkClient"
 srcDir = "src"
+
+# THE SECRETS FEATURE: the vendored voxgig/plugin and sekreto ports, each
+# tree its own srcDir root so upstream's imports resolve unchanged; the
+# plugin kinds the model selected (SekretoPlugins.*, no barrel); the feature
+# over them; and its shipped suite. All of it lives under
+# src/feature/secrets/ and test/feature/secrets/, which `feature add` trims
+# together with this block.
+[[lean_lib]]
+name = "Plugin"
+srcDir = "src/feature/secrets/plugin"
+globs = ["Plugin", "Plugin.*"]
+
+[[lean_lib]]
+name = "Sekreto"
+srcDir = "src/feature/secrets/sekreto"
+globs = ["Sekreto", "Sekreto.*"]
+
+[[lean_lib]]
+name = "SekretoPlugins"
+srcDir = "src/feature/secrets/sekreto/plugins"
+globs = ["SekretoPlugins.*"]
+
+[[lean_lib]]
+name = "SecretsFeature"
+srcDir = "src/feature/secrets"
+
+[[lean_exe]]
+name = "secrets"
+srcDir = "test/feature/secrets"
+root = "TSecrets"
 
 # The corpus ENGINE: the vendored @voxgig/omni Lean port, source rather than
 # a dependency. Its own lean_lib so Lake can find the module, and

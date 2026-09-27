@@ -43,16 +43,6 @@ const Config = cmp(async function Config(props: any) {
   const { def: configDef, json: configJson } = configDefinition(model)
   const asData = isConfigData(configJson, configReprSetting(model))
 
-  // ABOVE THE THRESHOLD: emit the model as DATA.
-  //
-  // The literal representation is one enormous CV expression. GHC type-checks
-  // and desugars every constructor application in it, and buildCV then walks
-  // the whole tree allocating an IORef per node. A string constant is one
-  // token, and jsonRead builds the same Value from it directly.
-  //
-  // Both branches return a FRESH Value per call - buildCV allocates new
-  // IORefs, jsonRead re-parses - so a caller that mutates one config cannot
-  // reach another's, exactly as before.
   const configBody = asData
     ? `-- THE API MODEL, EMBEDDED AS DATA (sdkgen rung L1).
 --

@@ -182,8 +182,8 @@ function generateDirectLoad(model: Model, entity: ModelEntity) {
     return
   }
 
-  const allLoadParams = loadPoint.args?.params || []
-  const loadPath = normalizePathParams(pointParts(loadPoint), allLoadParams, loadPoint.rename?.param)
+  const allLoadParams = loadPoint.g?.params || []
+  const loadPath = normalizePathParams(pointParts(loadPoint), allLoadParams, loadPoint.r?.param)
 
   // Only path params that actually appear in the URL template drive the
   // direct-test path-param setup and URL-substitution asserts.
@@ -193,7 +193,7 @@ function generateDirectLoad(model: Model, entity: ModelEntity) {
       pathPlaceholders.add(part.slice(1, -1))
     }
   }
-  const renameMap = (loadPoint.rename?.param || {}) as Record<string, string>
+  const renameMap = (loadPoint.r?.param || {}) as Record<string, string>
   const renamedPlaceholders = new Set<string>()
   for (const ph of pathPlaceholders) {
     renamedPlaceholders.add(ph)
@@ -202,43 +202,43 @@ function generateDirectLoad(model: Model, entity: ModelEntity) {
     }
   }
   const loadParams = allLoadParams.filter((p: any) =>
-    renamedPlaceholders.has(p.name) || renamedPlaceholders.has(p.orig))
+    renamedPlaceholders.has(p.n) || renamedPlaceholders.has(p.or))
 
   // Required query params with spec-provided examples — needed to satisfy
   // the API contract in live mode; mock mode ignores them.
-  const loadQuery = loadPoint.args?.query || []
+  const loadQuery = loadPoint.g?.query || []
   const liveQueryEntries = loadQuery
-    .filter((q: any) => q.reqd && undefined !== q.example && null !== q.example)
+    .filter((q: any) => q.r && undefined !== q.ex && null !== q.ex)
   const hasLiveQuery = liveQueryEntries.length > 0
   const liveQueryLines = liveQueryEntries
-    .map((q: any) => `        query['${q.name}'] = ${dartValue(q.example)};`)
+    .map((q: any) => `        query['${q.n}'] = ${dartValue(q.ex)};`)
     .join('\n')
 
   // Get list info for live mode bootstrapping
   const listOp = entity.op?.list
   const listPoint = listOp?.points?.[0]
-  const listParams = listPoint?.args?.params || []
-  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listParams, listPoint.rename?.param) : ''
+  const listParams = listPoint?.g?.params || []
+  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listParams, listPoint.r?.param) : ''
   const hasList = null != listPoint
 
   // Ancestor params (not 'id') for live mode
-  const ancestorParams = loadParams.filter((p: any) => p.name !== 'id')
+  const ancestorParams = loadParams.filter((p: any) => p.n !== 'id')
 
   const paramAsserts = loadParams.map((p: any, i: number) =>
     `        ok(calls[0]['url'].toString().contains('direct0${i + 1}'));\n`).join('')
 
   // Build live list params
   const liveListParams = listParams.map((p: any) => {
-    const key = p.name === 'id'
+    const key = p.n === 'id'
       ? entity.name + '01'
-      : p.name.replace(/_id$/, '') + '01'
-    return { name: p.name, key }
+      : p.n.replace(/_id$/, '') + '01'
+    return { name: p.n, key }
   })
 
   // Build live ancestor params for load
   const liveAncestorParams = ancestorParams.map((p: any) => {
-    const key = p.name.replace(/_id$/, '') + '01'
-    return { name: p.name, key }
+    const key = p.n.replace(/_id$/, '') + '01'
+    return { name: p.n, key }
   })
 
   const liveQueryPrefix = liveQueryLines ? liveQueryLines + '\n' : ''
@@ -246,21 +246,20 @@ function generateDirectLoad(model: Model, entity: ModelEntity) {
   // Path params with spec-provided examples — when present, prefer them
   // over list-bootstrap.
   const liveExampleParams = loadParams.filter(
-    (p: any) => undefined !== p.example && null !== p.example
+    (p: any) => undefined !== p.ex && null !== p.ex
   )
   const allLoadParamsHaveExamples =
     loadParams.length > 0 && liveExampleParams.length === loadParams.length
 
-  // Set of idmap keys this test reads in live mode: used to skip-on-missing.
   let liveIdKeys: string[] = []
 
   const mockParamLines = loadParams.map((p: any, i: number) =>
-    `        params['${p.name}'] = 'direct0${i + 1}';`).join('\n')
+    `        params['${p.n}'] = 'direct0${i + 1}';`).join('\n')
 
   let liveParamsBlock = ''
   if (allLoadParamsHaveExamples) {
     const exampleLines = loadParams.map(
-      (p: any) => `        params['${p.name}'] = ${dartValue(p.example)};`
+      (p: any) => `        params['${p.n}'] = ${dartValue(p.ex)};`
     ).join('\n')
     liveParamsBlock = `      if (true == setup['live']) {
 ${liveQueryPrefix}${exampleLines}
@@ -275,9 +274,9 @@ ${mockParamLines}
       `            '${lp.name}': setup['idmap']['${lp.key}'],`).join('\n')
     const ancestorParamLines = liveAncestorParams.map((lp: any) =>
       `        params['${lp.name}'] = setup['idmap']['${lp.key}'];`).join('\n')
-    const idParamName = loadParams.find((p: any) => p.name === 'id')
+    const idParamName = loadParams.find((p: any) => p.n === 'id')
       ? 'id'
-      : (loadParams[0]?.name ?? 'id')
+      : (loadParams[0]?.n ?? 'id')
 
     liveParamsBlock = `      if (true == setup['live']) {
 ${liveQueryPrefix}        final listResult = await client.direct({
@@ -308,7 +307,7 @@ ${mockParamLines}
   } else if (hasLiveQuery || loadParams.length > 0) {
     // Synthetic-only fallback: skip live when ENTID overrides are missing.
     if (loadParams.length > 0) {
-      liveIdKeys = loadParams.map((p: any) => p.name + '01')
+      liveIdKeys = loadParams.map((p: any) => p.n + '01')
     }
     liveParamsBlock = `      if (true == setup['live']) {
 ${liveQueryPrefix.replace(/\n$/, '')}
@@ -375,20 +374,20 @@ function generateDirectList(model: Model, entity: ModelEntity) {
     return
   }
 
-  const listParams = listPoint.args?.params || []
-  const listPath = normalizePathParams(pointParts(listPoint), listParams, listPoint.rename?.param)
+  const listParams = listPoint.g?.params || []
+  const listPath = normalizePathParams(pointParts(listPoint), listParams, listPoint.r?.param)
 
-  const listQuery = listPoint.args?.query || []
+  const listQuery = listPoint.g?.query || []
   const liveQueryLines = listQuery
-    .filter((q: any) => q.reqd && undefined !== q.example && null !== q.example)
-    .map((q: any) => `        query['${q.name}'] = ${dartValue(q.example)};`)
+    .filter((q: any) => q.r && undefined !== q.ex && null !== q.ex)
+    .map((q: any) => `        query['${q.n}'] = ${dartValue(q.ex)};`)
     .join('\n')
 
   const liveParams = listParams.map((p: any) => {
-    const key = p.name === 'id'
+    const key = p.n === 'id'
       ? entity.name + '01'
-      : p.name.replace(/_id$/, '') + '01'
-    return { name: p.name, key }
+      : p.n.replace(/_id$/, '') + '01'
+    return { name: p.n, key }
   })
 
   const paramAsserts = listParams.map((p: any, i: number) =>
@@ -402,7 +401,7 @@ function generateDirectList(model: Model, entity: ModelEntity) {
         `        params['${lp.name}'] = setup['idmap']['${lp.key}'];`).join('\n'),
     ].filter(Boolean).join('\n')
     const mockLines = listParams.map((p: any, i: number) =>
-      `        params['${p.name}'] = 'direct0${i + 1}';`).join('\n')
+      `        params['${p.n}'] = 'direct0${i + 1}';`).join('\n')
 
     paramsBlock = `      if (true == setup['live']) {
 ${liveLines}
@@ -486,10 +485,10 @@ function normalizePathParams(
       const snaked = snakify(rawName)
       const depluralized = depluralize(snaked)
       const param = params.find((p: any) =>
-          p.name === snaked || p.name === depluralized) ||
+          p.n === snaked || p.n === depluralized) ||
         params.find((p: any) =>
-          p.orig === snaked || p.orig === depluralized)
-      if (param) return '{' + param.name + '}'
+          p.or === snaked || p.or === depluralized)
+      if (param) return '{' + param.n + '}'
 
       if (rename) {
         for (const [origCamel, renamedTo] of Object.entries(rename)) {
@@ -497,10 +496,10 @@ function normalizePathParams(
             const origSnaked = snakify(origCamel)
             const origDepluralized = depluralize(origSnaked)
             const renamedParam = params.find(
-              (p: any) => p.orig === origSnaked || p.name === origSnaked ||
-                p.orig === origDepluralized || p.name === origDepluralized
+              (p: any) => p.or === origSnaked || p.n === origSnaked ||
+                p.or === origDepluralized || p.n === origDepluralized
             )
-            if (renamedParam) return '{' + renamedParam.name + '}'
+            if (renamedParam) return '{' + renamedParam.n + '}'
           }
         }
       }

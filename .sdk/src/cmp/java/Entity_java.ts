@@ -36,18 +36,12 @@ const Entity = cmp(function Entity(props: any) {
 
   const ff = Path.normalize(__dirname + '/../../../src/cmp/java/fragment/')
 
-  // Entity classes go to the entity/ folder; the file name must match the
-  // public class name (Java requirement).
   Folder({ name: 'entity' }, () => {
 
     File({ name: cls + '.' + target.ext }, () => {
 
       const opnames = Object.keys(entity.op || {})
 
-      // For each CRUD op: if the spec defines it, splice in the real
-      // implementation. Otherwise emit a stub that satisfies the SdkEntity
-      // interface (so the package compiles) but errors at runtime if the
-      // caller invokes an unsupported op.
       const opfrags =
         (['load', 'list', 'create', 'update', 'remove']
           .reduce((a: any, opname: string) =>

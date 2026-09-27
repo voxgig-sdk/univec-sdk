@@ -41,12 +41,6 @@ function entityOp(opname: string, present: boolean, entityname: string): string 
     post = `            ()\n`
   }
 
-  // The op resolves to the ENTITY (see Sdk_types). `list` builds one entity
-  // per record here, since make_result works in `value` and cannot; `remove`
-  // marks the instance. With throwing disabled run_op returns the error
-  // payload, which an entity_obj return cannot carry, so that path resolves to
-  // the entity too and the caller reads ctrl.err - the mechanism no-throw mode
-  // documents anyway.
   const tail =
     'list' === opname
       ? `      let out = run_op ctx post_done in

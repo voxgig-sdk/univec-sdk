@@ -1,10 +1,10 @@
-# VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (elixir/plugins/httpjson.ex)
-# Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+# VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (elixir/plugins/httpjson.ex)
+# Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 # The round-trip every remote store shares - and OUTSIDE THE CORE with the
 # client under it.
 #
-# Eight of the ten plugin kinds read a vault over HTTPS, and all eight
+# Eight of the eleven plugin kinds read a vault over HTTPS, and all eight
 # want the same three things: one JSON round-trip whose failures are
 # never a miss, a login token renewed shortly before its lease runs out,
 # and a handful of conversions between a JSON value and the string a

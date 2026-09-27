@@ -308,13 +308,71 @@ let () =
       ignore (u.u_fetcher ctx "http://h/a" (jo [("method", Str "GET"); ("headers", empty_map ())]));
       check "order" (!order = ["second"; "first"; "server"]));
 
+  (* prepare_auth IS GENERATED (Sdk_prepare_auth), so these four cases ask
+   * the generated module where this SDK puts its credential instead of
+   * assuming a header. They used to read `spec.headers["authorization"]`
+   * outright, which made them pass only for a header scheme and FAIL on
+   * every apiKey-in-query SDK - joplin's `?token=` - i.e. on exactly the
+   * SDKs the model-driven placement exists to make work. The assertions
+   * still drive the real u_prepare_auth end to end and check the bag, the
+   * key and the value it actually wrote; only the expectation is read from
+   * the SDK's own declared contract rather than hardcoded. *)
+  let auth_bag (ctx : ctx) : value =
+    let sp = match ctx.c_spec with Some s -> s | None -> assert false in
+    if Sdk_prepare_auth.cred_where = "query" then sp.sp_query else sp.sp_headers in
+
+  (* A cookie rides the shared `cookie` header, so the KEY is that header and
+   * the VALUE is a `name=value` pair. A header and a query parameter are
+   * keyed by the credential name itself. *)
+  let auth_key =
+    if Sdk_prepare_auth.cred_where = "cookie" then "cookie"
+    else Sdk_prepare_auth.cred_name in
+
+  (* A header carries the auth.prefix, space-joined when it is non-empty. A
+   * query parameter and a cookie do NOT: `?token=Bearer%20abc` is not a
+   * thing any API reads. *)
+  let auth_placed (prefix : string) (cred : string) : string =
+    if Sdk_prepare_auth.cred_where = "query" then cred
+    else if Sdk_prepare_auth.cred_where = "cookie" then
+      Sdk_prepare_auth.cred_name ^ "=" ^ cred
+    else if prefix <> "" then prefix ^ " " ^ cred
+    else cred in
+
+  (* An SDK built with main.kit.config.auth.active: false places nothing at
+   * all, by design, so the two placement cases assert the absence instead. *)
+  let check_placed (label : string) (ctx : ctx) (prefix : string) (cred : string) =
+    if Sdk_prepare_auth.cred_active then
+      check_vstr label (getp (auth_bag ctx) auth_key) (auth_placed prefix cred)
+    else
+      check (label ^ ": auth off, nothing placed")
+        (is_noval (getp (auth_bag ctx) auth_key)) in
+
+  (* The stale credential a clearing case must remove, written the way
+   * prepare_auth would have written it - a bare value for a header or a
+   * query parameter, a `name=value` pair for a cookie, since cookie_set
+   * splices OUR pair out and leaves every other cookie alone. *)
+  let stale_spec () : spec =
+    let placed = Str (auth_placed "" "stale") in
+    if Sdk_prepare_auth.cred_where = "query" then
+      new_spec (jo [("headers", empty_map ()); ("query", jo [(auth_key, placed)])])
+    else
+      new_spec (jo [("headers", jo [(auth_key, placed)])]) in
+
+  (* With auth switched off nothing is removed either: the function is a
+   * no-op by design, so a stale value is expected to survive. *)
+  let check_cleared (label : string) (ctx : ctx) =
+    let got = getp (auth_bag ctx) auth_key in
+    if Sdk_prepare_auth.cred_active then check label (is_noval got)
+    else check (label ^ ": auth off, nothing touched")
+        (got = Str (auth_placed "" "stale")) in
+
   test "prepare_auth.apikey_prefix_space_joined" (fun () ->
       let cl = client () in
       let ctx = mk_ctx cl "load" in
       cl.cl_options <- jo [("apikey", Str "K"); ("auth", jo [("prefix", Str "Bearer")])];
       ctx.c_spec <- Some (new_spec (jo [("headers", empty_map ())]));
       ignore (cl.cl_utility.u_prepare_auth ctx);
-      check_vstr "auth" (getp (match ctx.c_spec with Some s -> s.sp_headers | None -> Noval) "authorization") "Bearer K");
+      check_placed "auth" ctx "Bearer" "K");
 
   test "prepare_auth.raw_apikey" (fun () ->
       let cl = client () in
@@ -322,23 +380,23 @@ let () =
       cl.cl_options <- jo [("apikey", Str "K"); ("auth", jo [("prefix", Str "")])];
       ctx.c_spec <- Some (new_spec (jo [("headers", empty_map ())]));
       ignore (cl.cl_utility.u_prepare_auth ctx);
-      check_vstr "auth" (getp (match ctx.c_spec with Some s -> s.sp_headers | None -> Noval) "authorization") "K");
+      check_placed "auth" ctx "" "K");
 
   test "prepare_auth.empty_apikey_drops_header" (fun () ->
       let cl = client () in
       let ctx = mk_ctx cl "load" in
       cl.cl_options <- jo [("apikey", Str ""); ("auth", jo [("prefix", Str "Bearer")])];
-      ctx.c_spec <- Some (new_spec (jo [("headers", jo [("authorization", Str "stale")])]));
+      ctx.c_spec <- Some (stale_spec ());
       ignore (cl.cl_utility.u_prepare_auth ctx);
-      check "dropped" (is_noval (getp (match ctx.c_spec with Some s -> s.sp_headers | None -> Noval) "authorization")));
+      check_cleared "dropped" ctx);
 
   test "prepare_auth.no_auth_block_drops_header" (fun () ->
       let cl = client () in
       let ctx = mk_ctx cl "load" in
       cl.cl_options <- jo [("apikey", Str "K")];
-      ctx.c_spec <- Some (new_spec (jo [("headers", jo [("authorization", Str "stale")])]));
+      ctx.c_spec <- Some (stale_spec ());
       ignore (cl.cl_utility.u_prepare_auth ctx);
-      check "dropped" (is_noval (getp (match ctx.c_spec with Some s -> s.sp_headers | None -> Noval) "authorization")));
+      check_cleared "dropped" ctx);
 
   test "result_headers.no_headers_empty_map" (fun () ->
       let cl = client () in

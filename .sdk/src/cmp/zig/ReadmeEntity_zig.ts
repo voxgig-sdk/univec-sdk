@@ -66,7 +66,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
-    const fields = entity.fields || []
+    const fields = Object.values(entity.fields || {})
     const idF = entityIdField(entity)
     const eVar = zigVarName(entity.name)
     const method = zigVarName(entity.name)
@@ -115,8 +115,8 @@ carries the result \`Value\`, \`.err => |e|\` carries the branded error.
 `)
 
       each(fields, (field: any) => {
-        const desc = field.short || ''
-        Content(`| \`${field.name}\` | \`${zigType(field.type)}\` | ${desc} |
+        const desc = field.sh || ''
+        Content(`| \`${field.n}\` | \`${zigType(field.t)}\` | ${desc} |
 `)
       })
 

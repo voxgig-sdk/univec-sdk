@@ -1,12 +1,3 @@
-// Response caching for safe (read) requests (mirrors go
-// feature/cache_feature.go). Wraps the active transport and serves a fresh
-// cached snapshot instead of hitting the network when the same method+URL
-// was fetched within `ttl` ms (default: 5000). Only successful (2xx)
-// responses to cacheable methods (default: GET) are stored, keyed by
-// method+URL. The cache is bounded (`max` entries, default 256, oldest
-// evicted first) and every hit/miss/bypass is counted. Bodies are
-// snapshotted on capture so both the current caller and later hits can
-// re-read the JSON body repeatedly.
 
 use std::cell::RefCell;
 use std::collections::HashMap;

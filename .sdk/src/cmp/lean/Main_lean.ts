@@ -1,6 +1,7 @@
 import {
   cmp, each,
   File, Content, Copy, Folder,
+  srcFeatureExcludes, pluginExcludes,
 } from '@voxgig/sdkgen'
 
 import type {
@@ -15,6 +16,7 @@ import {
 import { Package } from './Package_lean'
 import { Config } from './Config_lean'
 import { Gitignore } from './Gitignore_lean'
+import { leanSecrets } from './utility_lean'
 
 
 // Op name -> generated wrapper. list/load/remove take a match; create takes
@@ -49,14 +51,53 @@ const Main = cmp(async function Main(props: any) {
   Package({ target })
   Gitignore({})
 
-  // Copy tm/lean verbatim (placeholder substitution applies): the runtime under
-  // src/ (VoxgigStruct, Vregex, SdkJson, SdkRuntime), plus LICENSE/VERSION. The
-  // per-feature custom-source scaffold under src/feature is excluded.
+  const secrets = leanSecrets(model, target)
+
+  const T = '\t'
+  const ffiRules = !secrets.ffi ? '' : [
+    'export LEAN_CC ?= cc',
+    'CC ?= cc',
+    'LEANPREFIX := $(shell lean --print-prefix)',
+    'SECRETS_FFI_DIR := src/feature/secrets/ffi',
+    'SECRETS_FFI_OBJS := $(SECRETS_FFI_DIR)/sekreto_curl.o $(SECRETS_FFI_DIR)/sekreto_clock.o',
+    'SECRETS_FFI_RSP := $(SECRETS_FFI_DIR)/link.rsp',
+    'SECRETS_FFI := $(SECRETS_FFI_OBJS) $(SECRETS_FFI_RSP)',
+    '# Where the compiler finds libcurl (multiarch on Debian, lib64 on Fedora),',
+    '# asked rather than guessed; a bare name back means no development package.',
+    'SECRETS_LIBCURL := $(shell $(CC) -print-file-name=libcurl.so)',
+    '',
+    '$(SECRETS_FFI_DIR)/%.o: $(SECRETS_FFI_DIR)/%.c',
+    T + '$(CC) -c -o $@ $< -I$(LEANPREFIX)/include -fPIC -std=c11 -Wall -Wextra',
+    '',
+    '$(SECRETS_FFI_RSP): $(SECRETS_FFI_OBJS) lakefile.toml',
+    T + '@test "$(SECRETS_LIBCURL)" != "libcurl.so" || { echo "secrets: libcurl ' +
+      'development files not found (libcurl4-openssl-dev / libcurl-devel)" >&2; exit 1; }',
+    T + String.raw`printf '%s\n' $(SECRETS_FFI_OBJS) -L$(LEANPREFIX)/lib ` +
+      String.raw`-L$(dir $(SECRETS_LIBCURL)) -lcurl -lssl -lcrypto > $@`,
+    '',
+  ].join('\n')
+
+  const secretsMarkers = {
+    '-- #SecretsImport': secrets.active ? 'import SecretsFeature' : '',
+    '-- #SecretsMakeFeature': secrets.active ?
+      '| "secrets" => SecretsFeature.secretsFeature' : '',
+    '-- #SecretsFeatureName': secrets.active ? ', "secrets"' : '',
+    '-- #SecretsPluginImports': secrets.imports
+      .map((m: string) => 'import ' + m).join('\n'),
+    '-- #SecretsPluginDefs': secrets.defs.join(', '),
+    '# #SecretsTest': secrets.active ? '\tlake exe secrets' : '',
+    '# #SecretsFfi': ffiRules,
+  }
+
   Copy({
     from: 'tm/' + target.name,
-    exclude: [/src\/feature\//],
+    exclude: [
+      /\.gitkeep$/, /src\/feature\/README\.md$/,
+      ...srcFeatureExcludes(model), ...pluginExcludes(model),
+    ],
     replace: {
       ...props.ctx$.stdrep,
+      ...secretsMarkers,
     }
   })
 

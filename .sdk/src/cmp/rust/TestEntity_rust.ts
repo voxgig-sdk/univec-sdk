@@ -1,3 +1,4 @@
+import { flowSteps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -26,8 +27,6 @@ import {
 import { rustVarName, rustMethodName } from './utility_rust'
 
 
-// Rust's GenCtx mirrors the shared shape (see TestEntity_ts.ts) plus the
-// crate ident used to build qualified paths in emitted code.
 type GenCtx = {
   model: Model
   entity: ModelEntity
@@ -64,13 +63,6 @@ const TestEntity = cmp(function TestEntity(props: any) {
     ? `("apikey", getp(&env, "${PROJUPPER}_APIKEY"))`
     : ''
 
-  // A templated server URL (OpenAPI server variables) makes a LIVE client
-  // impossible to construct without values: makeOptions raises rather than
-  // request a URL with a literal `{account_id}` in it. So the live suite
-  // takes them from the environment the same way it takes the apikey.
-  //
-  // Emitted as a jo() tuple entry, so it carries its own leading comma only
-  // when an apikey entry precedes it - otherwise `jo(vec![, ...])`.
   const svars = serverVariables(model)
   const serverEnvEntry = svars
     .map((v: any) => `\n        ("${serverVarEnv(PROJUPPER, v.name)}", Value::str(${JSON.stringify(v.dflt)})),`).join('')
@@ -84,16 +76,16 @@ const TestEntity = cmp(function TestEntity(props: any) {
   const idnamesStr = idnames.map(n => `Value::str("${n}")`).join(', ')
 
   // All update data entries for alias generation.
-  const allSteps = Object.values(basicflow.step) as any[]
-  const updateStep = allSteps.find((s: any) => s.op === 'update')
-  const updateData = updateStep?.data
-    ? Object.entries(updateStep.data).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+  const allSteps = Object.values(flowSteps(basicflow)) as any[]
+  const updateStep = allSteps.find((s: any) => s.o === 'update')
+  const updateData = updateStep?.d
+    ? Object.entries(updateStep.d).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
     : []
   const aliases = updateData.map(([k, v]: any) => [k, v])
 
   const genCtx: GenCtx = { model, entity, rustcrate, flow: basicflow, PROJUPPER }
 
-  const opNames = Array.from(new Set(allSteps.map((s: any) => s.op).filter(Boolean)))
+  const opNames = Array.from(new Set(allSteps.map((s: any) => s.o).filter(Boolean)))
   const opsList = opNames.map(o => `"${o}"`).join(', ')
 
   // Same hazard as the csharp target: an entity whose basic flow has no ops
@@ -149,7 +141,7 @@ fn ${evar}_entity_instance() {
     // The stream test drives the list op; only emit it when the entity has a
     // list op (a create/load-only entity has no list endpoint, so
     // stream("list") panics with point_no_points).
-    const flowHasList = allSteps.some((s: any) => 'list' === s.op)
+    const flowHasList = allSteps.some((s: any) => 'list' === s.o)
     if (flowHasList) {
       Content(`
 #[test]
@@ -207,7 +199,7 @@ ${skipBlock}    // The basic flow consumes synthetic IDs from the fixture. In li
 ${allSteps.length > 0 ? '    let client = setup.client.clone();\n' : ''}`)
 
     // No create step: bootstrap entity data from existing fixture data.
-    const flowHasCreate = allSteps.some((s: any) => s.op === 'create')
+    const flowHasCreate = allSteps.some((s: any) => s.o === 'create')
     if (!flowHasCreate) {
       const preambleVar = rustVarName(entity.name + '_ref01')
       Content(`
@@ -222,8 +214,8 @@ ${allSteps.length > 0 ? '    let client = setup.client.clone();\n' : ''}`)
     }
 
     // Model-driven step iteration.
-    each(basicflow.step, (step: any, index: any) => {
-      const opgen: OpGen = GENERATE_OP[step.op]
+    each(flowSteps(basicflow), (step: any, index: any) => {
+      const opgen: OpGen = GENERATE_OP[step.o]
       if (opgen) {
         opgen(genCtx, step, index)
         Content('\n')
@@ -352,13 +344,13 @@ ${allSteps.length > 0 ? '    let client = setup.client.clone();\n' : ''}`)
 
 const generateCreate: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = rustVarName(step.input.entvar ?? ref + '_ent')
-  const datavar = rustVarName(step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? '')))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = rustVarName(step.i.entvar ?? ref + '_ent')
+  const datavar = rustVarName(step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? '')))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const needsEnt = !priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   Content(`    // CREATE
 `)
@@ -402,14 +394,14 @@ const generateCreate: OpGen = (ctx, step, index) => {
 
 const generateList: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = rustVarName(step.input.entvar ?? ref + '_ent')
-  const matchvar = rustVarName(step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? '')))
-  const listvar = rustVarName(step.input.listvar ?? (ref + '_list' + (step.input.suffix ?? '')))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = rustVarName(step.i.entvar ?? ref + '_ent')
+  const matchvar = rustVarName(step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? '')))
+  const listvar = rustVarName(step.i.listvar ?? (ref + '_list' + (step.i.suffix ?? '')))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const needsEnt = !priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   Content(`    // LIST
 `)
@@ -441,13 +433,13 @@ const generateList: OpGen = (ctx, step, index) => {
     let ${listvar} = ja(${listvar}.iter().map(|e| e.data(None)).collect::<Vec<Value>>());
 `)
 
-  // Validators from step.valid.
-  const allSteps = Object.values(flow.step) as any[]
-  if (step.valid) {
-    for (const validator of (step as any).valid) {
+  // Validators from step.v.
+  const allSteps = Object.values(flowSteps(flow)) as any[]
+  if (step.v) {
+    for (const validator of (step as any).v) {
       const validRef = validator.def?.ref
-      const hasRefData = validRef && allSteps.some((s: any) => 'create' === s.op &&
-        ((s.input.ref ?? entity.name + '_ref01') === validRef))
+      const hasRefData = validRef && allSteps.some((s: any) => 'create' === s.o &&
+        ((s.i.ref ?? entity.name + '_ref01') === validRef))
 
       if ('ItemExists' === validator.apply && hasRefData) {
         const refDataVar = rustVarName(validRef + '_data')
@@ -481,16 +473,16 @@ const generateList: OpGen = (ctx, step, index) => {
 
 const generateUpdate: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = rustVarName(step.input.entvar ?? ref + '_ent')
-  const datavar = rustVarName(step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? '')))
-  const resdatavar = rustVarName(step.input.resdatavar ?? (ref + '_resdata' + (step.input.suffix ?? '')))
-  const markdefvar = rustVarName(step.input.markdefvar ?? (ref + '_markdef' + (step.input.suffix ?? '')))
-  const srcdatavar = rustVarName(step.input.srcdatavar ?? (ref + '_data' + (step.input.suffix ?? '')))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = rustVarName(step.i.entvar ?? ref + '_ent')
+  const datavar = rustVarName(step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? '')))
+  const resdatavar = rustVarName(step.i.resdatavar ?? (ref + '_resdata' + (step.i.suffix ?? '')))
+  const markdefvar = rustVarName(step.i.markdefvar ?? (ref + '_markdef' + (step.i.suffix ?? '')))
+  const srcdatavar = rustVarName(step.i.srcdatavar ?? (ref + '_data' + (step.i.suffix ?? '')))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const needsEnt = !priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   const hasEntIdU = null != entity.id
 
@@ -507,9 +499,9 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 `)
   }
 
-  // Data entries from step.data.
-  if (step.data) {
-    const dataEntries = Object.entries(step.data).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+  // Data entries from step.d.
+  if (step.d) {
+    const dataEntries = Object.entries(step.d).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
     for (const [key] of dataEntries) {
       Content(`    setp(&${datavar}_up, "${key}", getp(&setup.idmap, "${key}"));
 `)
@@ -517,10 +509,10 @@ const generateUpdate: OpGen = (ctx, step, index) => {
   }
 
   // TextFieldMark spec.
-  if (step.spec) {
-    for (const spec of (step as any).spec) {
-      if ('TextFieldMark' === spec.apply && null != step.input.textfield) {
-        const fieldname = step.input.textfield
+  if (step.s) {
+    for (const spec of (step as any).s) {
+      if ('TextFieldMark' === spec.apply && null != step.i.textfield) {
+        const fieldname = step.i.textfield
         const fieldvalue = spec.def?.mark ?? `Mark01-${ref}`
         Content(`
     let ${markdefvar}_name = "${fieldname}";
@@ -555,9 +547,9 @@ const generateUpdate: OpGen = (ctx, step, index) => {
   }
 
   // Assert TextFieldMark.
-  if (step.spec) {
-    for (const spec of (step as any).spec) {
-      if ('TextFieldMark' === spec.apply && null != step.input.textfield) {
+  if (step.s) {
+    for (const spec of (step as any).s) {
+      if ('TextFieldMark' === spec.apply && null != step.i.textfield) {
         Content(`    assert_eq!(
         getp(&${resdatavar}, ${markdefvar}_name),
         Value::str(${markdefvar}_value.clone()),
@@ -573,24 +565,24 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 
 const generateLoad: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = rustVarName(step.input.entvar ?? ref + '_ent')
-  const matchvar = rustVarName(step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? '')))
-  const datavar = rustVarName(step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? '')))
-  const srcdatavar = rustVarName(step.input.srcdatavar ?? (ref + '_data' + (step.input.suffix ?? '')))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = rustVarName(step.i.entvar ?? ref + '_ent')
+  const matchvar = rustVarName(step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? '')))
+  const datavar = rustVarName(step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? '')))
+  const srcdatavar = rustVarName(step.i.srcdatavar ?? (ref + '_data' + (step.i.suffix ?? '')))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const hasEntVar = priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   // Was srcdatavar declared by a prior create step or the preamble?
-  const flowHasCreate = Object.values(flow.step).some((s: any) => (s as any).op === 'create')
+  const flowHasCreate = Object.values(flowSteps(flow)).some((s: any) => (s as any).o === 'create')
   const preambleRef = entity.name + '_ref01'
   const hasSrcData = (!flowHasCreate && srcdatavar === rustVarName(preambleRef + '_data')) ||
     priorSteps.some((s: any) => {
-      if ('create' === s.op) {
-        const priorRef = s.input.ref ?? entity.name + '_ref01'
-        const priorDatvar = rustVarName(s.input.datavar ?? (priorRef + '_data' + (s.input.suffix ?? '')))
+      if ('create' === s.o) {
+        const priorRef = s.i.ref ?? entity.name + '_ref01'
+        const priorDatvar = rustVarName(s.i.datavar ?? (priorRef + '_data' + (s.i.suffix ?? '')))
         return priorDatvar === srcdatavar
       }
       return false
@@ -647,14 +639,14 @@ const generateLoad: OpGen = (ctx, step, index) => {
 
 const generateRemove: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = rustVarName(step.input.entvar ?? ref + '_ent')
-  const matchvar = rustVarName(step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? '')))
-  const srcdatavar = rustVarName(step.input.srcdatavar ?? (ref + '_data'))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = rustVarName(step.i.entvar ?? ref + '_ent')
+  const matchvar = rustVarName(step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? '')))
+  const srcdatavar = rustVarName(step.i.srcdatavar ?? (ref + '_data'))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const needsEnt = !priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   Content(`    // REMOVE
 `)

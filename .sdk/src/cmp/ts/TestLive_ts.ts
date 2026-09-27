@@ -16,10 +16,10 @@ const TestLive = cmp(function TestLive(props: any) {
           securitySource: all.securitySource,
           responses: all.responses,
         }
-        const same = operation.points.filter((p: any) => JSON.stringify(p.select || {}) === JSON.stringify(point.select || {}))
+        const same = operation.points.filter((p: any) => JSON.stringify(p.q || {}) === JSON.stringify(point.q || {}))
         plan.push({ entity: entity.name, accessor: nom(entity, 'Name'), op,
-          id: point.method + ' ' + point.orig, contractVersion: 1, kind: point.kind, graphql: point.graphql, path: point.orig, method: point.method,
-          action: point.select?.$action, rename: point.rename, args: point.args, facts, reachable: same.length === 1 })
+          id: point.m + ' ' + point.o, contractVersion: 1, kind: point.k, graphql: point.gq, path: point.o, method: point.m,
+          action: point.q?.$action, rename: point.r, args: point.g, facts, reachable: same.length === 1 })
       }
     }
   }

@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (java/src/voxgig/plugin/Inst.java)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (java/src/voxgig/plugin/Inst.java)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 package voxgig.univecsdk.feature.secrets.plugin;
 
@@ -138,6 +138,25 @@ public final class Inst {
   /** Published for other plugins and for the application (§11). */
   public void export(String key, Object value) {
     entry.exports.put(key, value);
+  }
+
+  /**
+   * WHICH provider this instance is bound to for {@code name} (§11.1), as
+   * a ref, or null when nothing provides it.
+   *
+   * <p>The host's own {@code capability} answers with the live providers
+   * RANKED, not with the one THIS instance took; §11.4's reluctant
+   * rebinding makes those differ. A REF, not the instance: every port can
+   * return a string and a corpus entry can assert on one. The selection
+   * is REMEMBERED, because this is the instance asking.
+   */
+  public String capability(String name) {
+    for (Object req : Depend.requirements(entry.options)) {
+      if (name.equals(Types.get(req, "name"))) {
+        return host.chosen(entry, req, true);
+      }
+    }
+    return null;
   }
 
   /** What this instance can do for others (§11.1). */

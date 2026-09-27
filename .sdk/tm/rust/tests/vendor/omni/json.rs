@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/omni sdk-20260908-1556-0 (rust/src/json.rs)
-// Source: https://github.com/voxgig/omni @ 274708cc2d12b21707d975543953f845f8444be0  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/omni sdk-20260925-1316-0 (rust/src/json.rs)
+// Source: https://github.com/voxgig/omni @ b909ff51fc644e4955c850e30cc65e74be076df2  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 //! The omni JSON value model, with a small in-tree parser.
 //!
@@ -165,12 +165,6 @@ impl From<String> for Json {
     }
 }
 
-/// Maximum nesting depth the parser will follow. Omni specs are trusted
-/// input, so this is crash-safety, not a security boundary: past this
-/// depth the recursive parser would overflow the stack and abort the
-/// process, so it returns an error instead. 1024 is far beyond any real
-/// spec, and low enough that reaching the limit itself fits comfortably
-/// in a default (2MiB) test-thread stack even in debug builds.
 const MAX_DEPTH: usize = 1024;
 
 /// Parse JSON text into a [`Json`] value.

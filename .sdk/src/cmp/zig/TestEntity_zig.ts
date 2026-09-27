@@ -4,14 +4,6 @@ import { cmp, Content } from '@voxgig/sdkgen'
 import { zigVarName } from './utility_zig'
 
 
-// Per-entity model-driven smoke tests. Emits `test "..."` blocks INTO the
-// shared generated_test.zig file (opened by Test_zig) — zig's build.zig uses
-// an explicit test-file list, so every generated test must live in that one
-// file rather than a per-entity file (the go/rust one-file-per-entity layout
-// relies on cargo/go auto-discovery, which zig lacks). Each test drives the
-// entity through the full pipeline via the offline `test` transport and
-// asserts a non-error result. `std`, `sdk`, `h`, `Value` and `vnull()` are in
-// scope from the Test_zig header.
 const TestEntity = cmp(function TestEntity(props: any) {
   const { target, entity } = props
 

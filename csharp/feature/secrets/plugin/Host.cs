@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (csharp/src/Host.cs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (csharp/src/Host.cs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 using System;
 using System.Collections.Generic;
@@ -649,6 +649,13 @@ namespace Voxgig.Plugin
         /// ABOUT an instance rather than BY it: introspection must not
         /// create a binding.
         /// </summary>
+        /// <summary>The instance api's way onto Chosen, which is
+        /// private.</summary>
+        internal string InstCapability(Entry entry, object req)
+        {
+            return Chosen(entry, req, true);
+        }
+
         private string Chosen(Entry entry, object req, bool remember)
         {
             var cands = ProvidersOf(req);

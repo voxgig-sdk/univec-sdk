@@ -1,5 +1,5 @@
-(* VENDORED: @voxgig/plugin sdk-20260908-1556-0 (ocaml/src/host.ml) *)
-(* Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0] *)
+(* VENDORED: @voxgig/plugin sdk-20260925-1316-0 (ocaml/src/host.ml) *)
+(* Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0] *)
 (* License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream. *)
 (* The host: the lifecycle state machine (§5), extension points (§6),
    and resource capture (§8).
@@ -357,6 +357,22 @@ let chosen h e req remember =
       if remember then V.set e.selected name (V.vstr first);
       Some first
   end
+
+(* WHICH provider this instance is bound to for `name` (§11.1), as a
+   ref, or None when nothing provides it.
+
+   The host's own `capability` answers with the live providers RANKED,
+   not with the one THIS instance took; §11.4's reluctant rebinding
+   makes those differ. A REF, not the instance. The selection is
+   REMEMBERED, because this is the instance asking. *)
+let instcapability e name =
+  match
+    List.find_opt
+      (fun r -> V.is_str (V.get r "name") && V.as_str (V.get r "name") = name)
+      (V.items (Depend.requirements e.options))
+  with
+  | None -> None
+  | Some req -> chosen e.owner e req true
 
 (* The instance currently SELECTED for each of this one's
    restart-causing requirements. A BINDING IS TO AN INSTANCE, not to a

@@ -3,7 +3,8 @@
 // query; on the way back (PreResult) it reads the server's pagination
 // signals — a `Link: rel="next"` header, `X-Page`/`X-Next-Page`/
 // `X-Total-Count` headers, or `next`/`cursor`/`nextCursor`/`hasMore` fields
-// in the body — and records them on `result.paging`. A per-call cursor/page
+// in the body (snake_case forms too) — and records them on `result.paging`
+// and the caller's ctrl paging. A per-call cursor/page
 // from ctrl takes priority (used by auto-iteration). Parameter names
 // (`pageParam`, `limitParam`, `cursorParam`), the page size (`limit`) and
 // the start page (`startPage`, default 1) are configurable.
@@ -225,7 +226,10 @@ static void paging_pre_request(PagingFeature* pf, Context* ctx) {
   if (!v_is_noval(cursor) && !v_is_null(cursor)) {
     setp(query, cursor_param, cursor);
   } else if (v_is_noval(getp(query, page_param))) {
-    voxgig_value* page = getp(paging, "page");
+    // A record written back by pre_result holds the page just fetched as
+    // "page" and the one to fetch as "nextPage", so nextPage wins.
+    voxgig_value* page = getp(paging, "nextPage");
+    if (v_is_noval(page) || v_is_null(page)) page = getp(paging, "page");
     if (!v_is_noval(page) && !v_is_null(page)) {
       setp(query, page_param, page);
     } else {
@@ -297,11 +301,15 @@ static void paging_pre_result(PagingFeature* pf, Context* ctx) {
     }
   }
 
-  // Body-level cursors.
+  // Body-level signals; snake_case forms are read first so camelCase wins.
   if (voxgig_is_map(body)) {
     voxgig_value* next = getp(body, "next");
     if (!v_is_noval(next) && !v_is_null(next) && v_is_noval(getp(paging, "next"))) {
       setp(paging, "next", next);
+    }
+    voxgig_value* snake_cursor = getp(body, "next_cursor");
+    if (!v_is_noval(snake_cursor) && !v_is_null(snake_cursor)) {
+      setp(paging, "cursor", snake_cursor);
     }
     voxgig_value* cursor = getp(body, "cursor");
     if (!v_is_noval(cursor) && !v_is_null(cursor)) {
@@ -311,7 +319,18 @@ static void paging_pre_result(PagingFeature* pf, Context* ctx) {
     if (!v_is_noval(next_cursor) && !v_is_null(next_cursor)) {
       setp(paging, "cursor", next_cursor);
     }
+    if (v_is_noval(getp(paging, "nextPage"))) {
+      voxgig_value* np = getp(body, "nextPage");
+      if (v_is_noval(np) || v_is_null(np)) np = getp(body, "next_page");
+      if (voxgig_is_number(np) || voxgig_is_string(np)) {
+        setp(paging, "nextPage", np);
+      }
+    }
     bool has_more;
+    if (get_bool(body, "has_more", &has_more)) {
+      setp(paging, "hasMore", v_bool(has_more));
+      explicit_more = true;
+    }
     if (get_bool(body, "hasMore", &has_more)) {
       setp(paging, "hasMore", v_bool(has_more));
       explicit_more = true;
@@ -334,6 +353,21 @@ static void paging_pre_result(PagingFeature* pf, Context* ctx) {
 
   ctx->result->paging = paging;
   pf->last = paging;
+
+  if (ctx->ctrl) {
+    // The Context shares the caller's paging map by pointer, so refill it in
+    // place; a fresh map on ctrl never reaches the caller.
+    if (voxgig_is_map(ctx->ctrl->paging)) {
+      voxgig_map* dst = voxgig_as_map(ctx->ctrl->paging);
+      voxgig_map* src = voxgig_as_map(paging);
+      voxgig_map_clear(dst);
+      for (size_t i = 0; i < voxgig_map_len(src); i++) {
+        voxgig_map_set(dst, voxgig_map_key_at(src, i), v_share(voxgig_map_val_at(src, i)));
+      }
+    } else {
+      ctx->ctrl->paging = paging;
+    }
+  }
 }
 
 static void paging_hook(Feature* f, const char* name, Context* ctx) {

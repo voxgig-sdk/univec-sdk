@@ -1,17 +1,6 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (rust/src/refs.rs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (rust/src/refs.rs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! Identity: name+tag, written `name$tag` (§4).
-//!
-//! The four pure functions, and the whole of what `ref` pins. They are the
-//! first thing a new port implements and the first corpus section it
-//! passes.
-//!
-//! NO REGEX ENGINE, because the standard library has none and §16 permits
-//! no crate to supply one. The grammar is a character-class walk instead -
-//! which is also why the `#trailing-newline` entries cannot bite this port
-//! the way they bit ruby, python and perl: there is no `$` here to match
-//! before a newline.
 
 use super::types::{details, fail, PluginError};
 use super::value::Value;
@@ -35,12 +24,6 @@ pub fn check_name(name: &Value) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '~' | '_' | '-' | '/'))
 }
 
-/// §4: `^[a-zA-Z0-9.~_-]+$`, max 1024, or empty.
-///
-/// The asymmetry with a name is deliberate: a tag MAY start with a digit
-/// because auto-tagging assigns integer tags (`stripe$1`), and a tag
-/// admits neither `@` nor `/` because a name is a package specifier and a
-/// tag is not.
 pub fn check_tag(tag: &Value) -> bool {
     let text = match tag.as_str() {
         Some(s) => s,
@@ -58,18 +41,12 @@ pub fn check_tag(tag: &Value) -> bool {
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '~' | '_' | '-'))
 }
 
-/// `name$tag` -> the pair. Canonicalizing: `stripe$` and `stripe` both
-/// give tag "".
 pub fn parse_ref(value: &Value) -> Result<Value, PluginError> {
     let text = match value.as_str() {
         Some(s) => s,
         None => return fail("plugin_bad_name", "ref must be a string", Value::Null),
     };
 
-    // Split on the FIRST `$`. Nothing in the grammar decides this - `$` is
-    // in neither character class - so the corpus is the arbiter (§4 rule
-    // 5), and it picks the split that blames the part actually at fault:
-    // `a$b$c` is a good name with a bad tag, not the reverse.
     let (name, tag) = match text.find('$') {
         Some(cut) => (&text[..cut], &text[cut + 1..]),
         None => (text, ""),
@@ -98,9 +75,6 @@ pub fn parse_ref(value: &Value) -> Result<Value, PluginError> {
     Ok(out)
 }
 
-/// The pair -> `name$tag`. An empty tag NEVER writes the separator, which
-/// is the half of canonicalization `format_ref` owns: parse tolerates
-/// `stripe$`, format never produces it, so a round trip is idempotent.
 pub fn format_ref(name: &Value, tag: &Value) -> Result<String, PluginError> {
     let tag = if tag.is_null() { Value::str("") } else { tag.clone() };
     if !check_name(name) {

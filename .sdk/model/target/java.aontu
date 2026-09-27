@@ -1,0 +1,47 @@
+main: kit: target: java: {
+
+  title: Java
+  ext: java
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  provides: { sekreto: true, schema: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the struct-corpus runner class
+  # (test/RunnerSupport.java is support-only and RETAINED, name unchanged
+  # so emitted call sites need no churn). `doctor` reports leftovers;
+  # `doctor prune` deletes them.
+  superseded: [
+    'test/StructRunner.java'
+  ]
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  deps: {}
+}
+
+
+main: kit: feature: &: target: java: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: java: publish: {
+  registry: {
+    name: 'maven-central'
+    url: 'https://central.sonatype.com'
+    vault: { recipe: 'maven', alias: 'central' }
+  }
+}
+
+
+main: kit: target: java: feature: {
+  trim: true
+  fullset: ['test/FeatureTest.java']
+}

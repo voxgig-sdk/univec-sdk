@@ -18,8 +18,8 @@ import JAVAPACKAGE.utility.struct.Struct;
 // stamps page/limit (or a cursor) into the request query; on the way back
 // (PreResult) it reads the server's pagination signals — a `Link:
 // rel="next"` header, `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body — and records
-// them on `ctx.result.paging`. A per-call cursor/page from ctrl takes
+// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body (snake_case
+// forms too) — and records them on `ctx.result.paging` and `ctrl.paging`. A per-call cursor/page from ctrl takes
 // priority (used by auto-iteration). Parameter names (`pageParam`,
 // `limitParam`, `cursorParam`), the page size (`limit`) and the start page
 // (`startPage`, default 1) are configurable.
@@ -82,7 +82,12 @@ public class PagingFeature extends BaseFeature {
       spec.query.put(cursorParam, cursor);
     }
     else if (spec.query.get(pageParam) == null) {
-      Object page = paging.get("page");
+      // A record written back by preResult holds the page just fetched as
+      // "page" and the one to fetch as "nextPage", so nextPage wins.
+      Object page = paging.get("nextPage");
+      if (page == null) {
+        page = paging.get("page");
+      }
       if (page != null) {
         spec.query.put(pageParam, page);
       }
@@ -206,17 +211,36 @@ public class PagingFeature extends BaseFeature {
       }
     }
 
-    // Body-level cursors.
+    // Body-level signals; snake_case forms are read first so camelCase wins.
     if (body instanceof Map) {
       Map<String, Object> bm = (Map<String, Object>) body;
       if (bm.get("next") != null && paging.get("next") == null) {
         paging.put("next", bm.get("next"));
+      }
+      if (bm.get("next_cursor") != null) {
+        paging.put("cursor", bm.get("next_cursor"));
       }
       if (bm.get("cursor") != null) {
         paging.put("cursor", bm.get("cursor"));
       }
       if (bm.get("nextCursor") != null) {
         paging.put("cursor", bm.get("nextCursor"));
+      }
+      if (paging.get("nextPage") == null) {
+        Object np = bm.get("nextPage");
+        if (np == null) {
+          np = bm.get("next_page");
+        }
+        if (np instanceof Number) {
+          paging.put("nextPage", ((Number) np).intValue());
+        }
+        else if (np instanceof String) {
+          paging.put("nextPage", np);
+        }
+      }
+      if (bm.get("has_more") instanceof Boolean) {
+        paging.put("hasMore", bm.get("has_more"));
+        explicitMore = true;
       }
       if (bm.get("hasMore") instanceof Boolean) {
         paging.put("hasMore", bm.get("hasMore"));
@@ -237,6 +261,24 @@ public class PagingFeature extends BaseFeature {
 
     result.paging = paging;
     this.last = paging;
+
+    if (ctx.ctrl != null) {
+      // The Context shares the caller's paging map by reference, so refill
+      // it in place; an immutable map falls back to replacing the reference.
+      Map<String, Object> shared = ctx.ctrl.paging;
+      if (shared == null) {
+        ctx.ctrl.paging = paging;
+      }
+      else {
+        try {
+          shared.clear();
+          shared.putAll(paging);
+        }
+        catch (UnsupportedOperationException e) {
+          ctx.ctrl.paging = paging;
+        }
+      }
+    }
   }
 
   private boolean isList(Context ctx) {

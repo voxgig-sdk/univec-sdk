@@ -1,5 +1,6 @@
 // Univec SDK utility: request preparation steps (method, path, params,
-// query, headers, body, auth) plus param resolution.
+// query, headers, body) plus param resolution. The auth step is GENERATED
+// into utility/PrepareAuth.swift - see the note below.
 
 import Foundation
 
@@ -70,7 +71,7 @@ func prepareQueryUtil(_ ctx: Context) -> VMap {
   for item in items(.map(reqmatch)) {
     let key = item[0].asString ?? ""
     let val = item[1]
-    if !isNil(val) && !containsStr(paramnames, key) {
+    if !isNil(val) && "$action" != key && !containsStr(paramnames, key) {
       query.entries[key] = val
     }
   }
@@ -89,44 +90,25 @@ func prepareBodyUtil(_ ctx: Context) -> Value {
   return .noval
 }
 
-private let headerAuth = "authorization"
-private let optionApikey = "apikey"
-private let notFound = "__NOTFOUND__"
-
-func prepareAuthUtil(_ ctx: Context) throws -> Spec {
-  guard let spec = ctx.spec else {
-    throw ctx.makeError("auth_no_spec", "Expected context spec property to be defined.")
-  }
-
-  let headers = spec.headers
-  let options = ctx.client!.optionsMap()
-
-  // Public APIs that need no auth omit the options.auth block entirely.
-  let auth = getprop(.map(options), .string("auth"))
-  if isNil(auth) {
-    headers.entries.removeValue(forKey: headerAuth)
-    return spec
-  }
-
-  let apikey = getprop(.map(options), .string(optionApikey), .string(notFound))
-
-  var skip = isNil(apikey)
-  if let apikeyStr = apikey.asString, apikeyStr == notFound || apikeyStr == "" {
-    skip = true
-  }
-
-  if skip {
-    headers.entries.removeValue(forKey: headerAuth)
-  } else {
-    var authPrefix = ""
-    if let ap = gpath(options, "auth", "prefix").asString { authPrefix = ap }
-    let apikeyVal = apikey.asString ?? ""
-    // Empty prefix (raw apiKey credential) must not add a leading space.
-    headers.entries[headerAuth] = .string(authPrefix == "" ? apikeyVal : authPrefix + " " + apikeyVal)
-  }
-
-  return spec
-}
+// prepareAuth IS NOT HERE. It was, and it hardcoded
+//
+//   private let headerAuth = "authorization"
+//
+// WHERE THE CREDENTIAL GOES IS A FACT ABOUT THE API - header, query or
+// cookie, and under what name - and apidef resolves it into
+// main.kit.info.security. A template can only hold one answer, so an
+// apiKey-in-query API (joplin's `?token=`) got an Authorization header it
+// does not read and never got the query parameter it does.
+//
+// So `prepareAuthUtil` is GENERATED, into utility/PrepareAuth.swift beside
+// this file, by cmp/swift/PrepareAuth_swift.ts. Same module, same internal
+// symbol, so utility/Register.swift still binds it with
+// `u.prepareAuth = prepareAuthUtil` and nothing else moved. Declaring it
+// here as well would be an "invalid redeclaration" that fails the whole
+// SwiftPM target.
+//
+// The seven functions above and paramUtil below do not depend on the model,
+// so they stay templated.
 
 func paramUtil(_ ctx: Context, _ paramdef: Value) -> Value {
   let point = ctx.point

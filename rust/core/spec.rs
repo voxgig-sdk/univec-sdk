@@ -1,4 +1,3 @@
-// Request specification (mirrors go core/spec.go).
 
 use crate::core::helpers::{get_str, getp};
 use crate::utility::voxgigstruct::Value;

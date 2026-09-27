@@ -2,27 +2,6 @@
 import { cmp, File, Content } from '@voxgig/sdkgen'
 
 
-// Emits test/TReadmeExamples.hs — a STRUCTURAL gate over every fenced
-// Haskell code block in the three docs that ship Haskell examples:
-//   - the root README.md (top-level, multi-language quick start)
-//   - the per-language haskell/README.md
-//   - the per-language haskell/REFERENCE.md
-//
-// DESIGN NOTE vs the Python gate (ReadmeExamplesTest_py.ts): the Python
-// version parses AND executes every block in a seeded test-mode subprocess.
-// A faithful Haskell port would compile every snippet against the generated
-// SDK — a throwaway module per block plus a GHC invocation — a large,
-// environment-sensitive harness that cannot be authored safely without a build
-// to validate it. This gate instead validates that every documented Haskell
-// block is PRESENT, non-empty, and STRUCTURALLY well-formed (balanced
-// delimiters). Missing docs are tolerated (a run may generate a subset of
-// phases), and no blocks found records no failures — so this never breaks the
-// shared runner. Upgrading it to a true compile gate is left as a follow-up.
-//
-// The emitted module exposes `tests :: Counters -> IO ()`; the generated
-// SdkGenTests calls it, so it runs inside the standard Runner. The triple
-// backtick fence marker is built from its char code (toEnum 96) so this
-// component's Haskell source needs no backtick/backslash gymnastics.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { target, ctx$: { model } } = props
 

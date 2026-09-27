@@ -2,12 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MetricsFeature = void 0;
 const BaseFeature_1 = require("../base/BaseFeature");
-// Statistics capture. Records per-operation counters and latency for every
-// call: totals plus a breakdown keyed by `<entity>.<op>`. Timing starts at
-// endpoint resolution (PrePoint) and stops when the call returns (PreDone)
-// or throws (PreUnexpected). Aggregates live on `client._metrics` and can be
-// read via `client.metrics()` in the generated SDK. The clock is injectable
-// (`now`) for deterministic tests.
 class MetricsFeature extends BaseFeature_1.BaseFeature {
     version = '0.0.1';
     name = 'metrics';

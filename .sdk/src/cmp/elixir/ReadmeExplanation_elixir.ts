@@ -26,6 +26,7 @@ elixir/
 ├── lib/
 │   ├── ${app}.ex                 -- Main SDK module (entity factories)
 │   ├── config.ex                 -- Resolved configuration
+│   ├── schema.ex                 -- Generated option + entity specs
 │   ├── features.ex               -- Feature factory
 │   ├── pipeline.ex               -- Operation pipeline
 │   └── ${app}/

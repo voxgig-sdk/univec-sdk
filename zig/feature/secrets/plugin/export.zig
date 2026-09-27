@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (zig/src/export.zig)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (zig/src/export.zig)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 //! Exports (§11).
 //!
@@ -24,7 +24,7 @@ fn lessStr(_: void, a: []const u8, b: []const u8) bool {
 /// rather than a null Value.
 pub fn resolveexport(spec: ?*v.Value, exported: ?*v.Value) t.Err!?*v.Value {
     const s = if (v.isStr(spec)) v.asStr(spec) else "";
-    const cut = std.mem.indexOfScalar(u8, s, '/') orelse
+    const cut = std.mem.lastIndexOfScalar(u8, s, '/') orelse
         return t.fail("plugin_export_ambiguous", v.print("export spec needs a key: {s}", .{s}), t.details1("spec", v.vstr(s)));
     const head = s[0..cut];
     const key = s[cut + 1 ..];

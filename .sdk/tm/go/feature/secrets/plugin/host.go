@@ -1,22 +1,6 @@
 // VENDORED: @voxgig/plugin 0.1.6 (go/plugin/host.go)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-/* The host: the lifecycle state machine (§5), extension points (§6), and
- * resource capture (§8).
- *
- * TWO RULES SHAPE EVERY METHOD BELOW.
- *
- * Transitions are SEQUENTIAL (§5.2). One at a time, in call order, never
- * interleaved; a transition triggered from inside a lifecycle callback
- * is `plugin_reentrant`. A hard rule, because it is the only way the
- * semantics can be identical in Go, in Ruby and in single-threaded
- * JavaScript.
- *
- * Reconciliation is EAGER (§18's portability budget). A transition
- * settles by running the state machine to a fixed point, not by
- * suspending on a promise. Every port must be able to do the same, and
- * fourteen of them will not have JavaScript's event loop. */
-
 package plugin
 
 import (
@@ -28,21 +12,12 @@ import (
 type PointSpec = Spec
 
 type HostOptions struct {
-	Catalog  *Catalog
-	Reserved []string
-	Keys     Keys
-	Defaults map[string]any
-	Profile  string
-	Points   map[string]Spec
-	// Dependency is §11.3. `restart` (the default) treats provider
-	// replacement as an ordinary runtime operation: deactivate the old
-	// store, activate the new one, and everything that depended on it
-	// rides through, having released the old one's resources in between.
-	//
-	// `hold` is the strict reading — deactivating a required instance is
-	// `plugin_dependency_held`, naming the holders. NOT the default,
-	// because a station that cannot swap a provider without a restart
-	// has lost the argument for having a plugin system.
+	Catalog    *Catalog
+	Reserved   []string
+	Keys       Keys
+	Defaults   map[string]any
+	Profile    string
+	Points     map[string]Spec
 	Dependency string
 }
 
@@ -58,15 +33,8 @@ type Live struct {
 	// Inner is set when this instance is itself a host (§6.5).
 	Inner *Host
 
-	def   Definition
-	order *OrderBlock
-	// selected is §11.4's ALWAYS-RELUCTANT rebinding made concrete: the
-	// provider ref this instance's activation actually chose, per
-	// requirement name. "A satisfied requirement is not re-bound while
-	// it stays satisfied" is a statement about a REMEMBERED choice —
-	// re-ranking on every question silently re-points a live consumer at
-	// any better newcomer, and then losing the provider it was really
-	// using does not restart it. Captured at activate, cleared on exit.
+	def      Definition
+	order    *OrderBlock
 	selected map[string]string
 	// barred is §9.6's `active: false` — "declares it and bars it: it
 	// appears in `host.list()`, and `activate` and `ready` on it fail
@@ -74,9 +42,7 @@ type Live struct {
 	// THAT SET IT: a flag consulted only while `apply` ran let a later
 	// direct `Ready` bring the instance live.
 	barred bool
-	// unmet holds requirements this instance declared but has not been
-	// given.
-	unmet []string
+	unmet  []string
 	// scope holds the resources the instance scope holds, newest last —
 	// unwound in REVERSE, because that is the only order in which
 	// teardown mirrors setup (§8.3).
@@ -118,19 +84,6 @@ type Host struct {
 	// deactivation.
 	coordinated bool
 
-	// §18: "a port uses its idiom (a mutex in Go/Rust/Java, the GIL
-	// where that is enough)". §5.2 makes transitions SEQUENTIAL — one at
-	// a time, in call order, never interleaved — and `intransition`
-	// cannot deliver that: it is set inside `run`, so two goroutines
-	// both pass `guard` and both run a callback. This holds for the
-	// WHOLE public transition, reconciliation included, which is the
-	// unit §5.2 names.
-	//
-	// It is NOT reentrant, and must not be: a transition attempted from
-	// inside a lifecycle callback is `plugin_reentrant`, and `enter`
-	// answers that without ever blocking. Below the door the unlocked
-	// bodies (`declare`, `load`, `activate`, …) call each other, so the
-	// lock is taken exactly once per public call.
 	mu sync.Mutex
 
 	inst map[string]*Live
@@ -142,12 +95,7 @@ type Host struct {
 	seqn         int
 	open         int
 	intransition bool
-	// phase is WHICH callback is running, not merely that one is. §8.1
-	// puts resource capture in `activate` and §8.3 says `Release`
-	// outside `activate` is `plugin_release_scope` — and `intransition`
-	// alone cannot tell `activate` from `define`, so it admitted an
-	// Acquire in `define` whose scope `Unload` would never unwind.
-	phase string
+	phase        string
 }
 
 func MakeHost(options HostOptions) *Host {
@@ -174,9 +122,6 @@ func (h *Host) Catalog() *Catalog { return h.catalog }
 
 // --- observation -----------------------------------------------------
 
-// List is introspection, and introspection NEVER advances the state
-// (§5.2). A status page must not be a way to accidentally import twenty
-// packages.
 func (h *Host) List() map[string]Status {
 	out := map[string]Status{}
 	for _, r := range sortedkeys(h.inst) {
@@ -219,29 +164,6 @@ func (h *Host) guard() error {
 	return nil
 }
 
-// enter is the door every PUBLIC transition goes through, and the only
-// place `h.mu` is taken. It returns the matching release.
-//
-// The two rules it has to serve pull in opposite directions. §5.2 wants
-// transitions SEQUENTIAL, which is a lock; and §5.2 also wants a
-// transition attempted from INSIDE a lifecycle callback to answer
-// `plugin_reentrant`, which is the one caller that must not block —
-// it is the goroutine already holding the lock, so blocking is a
-// deadlock.
-//
-// TryLock separates them as far as Go allows. Taking the lock proves
-// nothing else is in flight, so the call cannot be reentrant. Failing to
-// take it means SOMEONE holds it, and `intransition` says whether that
-// someone is running a callback — the only state from which a reentrant
-// call can arise.
-//
-// THE RESIDUAL WINDOW IS REAL AND IS NOT PAPERED OVER: a genuinely
-// concurrent caller that arrives while a callback is running gets
-// `plugin_reentrant` instead of waiting, because Go exposes no goroutine
-// identity to tell the two apart. It is a refusal with a code, not a
-// corruption, and it is strictly better than the interleaving an
-// unlocked host allowed; a host that needs the other answer should
-// serialise its own calls. See AGENTS.md.
 func (h *Host) enter() (func(), error) {
 	if h.mu.TryLock() {
 		return h.mu.Unlock, nil
@@ -283,12 +205,6 @@ func (h *Host) run(e *Live, fn func(*Inst) error, at string) error {
 	if nil == err {
 		return nil
 	}
-	// §12: `plugin_define_failed` and its three siblings are "a callback
-	// raised; wraps the cause". AN ERROR THAT ALREADY CARRIES A CODE
-	// KEEPS IT — the code is the error's identity, and a plugin
-	// returning `store_unreachable` must not have it rewritten. Only a
-	// code-less error is wrapped, which is the ordinary case for a
-	// callback that let a library error through.
 	if "" != CodeOf(err) {
 		return err
 	}
@@ -297,9 +213,6 @@ func (h *Host) run(e *Live, fn func(*Inst) error, at string) error {
 		map[string]any{"ref": e.Ref, "cause": err.Error()})
 }
 
-// Inst is what a definition's callbacks see. Deliberately not the
-// internal record: a plugin that could reach `Status` could also write
-// it.
 type Inst struct {
 	h *Host
 	e *Live
@@ -339,12 +252,6 @@ func (i *Inst) Release(fn func()) error {
 	return nil
 }
 
-// Acquire is the synthetic counter the driver owns, so "what is open" is
-// data rather than an assertion each port words differently.
-//
-// Returns its own release, so a plugin can hand one back early. The
-// scope still holds the entry and unwinding it twice is a no-op —
-// releasing early must not make teardown wrong.
 func (i *Inst) Acquire() (func(), error) {
 	// §8.1: resources are "acquired during `activate` — the scope's
 	// actual job". Same reason as `Release` above.
@@ -364,16 +271,7 @@ func (i *Inst) Acquire() (func(), error) {
 	return rel, nil
 }
 
-// Bind attaches a function to a host point. Declared in `define`; the
-// host inserts it only after `activate` returns successfully (§8.1),
-// which is why a failing activate leaves no live binding behind.
 func (i *Inst) Bind(point string, fn BindFn, band int) error {
-	// §12's `plugin_bind_scope`: "binding declared outside `define`".
-	// §8.1 puts binding DECLARATION in `define` and INSERTION at a
-	// successful activate, and the guard was the half nobody wrote — so
-	// a binding added from `activate` went live without being part of
-	// the loaded definition, and a deactivate/activate cycle appended
-	// it again. The code was in the table before anything raised it.
 	if "define" != i.h.phase {
 		return Fail("plugin_bind_scope", "bind called outside define: "+point,
 			map[string]any{"ref": i.e.Ref, "point": point})
@@ -393,6 +291,15 @@ func (i *Inst) Export(key string, value any) { i.e.exports[key] = value }
 // Provides declares what this instance can do for others (§11.1).
 func (i *Inst) Provides(p Provided) { i.e.provides = append(i.e.provides, p) }
 
+func (i *Inst) Capability(name string) string {
+	for _, req := range Requirements(i.e.Options) {
+		if req.Name == name {
+			return i.h.chosen(i.e, req, true)
+		}
+	}
+	return ""
+}
+
 type Position struct {
 	Index     int  `json:"index"`
 	Count     int  `json:"count"`
@@ -400,17 +307,6 @@ type Position struct {
 	Innermost bool `json:"innermost"`
 }
 
-/* Position reports where this binding landed (§6.6) — the plugin-side
- * counterpart to a host pin. Station found that a plugin can need to
- * KNOW it is in the right place: its middleware must sit immediately
- * outside the base transport or its "wire truth" events are fiction.
- *
- * THE HOST DOES NOT POLICE THIS; it just makes the fact available. A
- * plugin that requires a position it did not get fails loudly rather
- * than reporting nonsense — and that is the plugin's call, because only
- * it knows what its position means. Verification tells a plugin it was
- * misplaced; a pin (§7) stops the misplacement from being expressible at
- * all. The two are not substitutes. */
 func (i *Inst) Position(point string) (Position, error) {
 	return i.h.PositionOf(i.e.Ref, point)
 }
@@ -430,13 +326,6 @@ func (i *Inst) Nest(nestopts HostOptions) (*Host, error) {
 	return inner, nil
 }
 
-// AutoTag is EXPLICIT (§4 rule 3). `Declare("stripe", {Tag: "?"})`
-// assigns the LOWEST UNUSED POSITIVE INTEGER tag and returns the
-// assigned pair. Without `"?"`, a collision is an error.
-//
-// It needs a host because it must know what is already declared, which
-// is why it cannot live in the pure `ref` section — the correction P1.7
-// made to §15.3.
 func (h *Host) AutoTag(name string) (string, error) {
 	for n := 1; ; n++ {
 		cand, err := FormatRef(name, itoa(n))
@@ -534,14 +423,6 @@ func (h *Host) declare(ref string, spec DeclareSpec) (*Live, error) {
 	return e, nil
 }
 
-// HostDeclare is §9.1's host-owned path: a host that reserves a name
-// MUST still be able to declare the instance it reserved.
-//
-// THE BOUNDARY IS BY METHOD, NOT BY CALLER, and that is a real limit: no
-// language here can tell the embedding host from a plugin holding the
-// same host object. What reservation protects is CONFIGURATION —
-// documents, overlays, `VOXGIG_PLUGIN_*`, construction options and
-// ordinary Declare/Load/Options — and all of that still checks.
 func (h *Host) HostDeclare(ref string, spec DeclareSpec) (*Live, error) {
 	leave, err := h.enter()
 	if nil != err {
@@ -578,11 +459,6 @@ func (h *Host) load(ref string, spec DeclareSpec) (*Live, error) {
 	}
 	e.Status = StatusLoaded
 
-	// AT LOAD, and before anything runs: a cycle through
-	// restart-causing requirements does not settle, and the only safe
-	// time to report a non-terminating reconcile is before it starts
-	// (§11.3). `provides` is populated by `define`, which has just run,
-	// so this is the first moment the graph is complete.
 	if err := CheckCycle(h.graphnodes()); nil != err {
 		e.Status = StatusFailed
 		return nil, err
@@ -590,8 +466,6 @@ func (h *Host) load(ref string, spec DeclareSpec) (*Live, error) {
 	return e, nil
 }
 
-// graphnodes is the requirement graph as plain data, for the pure
-// detector.
 func (h *Host) graphnodes() []DependNode {
 	out := []DependNode{}
 	for _, r := range sortedkeys(h.inst) {
@@ -641,8 +515,6 @@ func (h *Host) activate(ref string) (*Live, error) {
 		}
 	}
 
-	// A declared requirement that is not live means `pending`:
-	// activation is a STANDING REQUEST, not a one-shot event.
 	if unmet := h.unmetof(e); 0 < len(unmet) {
 		e.unmet = unmet
 		e.Status = StatusPending
@@ -691,12 +563,6 @@ func (h *Host) deactivate(ref string) (*Live, error) {
 	}
 
 	if StatusPending == e.Status {
-		// DEACTIVATING A PENDING INSTANCE RUNS NO CALLBACK (§5.2). It
-		// never reached activate, so it holds no scope and no live
-		// bindings; running the definition's deactivate there would be
-		// teardown without matching setup, which plugins are not written
-		// to survive and which could fail an instance that had done
-		// nothing wrong. It cannot fail.
 		e.Status = StatusLoaded
 		e.unmet = []string{}
 		return e, nil
@@ -764,10 +630,6 @@ func (h *Host) unload(ref string) error {
 	return nil
 }
 
-// Ready runs the whole forward path in one call (§5.1). §15.2's verb
-// list omits this; §5.1 defines it and §15.3's `declare` row requires
-// the corpus to pin it, so the list was incomplete rather than excluding
-// it (DOCS.md §4.2).
 func (h *Host) Ready(ref string) (*Live, error) {
 	leave, err := h.enter()
 	if nil != err {
@@ -795,20 +657,6 @@ func (h *Host) ready(ref string) (*Live, error) {
 	return h.activate(r)
 }
 
-// unwind: bindings go live only when activation succeeds (§8.1), so the
-// teardown is the exact inverse: reverse order, always.
-// unwind runs the scope in reverse and returns the errors it raised.
-// §8.3: "A failing release does not stop the rest. Every entry runs, in
-// reverse order, whatever any of them does; the errors are collected and
-// raised as one `plugin_release_failed`."
-//
-// A Go release is `func()` and cannot return an error, so it signals
-// failure by PANICKING — which is what a Go author's `defer f.Close()`
-// wrapper does when it has nowhere to put the error, and which is
-// recovered here rather than taking the host down.
-// A selection belongs to ONE activation (§11.4). Leaving `live` by any
-// door drops it, so the next activation ranks afresh — keeping it would
-// make a consumer prefer a provider it never actually ran against.
 func (h *Host) unwind(e *Live) []string {
 	e.selected = map[string]string{}
 	errors := []string{}
@@ -843,13 +691,6 @@ func (h *Host) releasecheck(e *Live, errors []string) error {
 		map[string]any{"ref": e.Ref, "cause": errors})
 }
 
-/* unmetof: A REQUIREMENT IS ON A CAPABILITY, not on a ref (§11.1) — it
- * is a dependency on something that can do the job, and which instance
- * is doing it is exactly the configuration detail a plugin must not care
- * about. A bare string is shorthand for `{name}`.
- *
- * A ref satisfies too, because a host that genuinely needs a specific
- * instance should not have to invent a capability for it. */
 func (h *Host) unmetof(e *Live) []string {
 	out := []string{}
 	for _, r := range Requirements(e.Options) {
@@ -863,20 +704,6 @@ func (h *Host) unmetof(e *Live) []string {
 	return out
 }
 
-/* boundproviders: the instance currently SELECTED for each of this one's
- * restart-causing requirements. A BINDING IS TO AN INSTANCE, not to a
- * capability (§11.1), and that is what decides behaviour when the bound
- * provider leaves while another match remains: the selected one going
- * away restarts a `static` consumer even though a survivor is available.
- * It is not silently re-pointed — `static` is the plugin saying in
- * writing that it cannot survive a provider swap, and a survivor being
- * available does not make the swap survivable. */
-// chosen is §11.4's always-reluctant selection, and the ONE place a
-// provider is picked for a live instance. If this instance already
-// selected a provider for `req` and that provider is STILL a candidate,
-// it keeps it — a better-ranked newcomer does not take it. `remember`
-// is false for the questions asked ABOUT an instance rather than BY it:
-// introspection must not create a binding.
 func (h *Host) chosen(e *Live, req Required, remember bool) string {
 	cands := h.providersof(req)
 	if 0 == len(cands) {
@@ -921,24 +748,6 @@ func (h *Host) consumersof(ref string) []string {
 	return out
 }
 
-// holdersof answers §11.3's `hold` question, which is a DIFFERENT
-// question from the cascade's — and reading it off `consumersof`
-// answered the cascade's.
-//
-// The cascade wants the edges that RESTART (mandatory-static and
-// optional-static), because a restart is what it performs. `hold` says
-// "deactivating a REQUIRED instance is `plugin_dependency_held`", and
-// required is cardinality: GatesActivation, not RestartsOnLoss. The two
-// sets differ in both directions and each difference was a real bug.
-//
-// A MANDATORY-DYNAMIC consumer was excluded, so the strictest policy
-// let a provider go that a live consumer could not do without —
-// `dynamic` promises survival of a SWAP, and under `hold` there is no
-// swap, so the consumer falls back to `pending`.
-//
-// An OPTIONAL-STATIC consumer was included, so `hold` refused a
-// deactivation on behalf of an instance that had said in writing it
-// does not need the thing.
 func (h *Host) holdersof(ref string) []string {
 	out := []string{}
 	for _, r := range sortedkeys(h.inst) {
@@ -981,19 +790,6 @@ func (h *Host) providersof(req Required) []Candidate {
 	return ResolveCapability(req, cands)
 }
 
-/* CONSUMERS GO DOWN FIRST, NOT AFTERWARDS (§11.3).
- *
- * The cascade is part of the provider's own deactivation and runs BEFORE
- * the provider's `deactivate` callback and scope unwind, so a consumer's
- * teardown can still call the thing it depends on — flushing a buffer to
- * the store it is about to lose is exactly what a `deactivate` callback
- * is for, and a cascade that fired after the provider was already gone
- * would make that impossible.
- *
- * Order: consumers deepest-first, then the provider. `Unload` and
- * `Close` inherit it, UNDER EITHER DEPENDENCY POLICY, which is what
- * makes apply's reverse-load-order teardown safe even when a document
- * happens to list a consumer before its provider. */
 func (h *Host) cascade(provider *Live, seen map[string]bool) {
 	if seen[provider.Ref] {
 		return
@@ -1021,16 +817,6 @@ func (h *Host) cascade(provider *Live, seen map[string]bool) {
 	}
 }
 
-/* held is A GUARD ON AD-HOC DEACTIVATION, NOT ON COORDINATED TEARDOWN.
- * In a bulk operation that is removing the holders too — `Close()`, or
- * an `Apply` plan whose own steps deactivate them — it is suspended for
- * exactly those holders, and the teardown still runs consumers before
- * providers.
- *
- * Otherwise `Close()` under `hold` would raise on the first provider it
- * reached whenever a document happened to list a consumer after it,
- * which is the policy refusing to allow the one teardown it has no
- * reason to object to. */
 func (h *Host) held(e *Live) error {
 	if "hold" != h.dependency {
 		return nil
@@ -1047,13 +833,6 @@ func (h *Host) held(e *Live) error {
 		map[string]any{"ref": e.Ref, "holders": holders})
 }
 
-/* reconcile is EAGER: run to a fixed point rather than scheduling.
- *
- * Two directions, and both are the reason `pending` exists. Activation
- * is a STANDING REQUEST, not a one-shot event: a pending instance whose
- * requirement arrives activates without being asked again, and a LIVE
- * instance whose requirement is lost goes back to pending —
- * recursively, through its own consumers. */
 func (h *Host) reconcile() {
 	rounds := 0
 	for moved := true; moved; {
@@ -1079,13 +858,6 @@ func (h *Host) reconcile() {
 			if 0 == len(lost) {
 				continue
 			}
-			// POLICY IS PER REQUIREMENT, not per instance (§11.3): only
-			// the definition that has the requirement knows what it can
-			// cope with, and one instance may hold both a `static` and a
-			// `dynamic` one. A `dynamic` requirement whose provider is
-			// gone leaves the consumer LIVE and notified; it is a
-			// statement about surviving a swap, so it does not restart
-			// here.
 			restarts := false
 			for _, q := range lost {
 				if RestartsOnLoss(q) {
@@ -1131,13 +903,6 @@ func (h *Host) reconcile() {
 // --- ordering --------------------------------------------------------
 
 func (h *Host) Order(point string) ([]string, error) {
-	// Sorted by declaration SEQUENCE, which is what makes §7's sort
-	// deterministic here. §7 breaks ties by `pos`, and two instances CAN
-	// share one — `Declare` defaults `Pos` to the registry size, so an
-	// unload followed by a fresh declare reuses a surviving instance's.
-	// Past that the canonical fell through to its map's insertion order;
-	// a Go map has none, and sorting by REF gave the opposite answer.
-	// `Seq` IS that order, made explicit — in the canonical too.
 	refs := sortedkeys(h.inst)
 	sort.SliceStable(refs, func(i, j int) bool {
 		return h.inst[refs[i]].Seq < h.inst[refs[j]].Seq
@@ -1324,15 +1089,6 @@ func (h *Host) Capability(name string) []string {
 
 // --- documents -------------------------------------------------------
 
-// Apply is §9.6: "load what is missing, UNLOAD WHAT IS GONE, patch what
-// changed, and move activation state to match", with the stated
-// ordering — "deactivations and unloads first (reverse load order), then
-// loads, then activations in load order".
-//
-// FOUR PHASES, NOT ONE INTERLEAVED LOOP. An earlier draft walked the
-// document once, which never looked at instances the new document had
-// DROPPED — so an integration removed from a config reload stayed live
-// with its bindings and resources.
 func (h *Host) Apply(doc any, profile string) error {
 	leave, err := h.enter()
 	if nil != err {
@@ -1402,13 +1158,6 @@ func (h *Host) apply(doc any, profile string) error {
 	for _, ref := range want {
 		ent := norm.Instance[ref]
 		pos := ent.Pos
-		// NO OPTIONS HERE, and the omission is the fix rather than an
-		// oversight. `declare` ADOPTS the options map it is handed as
-		// the instance's own, so passing the resolved map made target
-		// and source THE SAME MAP in the refill below — which cleared
-		// its own source and left a first-time instance with no options
-		// at all. `declare` makes its own empty map and the refill fills
-		// it, so both paths are now one path.
 		if _, err := h.declare(ref, DeclareSpec{
 			Order: ent.Order, Pos: &pos}); nil != err {
 			return err
@@ -1426,9 +1175,6 @@ func (h *Host) apply(doc any, profile string) error {
 		h.inst[ref].Pos = ent.Pos
 	}
 
-	// --- phase 3: loads, in load order -------------------------------
-	// ONLY THE EAGER, ACTIVE ONES: "a document of twenty lazy instances
-	// is twenty map entries and no executed code" (§9.6).
 	for _, ref := range want {
 		if wantlive(ref) {
 			if _, err := h.load(ref, DeclareSpec{}); nil != err {
@@ -1500,8 +1246,6 @@ func (h *Host) setoptions(ref string, patch map[string]any) error {
 	return nil
 }
 
-// refill empties the target and refills it, so callers holding the
-// reference see the new values.
 func refill(target map[string]any, source map[string]any) {
 	for k := range target {
 		delete(target, k)
@@ -1532,9 +1276,6 @@ func (h *Host) Close() error {
 }
 
 func (h *Host) closeall() error {
-	// A bulk teardown removing the holders too, so `hold` is suspended
-	// for exactly those holders (§11.3) - while the consumers-first
-	// cascade still runs, which is the half that matters.
 	h.coordinated = true
 	defer func() { h.coordinated = false }()
 	refs := sortedkeys(h.inst)
@@ -1546,9 +1287,6 @@ func (h *Host) closeall() error {
 	return nil
 }
 
-// PositionOf is the same record §6.6 gives a plugin about itself,
-// reachable from outside for the corpus. A plugin asks via
-// `inst.Position(point)`.
 func (h *Host) PositionOf(ref string, point string) (Position, error) {
 	e := h.inst[canon(ref)]
 	if nil == e {
@@ -1562,10 +1300,6 @@ func (h *Host) PositionOf(ref string, point string) (Position, error) {
 	index := indexof(ranked, e.Ref)
 	return Position{
 		Index: index, Count: len(ranked),
-		// §6.2 composes b1(b2(b3(base))) with the FIRST binding
-		// OUTERMOST, so these are not index 0 and index count-1 the
-		// other way round. Getting this backwards is the exact error the
-		// positional pin vocabulary exists to prevent.
 		Outermost: 0 == index,
 		Innermost: index == len(ranked)-1,
 	}, nil

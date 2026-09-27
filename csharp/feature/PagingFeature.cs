@@ -2,8 +2,8 @@
 // stamps page/limit (or a cursor) into the request query; on the way back
 // (PreResult) it reads the server's pagination signals - a `Link:
 // rel="next"` header, `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body - and records
-// them on `ctx.Result.Paging`. A per-call cursor/page from ctrl takes
+// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body (snake_case
+// forms too) - and records them on `ctx.Result.Paging` and `Ctrl.Paging`. A per-call cursor/page from ctrl takes
 // priority (used by auto-iteration). Parameter names (`pageParam`,
 // `limitParam`, `cursorParam`), the page size (`limit`) and the start page
 // (`startPage`, default 1) are configurable.
@@ -79,8 +79,12 @@ public class PagingFeature : BaseFeature
         }
         else if (!spec.Query.TryGetValue(pageParam, out var existing) || existing == null)
         {
+            // A record written back by PreResult holds the page just fetched
+            // as "page" and the one to fetch as "nextPage", so nextPage wins.
             object? page = null;
-            var hasPage = paging != null && paging.TryGetValue("page", out page) && page != null;
+            var hasPage = paging != null &&
+                ((paging.TryGetValue("nextPage", out page) && page != null) ||
+                 (paging.TryGetValue("page", out page) && page != null));
             spec.Query[pageParam] = hasPage ? page : FoptInt(_options, "startPage", 1);
         }
 
@@ -224,13 +228,17 @@ public class PagingFeature : BaseFeature
             }
         }
 
-        // Body-level cursors.
+        // Body-level signals; snake_case forms are read first so camelCase wins.
         if (body is Dictionary<string, object?> bm)
         {
             if (bm.TryGetValue("next", out var next) && next != null &&
                 (!paging.TryGetValue("next", out var pn) || pn == null))
             {
                 paging["next"] = next;
+            }
+            if (bm.TryGetValue("next_cursor", out var snakeCursor) && snakeCursor != null)
+            {
+                paging["cursor"] = snakeCursor;
             }
             if (bm.TryGetValue("cursor", out var cursor) && cursor != null)
             {
@@ -239,6 +247,34 @@ public class PagingFeature : BaseFeature
             if (bm.TryGetValue("nextCursor", out var nextCursor) && nextCursor != null)
             {
                 paging["cursor"] = nextCursor;
+            }
+            if (!paging.TryGetValue("nextPage", out var np0) || np0 == null)
+            {
+                bm.TryGetValue("nextPage", out var np);
+                if (np == null)
+                {
+                    bm.TryGetValue("next_page", out np);
+                }
+                switch (np)
+                {
+                    case int n:
+                        paging["nextPage"] = n;
+                        break;
+                    case long n:
+                        paging["nextPage"] = (int)n;
+                        break;
+                    case double n:
+                        paging["nextPage"] = (int)n;
+                        break;
+                    case string s:
+                        paging["nextPage"] = s;
+                        break;
+                }
+            }
+            if (bm.TryGetValue("has_more", out var snakeMore) && snakeMore is bool smb)
+            {
+                paging["hasMore"] = smb;
+                explicitMore = true;
             }
             if (bm.TryGetValue("hasMore", out var hasMore) && hasMore is bool hmb)
             {
@@ -262,6 +298,24 @@ public class PagingFeature : BaseFeature
 
         result.Paging = paging;
         Last = paging;
+
+        if (ctx.Ctrl != null)
+        {
+            // The Context shares the caller's paging map by reference, so
+            // refill it in place; a fresh map on Ctrl never reaches the caller.
+            if (ctx.Ctrl.Paging != null)
+            {
+                ctx.Ctrl.Paging.Clear();
+                foreach (var kv in paging)
+                {
+                    ctx.Ctrl.Paging[kv.Key] = kv.Value;
+                }
+            }
+            else
+            {
+                ctx.Ctrl.Paging = paging;
+            }
+        }
     }
 
     private bool IsList(Context ctx)

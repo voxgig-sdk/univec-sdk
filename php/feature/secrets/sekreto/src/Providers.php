@@ -1,6 +1,6 @@
 <?php
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (php/src/Providers.php)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (php/src/Providers.php)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 
 /**
@@ -22,7 +22,8 @@
  * THIS FILE REQUIRES NOTHING UNDER plugins/, OPENS NO SOCKET, SPAWNS NO
  * PROCESS AND HASHES NOTHING. What makes a kind built in is that it needs
  * nothing of the platform beyond reading a local file; every kind that
- * opens a socket, signs a request or spawns a process is a plugin under
+ * opens a socket, signs a request, spawns a process or does cryptography
+ * is a plugin under
  * plugins/, in its own file and its own namespace, required only by a
  * program that names it (docs/design/plugin-providers.md).
  *
@@ -319,4 +320,5 @@ const BUILTIN_KINDS = ['env', 'memory', 'dotenv', 'file'];
 const PLUGIN_KINDS = [
     'hashicorp', 'boru', 'awssecrets', 'awsparams', 'gcpsecrets',
     'azuresecrets', 'onepassword', 'doppler', 'infisical', 'secretspec',
+    'minivault',
 ];

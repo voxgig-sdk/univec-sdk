@@ -422,6 +422,10 @@ struct CtxOut {
   Value point = Value::undef();
   SdkErrorPtr pointError;
   SpecPtr spec;
+  // A PreSpec hook (e.g. validate) rejecting the operation. `spec` above is
+  // a Spec, so it cannot carry the error the way go's `out["spec"]` map slot
+  // does; this is the same seam as pointError, one stage later.
+  SdkErrorPtr specError;
   ResponsePtr request;
   ResponsePtr response;
   ResultPtr result;
@@ -686,7 +690,7 @@ inline Context::Context(const CtxSpec& cs, const CtxPtr& basectx) {
     if (a.is_string()) ctrl->actor = a.as_string();
     Value p = getp(cs.ctrlMap, "paging");
     if (p.is_map()) ctrl->paging = p;
-  } else if (basectx && basectx->ctrl) {
+  } else if (basectx && basectx->ctrl && cs.opname.empty()) {
     ctrl = basectx->ctrl;
   }
 

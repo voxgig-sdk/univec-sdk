@@ -14,26 +14,8 @@ import {
 } from '@voxgig/apidef'
 
 
-// The `py-data` target: a Python package for DATA ANALYSTS working in
-// notebooks (Colab, Jupyter), layered on the sibling `py` SDK generated into
-// the same repo. It is a consumer target in the go-cli / go-mcp mould — every
-// standard generation phase is switched off in model/target/py-data.aon and
-// this component emits the whole package.
-//
-// The deliverable an analyst wants is not "a client", it is TABLES: one line
-// from API to a typed pandas DataFrame, discovered by tab-completion rather
-// than by reading reference docs.
-//
-// Layered, NOT forked from `py`: the dependency arrow points one way
-// (py-data -> py) and `py` must never learn this target exists. A fork would
-// duplicate the entity/feature machinery and drift, which is the known
-// failure mode.
 
 
-// Accessors are generated only for entities exposing these ops. `list` gives
-// a DataFrame; `load` gives a Series. Everything else (create/update/remove)
-// is a write path and deliberately out of scope — see the README's
-// "What this package does not do".
 const FRAME_OP = 'list'
 const SERIES_OP = 'load'
 
@@ -42,9 +24,6 @@ const Main = cmp(function Main(props: any) {
   const { target, ctx$ } = props
   const { model, log } = ctx$
 
-  // HARD REQUIREMENT: this package imports the sibling py SDK. Generating it
-  // without `py` produces a package whose every import fails at runtime, so
-  // fail at GENERATE time with an actionable message instead.
   const targets = model.main[KIT].target || {}
   if (null == targets.py) {
     throw new SdkGenError(
@@ -54,12 +33,12 @@ const Main = cmp(function Main(props: any) {
       'then regenerate.')
   }
 
-  const name = model.const.Name              // PascalCase, e.g. Univec
-  const lower = String(name).toLowerCase()   // univec
-  const ENV = envName(model)                 // UNIVEC
-  const sdkModule = `${lower}_sdk`           // univec_sdk
-  const sdkClass = `${name}SDK`              // UnivecSDK
-  const dataModule = `${lower}_data`         // univec_data
+  const name = model.const.Name
+  const lower = String(name).toLowerCase()
+  const ENV = envName(model)
+  const sdkModule = `${lower}_sdk`
+  const sdkClass = `${name}SDK`
+  const dataModule = `${lower}_data`
 
   // Multi-tenant APIs (a server URL carrying an unresolved {variable}, e.g.
   // https://{instance}.example.com/api) have no single host, so base_url
@@ -80,25 +59,12 @@ const Main = cmp(function Main(props: any) {
     note: `frames:${frameEnts.length} series:${seriesEnts.length} of ${ents.length}`,
   })
 
-  // Root-level statics: Makefile, LICENSE, the template-side tests.
   Copy({
     from: 'tm/' + target.name,
     exclude: [/src\//, /pkg\//],
     replace: { ...ctx$.stdrep },
   })
 
-  // The runtime modules live INSIDE the package, not at the top level.
-  //
-  // They were originally emitted flat as auth.py / fetch.py / frames.py, which
-  // is actively dangerous here: `auth`, `fetch`, `frames`, `core`, `entity`
-  // and `utility` are all real PyPI distributions AND exactly the names an
-  // analyst leaves lying around next to a notebook. In Colab the working
-  // directory is on sys.path, so one stray auth.py shadowed ours and `data()`
-  // died with `module 'auth' has no attribute 'resolve'`. A package keeps
-  // every internal module behind the distinctive `<name>_data.` prefix.
-  //
-  // The folder name is model-derived, so it comes from the component; the file
-  // contents are the same for every API, so they stay in tm/py-data/pkg.
   Folder({ name: dataModule }, () => {
     Copy({
       from: 'tm/' + target.name + '/pkg',
@@ -133,9 +99,7 @@ const Package = cmp(function Package(props: any) {
   const { target, model, lower, dataModule } = props
   const ctx$ = props.ctx$
 
-  const ns = model.origin || 'voxgig-sdk'
-  const pkgBase = ns.endsWith('-sdk') ? model.name : `${model.name}-sdk`
-  const distName = `${ns}-${pkgBase}-data`
+  const distName = packageName(model, target.name)
   // The `py` SDK this package WRAPS — a different target, so it keeps its
   // own name and does not follow this target's alias.
   const sdkDist = packageName(model, 'py')
@@ -351,11 +315,11 @@ class EntityFrames:
 // and the doc table the docstring shows.
 function entFields(ent: any): { name: string, dtype: string, req: boolean }[] {
   return each(ent.fields)
-    .filter((f: any) => f && null != f.name && false !== f.active)
+    .filter((f: any) => f && null != f.n && false !== f.a)
     .map((f: any) => ({
-      name: String(f.name),
-      dtype: canonToDtype(f.type),
-      req: true === f.req,
+      name: String(f.n),
+      dtype: canonToDtype(f.t),
+      req: true === f.r,
     }))
 }
 
@@ -436,7 +400,7 @@ function fieldDoc(fields: any[], indent: string): string {
 
 function frameAccessor(ent: any): string {
   const acc = pluralAccessor(ent)
-  const entMethod = ent.Name                 // PascalCase SDK accessor
+  const entMethod = ent.Name
   const fields = entFields(ent)
   const dtypes = pyDict(fields.map((f) => [f.name, f.dtype] as [string, string]), '            ')
   const order = pyList(fields.map((f) => f.name), '            ')

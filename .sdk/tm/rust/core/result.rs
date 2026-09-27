@@ -1,4 +1,3 @@
-// Operation result (mirrors go core/result.go).
 
 use std::rc::Rc;
 

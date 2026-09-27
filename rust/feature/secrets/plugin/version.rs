@@ -1,19 +1,6 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (rust/src/version.rs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (rust/src/version.rs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! Versions and ranges (§11.2).
-//!
-//! TWO FIELDS AND ONE PREDICATE. A capability declares `version`, a
-//! concrete version. A requirement declares `range`. A requirement is
-//! satisfied when the names match, the `match` passes, and:
-//!
-//!   the provider's `version` falls inside the requirement's `range`.
-//!
-//! That is the whole rule. There is no third field and no second
-//! comparison - an earlier draft added a provider-side `compat` range,
-//! which left three values and no statement of how they combine, and three
-//! defensible readings of one declaration is worse than the ambiguity it
-//! was introduced to fix.
 
 use super::types::{details, fail, PluginError};
 use super::value::Value;
@@ -64,10 +51,6 @@ fn parts(text: &str, whole: &str, field: &str) -> Option<Result<[u64; 3], Plugin
     Some(Ok(out))
 }
 
-/// Two forms and no more (§11.2):
-///
-///   '2.1'    >= 2.1.0 and < 3.0.0
-///   '~2.1'   >= 2.1.0 and < 2.2.0
 pub fn parse_range(range: &Value) -> Result<Value, PluginError> {
     let text = match range.as_str() {
         Some(s) if !s.is_empty() => s,
@@ -142,7 +125,6 @@ pub fn parse_version(version: &Value) -> Result<[u64; 3], PluginError> {
     }
 }
 
-/// The one satisfaction predicate: lo <= version < hi.
 pub fn satisfies(version: &Value, range: &Value) -> Result<bool, PluginError> {
     let v = parse_version(version)?;
     let r = parse_range(range)?;
@@ -166,7 +148,6 @@ fn triple(value: &Value) -> [u64; 3] {
     ]
 }
 
-/// The version triple as a comparable key, for the capability rank.
 pub fn version_parts(text: &str) -> Vec<i64> {
     text.split('.')
         .map(|p| p.parse::<i64>().unwrap_or(0))

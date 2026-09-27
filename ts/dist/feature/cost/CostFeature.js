@@ -2,30 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CostFeature = void 0;
 const BaseFeature_1 = require("../base/BaseFeature");
-// Cost tracking and spend budget. Uses BOTH seams, which is the point of
-// the feature: money is spent per HTTP ATTEMPT (a retried call is charged
-// again, because the upstream API charges it again), but it is owed by an
-// OPERATION. So the transport wrap prices each attempt, and PreDone
-// attributes the running total to `<entity>.<op>` and to the caller
-// (`ctrl.actor`, the same actor the audit feature records).
-//
-// The price of an attempt comes from the first source that answers:
-// a response header (`header` x `perUnit`), the rate table (`rates`, keyed
-// '<entity>.<op>' / '<op>' / '*'), then the flat `unit`. A body figure
-// (`path` x `perUnit`, e.g. 'usage.total_tokens') is read at PreDone
-// instead, from the already-parsed result: the response body is a one-shot
-// stream, and consuming it at the transport seam would leave the pipeline
-// with nothing. A body figure describes the whole call, so it REPLACES the
-// per-attempt estimate rather than adding to it.
-//
-// `budget` caps total spend. With `onBudget: 'deny'` a further operation is
-// refused at PrePoint, before an endpoint is resolved and before anything
-// reaches the network.
-//
-// ORDER MATTERS. Cost must sit INSIDE the cache, or a response served from
-// cache is charged for money that was never spent. The default (map) order
-// puts cache innermost and cost outside it, so activate them in array form
-// with cost first: [{ name: 'cost' }, { name: 'cache' }].
 class CostFeature extends BaseFeature_1.BaseFeature {
     version = '0.0.1';
     name = 'cost';
@@ -68,8 +44,6 @@ class CostFeature extends BaseFeature_1.BaseFeature {
         if (!this.active) {
             return;
         }
-        // Mark the context as running through the pipeline, so _charge knows a
-        // PreDone is coming and does not commit the spend itself.
         let pending = this._pending.get(ctx);
         if (null == pending) {
             pending = this._newPending();
@@ -118,25 +92,11 @@ class CostFeature extends BaseFeature_1.BaseFeature {
             this._pending.set(ctx, pending);
         }
         pending.attempts++;
-        // Accumulated here, committed once at PreDone. Adding each attempt to
-        // the running total and then subtracting it again when a body figure
-        // supersedes it loses precision to catastrophic cancellation
-        // (5 + (0.01 - 5) is not 0.01 in binary floating point).
-        //
-        // Reported and estimated are kept apart per ATTEMPT, not per operation:
-        // a 503 priced from the rate table followed by a 200 carrying the cost
-        // header is part estimate, part reported, and collapsing both into the
-        // final attempt's category would corrupt the split.
         pending.amount += priced.amount;
         pending[('header' === priced.source || 'body' === priced.source) ?
             'reported' : 'estimated'] += priced.amount;
         pending.source = priced.source;
         cost.total.attempts++;
-        // direct() and graphql() call the transport through _rawRequest, which
-        // dispatches no pipeline hooks at all — no PrePoint to gate on, and no
-        // PreDone to commit. Their spend is committed here instead, or it would
-        // never be counted and could run past an onBudget: 'deny' ceiling
-        // indefinitely. `piped` is set by PrePoint, so its absence is the signal.
         if (!pending.piped) {
             this._commit(ctx, pending, '_', 'direct');
             this._pending.delete(ctx);
@@ -170,15 +130,6 @@ class CostFeature extends BaseFeature_1.BaseFeature {
             return;
         }
         this._pending.delete(ctx);
-        // A FAILED operation that made no attempt never reached the network:
-        // PrePoint creates the pending entry to mark the context as piped, and
-        // then the budget gate refuses the call (rbac, or an unresolvable
-        // endpoint, short-circuits just as early). Committing it would count a
-        // call that never happened and file a zero-amount record as `last`.
-        //
-        // A SUCCEEDED operation that made no attempt is the opposite case: it was
-        // served from the cache. That is a real call, and the fact that it cost
-        // nothing is the whole point of ordering cost inside the cache.
         if (!done && 0 === pending.attempts) {
             return;
         }
@@ -186,9 +137,6 @@ class CostFeature extends BaseFeature_1.BaseFeature {
         const opname = (ctx.op && ctx.op.name) || '_';
         this._commit(ctx, pending, entity, opname);
     }
-    // Commit one operation's spend: totals, budget, per-op and per-actor
-    // attribution, and the record. Shared by PreDone and the raw-request path
-    // in _charge, which has no PreDone to reach.
     _commit(ctx, pending, entity, opname) {
         const client = this._client;
         const cost = client._cost;

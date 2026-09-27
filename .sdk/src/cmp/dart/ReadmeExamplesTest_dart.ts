@@ -8,38 +8,12 @@ import {
 } from '@voxgig/apidef'
 
 
-// Emits dart/test/readme_examples_test.dart — a COMPLETENESS + PRESENCE gate
-// over every ```dart fenced block in the three documents that ship dart
-// examples:
-//   - the repository ROOT README.md (one directory above the dart/ package),
-//   - the per-language dart/README.md,
-//   - the per-language dart/REFERENCE.md.
-//
-// Unlike the interpreted-language gates (py/rb), which EXECUTE every runnable
-// block in a subprocess, and the go gate, which COMPILES every block, this
-// gate is a dependency-free STRUCTURAL gate that runs inside the dependency-
-// free dart test harness (no `dart analyze`/`dart run` subprocess, so it never
-// depends on a resolvable package_config at test time). Per document it:
-//   1. extracts every ```dart fenced block (tagged by source doc + index);
-//   2. classifies each block into exactly one of
-//      {runnable, illustration, compiled-nonrunnable} and asserts the
-//      partition is complete (total == runnable + illustration + compiled);
-//   3. asserts PRESENCE: every available doc carries at least one dart block,
-//      and at least one RUNNABLE block (one that constructs the SDK or drives
-//      a `client`), so no doc silently ships zero exercised dart examples.
-//
-// A missing doc is SKIPPED (not failed) — the root README is optional in a
-// single-language checkout. The dart source is written with the fence marker
-// and newline built from escapes (` = backtick) so this template literal
-// stays clean.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { target, ctx$: { model } } = props
 
   const Name = model.const.Name
   const sdkClass = Name + 'SDK'
 
-  // The API's capitalised semantic entities — used to detect entity-factory
-  // references (client.<Entity>() ) inside a block.
   const entities = Object.values(getModelPath(model, `main.${KIT}.entity`) || {})
     .filter((e: any) => e && e.active !== false)
     .map((e: any) => nom(e, 'Name'))

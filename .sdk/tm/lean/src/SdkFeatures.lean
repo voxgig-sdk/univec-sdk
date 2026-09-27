@@ -12,6 +12,14 @@ import VoxgigStruct
 import SdkJson
 import SdkUtility
 import SdkFeature
+-- The one feature that lives OUTSIDE this module: `secrets` sits in its own
+-- container (src/feature/secrets/) so `feature add`/`target add` can trim it
+-- with the vendored sekreto port it wraps. Main_lean fills the three
+-- secrets marker lines in this module (here, in `makeFeature` and in
+-- `featureNames`) only when the model activates the feature; an unconditional
+-- import would break every SDK that ships without the container. The markers
+-- are blanked otherwise.
+-- #SecretsImport
 
 open VoxgigStruct
 open SdkFeature
@@ -450,7 +458,8 @@ def pagingFeature : SIO Feature := do
   pure { name := "paging"
        , init := fun _ opts => do optsR.set (← toOptsMap opts)
        , hook := fun stage ctx => do
-           if stage == "PreSpec" then do
+           -- After makeSpec, whose prepareQuery would replace the query map.
+           if stage == "PreRequest" then do
              let o ← optsR.get
              let opname ← SdkUtility.opnameOf ctx
              if opname == "list" then do
@@ -525,7 +534,8 @@ def costFeature : SIO Feature := do
     let perUnit ← optNum o "perUnit" 0.0
     let hname ← optStr o "header" ""
     let hv ← if hname == "" then pure Value.noval else headerCI (← gp res "headers") hname
-    let hn := numOf hv (-1.0)
+    -- A wire header is a string; ts prices it through Number().
+    let hn := if isNov hv then -1.0 else (let n := jsNumber hv; if n.isNaN then -1.0 else n)
     if hname != "" && hn >= 0.0 then
       pure (hn * perUnit, "header")
     else do
@@ -654,12 +664,10 @@ def costFeature : SIO Feature := do
              -- too: that is the point of ordering cost inside the cache.
              commit ctx
            else if stage == "PreUnexpected" then do
-             -- A failed operation never reaches PreDone, so without this its
-             -- attempts are priced and then discarded: repeated connection
-             -- failures would slip past an onBudget "deny" ceiling, and the
-             -- shared pending value would survive to be attributed to the
-             -- next successful call. A call that made NO attempt was refused
-             -- before the network and must not be counted.
+             -- An operation that fails BEFORE the transport never reaches
+             -- PreDone, so this is the only stage that can close it out. A
+             -- call that made NO attempt was refused before the network and
+             -- must not be counted.
              let p ← pendR.get
              if numOf (← gp p "attempts") 0.0 > 0.0 then commit ctx else resetPending }
 
@@ -776,12 +784,19 @@ def makeFeature (name : String) : SIO Feature :=
   | "proxy" => proxyFeature
   | "netsim" => netsimFeature
   | "cost" => costFeature
+  -- #SecretsMakeFeature
   | _ => baseFeature
 
-/-- The catalog order: transport wrappers compose in this order. -/
+/-- The catalog order: transport wrappers compose in this order, the LAST
+    name outermost. `secrets` (when the model ships it) goes last: it must
+    write the credential onto the request before any other wrapper sees it,
+    and its fail-closed refusal must reach the caller untouched rather than
+    be retried by `retry` or rewritten by `netsim`. -/
 def featureNames : Array String :=
   #["log", "rbac", "idempotency", "clienttrack", "paging", "streaming",
     "metrics", "telemetry", "debug", "audit",
-    "cost", "cache", "ratelimit", "timeout", "retry", "proxy", "netsim"]
+    "cost", "cache", "ratelimit", "timeout", "retry", "proxy", "netsim"
+    -- #SecretsFeatureName
+    ]
 
 end SdkFeatures

@@ -132,17 +132,6 @@ impl EntyClass {
         utility.done(ctx)
     }
 
-    /// Streaming operation. Runs `action` through the full pipeline and
-    /// returns an iterator over the result items, so the `streaming`
-    /// feature's incremental output is reachable from a generated entity (a
-    /// normal op call materialises the whole result). This runtime is
-    /// synchronous, so the returned iterator is a lazy cursor over items the
-    /// pipeline produced. `callopts` parameterises the call:
-    ///   - inbound (download): iterate items/chunks from the streaming
-    ///     feature when active, else the materialised items;
-    ///   - outbound (upload): a `body` in `callopts` is attached to the
-    ///     request (reqdata `body$`) so the transport can stream a payload;
-    ///   - `ctrl` (pipeline control) threads pipeline options.
     pub fn stream(
         &self,
         action: &str,
@@ -239,9 +228,6 @@ impl Entity for EntyClass {
         self.name.clone()
     }
 
-    // `remove` resolves to the entity, marked. The instance KEEPS the data
-    // it held — a caller can still read what was deleted — but it is no
-    // longer a live record.
     fn mark_deleted(&self) {
         *self.deleted.borrow_mut() = true;
     }

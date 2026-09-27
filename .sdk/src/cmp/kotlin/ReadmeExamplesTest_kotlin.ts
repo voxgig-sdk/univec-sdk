@@ -4,26 +4,6 @@ import { cmp, File, Content } from '@voxgig/sdkgen'
 import { kotlinPackage } from './utility_kotlin'
 
 
-// Emits test/ReadmeExamplesTest.kt — a JUnit PRESENCE + STRUCTURE gate over
-// every ```kotlin fenced block in the repository ROOT README.md, the
-// per-language kotlin/README.md, AND the per-language kotlin/REFERENCE.md.
-//
-// SCOPE NOTE (deliberate, documented): the Python/TS/Go equivalents EXECUTE and
-// type-check every documented block. That is infeasible here — the generated
-// Kotlin SDK compiles with Gradle/kotlinc only (no in-process Kotlin compiler
-// dependency wired into the test classpath), so a test cannot compile-and-run
-// arbitrary doc snippets at test time. This gate therefore guarantees the
-// weaker-but-real invariant that keeps the docs honest as the generator evolves:
-//   1. every doc exists and contains at least one ```kotlin block (nothing was
-//      dropped);
-//   2. every ```kotlin block is structurally well-formed — its braces,
-//      parentheses and brackets balance (catches a truncated or malformed
-//      generated snippet).
-// A per-doc summary line makes the coverage visible in the test output.
-//
-// The emitted Kotlin is written WITHOUT literal backticks (the fence marker is
-// built at runtime as 96.toChar().toString().repeat(3)) so this TS template
-// literal stays clean.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { target, ctx$: { model } } = props
 

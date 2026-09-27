@@ -37,7 +37,7 @@ pub fn prepare_query_util(ctx: &Rc<Context>) -> Value {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         for (key, val) in entries {
-            if !val.is_noval() && !val.is_null() && !contains(&key) {
+            if !val.is_noval() && !val.is_null() && "$action" != key && !contains(&key) {
                 setp(&out, &key, val);
             }
         }

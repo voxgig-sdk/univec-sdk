@@ -1,11 +1,6 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (go/plugins/aws/aws.go)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (go/plugins/aws/aws.go)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-// The aws plugin: Secrets Manager and SSM Parameter Store, with requests
-// SigV4-signed in-tree (sigv4.go, beside this file). Needs HTTPS and
-// HMAC-SHA256 - the one cryptographic dependency in the library, which is
-// why this is a plugin and why the core never imports crypto. A port of
-// typescript/plugins/aws.ts.
 package aws
 
 import (
@@ -21,12 +16,10 @@ import (
 	"GOMODULE/feature/secrets/sekreto"
 )
 
-// awsnow is the YYYYMMDDTHHMMSSZ timestamp SigV4 wants, for now.
 func awsnow() string {
 	return time.Now().UTC().Format("20060102T150405Z")
 }
 
-// awscreds is a resolved set of AWS credentials.
 type awscreds struct {
 	region  string
 	keyid   string
@@ -67,7 +60,6 @@ func awsauth(region string, keyid string, secret string, session string) (*awscr
 	return &awscreds{region: region, keyid: keyid, secret: secret, session: session}, nil
 }
 
-// awscall makes one signed call to an AWS JSON-1.1 API.
 func awscall(
 	region string, keyid string, secret string, session string, addr string,
 	service string, target string, payload string,
@@ -134,13 +126,6 @@ func awsmiss(body any, types []string) bool {
 	return false
 }
 
-// SecretsProvider reads AWS Secrets Manager.
-//
-// api.token reads the secret named `api` (the vaultref path, so
-// db.pass.main reads db/pass) and takes the `token` field of its JSON
-// SecretString - the AWS idiom of one JSON map per secret. A SecretString
-// that is not JSON is the value itself, under the conventional field
-// `value`. Requests are SigV4-signed in-tree; see sigv4.go.
 type SecretsProvider struct {
 	Region  string
 	KeyID   string

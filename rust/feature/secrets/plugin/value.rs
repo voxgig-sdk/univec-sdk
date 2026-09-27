@@ -1,22 +1,6 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (rust/src/value.rs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (rust/src/value.rs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! The JSON value, and the only parser this port has.
-//!
-//! NO SERDE, AND NO CRATE GRAPH AT ALL (§16). The library is allowed
-//! exactly one runtime dependency, `voxgig/struct`, which has no rust
-//! port; everything else is the standard library. Parsing the corpus is a
-//! hundred lines, and a hundred lines is cheaper than a supply chain.
-//!
-//! `Map` is a `BTreeMap`, which is not a convenience: every port has to
-//! sort its keys before iterating - the canonical's status maps, export
-//! lookups and registry walks all depend on it - and a sorted map makes
-//! that the default rather than a discipline to remember.
-//!
-//! `Num` is `f64` because JSON HAS ONE NUMBER TYPE. The canonical is
-//! javascript, `1` and `1.0` are the same value there, and a port that
-//! split them would disagree with the corpus on which of two spellings a
-//! document used.
 
 use std::any::Any;
 use std::collections::BTreeMap;
@@ -90,9 +74,6 @@ impl Value {
         }
     }
 
-    /// The value at a key, or `Null`. Absence and null read the same here
-    /// ON PURPOSE at the call sites that want a default; the call sites
-    /// that must tell them apart use `has` instead, and say so.
     pub fn get(&self, key: &str) -> Value {
         match self {
             Value::Map(m) => m.get(key).cloned().unwrap_or(Value::Null),
@@ -154,8 +135,6 @@ impl Value {
                     && a.iter()
                         .all(|(k, v)| b.get(k).map(|o| v.same(o)).unwrap_or(false))
             }
-            // Two opaque handles are the same only if they are the same
-            // allocation. Nothing in the corpus compares one.
             (Value::Opaque(a), Value::Opaque(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
@@ -175,9 +154,6 @@ impl Value {
             Value::Null => out.push_str("null"),
             Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
             Value::Num(n) => {
-                // An integral f64 prints without a fractional part, so a
-                // `pos` of 3 renders as `3` and not `3.0` - JSON has one
-                // number type and the corpus writes them as it means them.
                 if n.fract() == 0.0 && n.is_finite() && n.abs() < 1e15 {
                     let _ = write!(out, "{}", *n as i64);
                 } else {
@@ -374,9 +350,6 @@ fn parse_string(b: &[char], at: &mut usize) -> Result<String, String> {
                             code = code * 16 + d;
                             *at += 1;
                         }
-                        // A surrogate PAIR is two escapes; a lone
-                        // surrogate is left as the replacement character
-                        // rather than failing the whole corpus.
                         if (0xD800..0xDC00).contains(&code)
                             && *at + 1 < b.len()
                             && '\\' == b[*at]

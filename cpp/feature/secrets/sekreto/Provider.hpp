@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (cpp/src/Provider.hpp)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (cpp/src/Provider.hpp)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 // What a provider is, what its declarative form looks like, and how a
 // provider kind becomes a voxgig/plugin definition.
@@ -172,6 +172,16 @@ struct ProviderSpec {
   /// infisical: the environment slug and secret path.
   std::string environment;
   std::string path;
+  /// minivault: the passphrase that unwraps `vaultkey`.
+  std::string passphrase;
+  /// minivault: which key in the vault file to open with, defaulting to
+  /// `master`. Named apart from `keyid` because that already means an AWS
+  /// access key id.
+  std::string vaultkey;
+  /// minivault: PBKDF2 rounds, used only when a key is created.
+  std::optional<int> iterations;
+  /// minivault: make the vault file if it is not there.
+  bool create = false;
 
   /// Printed without its credentials. See AuthSpec::str.
   std::string str() const;

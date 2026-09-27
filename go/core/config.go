@@ -346,21 +346,24 @@ func MakeConfig() map[string]any {
 				"fields": []any{
 					map[string]any{
 						"name": "embeddings",
+						"title": "Embeddings",
+						"type": "`$ARRAY`",
 						"req": true,
 						"short": "Translated vectors, in the target model's dimension.",
-						"type": "`$ARRAY`",
 					},
 					map[string]any{
 						"name": "source_model",
+						"title": "Source Model",
+						"type": "`$STRING`",
 						"req": true,
 						"short": "Model space the supplied vectors are currently in.",
-						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "target_model",
+						"title": "Target Model",
+						"type": "`$STRING`",
 						"req": true,
 						"short": "Model space to translate into.",
-						"type": "`$STRING`",
 					},
 				},
 				"name": "convert",
@@ -370,8 +373,28 @@ func MakeConfig() map[string]any {
 						"name": "create",
 						"points": []any{
 							map[string]any{
-								"args": map[string]any{},
 								"kind": "http",
+								"method": "POST",
+								"orig": "/v1/convert",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "convert",
+									},
+								},
+								"parts": []any{
+									"v1",
+									"convert",
+								},
+								"rename": map[string]any{},
+								"transform": map[string]any{
+									"req": "`reqdata`",
+									"res": "`body.data`",
+								},
+								"args": map[string]any{},
+								"select": map[string]any{},
 								"live": map[string]any{
 									"assert": map[string]any{
 										"equal": map[string]any{
@@ -465,29 +488,32 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+							},
+							map[string]any{
+								"kind": "http",
 								"method": "POST",
-								"orig": "/v1/convert",
+								"orig": "/v1/embed-bridge",
 								"segments": []any{
 									map[string]any{
 										"lit": "v1",
 									},
 									map[string]any{
-										"lit": "convert",
+										"lit": "embed-bridge",
 									},
 								},
-								"select": map[string]any{},
+								"parts": []any{
+									"v1",
+									"embed-bridge",
+								},
+								"rename": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
 								},
-								"parts": []any{
-									"v1",
-									"convert",
-								},
-							},
-							map[string]any{
 								"args": map[string]any{},
-								"kind": "http",
+								"select": map[string]any{
+									"$action": "bridge",
+								},
 								"live": map[string]any{
 									"assert": map[string]any{
 										"equal": map[string]any{
@@ -580,31 +606,36 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+							},
+							map[string]any{
+								"kind": "http",
 								"method": "POST",
-								"orig": "/v1/embed-bridge",
+								"orig": "/v1/ephemeral/convert",
 								"segments": []any{
 									map[string]any{
 										"lit": "v1",
 									},
 									map[string]any{
-										"lit": "embed-bridge",
+										"lit": "ephemeral",
+									},
+									map[string]any{
+										"lit": "convert",
 									},
 								},
-								"select": map[string]any{
-									"$action": "bridge",
+								"parts": []any{
+									"v1",
+									"ephemeral",
+									"convert",
 								},
+								"rename": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
 								},
-								"parts": []any{
-									"v1",
-									"embed-bridge",
-								},
-							},
-							map[string]any{
 								"args": map[string]any{},
-								"kind": "http",
+								"select": map[string]any{
+									"$action": "ephemeral",
+								},
 								"live": map[string]any{
 									"assert": map[string]any{
 										"equal": map[string]any{
@@ -702,8 +733,11 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+							},
+							map[string]any{
+								"kind": "http",
 								"method": "POST",
-								"orig": "/v1/ephemeral/convert",
+								"orig": "/v1/ephemeral/embed-bridge",
 								"segments": []any{
 									map[string]any{
 										"lit": "v1",
@@ -712,25 +746,23 @@ func MakeConfig() map[string]any {
 										"lit": "ephemeral",
 									},
 									map[string]any{
-										"lit": "convert",
+										"lit": "embed-bridge",
 									},
-								},
-								"select": map[string]any{
-									"$action": "ephemeral",
-								},
-								"transform": map[string]any{
-									"req": "`reqdata`",
-									"res": "`body.data`",
 								},
 								"parts": []any{
 									"v1",
 									"ephemeral",
-									"convert",
+									"embed-bridge",
 								},
-							},
-							map[string]any{
+								"rename": map[string]any{},
+								"transform": map[string]any{
+									"req": "`reqdata`",
+									"res": "`body.data`",
+								},
 								"args": map[string]any{},
-								"kind": "http",
+								"select": map[string]any{
+									"$action": "ephemeral_bridge",
+								},
 								"live": map[string]any{
 									"assert": map[string]any{
 										"equal": map[string]any{
@@ -827,31 +859,6 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
-								"method": "POST",
-								"orig": "/v1/ephemeral/embed-bridge",
-								"segments": []any{
-									map[string]any{
-										"lit": "v1",
-									},
-									map[string]any{
-										"lit": "ephemeral",
-									},
-									map[string]any{
-										"lit": "embed-bridge",
-									},
-								},
-								"select": map[string]any{
-									"$action": "ephemeral_bridge",
-								},
-								"transform": map[string]any{
-									"req": "`reqdata`",
-									"res": "`body.data`",
-								},
-								"parts": []any{
-									"v1",
-									"ephemeral",
-									"embed-bridge",
-								},
 							},
 						},
 					},
@@ -864,21 +871,24 @@ func MakeConfig() map[string]any {
 				"fields": []any{
 					map[string]any{
 						"name": "embeddings",
+						"title": "Embeddings",
+						"type": "`$ARRAY`",
 						"req": true,
 						"short": "One vector per input text, in input order.",
-						"type": "`$ARRAY`",
 					},
 					map[string]any{
 						"name": "model",
+						"title": "Model",
+						"type": "`$STRING`",
 						"req": true,
 						"short": "Model that produced the vectors.",
-						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "texts",
+						"title": "Texts",
+						"type": "`$ARRAY`",
 						"req": true,
 						"short": "Texts to embed.",
-						"type": "`$ARRAY`",
 					},
 				},
 				"name": "embed",
@@ -888,8 +898,28 @@ func MakeConfig() map[string]any {
 						"name": "create",
 						"points": []any{
 							map[string]any{
-								"args": map[string]any{},
 								"kind": "http",
+								"method": "POST",
+								"orig": "/v1/embed",
+								"segments": []any{
+									map[string]any{
+										"lit": "v1",
+									},
+									map[string]any{
+										"lit": "embed",
+									},
+								},
+								"parts": []any{
+									"v1",
+									"embed",
+								},
+								"rename": map[string]any{},
+								"transform": map[string]any{
+									"req": "`reqdata`",
+									"res": "`body.data`",
+								},
+								"args": map[string]any{},
+								"select": map[string]any{},
 								"live": map[string]any{
 									"assert": map[string]any{
 										"equal": map[string]any{
@@ -952,29 +982,36 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+							},
+							map[string]any{
+								"kind": "http",
 								"method": "POST",
-								"orig": "/v1/embed",
+								"orig": "/v1/ephemeral/embed",
 								"segments": []any{
 									map[string]any{
 										"lit": "v1",
 									},
 									map[string]any{
+										"lit": "ephemeral",
+									},
+									map[string]any{
 										"lit": "embed",
 									},
 								},
-								"select": map[string]any{},
+								"parts": []any{
+									"v1",
+									"ephemeral",
+									"embed",
+								},
+								"rename": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
 								},
-								"parts": []any{
-									"v1",
-									"embed",
-								},
-							},
-							map[string]any{
 								"args": map[string]any{},
-								"kind": "http",
+								"select": map[string]any{
+									"$action": "ephemeral",
+								},
 								"live": map[string]any{
 									"assert": map[string]any{
 										"equal": map[string]any{
@@ -1041,31 +1078,6 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
-								"method": "POST",
-								"orig": "/v1/ephemeral/embed",
-								"segments": []any{
-									map[string]any{
-										"lit": "v1",
-									},
-									map[string]any{
-										"lit": "ephemeral",
-									},
-									map[string]any{
-										"lit": "embed",
-									},
-								},
-								"select": map[string]any{
-									"$action": "ephemeral",
-								},
-								"transform": map[string]any{
-									"req": "`reqdata`",
-									"res": "`body.data`",
-								},
-								"parts": []any{
-									"v1",
-									"ephemeral",
-									"embed",
-								},
 							},
 						},
 					},
@@ -1078,28 +1090,32 @@ func MakeConfig() map[string]any {
 				"fields": []any{
 					map[string]any{
 						"name": "dailyLimit",
+						"title": "Daily Limit",
+						"type": "`$INTEGER`",
 						"req": true,
 						"short": "Calls permitted per day.",
-						"type": "`$INTEGER`",
 					},
 					map[string]any{
 						"name": "dailyUsed",
+						"title": "Daily Used",
+						"type": "`$INTEGER`",
 						"req": true,
 						"short": "Calls already used today.",
-						"type": "`$INTEGER`",
 					},
 					map[string]any{
 						"name": "key",
+						"title": "Key",
+						"type": "`$STRING`",
 						"req": true,
 						"short": "The ephemeral API key, prefixed `eph_`.",
-						"type": "`$STRING`",
 					},
 					map[string]any{
-						"format": "date-time",
 						"name": "resetsAt",
+						"title": "Resets At",
+						"type": "`$STRING`",
 						"req": true,
 						"short": "When the daily allowance resets.",
-						"type": "`$STRING`",
+						"format": "date-time",
 					},
 				},
 				"name": "ephemeral_key",
@@ -1109,18 +1125,7 @@ func MakeConfig() map[string]any {
 						"name": "create",
 						"points": []any{
 							map[string]any{
-								"args": map[string]any{},
 								"kind": "http",
-								"live": map[string]any{
-									"assert": map[string]any{
-										"nonempty": []any{
-											"key",
-										},
-									},
-									"auth": "public",
-									"id": "key",
-									"retention": "No deletion endpoint; issued key is subject to the service daily allowance",
-								},
 								"method": "POST",
 								"orig": "/v1/ephemeral/key",
 								"segments": []any{
@@ -1134,15 +1139,27 @@ func MakeConfig() map[string]any {
 										"lit": "key",
 									},
 								},
-								"select": map[string]any{},
-								"transform": map[string]any{
-									"req": "`reqdata`",
-									"res": "`body.data`",
-								},
 								"parts": []any{
 									"v1",
 									"ephemeral",
 									"key",
+								},
+								"rename": map[string]any{},
+								"transform": map[string]any{
+									"req": "`reqdata`",
+									"res": "`body.data`",
+								},
+								"args": map[string]any{},
+								"select": map[string]any{},
+								"live": map[string]any{
+									"assert": map[string]any{
+										"nonempty": []any{
+											"key",
+										},
+									},
+									"auth": "public",
+									"id": "key",
+									"retention": "No deletion endpoint; issued key is subject to the service daily allowance",
 								},
 							},
 						},
@@ -1156,57 +1173,67 @@ func MakeConfig() map[string]any {
 				"fields": []any{
 					map[string]any{
 						"name": "eval",
-						"short": "Retrieval-fidelity metrics for a convert model.",
+						"title": "Eval",
 						"type": "`$OBJECT`",
+						"short": "Retrieval-fidelity metrics for a convert model.",
 					},
 					map[string]any{
 						"name": "executionProvider",
-						"short": "Hardware backend, e.g.",
+						"title": "Execution Provider",
 						"type": "`$STRING`",
+						"short": "Hardware backend, e.g.",
 					},
 					map[string]any{
 						"name": "modelCard",
-						"short": "Convert models only: training provenance and architecture detail.",
+						"title": "Model Card",
 						"type": "`$OBJECT`",
+						"short": "Convert models only: training provenance and architecture detail.",
 					},
 					map[string]any{
 						"name": "modelType",
+						"title": "Model Type",
+						"type": "`$STRING`",
 						"req": true,
 						"short": "`embed` for text-to-vector models, `convert` for space-translation models.",
-						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "name",
+						"title": "Name",
+						"type": "`$STRING`",
 						"req": true,
 						"short": "Model identifier used in requests.",
-						"type": "`$STRING`",
 					},
 					map[string]any{
 						"name": "sequenceLen",
-						"short": "Embed models only: maximum input sequence length.",
+						"title": "Sequence Len",
 						"type": "`$INTEGER`",
+						"short": "Embed models only: maximum input sequence length.",
 					},
 					map[string]any{
 						"name": "sourceDim",
-						"short": "Convert models only: source vector dimension.",
+						"title": "Source Dim",
 						"type": "`$INTEGER`",
+						"short": "Convert models only: source vector dimension.",
 					},
 					map[string]any{
 						"name": "sourceModel",
-						"short": "Convert models only: the source model space.",
+						"title": "Source Model",
 						"type": "`$STRING`",
+						"short": "Convert models only: the source model space.",
 					},
 					map[string]any{
 						"name": "targetDim",
+						"title": "Target Dim",
+						"type": "`$INTEGER`",
 						"req": true,
 						"short": "Dimension of the produced vectors.",
-						"type": "`$INTEGER`",
 					},
 					map[string]any{
 						"name": "targetModel",
+						"title": "Target Model",
+						"type": "`$STRING`",
 						"req": true,
 						"short": "The model space produced.",
-						"type": "`$STRING`",
 					},
 				},
 				"name": "model",
@@ -1216,17 +1243,7 @@ func MakeConfig() map[string]any {
 						"name": "list",
 						"points": []any{
 							map[string]any{
-								"args": map[string]any{},
 								"kind": "http",
-								"live": map[string]any{
-									"assert": map[string]any{
-										"nonempty": []any{
-											"",
-										},
-									},
-									"auth": "public",
-									"id": "models",
-								},
 								"method": "GET",
 								"orig": "/v1/models",
 								"segments": []any{
@@ -1237,14 +1254,25 @@ func MakeConfig() map[string]any {
 										"lit": "models",
 									},
 								},
-								"select": map[string]any{},
+								"parts": []any{
+									"v1",
+									"models",
+								},
+								"rename": map[string]any{},
 								"transform": map[string]any{
 									"req": "`reqdata`",
 									"res": "`body.data`",
 								},
-								"parts": []any{
-									"v1",
-									"models",
+								"args": map[string]any{},
+								"select": map[string]any{},
+								"live": map[string]any{
+									"assert": map[string]any{
+										"nonempty": []any{
+											"",
+										},
+									},
+									"auth": "public",
+									"id": "models",
 								},
 							},
 						},

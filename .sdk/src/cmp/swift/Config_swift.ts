@@ -5,6 +5,8 @@ import {
   cmp,
   configDefinition,
   each,
+  resolveAuthIn,
+  resolveAuthName,
   targetFeatures,
 } from '@voxgig/sdkgen'
 
@@ -27,54 +29,26 @@ const Config = cmp(async function Config(props: any) {
 
   const model: Model = ctx$.model
 
-  // Gated by the applicability tags, so this target never imports or
-  // registers a feature it has no source for. One rule, one place:
-  // helpers/applicability.
   const feature = targetFeatures(model, target)
 
-  // The config as data, built by the shared helper so every target embeds
-  // the same model by construction. Passing target.name opts this target
-  // into main.slug / main.version / main.target (the three station
-  // descriptor identity fields, station design §4); swift has only the
-  // JSON-literal rep, so that one call covers every rep this target emits.
-  const { json } = configDefinition(model, target.name)
+  const { def } = configDefinition(model, target.name)
 
-  // Model-data defaults may carry the ProjectName placeholder (e.g. the
-  // clienttrack clientName); resolve it to the API name so the embedded JSON
-  // matches the token-replaced runtime.
+  const authIn = resolveAuthIn(model)
+  const authName = resolveAuthName(model)
+  const authOpt: any = (def as any)?.options?.auth
+  if (null != authOpt) {
+    if ('header' !== authIn) authOpt.in = authIn
+    if ('Authorization' !== authName) authOpt.name = authName
+  }
+
+  const json = JSON.stringify(def)
+
   const configJson = json.replace(/ProjectName/g, model.const.Name)
 
-  // PLUGIN DEFINITIONS AND THE featurePlugins MAP (the swift peer of
-  // Config_go's featurePlugins / Config_ts's pluginDefs).
-  //
-  // Upstream sekreto replaced its self-registration registry with
-  // voxgig/plugin definitions: a provider kind the caller did not pass in
-  // via `plugins:` is unknown to that Sekreto. So the config names each
-  // active plugin's exported Definition BY SYMBOL (the model's per-target
-  // `def.swift` map - `hashicorp`, a top-level `let` in the vendored
-  // SekretoPlugins module) and hands the list to the feature through
-  // SdkConfig.featurePlugins.
-  //
-  // Typed `[String: [Any]]`, as go types it `[]any`, so Config never has to
-  // name `Definition` - and so needs `import SekretoPlugins` only when a
-  // definition is actually listed. The feature reads the list back and
-  // downcasts.
-  //
-  // The ACCESSOR IS EMITTED UNCONDITIONALLY (empty map when nothing is
-  // selected). Its caller, feature/SecretsFeature.swift, ships whenever the
-  // feature is active, and java gated the accessor on "a feature declares a
-  // plugin block" - which a project that never selected secrets does not
-  // have - and shipped an SDK that did not compile (.handover-briefs/
-  // fixb-java.md). One rule: what a template may reference, Config always
-  // declares.
   const featurePlugins: Record<string, string[]> = {}
   each(feature, (f: any) => {
     const syms: string[] = []
     each(f.plugin, (plugin: any) => {
-      // Filter on `active` HERE rather than trusting the feature object to
-      // arrive filtered (see Config_ts.pluginImports: getting this wrong
-      // names a definition the trim just deleted, and swiftc fails the
-      // whole module on the unresolved symbol).
       if (false === plugin.active || null == plugin.active) return
       for (const sym of Object.keys(plugin.def?.swift || {})) {
         syms.push(sym)

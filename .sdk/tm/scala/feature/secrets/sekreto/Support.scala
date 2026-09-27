@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (scala/src/Support.scala)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (scala/src/Support.scala)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 // How a provider kind becomes a voxgig/plugin definition.
 //
@@ -20,6 +20,7 @@ import scala.collection.immutable.ListMap
 import voxgig.plugin.Inst
 import voxgig.plugin.PluginError
 import voxgig.plugin.VMap
+import voxgig.plugin.VBool
 import voxgig.plugin.VNum
 import voxgig.plugin.VOpaque
 import voxgig.plugin.VStr
@@ -157,6 +158,10 @@ def optionsof(spec: ProviderSpec): Value =
       "config" -> str(spec.config),
       "environment" -> str(spec.environment),
       "path" -> str(spec.path),
+      "passphrase" -> str(spec.passphrase),
+      "vaultkey" -> str(spec.vaultkey),
+      "iterations" -> spec.iterations.map(value => VNum(value.toDouble)),
+      "create" -> spec.create.map(VBool.apply),
     ),
   )
 
@@ -213,4 +218,8 @@ def specof(options: Value): ProviderSpec =
     config = optstr(options, "config"),
     environment = optstr(options, "environment"),
     path = optstr(options, "path"),
+    passphrase = optstr(options, "passphrase"),
+    vaultkey = optstr(options, "vaultkey"),
+    iterations = options.get("iterations").flatMap(_.asDouble).map(_.toInt),
+    create = options.get("create").collect { case VBool(value) => value },
   )

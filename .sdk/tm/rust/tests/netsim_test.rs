@@ -1,9 +1,3 @@
-// Network-behaviour simulation over the offline mock transport (mirrors
-// tm/go/test/netsim_test.go). The `test` feature accepts an optional `net`
-// config so unit tests can exercise slow, failing and offline conditions
-// without a live server. These checks drive the transport through
-// direct(), which needs no entity, so they run for every generated SDK
-// regardless of its API shape.
 
 use RUSTCRATE::core::helpers::{getp, jo, now_ms};
 use RUSTCRATE::{test_sdk, Value};

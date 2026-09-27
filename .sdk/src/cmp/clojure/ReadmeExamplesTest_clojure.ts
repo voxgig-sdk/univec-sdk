@@ -2,22 +2,6 @@
 import { cmp, Content } from '@voxgig/sdkgen'
 
 
-// Emit a documentation clojure-examples SYNTAX gate INTO the shared gentest run
-// body (the clojure test runner drives a single sdk.gentest/run). For each doc
-// that ships clojure examples — the repository ROOT README.md, the per-language
-// README.md, and REFERENCE.md — every ```clojure fenced block is extracted and
-// PARSED with read-string (all forms wrapped in a vector), catching a malformed
-// documented example (an unbalanced paren, a bad token, an unclosed string).
-//
-// SCOPE NOTE: like the elixir gate, this stops at the syntax check rather than
-// EXECUTING each block. Running a README fragment against the generated
-// namespaces would need the SDK loaded and the narrative requires resolved for
-// every block; the syntax gate is a real, useful guard that keeps documented
-// examples parseable as the generator evolves. A doc that is absent at test
-// time is skipped (passes), so the gate never hard-fails on a missing file.
-//
-// The emitted clojure builds the triple-backtick fence from (char 96) so this
-// TS template literal needs no embedded backticks.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(_props: any) {
 
   Content(`  (letfn [(fence-pat [] (re-pattern (apply str (repeat 3 (char 96)))))

@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -66,7 +66,7 @@ const ReadmeRef = cmp(function ReadmeRef(props: any) {
   const { model } = props.ctx$
 
   const entity = getModelPath(model, `main.${KIT}.entity`)
-  const feature = getModelPath(model, `main.${KIT}.feature`)
+  const feature = targetFeatures(model, target)
 
   const publishedEntities = each(entity).filter((e: any) => e.active !== false)
 
@@ -174,7 +174,7 @@ Prepare a fetch definition without sending. Returns the \`fetchdef\` and raises 
     // Entity reference sections
     publishedEntities.map((ent: any) => {
       const opnames = Object.keys(ent.op || {})
-      const fields = ent.fields || []
+      const fields = Object.values(ent.fields || {})
       // Model-driven id key: null when this entity has no id-like field.
       const idF = entityIdField(ent)
       const eLow = ent.name
@@ -209,9 +209,9 @@ Prepare a fetch definition without sending. Returns the \`fetchdef\` and raises 
 | --- | --- | --- | --- |
 `)
         each(fields, (field: any) => {
-          const req = field.req ? 'Yes' : 'No'
-          const desc = field.short || ''
-          Content(`| \`${field.name}\` | \`${cljType(field.type)}\` | ${req} | ${desc} |
+          const req = field.r ? 'Yes' : 'No'
+          const desc = field.sh || ''
+          Content(`| \`${field.n}\` | \`${cljType(field.t)}\` | ${req} | ${desc} |
 `)
         })
 
@@ -236,7 +236,7 @@ Prepare a fetch definition without sending. Returns the \`fetchdef\` and raises 
               if (fop.active === false) return '-'
               return 'Yes'
             })
-            Content(`| \`${field.name}\` | ${cols.join(' | ')} |
+            Content(`| \`${field.n}\` | ${cols.join(' | ')} |
 `)
           })
 
@@ -397,9 +397,6 @@ Features are activated via the \`feature\` option:
 \`\`\`
 
 `)
-      // The shared feature reference: options, defaults, usage and the
-      // considerations. Model facts, identical in every target, so they are
-      // written once in cmp/ReadmeRefFeatures.ts rather than here.
       ReadmeRefFeatures({ target })
     }
 

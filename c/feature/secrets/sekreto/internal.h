@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (c/src/internal.h)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (c/src/internal.h)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* What the CORE's own files share, and a consumer never sees: the string
  * helpers and the one local-file read the four built-in kinds need.
@@ -79,8 +79,23 @@ int sek_absent(int why);
  * spec's own key names, the shape a config document would have. */
 Value *sek_optionsof(const sek_spec *spec);
 
+/* ...and back, as a kind's `define` reads it. Every string is copied
+ * into the pool: the options map lives in voxgig/plugin's arena, which
+ * this library never resets, and copying keeps the ownership rule - a
+ * provider's strings come from the pool it was built with - true rather
+ * than true by accident.
+ *
+ * Not static to providers.c because `minivault` writes its own `define`,
+ * publishing two exports where every other kind publishes one. */
+sek_spec sek_specof(sek_pool *pool, Value *options);
+
 void sek_build_begin(sek_pool *pool);
 void sek_build_end(void);
 sek_provider *sek_build_at(double index);
+
+/* The pool this construction allocates from, and where a hand-written
+ * `define` puts the provider it built. NULL outside a sek_new. */
+sek_pool *sek_build_pool(void);
+double sek_build_keep(sek_provider *provider);
 
 #endif /* VOXGIG_SEKRETO_INTERNAL_H */

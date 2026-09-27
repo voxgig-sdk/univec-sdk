@@ -57,7 +57,9 @@
   },
   "requests": {
     "GET /v1/models": {
-      "provenance": "operation-contract"
+      "provenance": "operation-contract",
+      "version": 2,
+      "source": "openapi3"
     }
   }
 }

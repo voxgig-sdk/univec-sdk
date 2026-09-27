@@ -1,5 +1,5 @@
 // VENDORED: @voxgig/struct 0.1.4 (javascript/src/struct.js)
-// Source: https://github.com/voxgig/struct @ abd93227e3295151f8dcd18597c3f3f2577af8b7  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/struct @ 3a42881b1d26c75ebbed9f1897f0ba94cf3cf780  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* Copyright (c) 2025-2026 Voxgig Ltd. MIT LICENSE. */
 // VERSION: @voxgig/struct-js 0.1.6
@@ -1714,7 +1714,6 @@ const validate_ONE = (inj, _val, _ref, store) => {
     // Clean up structure, replacing [$ONE, ...] with current
     inj.setval(inj.dparent, 2)
     inj.path = slice(inj.path, -1)
-    inj.key = getelem(inj.path, -1)
     let tvals = slice(parent, 1)
     if (0 === size(tvals)) {
       inj.errs.push(

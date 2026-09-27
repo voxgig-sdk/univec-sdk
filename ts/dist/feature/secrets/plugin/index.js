@@ -1,11 +1,7 @@
 "use strict";
 // VENDORED: @voxgig/plugin 0.1.6 (typescript/src/index.ts)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-/* The canonical surface `make parity` checks (AGENTS.md §4). Small on
- * purpose (§19): everything else is methods on the host and instance
- * types, because a library that grows a second public entry point per
- * feature is a library twenty ports pay for twice. */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PluginError = exports.featurepoints = exports.featuredefinition = exports.STATION_HOOKS = exports.SDK_HOOKS = exports.REQUEST_POINT = exports.resolveexport = exports.provider = exports.compose = exports.emit = exports.resolvegraph = exports.matches = exports.resolvecapability = exports.satisfies = exports.parseversion = exports.parserange = exports.encoderef = exports.applyenv = exports.resolvefrom = exports.resolvecandidates = exports.resolveorder = exports.checkshape = exports.resolveoptions = exports.normalizeconfig = exports.tryref = exports.canonref = exports.checktag = exports.checkname = exports.formatref = exports.parseref = exports.makecatalog = exports.makehost = void 0;
 var Host_1 = require("./Host");

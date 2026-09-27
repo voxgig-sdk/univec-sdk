@@ -1,6 +1,6 @@
 <?php
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (php/src/Host.php)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (php/src/Host.php)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 
 /**
@@ -233,6 +233,24 @@ class Inst
     public function export(string $key, $value): void
     {
         $this->entry->exports[$key] = $value;
+    }
+
+    /** WHICH provider this instance is bound to for $name (§11.1), as a
+     * ref, or null when nothing provides it.
+     *
+     * The host's own `capability` answers with the live providers
+     * RANKED, not with the one THIS instance took; §11.4's reluctant
+     * rebinding makes those differ. A REF, not the instance: every port
+     * can return a string and a corpus entry can assert on one. The
+     * selection is REMEMBERED, because this is the instance asking. */
+    public function capability(string $name): ?string
+    {
+        foreach (requirements($this->entry->options) as $req) {
+            if (($req['name'] ?? null) === $name) {
+                return $this->hostref->instcapability($this->entry, $req);
+            }
+        }
+        return null;
     }
 
     /** What this instance can do for others (§11.1). */
@@ -833,6 +851,12 @@ class Host
      *
      * @param array<string,mixed> $req
      */
+    /** The instance api's way onto `chosen`, which is private. */
+    public function instcapability(Entry $entry, array $req): ?string
+    {
+        return $this->chosen($entry, $req, true);
+    }
+
     private function chosen(Entry $entry, array $req, bool $remember): ?string
     {
         $cands = $this->providersof($req);

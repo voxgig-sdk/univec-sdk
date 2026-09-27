@@ -342,21 +342,24 @@ pub fn make_config() Value {
                 .{ "fields", h.ja(&.{
                     h.jo(&.{
                         .{ "name", h.vstr("embeddings") },
+                        .{ "title", h.vstr("Embeddings") },
+                        .{ "type", h.vstr("`$ARRAY`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Translated vectors, in the target model's dimension.") },
-                        .{ "type", h.vstr("`$ARRAY`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("source_model") },
+                        .{ "title", h.vstr("Source Model") },
+                        .{ "type", h.vstr("`$STRING`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Model space the supplied vectors are currently in.") },
-                        .{ "type", h.vstr("`$STRING`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("target_model") },
+                        .{ "title", h.vstr("Target Model") },
+                        .{ "type", h.vstr("`$STRING`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Model space to translate into.") },
-                        .{ "type", h.vstr("`$STRING`") },
                     }),
                 }) },
                 .{ "name", h.vstr("convert") },
@@ -366,8 +369,28 @@ pub fn make_config() Value {
                         .{ "name", h.vstr("create") },
                         .{ "points", h.ja(&.{
                             h.jo(&.{
-                                .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "method", h.vstr("POST") },
+                                .{ "orig", h.vstr("/v1/convert") },
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("convert") },
+                                    }),
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("convert"),
+                                }) },
+                                .{ "rename", h.omap() },
+                                .{ "transform", h.jo(&.{
+                                    .{ "req", h.vstr("`reqdata`") },
+                                    .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "args", h.omap() },
+                                .{ "select", h.omap() },
                                 .{ "live", h.jo(&.{
                                     .{ "assert", h.jo(&.{
                                         .{ "equal", h.jo(&.{
@@ -461,29 +484,32 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                            }),
+                            h.jo(&.{
+                                .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
-                                .{ "orig", h.vstr("/v1/convert") },
+                                .{ "orig", h.vstr("/v1/embed-bridge") },
                                 .{ "segments", h.ja(&.{
                                     h.jo(&.{
                                         .{ "lit", h.vstr("v1") },
                                     }),
                                     h.jo(&.{
-                                        .{ "lit", h.vstr("convert") },
+                                        .{ "lit", h.vstr("embed-bridge") },
                                     }),
                                 }) },
-                                .{ "select", h.omap() },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("embed-bridge"),
+                                }) },
+                                .{ "rename", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
                                 }) },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("convert"),
-                                }) },
-                            }),
-                            h.jo(&.{
                                 .{ "args", h.omap() },
-                                .{ "kind", h.vstr("http") },
+                                .{ "select", h.jo(&.{
+                                    .{ "$action", h.vstr("bridge") },
+                                }) },
                                 .{ "live", h.jo(&.{
                                     .{ "assert", h.jo(&.{
                                         .{ "equal", h.jo(&.{
@@ -576,31 +602,36 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                            }),
+                            h.jo(&.{
+                                .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
-                                .{ "orig", h.vstr("/v1/embed-bridge") },
+                                .{ "orig", h.vstr("/v1/ephemeral/convert") },
                                 .{ "segments", h.ja(&.{
                                     h.jo(&.{
                                         .{ "lit", h.vstr("v1") },
                                     }),
                                     h.jo(&.{
-                                        .{ "lit", h.vstr("embed-bridge") },
+                                        .{ "lit", h.vstr("ephemeral") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("convert") },
                                     }),
                                 }) },
-                                .{ "select", h.jo(&.{
-                                    .{ "$action", h.vstr("bridge") },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("ephemeral"),
+                                    h.vstr("convert"),
                                 }) },
+                                .{ "rename", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
                                 }) },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("embed-bridge"),
-                                }) },
-                            }),
-                            h.jo(&.{
                                 .{ "args", h.omap() },
-                                .{ "kind", h.vstr("http") },
+                                .{ "select", h.jo(&.{
+                                    .{ "$action", h.vstr("ephemeral") },
+                                }) },
                                 .{ "live", h.jo(&.{
                                     .{ "assert", h.jo(&.{
                                         .{ "equal", h.jo(&.{
@@ -698,8 +729,11 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                            }),
+                            h.jo(&.{
+                                .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
-                                .{ "orig", h.vstr("/v1/ephemeral/convert") },
+                                .{ "orig", h.vstr("/v1/ephemeral/embed-bridge") },
                                 .{ "segments", h.ja(&.{
                                     h.jo(&.{
                                         .{ "lit", h.vstr("v1") },
@@ -708,25 +742,23 @@ pub fn make_config() Value {
                                         .{ "lit", h.vstr("ephemeral") },
                                     }),
                                     h.jo(&.{
-                                        .{ "lit", h.vstr("convert") },
+                                        .{ "lit", h.vstr("embed-bridge") },
                                     }),
-                                }) },
-                                .{ "select", h.jo(&.{
-                                    .{ "$action", h.vstr("ephemeral") },
-                                }) },
-                                .{ "transform", h.jo(&.{
-                                    .{ "req", h.vstr("`reqdata`") },
-                                    .{ "res", h.vstr("`body.data`") },
                                 }) },
                                 .{ "parts", h.ja(&.{
                                     h.vstr("v1"),
                                     h.vstr("ephemeral"),
-                                    h.vstr("convert"),
+                                    h.vstr("embed-bridge"),
                                 }) },
-                            }),
-                            h.jo(&.{
+                                .{ "rename", h.omap() },
+                                .{ "transform", h.jo(&.{
+                                    .{ "req", h.vstr("`reqdata`") },
+                                    .{ "res", h.vstr("`body.data`") },
+                                }) },
                                 .{ "args", h.omap() },
-                                .{ "kind", h.vstr("http") },
+                                .{ "select", h.jo(&.{
+                                    .{ "$action", h.vstr("ephemeral_bridge") },
+                                }) },
                                 .{ "live", h.jo(&.{
                                     .{ "assert", h.jo(&.{
                                         .{ "equal", h.jo(&.{
@@ -823,31 +855,6 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
-                                .{ "method", h.vstr("POST") },
-                                .{ "orig", h.vstr("/v1/ephemeral/embed-bridge") },
-                                .{ "segments", h.ja(&.{
-                                    h.jo(&.{
-                                        .{ "lit", h.vstr("v1") },
-                                    }),
-                                    h.jo(&.{
-                                        .{ "lit", h.vstr("ephemeral") },
-                                    }),
-                                    h.jo(&.{
-                                        .{ "lit", h.vstr("embed-bridge") },
-                                    }),
-                                }) },
-                                .{ "select", h.jo(&.{
-                                    .{ "$action", h.vstr("ephemeral_bridge") },
-                                }) },
-                                .{ "transform", h.jo(&.{
-                                    .{ "req", h.vstr("`reqdata`") },
-                                    .{ "res", h.vstr("`body.data`") },
-                                }) },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("ephemeral"),
-                                    h.vstr("embed-bridge"),
-                                }) },
                             }),
                         }) },
                     }) },
@@ -860,21 +867,24 @@ pub fn make_config() Value {
                 .{ "fields", h.ja(&.{
                     h.jo(&.{
                         .{ "name", h.vstr("embeddings") },
+                        .{ "title", h.vstr("Embeddings") },
+                        .{ "type", h.vstr("`$ARRAY`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("One vector per input text, in input order.") },
-                        .{ "type", h.vstr("`$ARRAY`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("model") },
+                        .{ "title", h.vstr("Model") },
+                        .{ "type", h.vstr("`$STRING`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Model that produced the vectors.") },
-                        .{ "type", h.vstr("`$STRING`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("texts") },
+                        .{ "title", h.vstr("Texts") },
+                        .{ "type", h.vstr("`$ARRAY`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Texts to embed.") },
-                        .{ "type", h.vstr("`$ARRAY`") },
                     }),
                 }) },
                 .{ "name", h.vstr("embed") },
@@ -884,8 +894,28 @@ pub fn make_config() Value {
                         .{ "name", h.vstr("create") },
                         .{ "points", h.ja(&.{
                             h.jo(&.{
-                                .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
+                                .{ "method", h.vstr("POST") },
+                                .{ "orig", h.vstr("/v1/embed") },
+                                .{ "segments", h.ja(&.{
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("v1") },
+                                    }),
+                                    h.jo(&.{
+                                        .{ "lit", h.vstr("embed") },
+                                    }),
+                                }) },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("embed"),
+                                }) },
+                                .{ "rename", h.omap() },
+                                .{ "transform", h.jo(&.{
+                                    .{ "req", h.vstr("`reqdata`") },
+                                    .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "args", h.omap() },
+                                .{ "select", h.omap() },
                                 .{ "live", h.jo(&.{
                                     .{ "assert", h.jo(&.{
                                         .{ "equal", h.jo(&.{
@@ -948,29 +978,36 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                            }),
+                            h.jo(&.{
+                                .{ "kind", h.vstr("http") },
                                 .{ "method", h.vstr("POST") },
-                                .{ "orig", h.vstr("/v1/embed") },
+                                .{ "orig", h.vstr("/v1/ephemeral/embed") },
                                 .{ "segments", h.ja(&.{
                                     h.jo(&.{
                                         .{ "lit", h.vstr("v1") },
                                     }),
                                     h.jo(&.{
+                                        .{ "lit", h.vstr("ephemeral") },
+                                    }),
+                                    h.jo(&.{
                                         .{ "lit", h.vstr("embed") },
                                     }),
                                 }) },
-                                .{ "select", h.omap() },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("ephemeral"),
+                                    h.vstr("embed"),
+                                }) },
+                                .{ "rename", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
                                 }) },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("embed"),
-                                }) },
-                            }),
-                            h.jo(&.{
                                 .{ "args", h.omap() },
-                                .{ "kind", h.vstr("http") },
+                                .{ "select", h.jo(&.{
+                                    .{ "$action", h.vstr("ephemeral") },
+                                }) },
                                 .{ "live", h.jo(&.{
                                     .{ "assert", h.jo(&.{
                                         .{ "equal", h.jo(&.{
@@ -1037,31 +1074,6 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
-                                .{ "method", h.vstr("POST") },
-                                .{ "orig", h.vstr("/v1/ephemeral/embed") },
-                                .{ "segments", h.ja(&.{
-                                    h.jo(&.{
-                                        .{ "lit", h.vstr("v1") },
-                                    }),
-                                    h.jo(&.{
-                                        .{ "lit", h.vstr("ephemeral") },
-                                    }),
-                                    h.jo(&.{
-                                        .{ "lit", h.vstr("embed") },
-                                    }),
-                                }) },
-                                .{ "select", h.jo(&.{
-                                    .{ "$action", h.vstr("ephemeral") },
-                                }) },
-                                .{ "transform", h.jo(&.{
-                                    .{ "req", h.vstr("`reqdata`") },
-                                    .{ "res", h.vstr("`body.data`") },
-                                }) },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("ephemeral"),
-                                    h.vstr("embed"),
-                                }) },
                             }),
                         }) },
                     }) },
@@ -1074,28 +1086,32 @@ pub fn make_config() Value {
                 .{ "fields", h.ja(&.{
                     h.jo(&.{
                         .{ "name", h.vstr("dailyLimit") },
+                        .{ "title", h.vstr("Daily Limit") },
+                        .{ "type", h.vstr("`$INTEGER`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Calls permitted per day.") },
-                        .{ "type", h.vstr("`$INTEGER`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("dailyUsed") },
+                        .{ "title", h.vstr("Daily Used") },
+                        .{ "type", h.vstr("`$INTEGER`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Calls already used today.") },
-                        .{ "type", h.vstr("`$INTEGER`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("key") },
+                        .{ "title", h.vstr("Key") },
+                        .{ "type", h.vstr("`$STRING`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("The ephemeral API key, prefixed `eph_`.") },
-                        .{ "type", h.vstr("`$STRING`") },
                     }),
                     h.jo(&.{
-                        .{ "format", h.vstr("date-time") },
                         .{ "name", h.vstr("resetsAt") },
+                        .{ "title", h.vstr("Resets At") },
+                        .{ "type", h.vstr("`$STRING`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("When the daily allowance resets.") },
-                        .{ "type", h.vstr("`$STRING`") },
+                        .{ "format", h.vstr("date-time") },
                     }),
                 }) },
                 .{ "name", h.vstr("ephemeral_key") },
@@ -1105,18 +1121,7 @@ pub fn make_config() Value {
                         .{ "name", h.vstr("create") },
                         .{ "points", h.ja(&.{
                             h.jo(&.{
-                                .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
-                                .{ "live", h.jo(&.{
-                                    .{ "assert", h.jo(&.{
-                                        .{ "nonempty", h.ja(&.{
-                                            h.vstr("key"),
-                                        }) },
-                                    }) },
-                                    .{ "auth", h.vstr("public") },
-                                    .{ "id", h.vstr("key") },
-                                    .{ "retention", h.vstr("No deletion endpoint; issued key is subject to the service daily allowance") },
-                                }) },
                                 .{ "method", h.vstr("POST") },
                                 .{ "orig", h.vstr("/v1/ephemeral/key") },
                                 .{ "segments", h.ja(&.{
@@ -1130,15 +1135,27 @@ pub fn make_config() Value {
                                         .{ "lit", h.vstr("key") },
                                     }),
                                 }) },
-                                .{ "select", h.omap() },
-                                .{ "transform", h.jo(&.{
-                                    .{ "req", h.vstr("`reqdata`") },
-                                    .{ "res", h.vstr("`body.data`") },
-                                }) },
                                 .{ "parts", h.ja(&.{
                                     h.vstr("v1"),
                                     h.vstr("ephemeral"),
                                     h.vstr("key"),
+                                }) },
+                                .{ "rename", h.omap() },
+                                .{ "transform", h.jo(&.{
+                                    .{ "req", h.vstr("`reqdata`") },
+                                    .{ "res", h.vstr("`body.data`") },
+                                }) },
+                                .{ "args", h.omap() },
+                                .{ "select", h.omap() },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "nonempty", h.ja(&.{
+                                            h.vstr("key"),
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("public") },
+                                    .{ "id", h.vstr("key") },
+                                    .{ "retention", h.vstr("No deletion endpoint; issued key is subject to the service daily allowance") },
                                 }) },
                             }),
                         }) },
@@ -1152,57 +1169,67 @@ pub fn make_config() Value {
                 .{ "fields", h.ja(&.{
                     h.jo(&.{
                         .{ "name", h.vstr("eval") },
-                        .{ "short", h.vstr("Retrieval-fidelity metrics for a convert model.") },
+                        .{ "title", h.vstr("Eval") },
                         .{ "type", h.vstr("`$OBJECT`") },
+                        .{ "short", h.vstr("Retrieval-fidelity metrics for a convert model.") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("executionProvider") },
-                        .{ "short", h.vstr("Hardware backend, e.g.") },
+                        .{ "title", h.vstr("Execution Provider") },
                         .{ "type", h.vstr("`$STRING`") },
+                        .{ "short", h.vstr("Hardware backend, e.g.") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("modelCard") },
-                        .{ "short", h.vstr("Convert models only: training provenance and architecture detail.") },
+                        .{ "title", h.vstr("Model Card") },
                         .{ "type", h.vstr("`$OBJECT`") },
+                        .{ "short", h.vstr("Convert models only: training provenance and architecture detail.") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("modelType") },
+                        .{ "title", h.vstr("Model Type") },
+                        .{ "type", h.vstr("`$STRING`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("`embed` for text-to-vector models, `convert` for space-translation models.") },
-                        .{ "type", h.vstr("`$STRING`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("name") },
+                        .{ "title", h.vstr("Name") },
+                        .{ "type", h.vstr("`$STRING`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Model identifier used in requests.") },
-                        .{ "type", h.vstr("`$STRING`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("sequenceLen") },
-                        .{ "short", h.vstr("Embed models only: maximum input sequence length.") },
+                        .{ "title", h.vstr("Sequence Len") },
                         .{ "type", h.vstr("`$INTEGER`") },
+                        .{ "short", h.vstr("Embed models only: maximum input sequence length.") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("sourceDim") },
-                        .{ "short", h.vstr("Convert models only: source vector dimension.") },
+                        .{ "title", h.vstr("Source Dim") },
                         .{ "type", h.vstr("`$INTEGER`") },
+                        .{ "short", h.vstr("Convert models only: source vector dimension.") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("sourceModel") },
-                        .{ "short", h.vstr("Convert models only: the source model space.") },
+                        .{ "title", h.vstr("Source Model") },
                         .{ "type", h.vstr("`$STRING`") },
+                        .{ "short", h.vstr("Convert models only: the source model space.") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("targetDim") },
+                        .{ "title", h.vstr("Target Dim") },
+                        .{ "type", h.vstr("`$INTEGER`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("Dimension of the produced vectors.") },
-                        .{ "type", h.vstr("`$INTEGER`") },
                     }),
                     h.jo(&.{
                         .{ "name", h.vstr("targetModel") },
+                        .{ "title", h.vstr("Target Model") },
+                        .{ "type", h.vstr("`$STRING`") },
                         .{ "req", h.vbool(true) },
                         .{ "short", h.vstr("The model space produced.") },
-                        .{ "type", h.vstr("`$STRING`") },
                     }),
                 }) },
                 .{ "name", h.vstr("model") },
@@ -1212,17 +1239,7 @@ pub fn make_config() Value {
                         .{ "name", h.vstr("list") },
                         .{ "points", h.ja(&.{
                             h.jo(&.{
-                                .{ "args", h.omap() },
                                 .{ "kind", h.vstr("http") },
-                                .{ "live", h.jo(&.{
-                                    .{ "assert", h.jo(&.{
-                                        .{ "nonempty", h.ja(&.{
-                                            h.vstr(""),
-                                        }) },
-                                    }) },
-                                    .{ "auth", h.vstr("public") },
-                                    .{ "id", h.vstr("models") },
-                                }) },
                                 .{ "method", h.vstr("GET") },
                                 .{ "orig", h.vstr("/v1/models") },
                                 .{ "segments", h.ja(&.{
@@ -1233,14 +1250,25 @@ pub fn make_config() Value {
                                         .{ "lit", h.vstr("models") },
                                     }),
                                 }) },
-                                .{ "select", h.omap() },
+                                .{ "parts", h.ja(&.{
+                                    h.vstr("v1"),
+                                    h.vstr("models"),
+                                }) },
+                                .{ "rename", h.omap() },
                                 .{ "transform", h.jo(&.{
                                     .{ "req", h.vstr("`reqdata`") },
                                     .{ "res", h.vstr("`body.data`") },
                                 }) },
-                                .{ "parts", h.ja(&.{
-                                    h.vstr("v1"),
-                                    h.vstr("models"),
+                                .{ "args", h.omap() },
+                                .{ "select", h.omap() },
+                                .{ "live", h.jo(&.{
+                                    .{ "assert", h.jo(&.{
+                                        .{ "nonempty", h.ja(&.{
+                                            h.vstr(""),
+                                        }) },
+                                    }) },
+                                    .{ "auth", h.vstr("public") },
+                                    .{ "id", h.vstr("models") },
                                 }) },
                             }),
                         }) },

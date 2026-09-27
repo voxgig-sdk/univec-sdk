@@ -14,6 +14,7 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     "kind": "http",
     "path": "/v1/convert",
     "method": "POST",
+    "rename": {},
     "args": {},
     "facts": {
       "live": {
@@ -252,6 +253,7 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     "path": "/v1/embed-bridge",
     "method": "POST",
     "action": "bridge",
+    "rename": {},
     "args": {},
     "facts": {
       "live": {
@@ -354,126 +356,118 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
       "securitySource": "definition",
       "responses": {
         "200": {
-          "description": "Translated embeddings",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                "properties": {
+                  "data": {
+                    "properties": {
+                      "bridge_model": {
+                        "type": "string"
+                      },
+                      "embeddings": {
+                        "description": "Translated vectors, in the target model's dimension.",
+                        "items": {
+                          "description": "A single embedding vector.",
+                          "items": {
+                            "format": "float",
+                            "type": "number"
+                          },
+                          "type": "array"
+                        },
+                        "type": "array"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "target_model": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "embeddings",
+                      "bridge_model",
+                      "target_model"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "type": "boolean"
+                  }
+                },
                 "required": [
                   "success",
                   "data"
                 ],
-                "properties": {
-                  "success": {
-                    "type": "boolean"
-                  },
-                  "data": {
-                    "type": "object",
-                    "required": [
-                      "embeddings",
-                      "source_model",
-                      "target_model"
-                    ],
-                    "properties": {
-                      "embeddings": {
-                        "type": "array",
-                        "description": "Translated vectors, in the target model's dimension.",
-                        "items": {
-                          "type": "array",
-                          "description": "A single embedding vector.",
-                          "items": {
-                            "type": "number",
-                            "format": "float"
-                          },
-                          "x-ref": "#/components/schemas/Embedding"
-                        },
-                        "key$": "embeddings"
-                      },
-                      "source_model": {
-                        "type": "string",
-                        "key$": "source_model"
-                      },
-                      "target_model": {
-                        "type": "string",
-                        "key$": "target_model"
-                      }
-                    },
-                    "index$": 0
-                  }
-                },
-                "x-ref": "#/components/schemas/ConvertResponse"
+                "type": "object"
               }
             }
           },
-          "x-ref": "#/components/responses/ConvertResponse"
+          "description": "Translated embeddings"
         },
         "401": {
-          "description": "Error",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                "properties": {
+                  "error": {
+                    "properties": {
+                      "message": {
+                        "description": "Human-readable error detail.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "message"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "description": "Always false on an error.",
+                    "type": "boolean"
+                  }
+                },
                 "required": [
                   "success",
                   "error"
                 ],
-                "properties": {
-                  "success": {
-                    "type": "boolean",
-                    "description": "Always false on an error."
-                  },
-                  "error": {
-                    "type": "object",
-                    "required": [
-                      "message"
-                    ],
-                    "properties": {
-                      "message": {
-                        "type": "string",
-                        "description": "Human-readable error detail."
-                      }
-                    }
-                  }
-                },
-                "x-ref": "#/components/schemas/ErrorResponse"
+                "type": "object"
               }
             }
           },
-          "x-ref": "#/components/responses/ErrorResponse"
+          "description": "Error"
         },
         "422": {
-          "description": "Error",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                "properties": {
+                  "error": {
+                    "properties": {
+                      "message": {
+                        "description": "Human-readable error detail.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "message"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "description": "Always false on an error.",
+                    "type": "boolean"
+                  }
+                },
                 "required": [
                   "success",
                   "error"
                 ],
-                "properties": {
-                  "success": {
-                    "type": "boolean",
-                    "description": "Always false on an error."
-                  },
-                  "error": {
-                    "type": "object",
-                    "required": [
-                      "message"
-                    ],
-                    "properties": {
-                      "message": {
-                        "type": "string",
-                        "description": "Human-readable error detail."
-                      }
-                    }
-                  }
-                },
-                "x-ref": "#/components/schemas/ErrorResponse"
+                "type": "object"
               }
             }
           },
-          "x-ref": "#/components/responses/ErrorResponse"
+          "description": "Error"
         }
       }
     },
@@ -489,6 +483,7 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     "path": "/v1/ephemeral/convert",
     "method": "POST",
     "action": "ephemeral",
+    "rename": {},
     "args": {},
     "facts": {
       "live": {
@@ -765,6 +760,7 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     "path": "/v1/ephemeral/embed-bridge",
     "method": "POST",
     "action": "ephemeral_bridge",
+    "rename": {},
     "args": {},
     "facts": {
       "live": {
@@ -871,160 +867,150 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
       "securitySource": "definition",
       "responses": {
         "200": {
-          "description": "Translated embeddings",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                "properties": {
+                  "data": {
+                    "properties": {
+                      "bridge_model": {
+                        "type": "string"
+                      },
+                      "embeddings": {
+                        "description": "Translated vectors, in the target model's dimension.",
+                        "items": {
+                          "description": "A single embedding vector.",
+                          "items": {
+                            "format": "float",
+                            "type": "number"
+                          },
+                          "type": "array"
+                        },
+                        "type": "array"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "target_model": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "embeddings",
+                      "bridge_model",
+                      "target_model"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "type": "boolean"
+                  }
+                },
                 "required": [
                   "success",
                   "data"
                 ],
-                "properties": {
-                  "success": {
-                    "type": "boolean"
-                  },
-                  "data": {
-                    "type": "object",
-                    "required": [
-                      "embeddings",
-                      "source_model",
-                      "target_model"
-                    ],
-                    "properties": {
-                      "embeddings": {
-                        "type": "array",
-                        "description": "Translated vectors, in the target model's dimension.",
-                        "items": {
-                          "type": "array",
-                          "description": "A single embedding vector.",
-                          "items": {
-                            "type": "number",
-                            "format": "float"
-                          },
-                          "x-ref": "#/components/schemas/Embedding"
-                        },
-                        "key$": "embeddings"
-                      },
-                      "source_model": {
-                        "type": "string",
-                        "key$": "source_model"
-                      },
-                      "target_model": {
-                        "type": "string",
-                        "key$": "target_model"
-                      }
-                    },
-                    "index$": 0
-                  }
-                },
-                "x-ref": "#/components/schemas/ConvertResponse"
+                "type": "object"
               }
             }
           },
-          "x-ref": "#/components/responses/ConvertResponse"
+          "description": "Translated embeddings"
         },
         "401": {
-          "description": "Error",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                "properties": {
+                  "error": {
+                    "properties": {
+                      "message": {
+                        "description": "Human-readable error detail.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "message"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "description": "Always false on an error.",
+                    "type": "boolean"
+                  }
+                },
                 "required": [
                   "success",
                   "error"
                 ],
-                "properties": {
-                  "success": {
-                    "type": "boolean",
-                    "description": "Always false on an error."
-                  },
-                  "error": {
-                    "type": "object",
-                    "required": [
-                      "message"
-                    ],
-                    "properties": {
-                      "message": {
-                        "type": "string",
-                        "description": "Human-readable error detail."
-                      }
-                    }
-                  }
-                },
-                "x-ref": "#/components/schemas/ErrorResponse"
+                "type": "object"
               }
             }
           },
-          "x-ref": "#/components/responses/ErrorResponse"
+          "description": "Error"
         },
         "422": {
-          "description": "Error",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                "properties": {
+                  "error": {
+                    "properties": {
+                      "message": {
+                        "description": "Human-readable error detail.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "message"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "description": "Always false on an error.",
+                    "type": "boolean"
+                  }
+                },
                 "required": [
                   "success",
                   "error"
                 ],
-                "properties": {
-                  "success": {
-                    "type": "boolean",
-                    "description": "Always false on an error."
-                  },
-                  "error": {
-                    "type": "object",
-                    "required": [
-                      "message"
-                    ],
-                    "properties": {
-                      "message": {
-                        "type": "string",
-                        "description": "Human-readable error detail."
-                      }
-                    }
-                  }
-                },
-                "x-ref": "#/components/schemas/ErrorResponse"
+                "type": "object"
               }
             }
           },
-          "x-ref": "#/components/responses/ErrorResponse"
+          "description": "Error"
         },
         "429": {
-          "description": "Error",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                "properties": {
+                  "error": {
+                    "properties": {
+                      "message": {
+                        "description": "Human-readable error detail.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "message"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "description": "Always false on an error.",
+                    "type": "boolean"
+                  }
+                },
                 "required": [
                   "success",
                   "error"
                 ],
-                "properties": {
-                  "success": {
-                    "type": "boolean",
-                    "description": "Always false on an error."
-                  },
-                  "error": {
-                    "type": "object",
-                    "required": [
-                      "message"
-                    ],
-                    "properties": {
-                      "message": {
-                        "type": "string",
-                        "description": "Human-readable error detail."
-                      }
-                    }
-                  }
-                },
-                "x-ref": "#/components/schemas/ErrorResponse"
+                "type": "object"
               }
             }
           },
-          "x-ref": "#/components/responses/ErrorResponse"
+          "description": "Error"
         }
       }
     },
@@ -1039,6 +1025,7 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     "kind": "http",
     "path": "/v1/embed",
     "method": "POST",
+    "rename": {},
     "args": {},
     "facts": {
       "live": {
@@ -1242,6 +1229,7 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     "path": "/v1/ephemeral/embed",
     "method": "POST",
     "action": "ephemeral",
+    "rename": {},
     "args": {},
     "facts": {
       "live": {
@@ -1482,6 +1470,7 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     "kind": "http",
     "path": "/v1/ephemeral/key",
     "method": "POST",
+    "rename": {},
     "args": {},
     "facts": {
       "live": {
@@ -1563,6 +1552,7 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     "kind": "http",
     "path": "/v1/models",
     "method": "GET",
+    "rename": {},
     "args": {},
     "facts": {
       "live": {
@@ -1578,137 +1568,154 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
       "securitySource": "operation",
       "responses": {
         "200": {
-          "description": "Model list",
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                "properties": {
+                  "data": {
+                    "items": {
+                      "oneOf": [
+                        {
+                          "properties": {
+                            "eval": {
+                              "description": "Retrieval-fidelity metrics for a convert model.",
+                              "properties": {
+                                "cosine_mean": {
+                                  "format": "float",
+                                  "type": "number"
+                                },
+                                "cosine_median": {
+                                  "format": "float",
+                                  "type": "number"
+                                },
+                                "cosine_std": {
+                                  "format": "float",
+                                  "type": "number"
+                                },
+                                "kendall_p_value": {
+                                  "format": "float",
+                                  "type": "number"
+                                },
+                                "kendall_tau": {
+                                  "format": "float",
+                                  "type": "number"
+                                },
+                                "mrr": {
+                                  "description": "Mean reciprocal rank.",
+                                  "format": "float",
+                                  "type": "number"
+                                },
+                                "p_at_1": {
+                                  "format": "float",
+                                  "type": "number"
+                                },
+                                "p_at_10": {
+                                  "format": "float",
+                                  "type": "number"
+                                },
+                                "p_at_5": {
+                                  "format": "float",
+                                  "type": "number"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "executionProvider": {
+                              "description": "Hardware backend, e.g. `cpu`.",
+                              "type": "string"
+                            },
+                            "modelCard": {
+                              "additionalProperties": true,
+                              "description": "Convert models only: training provenance and architecture detail.",
+                              "type": "object"
+                            },
+                            "modelType": {
+                              "description": "`embed` for text-to-vector models, `convert` for space-translation models.",
+                              "enum": [
+                                "embed",
+                                "convert"
+                              ],
+                              "type": "string"
+                            },
+                            "name": {
+                              "description": "Model identifier used in requests.",
+                              "type": "string"
+                            },
+                            "sequenceLen": {
+                              "description": "Embed models only: maximum input sequence length.",
+                              "type": "integer"
+                            },
+                            "sourceDim": {
+                              "description": "Convert models only: source vector dimension.",
+                              "type": "integer"
+                            },
+                            "sourceModel": {
+                              "description": "Convert models only: the source model space.",
+                              "type": "string"
+                            },
+                            "targetDim": {
+                              "description": "Dimension of the produced vectors.",
+                              "type": "integer"
+                            },
+                            "targetModel": {
+                              "description": "The model space produced.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "modelType",
+                            "targetModel",
+                            "targetDim"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "executionProvider": {
+                              "type": "string"
+                            },
+                            "modelType": {
+                              "enum": [
+                                "convert-bridge",
+                                "embed-bridge"
+                              ],
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "restrictedTargets": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "modelType",
+                            "executionProvider"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    },
+                    "type": "array"
+                  },
+                  "success": {
+                    "type": "boolean"
+                  }
+                },
                 "required": [
                   "success",
                   "data"
                 ],
-                "properties": {
-                  "success": {
-                    "type": "boolean",
-                    "key$": "success"
-                  },
-                  "data": {
-                    "items": {
-                      "properties": {
-                        "eval": {
-                          "description": "Retrieval-fidelity metrics for a convert model.",
-                          "properties": {
-                            "cosine_mean": {
-                              "format": "float",
-                              "type": "number"
-                            },
-                            "cosine_median": {
-                              "format": "float",
-                              "type": "number"
-                            },
-                            "cosine_std": {
-                              "format": "float",
-                              "type": "number"
-                            },
-                            "kendall_p_value": {
-                              "format": "float",
-                              "type": "number"
-                            },
-                            "kendall_tau": {
-                              "format": "float",
-                              "type": "number"
-                            },
-                            "mrr": {
-                              "description": "Mean reciprocal rank.",
-                              "format": "float",
-                              "type": "number"
-                            },
-                            "p_at_1": {
-                              "format": "float",
-                              "type": "number"
-                            },
-                            "p_at_10": {
-                              "format": "float",
-                              "type": "number"
-                            },
-                            "p_at_5": {
-                              "format": "float",
-                              "type": "number"
-                            }
-                          },
-                          "type": "object",
-                          "x-ref": "#/components/schemas/ModelEval",
-                          "key$": "eval"
-                        },
-                        "executionProvider": {
-                          "description": "Hardware backend, e.g. `cpu`.",
-                          "type": "string",
-                          "key$": "executionProvider"
-                        },
-                        "modelCard": {
-                          "additionalProperties": true,
-                          "description": "Convert models only: training provenance and architecture detail.",
-                          "type": "object",
-                          "key$": "modelCard"
-                        },
-                        "modelType": {
-                          "description": "`embed` for text-to-vector models, `convert` for space-translation models.",
-                          "enum": [
-                            "embed",
-                            "convert"
-                          ],
-                          "type": "string",
-                          "key$": "modelType"
-                        },
-                        "name": {
-                          "description": "Model identifier used in requests.",
-                          "type": "string",
-                          "key$": "name"
-                        },
-                        "sequenceLen": {
-                          "description": "Embed models only: maximum input sequence length.",
-                          "type": "integer",
-                          "key$": "sequenceLen"
-                        },
-                        "sourceDim": {
-                          "description": "Convert models only: source vector dimension.",
-                          "type": "integer",
-                          "key$": "sourceDim"
-                        },
-                        "sourceModel": {
-                          "description": "Convert models only: the source model space.",
-                          "type": "string",
-                          "key$": "sourceModel"
-                        },
-                        "targetDim": {
-                          "description": "Dimension of the produced vectors.",
-                          "type": "integer",
-                          "key$": "targetDim"
-                        },
-                        "targetModel": {
-                          "description": "The model space produced.",
-                          "type": "string",
-                          "key$": "targetModel"
-                        }
-                      },
-                      "required": [
-                        "name",
-                        "modelType",
-                        "targetModel",
-                        "targetDim"
-                      ],
-                      "type": "object",
-                      "x-ref": "#/components/schemas/Model",
-                      "index$": 0
-                    },
-                    "type": "array",
-                    "key$": "data"
-                  }
-                },
-                "x-ref": "#/components/schemas/ModelListResponse"
+                "type": "object"
               }
             }
-          }
+          },
+          "description": "Model list"
         }
       }
     },

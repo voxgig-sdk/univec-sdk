@@ -27,7 +27,7 @@ make test
 
 | Source | Path | Edit when… |
 | --- | --- | --- |
-| Target definition | `.sdk/model/target/php.aon` | deps, module, extension, phases change |
+| Target definition | `.sdk/model/target/php.aontu` | deps, module, extension, phases change |
 | Templates | `.sdk/tm/php/` | the file is the **same for every API** (runtime, transport, base classes) — copied verbatim with placeholder substitution |
 | Components | `.sdk/src/cmp/php/` | the file's shape **depends on the API** (entities, constructor, README, tests) — TypeScript that walks the model |
 
@@ -38,30 +38,30 @@ component.* After editing a component run `npm run build` before
 ## Features in this target
 
 Each feature is a flat file in the `feature/` package. Its hooks and
-default activation come from `.sdk/model/feature/<name>.aon`; customise
+default activation come from `.sdk/model/feature/<name>.aontu`; customise
 the runtime under `.sdk/tm/php/feature/` and regenerate.
 
 | Feature | Runtime file | Active hooks |
 | --- | --- | --- |
-| **audit** — Structured audit trail of operations | `feature/AuditFeature.php` | `PreDone`, `PreUnexpected` |
-| **cache** — Response caching for safe read requests | `feature/CacheFeature.php` | — |
-| **clienttrack** — Client identity and per-request correlation headers | `feature/ClienttrackFeature.php` | `PostConstruct`, `PreRequest` |
-| **cost** — Cost tracking and spend budget for API calls | `feature/CostFeature.php` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **debug** — Request/response capture ring buffer for debugging | `feature/DebugFeature.php` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
-| **idempotency** — Idempotency keys for safe retries of mutating operations | `feature/IdempotencyFeature.php` | `PreRequest` |
-| **log** — Structured request and response logging | `feature/LogFeature.php` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **metrics** — Statistics capture: per-operation counters and latency | `feature/MetricsFeature.php` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **netsim** — Network behaviour simulation for offline testing (latency, failures, outages) | `feature/NetsimFeature.php` | — |
-| **paging** — Pagination signals for list operations | `feature/PagingFeature.php` | `PreRequest`, `PreResult` |
-| **proxy** — Outbound HTTP(S) proxy routing | `feature/ProxyFeature.php` | — |
-| **ratelimit** — Client-side rate limiting via a token bucket | `feature/RatelimitFeature.php` | — |
-| **rbac** — Client-side role/permission enforcement | `feature/RbacFeature.php` | `PrePoint` |
-| **retry** — Automatic retry of transient failures with exponential backoff | `feature/RetryFeature.php` | — |
-| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/SecretsFeature.php` | `PreSpec` |
-| **streaming** — Incremental streaming of list results via async iteration | `feature/StreamingFeature.php` | `PreResult` |
-| **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/TelemetryFeature.php` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
-| **test** — In-memory mock transport for testing without a live server | `feature/TestFeature.php` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **timeout** — Per-request timeout with transport abort | `feature/TimeoutFeature.php` | — |
+| **audit** — Audit trail | `feature/AuditFeature.php` | `PreDone`, `PreUnexpected` |
+| **cache** — Response cache | `feature/CacheFeature.php` | — |
+| **clienttrack** — Client tracking | `feature/ClienttrackFeature.php` | `PostConstruct`, `PreRequest` |
+| **cost** — Cost tracking | `feature/CostFeature.php` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **debug** — Debug capture | `feature/DebugFeature.php` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
+| **idempotency** — Idempotency | `feature/IdempotencyFeature.php` | `PreRequest` |
+| **log** — Logging | `feature/LogFeature.php` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **metrics** — Metrics | `feature/MetricsFeature.php` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **netsim** — Network simulation | `feature/NetsimFeature.php` | — |
+| **paging** — Paging | `feature/PagingFeature.php` | `PreRequest`, `PreResult` |
+| **proxy** — Proxy | `feature/ProxyFeature.php` | — |
+| **ratelimit** — Rate limiting | `feature/RatelimitFeature.php` | — |
+| **rbac** — Access control | `feature/RbacFeature.php` | `PrePoint` |
+| **retry** — Retry | `feature/RetryFeature.php` | — |
+| **secrets** — Secrets | `feature/SecretsFeature.php` | `PreSpec` |
+| **streaming** — Streaming | `feature/StreamingFeature.php` | `PreResult` |
+| **telemetry** — Telemetry | `feature/TelemetryFeature.php` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
+| **test** — Test transport | `feature/TestFeature.php` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **timeout** — Timeout | `feature/TimeoutFeature.php` | — |
 
 ---
 

@@ -57,7 +57,7 @@ defmodule Univec.Context do
         if S.ismap(pg), do: S.setprop(ctrl, "paging", pg)
         S.setprop(ctx, "ctrl", ctrl)
 
-      basectx != nil and bp.("ctrl") != nil ->
+      basectx != nil and bp.("ctrl") != nil and gp.("opname") == nil ->
         S.setprop(ctx, "ctrl", bp.("ctrl"))
 
       true ->

@@ -15,12 +15,6 @@ import type {
 } from '@voxgig/apidef'
 
 
-// Generate mix.exs for the Elixir SDK. The vendored struct library has zero
-// third-party runtime deps, so a bare SDK ships with none - but dependencies
-// declared by the model DO flow: the target's own `deps` block plus any
-// feature-declared elixir deps (e.g. the station feature's voxgig_station),
-// via the shared collectDeps helper, exactly like rust/dart/go. A model with
-// no deps emits the byte-identical `defp deps, do: []` it always has.
 const Package = cmp(async function Package(props: any) {
   const ctx$ = props.ctx$
   const target = props.target
@@ -32,13 +26,6 @@ const Package = cmp(async function Package(props: any) {
   const app = String(model.const.name).replace(/-/g, '_')
   const { repoUrl } = repoInfo(model)
 
-  // Render one mix deps entry per collected dependency. Hex package names
-  // share the atom alphabet, but a hyphen in a model dep name is mapped to
-  // '_' rather than emitted broken. Version -> Mix requirement: an explicit
-  // operator is kept (spaced, the mix convention: '>=0.0.1' -> '>= 0.0.1');
-  // a bare version gets hex's customary '~>'; a target dep with no version
-  // accepts anything. kind: 'dev' scopes to [:dev, :test]; 'peer'/'prod'
-  // (and anything else) are runtime deps - mix has no peer notion.
   const entries: string[] = []
   for (const d of collectDeps(model, target.name, target.deps, ctx$.log)) {
     const atom = String(d.name).replace(/-/g, '_')

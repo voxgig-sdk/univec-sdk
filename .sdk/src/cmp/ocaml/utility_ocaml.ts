@@ -4,6 +4,8 @@ import {
   walk,
 } from '@voxgig/struct'
 
+import { sdkName } from '@voxgig/sdkgen'
+
 
 // OCaml keywords that are illegal as a lowercase identifier. sdkgen's shared
 // safeVarName has no ocaml entry, so the guard lives here.
@@ -18,7 +20,6 @@ const OCAML_RESERVED = new Set<string>([
 ])
 
 
-// A collision-free snake_case OCaml (lowercase) identifier for a model name.
 function ocamlVarName(name: string): string {
   let snake = String(name).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
   if ('' === snake || !/^[a-z_]/.test(snake)) {
@@ -28,7 +29,6 @@ function ocamlVarName(name: string): string {
 }
 
 
-// The generated per-entity module basename (module Sdk_entity_<name>).
 function entityModule(name: string): string {
   return 'sdk_entity_' + ocamlVarName(name)
 }
@@ -38,7 +38,7 @@ function entityModule(name: string): string {
 // module naming: org prefix from model.origin).
 function packageName(model: any): string {
   const org = (model.origin || 'voxgig-sdk').replace(/-sdk$/, '')
-  return `${org}-${model.name}-sdk`.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  return `${org}-${sdkName(model.name)}`.toLowerCase().replace(/[^a-z0-9-]/g, '-')
 }
 
 
@@ -108,33 +108,8 @@ function formatOcamlValue(val: any, indent: number = 0): string {
 }
 
 
-// Deep-remove meta keys (`foo$`) from a model subtree (twin of go's clean).
-// Emission-time normalisation of a model subtree (L0).
-//
-// Always drops jostraca's iteration metadata (`$`-suffixed keys: index$,
-// key$, val$). With `dropDefaults`, also drops keys whose value IS the
-// default the runtime already assumes when the key is absent, which is pure
-// payload — see CONFIG_DEFAULT.
-//
-// Rebuilds the tree rather than mutating during a walk. The previous
-// implementation walked a clone calling `delete p[k]`, but walk() assigns its
-// callback's result back over the child (`setprop(out, ckey, walk(...))`), so
-// the delete was undone on the way out and the helper silently did nothing.
-// Returning `undefined` from the callback does not fix it either: setprop
-// stores undefined rather than removing the key, which then emits as a null.
-//
-// `dropDefaults` is opt-in and must be passed ONLY for the entity subtree.
-// `active` means something different in feature config, where absent reads as
-// INACTIVE (see feature_init) — dropping `active: true` there would silently
-// disable the feature.
-// jostraca's iteration metadata, injected by each()/names() while it walks the
-// model. Listed explicitly rather than matched by trailing-dollar suffix: a
-// trailing dollar is not exclusive to jostraca -- Seneca uses entity$ as real
-// data -- so a blanket suffix match can silently drop a legitimate API field.
 const MODEL_META = ['index$', 'key$', 'val$']
 
-// Keys whose value IS the default the runtime already assumes when the key is
-// absent, so emitting them is pure payload.
 const CONFIG_DEFAULT: Record<string, any> = {
   active: true,
   req: false,

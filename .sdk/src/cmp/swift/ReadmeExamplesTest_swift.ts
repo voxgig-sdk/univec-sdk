@@ -2,28 +2,6 @@
 import { cmp, File, Content } from '@voxgig/sdkgen'
 
 
-// Emits Tests/ProjectNameSDKTests/ReadmeExamplesTest.swift — a PRESENCE +
-// STRUCTURE gate over every swift fenced block in the repository ROOT
-// README.md, the per-language swift/README.md, AND swift/REFERENCE.md. It is a
-// plain XCTestCase (no @testable import — it only reads the doc files off
-// disk), resolved relative to the test file via #filePath.
-//
-// SCOPE NOTE (deliberate, documented): the Python/TS/Go equivalents EXECUTE and
-// type-check every documented block. That is infeasible here — the generated
-// Swift SDK compiles with SwiftPM only (no in-process Swift compiler wired into
-// the test runtime), so a test cannot compile-and-run arbitrary doc snippets at
-// test time. This gate therefore guarantees the weaker-but-real invariant that
-// keeps the docs honest as the generator evolves:
-//   1. PRESENCE: every scanned doc that exists holds at least one swift block
-//      (nothing was dropped);
-//   2. STRUCTURE: every swift block's braces / parens / brackets balance
-//      (ignoring string literals and line comments), catching a truncated or
-//      malformed generated snippet.
-//
-// The emitted Swift is written WITHOUT literal backticks (the fence marker is
-// built at runtime as String(repeating: "\u{60}", count: 3)) so this TS
-// template literal stays clean, and uses string concatenation instead of Swift
-// interpolation to keep backslash-escaping in this template minimal.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { ctx$: { model } } = props
 

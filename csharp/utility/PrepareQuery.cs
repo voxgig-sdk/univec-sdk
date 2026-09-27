@@ -24,7 +24,7 @@ public static partial class SdkUtility
         {
             var key = item[0] as string ?? "";
             var val = item[1];
-            if (val != null && !ContainsStr(paramnames, key))
+            if (val != null && "$action" != key && !ContainsStr(paramnames, key))
             {
                 query[key] = val;
             }

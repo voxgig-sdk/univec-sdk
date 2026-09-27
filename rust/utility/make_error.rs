@@ -63,8 +63,6 @@ pub fn make_error_util(
     sdk_err.result = crate::utility::clean::clean_util(ctx, &result.borrow().to_value());
     sdk_err.spec = crate::utility::clean::clean_util(ctx, &spec_val);
 
-    // Promote the HTTP status to the top level, so a consumer can branch on
-    // `err.status` / `err.not_found()` rather than reaching into `err.result`.
     sdk_err.status = result.borrow().status;
 
     ctrl.borrow_mut().err = Some(sdk_err.clone());

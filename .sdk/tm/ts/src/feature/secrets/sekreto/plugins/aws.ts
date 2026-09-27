@@ -1,5 +1,5 @@
 // VENDORED: @voxgig/sekreto 0.2.0 (typescript/plugins/aws.ts)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* Copyright (c) 2025 Voxgig Ltd, MIT License */
 
@@ -10,7 +10,6 @@ import { checkaddr } from '../provider/addr'
 import { sigv4 } from './sigv4'
 import { fetchjson } from './httpjson'
 
-/** The `YYYYMMDDTHHMMSSZ` timestamp SigV4 wants, for now. */
 function awsnow(): string {
   return new Date()
     .toISOString()
@@ -56,7 +55,6 @@ function awsauth(opts: Awsopts): {
   return { region, keyid, secret, session }
 }
 
-/** One signed call to an AWS JSON-1.1 API. */
 async function awscall(
   opts: Awsopts,
   service: string,
@@ -100,14 +98,6 @@ function awsmiss(body: any, types: string[]): boolean {
   return types.some((name) => errtype.includes(name))
 }
 
-/** AWS Secrets Manager.
- *
- * `api.token` reads the secret named `api` (the vaultref path, so
- * `db.pass.main` reads `db/pass`) and takes the `token` field of its
- * JSON SecretString - the AWS idiom of one JSON map per secret. A
- * SecretString that is not JSON is the value itself, under the
- * conventional field `value`. Requests are SigV4-signed in-tree; see
- * Sigv4.ts. */
 export function awssecretsprovider(options?: Awsopts): Provider {
   const opts = options || {}
 
@@ -155,7 +145,6 @@ export function awssecretsprovider(options?: Awsopts): Provider {
         return undefined === value || null === value ? undefined : String(value)
       }
 
-      // A plain-string secret is the whole value; it has no named fields.
       return 'value' === ref.field ? text : undefined
     },
     // Config only, never the environment: describe() feeds the spec's
@@ -195,10 +184,6 @@ export function awsparamsprovider(options?: Awsopts): Provider {
 }
 
 
-/** The two plugins. Both need HTTPS and HMAC-SHA256 - the one crypto
- * dependency in the library, which is why this is a plugin rather than
- * a built-in: `sigv4` is exported from here and from nowhere in the
- * core. */
 export const awssecrets = providerplugin('awssecrets', (spec: ProviderSpec) =>
   awssecretsprovider(spec))
 

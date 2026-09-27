@@ -14,16 +14,19 @@
             "name" "embeddings"
             "req" true
             "short" "Translated vectors, in the target model's dimension."
+            "title" "Embeddings"
             "type" "`$ARRAY`")
           (vs/jm
             "name" "source_model"
             "req" true
             "short" "Model space the supplied vectors are currently in."
+            "title" "Source Model"
             "type" "`$STRING`")
           (vs/jm
             "name" "target_model"
             "req" true
             "short" "Model space to translate into."
+            "title" "Target Model"
             "type" "`$STRING`"))
         "name" "convert"
         "op" (vs/jm
@@ -106,6 +109,7 @@
                 "parts" (vs/jt
                   "v1"
                   "convert")
+                "rename" (vs/jm)
                 "segments" (vs/jt
                   (vs/jm
                     "lit" "v1")
@@ -189,6 +193,7 @@
                 "parts" (vs/jt
                   "v1"
                   "embed-bridge")
+                "rename" (vs/jm)
                 "segments" (vs/jt
                   (vs/jm
                     "lit" "v1")
@@ -278,6 +283,7 @@
                   "v1"
                   "ephemeral"
                   "convert")
+                "rename" (vs/jm)
                 "segments" (vs/jt
                   (vs/jm
                     "lit" "v1")
@@ -368,6 +374,7 @@
                   "v1"
                   "ephemeral"
                   "embed-bridge")
+                "rename" (vs/jm)
                 "segments" (vs/jt
                   (vs/jm
                     "lit" "v1")
@@ -388,16 +395,19 @@
             "name" "embeddings"
             "req" true
             "short" "One vector per input text, in input order."
+            "title" "Embeddings"
             "type" "`$ARRAY`")
           (vs/jm
             "name" "model"
             "req" true
             "short" "Model that produced the vectors."
+            "title" "Model"
             "type" "`$STRING`")
           (vs/jm
             "name" "texts"
             "req" true
             "short" "Texts to embed."
+            "title" "Texts"
             "type" "`$ARRAY`"))
         "name" "embed"
         "op" (vs/jm
@@ -457,6 +467,7 @@
                 "parts" (vs/jt
                   "v1"
                   "embed")
+                "rename" (vs/jm)
                 "segments" (vs/jt
                   (vs/jm
                     "lit" "v1")
@@ -522,6 +533,7 @@
                   "v1"
                   "ephemeral"
                   "embed")
+                "rename" (vs/jm)
                 "segments" (vs/jt
                   (vs/jm
                     "lit" "v1")
@@ -542,22 +554,26 @@
             "name" "dailyLimit"
             "req" true
             "short" "Calls permitted per day."
+            "title" "Daily Limit"
             "type" "`$INTEGER`")
           (vs/jm
             "name" "dailyUsed"
             "req" true
             "short" "Calls already used today."
+            "title" "Daily Used"
             "type" "`$INTEGER`")
           (vs/jm
             "name" "key"
             "req" true
             "short" "The ephemeral API key, prefixed `eph_`."
+            "title" "Key"
             "type" "`$STRING`")
           (vs/jm
             "format" "date-time"
             "name" "resetsAt"
             "req" true
             "short" "When the daily allowance resets."
+            "title" "Resets At"
             "type" "`$STRING`"))
         "name" "ephemeral_key"
         "op" (vs/jm
@@ -581,6 +597,7 @@
                   "v1"
                   "ephemeral"
                   "key")
+                "rename" (vs/jm)
                 "segments" (vs/jt
                   (vs/jm
                     "lit" "v1")
@@ -599,46 +616,56 @@
           (vs/jm
             "name" "eval"
             "short" "Retrieval-fidelity metrics for a convert model."
+            "title" "Eval"
             "type" "`$OBJECT`")
           (vs/jm
             "name" "executionProvider"
             "short" "Hardware backend, e.g."
+            "title" "Execution Provider"
             "type" "`$STRING`")
           (vs/jm
             "name" "modelCard"
             "short" "Convert models only: training provenance and architecture detail."
+            "title" "Model Card"
             "type" "`$OBJECT`")
           (vs/jm
             "name" "modelType"
             "req" true
             "short" "`embed` for text-to-vector models, `convert` for space-translation models."
+            "title" "Model Type"
             "type" "`$STRING`")
           (vs/jm
             "name" "name"
             "req" true
             "short" "Model identifier used in requests."
+            "title" "Name"
             "type" "`$STRING`")
           (vs/jm
             "name" "sequenceLen"
             "short" "Embed models only: maximum input sequence length."
+            "title" "Sequence Len"
             "type" "`$INTEGER`")
           (vs/jm
             "name" "sourceDim"
             "short" "Convert models only: source vector dimension."
+            "title" "Source Dim"
             "type" "`$INTEGER`")
           (vs/jm
             "name" "sourceModel"
             "short" "Convert models only: the source model space."
+            "title" "Source Model"
             "type" "`$STRING`")
           (vs/jm
             "name" "targetDim"
             "req" true
             "short" "Dimension of the produced vectors."
+            "title" "Target Dim"
             "type" "`$INTEGER`")
           (vs/jm
             "name" "targetModel"
             "req" true
             "short" "The model space produced."
+            "title" "Target Model"
             "type" "`$STRING`"))
         "name" "model"
         "op" (vs/jm
@@ -660,6 +687,7 @@
                 "parts" (vs/jt
                   "v1"
                   "models")
+                "rename" (vs/jm)
                 "segments" (vs/jt
                   (vs/jm
                     "lit" "v1")

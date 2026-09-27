@@ -24,11 +24,6 @@ function dartLit(type: any, placeholder: string = 'example'): string {
 }
 
 
-// A `list()` on a NESTED entity needs its parent path params. The
-// quickstart used to emit `client.Moon().list()` for an entity at
-// `/planet/{planet_id}/moon`, which 404s against a live server from a
-// half-built URL — indistinguishable from "no such record". The model
-// already marks those params `reqd: true`; matchArg renders exactly them.
 function listMatchArg(ent: any): string {
   const idF = entityIdField(ent)
   return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))
@@ -177,7 +172,7 @@ Prepare a fetch definition without sending. Returns the \`fetchdef\` (or an erro
     // Entity reference sections
     publishedEntities.map((ent: any) => {
       const opnames = Object.keys(ent.op || {})
-      const fields = ent.fields || []
+      const fields = Object.values(ent.fields || {})
       const idF = entityIdField(ent)
       const eVar = exampleVarName(ent.name, 'dart')
 
@@ -209,9 +204,9 @@ final ${eVar} = client.${ent.Name}();
 | --- | --- | --- | --- |
 `)
         each(fields, (field: any) => {
-          const req = field.req ? 'Yes' : 'No'
-          const desc = field.short || ''
-          Content(`| \`${field.name}\` | \`${canonToType(field.type, target.name)}\` | ${req} | ${desc} |
+          const req = field.r ? 'Yes' : 'No'
+          const desc = field.sh || ''
+          Content(`| \`${field.n}\` | \`${canonToType(field.t, target.name)}\` | ${req} | ${desc} |
 `)
         })
 
@@ -236,7 +231,7 @@ final ${eVar} = client.${ent.Name}();
               if (fop.active === false) return '-'
               return 'Yes'
             })
-            Content(`| \`${field.name}\` | ${cols.join(' | ')} |
+            Content(`| \`${field.n}\` | ${cols.join(' | ')} |
 `)
           })
 
@@ -382,9 +377,6 @@ final client = ${model.const.Name}SDK({
 \`\`\`
 
 `)
-      // The shared feature reference: options, defaults, usage and the
-      // considerations. Model facts, identical in every target, so they are
-      // written once in cmp/ReadmeRefFeatures.ts rather than here.
       ReadmeRefFeatures({ target })
     }
 

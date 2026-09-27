@@ -62,7 +62,7 @@ pub const DebugFeature = @import("feature/debug.zig").DebugFeature;
 pub const AuditFeature = @import("feature/audit.zig").AuditFeature;
 pub const ClienttrackFeature = @import("feature/clienttrack.zig").ClienttrackFeature;
 pub const RbacFeature = @import("feature/rbac.zig").RbacFeature;
-// GATED features (model/feature/<name>.aon `needs:`), exported ONLY when the
+// GATED features (model/feature/<name>.aontu `needs:`), exported ONLY when the
 // model activates them: their source reaches a named build module (the
 // vendored sekreto for `secrets`) that build.zig declares under the same
 // condition, so a static export here would name a module an inactive SDK

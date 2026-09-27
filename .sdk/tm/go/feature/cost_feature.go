@@ -9,28 +9,6 @@ import (
 	"GOMODULE/core"
 )
 
-// Cost tracking and spend budget. Uses BOTH seams, which is the point of
-// the feature: money is spent per HTTP ATTEMPT (a retried call is charged
-// again, because the upstream API charges it again), but it is owed by an
-// OPERATION. So the transport wrap prices each attempt, and PreDone
-// attributes the running total to `<entity>.<op>` and to the caller
-// (`ctrl.actor`, the same actor the audit feature records).
-//
-// The price of an attempt comes from the first source that answers: a
-// response header (`header` x `perUnit`), the rate table (`rates`, keyed
-// `<entity>.<op>` / `<op>` / `*`), then the flat `unit`. A body figure
-// (`path` x `perUnit`, e.g. "usage.total_tokens") is read at PreDone
-// instead, from the already-parsed result, and describes the whole call, so
-// it REPLACES the per-attempt estimate rather than adding to it.
-//
-// `budget` caps total spend. With `onBudget: "deny"` a further operation is
-// refused at PrePoint (via ctx.Out["point"], which MakePoint surfaces),
-// before an endpoint is resolved and before anything reaches the network.
-//
-// ORDER MATTERS. Cost must sit INSIDE the cache, or a response served from
-// cache is charged for money that was never spent. The default (map) order
-// puts cache innermost and cost outside it, so activate them in array form
-// with cost first.
 type CostFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK
@@ -124,8 +102,6 @@ func (f *CostFeature) PrePoint(ctx *core.Context) {
 		return
 	}
 
-	// Mark the context as running through the pipeline, so charge knows a
-	// PreDone is coming and does not commit the spend itself.
 	pending, ok := ctx.Out[costPendingKey].(*costPending)
 	if !ok || pending == nil {
 		pending = &costPending{source: "none"}
@@ -171,18 +147,6 @@ func (f *CostFeature) charge(ctx *core.Context, url string, fetchdef map[string]
 
 	pending.attempts++
 
-	// Accumulated here, committed once at PreDone. Adding each attempt to
-	// the running total and then subtracting it again when a body figure
-	// supersedes it loses precision to catastrophic cancellation.
-	//
-	// Reported and estimated are kept apart per ATTEMPT: a 503 priced from
-	// the rate table followed by a 200 carrying the cost header is part
-	// estimate, part reported, and collapsing both into the final attempt's
-	// category would corrupt the split.
-	//
-	// A failed transport is an error VALUE here, not a panic, so it already
-	// reaches this point and is priced from the table or unit — no separate
-	// rescue is needed, unlike the ts/js ports.
 	pending.amount += amount
 	if source == "header" || source == "body" {
 		pending.reported += amount
@@ -193,9 +157,6 @@ func (f *CostFeature) charge(ctx *core.Context, url string, fetchdef map[string]
 
 	f.Total.Attempts++
 
-	// direct() and graphql() reach the transport without dispatching any
-	// pipeline hooks, so there is no PrePoint to gate on and no PreDone to
-	// commit. Their spend is committed here, or it would never be counted.
 	if !pending.piped {
 		f.commit(ctx, pending, "_", "direct")
 		delete(ctx.Out, costPendingKey)
@@ -227,15 +188,6 @@ func (f *CostFeature) finish(ctx *core.Context, done bool) {
 	}
 	delete(ctx.Out, costPendingKey)
 
-	// A FAILED operation that made no attempt never reached the network:
-	// PrePoint creates the pending entry to mark the context as piped, and
-	// then the budget gate refuses the call (rbac, or an unresolvable
-	// endpoint, short-circuits just as early). Committing it would count a
-	// call that never happened and file a zero-amount record as Last.
-	//
-	// A SUCCEEDED operation that made no attempt is the opposite case: it was
-	// served from the cache. That is a real call, and the fact that it cost
-	// nothing is the whole point of ordering cost inside the cache.
 	if !done && pending.attempts == 0 {
 		return
 	}
@@ -250,9 +202,6 @@ func (f *CostFeature) finish(ctx *core.Context, done bool) {
 	f.commit(ctx, pending, entity, opname)
 }
 
-// commit records one operation's spend: totals, budget, per-op and per-actor
-// attribution, and the record. Shared by finish and the raw-request path in
-// charge, which has no PreDone to reach.
 func (f *CostFeature) commit(ctx *core.Context, pending *costPending, entity, opname string) {
 	amount := pending.amount
 	reported := pending.reported

@@ -54,14 +54,25 @@ func resultHeadersUtil(_ ctx: Context) -> Result {
   return result!
 }
 
+// `$action` selects the point (see makePointUtil); it is never an API field,
+// so the body is a copy without it. The caller's map is left untouched.
+private func stripAction(_ reqdata: Value) -> Value {
+  guard let src = reqdata.asMap, src.entries["$action"] != nil else { return reqdata }
+  let body = VMap()
+  for (key, val) in src.entries where "$action" != key {
+    body.entries[key] = val
+  }
+  return .map(body)
+}
+
 func transformRequestUtil(_ ctx: Context) -> Value {
   if let sp = ctx.spec { sp.step = "reqform" }
 
-  guard let tfm = gp(ctx.point, "transform").asMap else { return .map(ctx.reqdata) }
+  guard let tfm = gp(ctx.point, "transform").asMap else { return stripAction(.map(ctx.reqdata)) }
   let reqform = gp(tfm, "req")
-  if isNil(reqform) { return .map(ctx.reqdata) }
+  if isNil(reqform) { return stripAction(.map(ctx.reqdata)) }
 
-  return transform(.map(vm(("reqdata", .map(ctx.reqdata)))), reqform)
+  return stripAction(transform(.map(vm(("reqdata", .map(ctx.reqdata)))), reqform))
 }
 
 func transformResponseUtil(_ ctx: Context) -> Value {

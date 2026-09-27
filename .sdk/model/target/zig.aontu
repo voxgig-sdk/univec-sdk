@@ -1,0 +1,47 @@
+
+main: kit: target: zig: {
+
+  title: Zig
+  ext: zig
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  provides: { sekreto: true, schema: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the hand-written struct runner, whose engine half
+  # AND assertion half are now the vendored omni port driven through
+  # test/omniresolver.zig. `doctor` reports leftovers; `doctor prune`
+  # deletes them.
+  superseded: [
+    'test/struct_runner.zig'
+  ]
+
+  # The vendored voxgig struct port is in-tree (utility/voxgigstruct) — Zig
+  # has no package registry to depend on, so there are no external deps.
+  deps: &: {
+    kind: *'prod' | string
+  }
+}
+
+
+main: kit: feature: &: target: zig: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: zig: publish: {
+  registry: {
+    name: 'none'
+    url: ''
+    vault: { alias: 'none', env: 'NONE' }
+  }
+}
+
+
+main: kit: target: zig: feature: {
+  trim: false
+}

@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (go/plugins/azuresecrets/azuresecrets.go)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (go/plugins/azuresecrets/azuresecrets.go)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 // The azuresecrets plugin: Azure Key Vault. Needs HTTPS. A port of
 // typescript/plugins/azuresecrets.ts.
@@ -19,17 +19,6 @@ import (
 // azureresource is the audience Azure Key Vault tokens are scoped to.
 const azureresource = "https://vault.azure.net"
 
-// Provider reads Azure Key Vault.
-//
-// api.token reads secret api-token (dots flattened to `-`; Key Vault names
-// allow nothing else), current version. The token comes from config, then
-// a client-credentials login when tenant/clientid/clientsecret are given,
-// then the IMDS managed-identity endpoint - so on Azure's own platform no
-// credential configuration is needed.
-//
-// As with GCP, the IMDS call is plain http to a link-local host by
-// platform design and carries no credential; the login and vault addresses
-// are checkaddr-guarded.
 type Provider struct {
 	Vault        string
 	Token        string

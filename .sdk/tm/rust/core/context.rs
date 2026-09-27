@@ -1,7 +1,3 @@
-// Operation context (mirrors go core/context.go). Fields use interior
-// mutability (RefCell) since the pipeline mutates the context in place;
-// contexts are shared as Rc<Context>.
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -104,7 +100,7 @@ impl Context {
             Rc::new(RefCell::new(c))
         } else if let Some(co) = ctxspec.ctrl_obj {
             co
-        } else if let Some(b) = basectx {
+        } else if let Some(b) = basectx.filter(|_| ctxspec.opname.is_none()) {
             b.ctrl.borrow().clone()
         } else {
             Rc::new(RefCell::new(Control::new()))
@@ -236,8 +232,6 @@ impl Context {
     }
 
     fn resolve_op(&self, opname: &str) -> Rc<Operation> {
-        // Cache key is `<entity>:<opname>` so two entities with the same op
-        // (e.g. both have a "list") get distinct cached Operations.
         let entname = self
             .entity
             .borrow()
@@ -254,10 +248,7 @@ impl Context {
             return Rc::new(Operation::new(&Value::empty_map()));
         }
 
-        let opcfg = getpath(
-            &["entity", &entname, "op", opname],
-            &self.config.borrow(),
-        );
+        let opcfg = getpath(&["entity", &entname, "op", opname], &self.config.borrow());
 
         let input = if opname == "update" || opname == "create" {
             "data"

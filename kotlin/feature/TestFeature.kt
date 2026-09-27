@@ -63,12 +63,16 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
     if (null == data || null == ctx) return data
     val tm = Struct.getprop(ctx.point, "transform")
     val restf = Struct.getprop(tm, "res") as? String ?: return data
-    // Exactly `body.<key>`; a deeper path is not an envelope this mock can
-    // synthesise, so it is left alone rather than guessed at.
+    // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+    // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
     if (!restf.startsWith("`body.") || !restf.endsWith("`") || restf.length < 8) return data
     val inner = restf.substring(6, restf.length - 1)
-    if (inner.isEmpty() || inner.contains(".")) return data
-    return linkedMapOf<String, Any?>(inner to data)
+    if (inner.isEmpty()) return data
+    var out: Any? = data
+    for (seg in inner.split(".").reversed()) {
+      out = linkedMapOf<String, Any?>(seg to out)
+    }
+    return out
   }
 
   private fun respond(ctx: Context?, status: Int, data: Any?, extra: MutableMap<String, Any?>?): MutableMap<String, Any?> {
@@ -156,20 +160,13 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
         }
         val args = buildArgs(ctx, op, updateMatch)
         val found = Struct.select(entmap, args)
-        var ent = Struct.getelem(found, 0, null)
+        val ent = Struct.getelem(found, 0, null)
         if (ent == null) {
-          for (e in entmap.values) {
-            if (e is MutableMap<*, *>) {
-              ent = e
-              break
-            }
-          }
-        }
-        if (ent == null) {
+          // update miss: 404, never another record
           return respond(ctx, 404, null, extra("statusText", "Not found"))
         }
         if (ent is MutableMap<*, *>) {
-          (ent as MutableMap<String, Any?>).putAll(reqdata)
+          Struct.merge(Struct.jt(ent, reqdata))
         }
         Struct.delprop(ent, "\$KEY")
         val out = Struct.clone(ent)
@@ -316,10 +313,14 @@ class TestFeature : BaseFeature("test", "0.0.1", true) {
       }
     }
 
-    // Get required params.
-    val paramsPath = Struct.getpath(point, listOf("args", "params"))
-    val reqdParams = Struct.select(paramsPath, Struct.jm("reqd", true))
-    val reqd = Struct.transform(reqdParams, Struct.jt("`\$EACH`", "", "`\$KEY.name`"))
+    // Path AND query: a path-only read misses a query-addressed record
+    // (e.g. GET /result?trace_id=), which has no path param at all.
+    val reqdArgs = Struct.jt()
+    for (kind in listOf("params", "query")) {
+      val argsPath = Struct.getpath(point, listOf("args", kind))
+      reqdArgs.addAll(Struct.select(argsPath, Struct.jm("reqd", true)))
+    }
+    val reqd = Struct.transform(reqdArgs, Struct.jt("`\$EACH`", "", "`\$KEY.name`"))
 
     val qand = Struct.jt()
     val q = Struct.jm("`\$AND`", qand)

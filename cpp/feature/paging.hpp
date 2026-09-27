@@ -3,7 +3,8 @@
 // page/limit (or a cursor) into the request query; on the way back
 // (PreResult) it reads the server's pagination signals — a `Link` rel="next"
 // header, `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-// `next`/`cursor`/`nextCursor`/`hasMore` body fields — onto ctx.result.paging.
+// `next`/`cursor`/`nextCursor`/`hasMore` body fields (snake_case forms too)
+// — onto ctx.result.paging and the caller's ctrl paging.
 // A per-call cursor/page from ctrl takes priority (auto-iteration).
 
 #ifndef SDK_FEATURE_PAGING_HPP
@@ -61,7 +62,10 @@ public:
     if (!is_nullish(cursor)) {
       map_put(spec->query, cursorParam, cursor);
     } else if (is_nullish(getp(spec->query, pageParam))) {
-      Value page = getp(paging, "page");
+      // A record written back by preResult holds the page just fetched as
+      // "page" and the one to fetch as "nextPage", so nextPage wins.
+      Value page = getp(paging, "nextPage");
+      if (is_nullish(page)) page = getp(paging, "page");
       if (!is_nullish(page)) {
         map_put(spec->query, pageParam, page);
       } else {
@@ -171,11 +175,15 @@ public:
       }
     }
 
-    // Body-level cursors.
+    // Body-level signals; snake_case forms are read first so camelCase wins.
     if (body.is_map()) {
       Value bnext = getp(body, "next");
       if (!is_nullish(bnext) && is_nullish(getp(paging, "next"))) {
         map_put(paging, "next", bnext);
+      }
+      Value bsnakeCursor = getp(body, "next_cursor");
+      if (!is_nullish(bsnakeCursor)) {
+        map_put(paging, "cursor", bsnakeCursor);
       }
       Value bcursor = getp(body, "cursor");
       if (!is_nullish(bcursor)) {
@@ -184,6 +192,18 @@ public:
       Value bnextCursor = getp(body, "nextCursor");
       if (!is_nullish(bnextCursor)) {
         map_put(paging, "cursor", bnextCursor);
+      }
+      if (is_nullish(getp(paging, "nextPage"))) {
+        Value np = getp(body, "nextPage");
+        if (is_nullish(np)) np = getp(body, "next_page");
+        if (np.is_number() || np.is_string()) {
+          map_put(paging, "nextPage", np);
+        }
+      }
+      Value bsnakeMore = getp(body, "has_more");
+      if (bsnakeMore.is_bool()) {
+        map_put(paging, "hasMore", bsnakeMore);
+        explicitMore = true;
       }
       Value bhasMore = getp(body, "hasMore");
       if (bhasMore.is_bool()) {
@@ -205,6 +225,19 @@ public:
 
     result->paging = paging;
     last = paging;
+
+    if (ctx->ctrl) {
+      // Value maps are shared_ptr-backed, so the caller's map is refilled in
+      // place; a fresh map on ctrl never reaches the caller.
+      if (ctx->ctrl->paging.is_map()) {
+        ctx->ctrl->paging.as_map()->clear();
+        for (const auto& kv : *paging.as_map()) {
+          map_put(ctx->ctrl->paging, kv.first, kv.second);
+        }
+      } else {
+        ctx->ctrl->paging = paging;
+      }
+    }
   }
 
 private:

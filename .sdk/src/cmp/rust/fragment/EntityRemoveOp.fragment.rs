@@ -31,10 +31,6 @@ fn remove(self: &Rc<Self>, reqmatch: Value, ctrl: Value) -> Result<Rc<Self>, Pro
         }
     })?;
 
-    // The operation resolves to THIS entity: `run_op` has just absorbed the
-    // result into it, and the caller reaches the record through `.data(None)`.
-    // See AGENTS.md "Entity operations return ENTITIES". A removed entity
-    // keeps its data but is no longer a live record.
     self.mark_deleted();
 
     Ok(self.clone())

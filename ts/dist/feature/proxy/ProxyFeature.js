@@ -2,14 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProxyFeature = void 0;
 const BaseFeature_1 = require("../base/BaseFeature");
-// Outbound HTTP(S) proxy support. Wraps the active transport and attaches
-// proxy routing to each request's fetch definition. The proxy target comes
-// from options (`url`) or, when `fromEnv` is set, the standard
-// HTTPS_PROXY / HTTP_PROXY / NO_PROXY environment variables. Constructing a
-// concrete agent/dispatcher is dependency-specific, so a factory may be
-// supplied via `options.agent` (e.g. wrapping undici's ProxyAgent); when
-// absent the request is annotated with `fetchdef.proxy` for the transport
-// to honour. Hosts matching `noProxy` bypass the proxy.
 class ProxyFeature extends BaseFeature_1.BaseFeature {
     version = '0.0.1';
     name = 'proxy';

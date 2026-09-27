@@ -12,8 +12,11 @@
  *   - the client is LIVE (Sdk_client.make), so `options.system.fetch` really
  *     is the transport and the feature's wrapper sits above it - never the
  *     test-mode mock, which replaces the fetcher and hides the seam;
- *   - every assertion reads the authorization header the RECORDER received,
- *     never the options map, which this feature never writes;
+ *   - every assertion reads what the RECORDER received, never the options
+ *     map, which this feature never writes. The FEATURE writes the
+ *     authorization header (see the header-only note on placed_cred_of
+ *     below), so its cases read that; the three cases where the feature is
+ *     inactive or missed read whatever the generated prepare_auth placed;
  *   - a refusal must carry the PROVIDER'S OWN message (sekreto's wording),
  *     not any error;
  *   - beside every refusal is a CONTROL leg: the same construction with a
@@ -87,7 +90,94 @@ let api_calls (r : recorder) : value list =
 let token_calls (r : recorder) : value list =
   List.filter (fun c -> is_token (match getp c "url" with Str u -> u | _ -> "")) !(r.calls)
 
-(* The authorization header the i-th API call carried, or Noval. *)
+(* WHERE prepare_auth PUT THE CREDENTIAL, asked of the generated module
+ * rather than assumed to be a header.
+ *
+ * prepare_auth is GENERATED (Sdk_prepare_auth) from the API's own security
+ * scheme, so it is not always a header: an apiKey-in-query API - joplin's
+ * `?token=` - carries the credential in the URL, and a cookie scheme in the
+ * shared `cookie` header. Reading `authorization` outright made
+ * `inactive.apikey_option_behaves_as_before` a HEADER assertion, so it
+ * failed on a query-placement SDK that was carrying its credential
+ * perfectly well.
+ *
+ * KNOWN GAP, DELIBERATELY NOT PAPERED OVER HERE: the FEATURE'S own rewrite
+ * (secrets_feature.ml) still writes `authorization` whatever the scheme
+ * says, so a chain-resolved secret does NOT follow the placement. Every
+ * target's secrets feature does the same. The cases below that exercise the
+ * feature therefore keep reading the header - which is what the code
+ * actually does - and only the three cases where the feature is inactive or
+ * missed read the placed bag. Making the feature placement-aware is a
+ * separate change, across every target at once. *)
+
+(* Percent-decoding, because make_url escapes a query value on the way in.
+ * `+` is NOT treated as a space: that is form encoding, and a literal `+`
+ * in a token must survive. *)
+let pct_decode (s : string) : string =
+  let hex c =
+    if c >= '0' && c <= '9' then Char.code c - 48
+    else if c >= 'a' && c <= 'f' then Char.code c - 87
+    else if c >= 'A' && c <= 'F' then Char.code c - 55
+    else (-1) in
+  let n = String.length s in
+  let buf = Buffer.create n in
+  let i = ref 0 in
+  while !i < n do
+    if s.[!i] = '%' && !i + 2 < n && hex s.[!i + 1] >= 0 && hex s.[!i + 2] >= 0 then begin
+      Buffer.add_char buf (Char.chr ((hex s.[!i + 1] * 16) + hex s.[!i + 2]));
+      i := !i + 3
+    end
+    else (Buffer.add_char buf s.[!i]; incr i)
+  done;
+  Buffer.contents buf
+
+(* The first `name=` value in a `sep`-separated list, trimmed and optionally
+ * percent-decoded. Noval when the list has no such entry. *)
+let pair_value ?(decode = false) (raw : string) (sep : char) (name : string) : value =
+  let want = name ^ "=" in
+  let wl = String.length want in
+  let trim s =
+    let n = String.length s in
+    let b = ref 0 and e = ref n in
+    while !b < !e && s.[!b] = ' ' do incr b done;
+    while !e > !b && s.[!e - 1] = ' ' do decr e done;
+    String.sub s !b (!e - !b) in
+  let rec go = function
+    | [] -> Noval
+    | part :: rest ->
+      let part = trim part in
+      if String.length part >= wl && String.sub part 0 wl = want then
+        let v = String.sub part wl (String.length part - wl) in
+        Str (if decode then pct_decode v else v)
+      else go rest in
+  go (String.split_on_char sep raw)
+
+(* The credential one recorded fetchdef carried, read from the bag this
+ * SDK's generated prepare_auth places it in. *)
+let placed_cred_of (fd : value) : value =
+  let headers = getp fd "headers" in
+  if Sdk_prepare_auth.cred_where = "query" then
+    let url = match getp fd "url" with Str u -> u | _ -> "" in
+    (match String.index_opt url '?' with
+     | None -> Noval
+     | Some at ->
+       pair_value ~decode:true
+         (String.sub url (at + 1) (String.length url - at - 1)) '&'
+         Sdk_prepare_auth.cred_name)
+  else if Sdk_prepare_auth.cred_where = "cookie" then
+    (match headers with
+     | Map _ ->
+       (match Sdk_features.header_ci headers "cookie" with
+        | Str raw -> pair_value raw ';' Sdk_prepare_auth.cred_name
+        | _ -> Noval)
+     | _ -> Noval)
+  else
+    (match headers with
+     | Map _ -> Sdk_features.header_ci headers Sdk_prepare_auth.cred_name
+     | _ -> Noval)
+
+(* The AUTHORIZATION HEADER the i-th API call carried, or Noval - what the
+ * feature's own rewrite writes (see the note above). *)
 let auth_of (r : recorder) (i : int) : value =
   match List.nth_opt (api_calls r) i with
   | Some c -> (match getp (getp c "fetchdef") "headers" with
@@ -95,15 +185,32 @@ let auth_of (r : recorder) (i : int) : value =
       | _ -> Noval)
   | None -> Noval
 
-(* The Authorization header carries the SPEC's credential prefix, which a
- * TEMPLATE cannot know - so assert on the CREDENTIAL and let the prefix be
- * whatever this SDK's API declares. *)
+(* The same call read through the SCHEME'S placement, for the cases where no
+ * chain resolved anything and prepare_auth's own placement is what reached
+ * the wire. *)
+let placed_of (r : recorder) (i : int) : value =
+  match List.nth_opt (api_calls r) i with
+  | Some c -> placed_cred_of (getp c "fetchdef")
+  | None -> Noval
+
+(* A header credential carries the SPEC's prefix, which a TEMPLATE cannot
+ * know - so assert on the CREDENTIAL and let the prefix be whatever this
+ * SDK's API declares. A query parameter and a cookie carry no prefix at all,
+ * which the bare equality already covers. *)
 let credential_is (header : value) (token : string) : bool =
   match header with
   | Str s -> s = token || Sdk_features.ends_with s (" " ^ token)
   | _ -> false
 
 let absent (header : value) : bool = is_nullish header
+
+(* SUPPRESSION IS ABOUT EVERY BAG, not just the header. `auth: null` must
+ * leave nothing anywhere, so a suppression case asserts the authorization
+ * header AND the bag this API's scheme places its credential in - otherwise
+ * a query-placement SDK could leak `?token=...` and still read green,
+ * because the header it never uses was empty. *)
+let nothing_placed (r : recorder) (i : int) : bool =
+  absent (auth_of r i) && absent (placed_of r i)
 
 (* ---------------------------------------------------------------------- *)
 (* clients and paths                                                      *)
@@ -217,13 +324,17 @@ let () =
       let client = inactive ~sdkopts:[("apikey", Str "OPTKEY01")] fetch in
       check "ok" (res_ok (direct client));
       check_int "one call" (List.length (api_calls r)) 1;
-      check "carries OPTKEY01" (credential_is (auth_of r 0) "OPTKEY01"));
+      (* THE FEATURE IS INACTIVE HERE, so what reaches the wire is exactly
+         what the generated prepare_auth placed - in the bag this API's
+         scheme names, which for an apiKey-in-query SDK is the query string
+         and not a header. *)
+      check "carries OPTKEY01" (credential_is (placed_of r 0) "OPTKEY01"));
 
   test "inactive.no_apikey_no_header" (fun () ->
       let (r, fetch) = recorder () in
       let client = inactive fetch in
       check "ok" (res_ok (direct client));
-      check "no header" (absent (auth_of r 0)));
+      check "no header" (absent (placed_of r 0)));
 
   (* ---------------------------------------------------------------------- *)
   (* the chain                                                              *)
@@ -276,7 +387,9 @@ let () =
       let client = live fetch [("providers", ja [fn])] in
       check "ok" (res_ok (direct client));
       check_int "one call" (List.length (api_calls r)) 1;
-      check "no header" (absent (auth_of r 0));
+      (* NOTHING resolved, so the feature wrote nothing and the placed bag -
+         whichever this API's scheme names - is what must be empty. *)
+      check "no header" (absent (placed_of r 0));
       check_int "the chain was asked" !asked 1);
 
   test "chain.miss_falls_through_to_the_next_provider" (fun () ->
@@ -451,7 +564,7 @@ let () =
           [("providers", ja [jo [("kind", Str "env"); ("prefix", Str envprefix)]])] in
       check "ok" (res_ok (direct client));
       check_int "one call" (List.length (api_calls r)) 1;
-      check "no header, though the chain resolved" (absent (auth_of r 0));
+      check "nothing placed, though the chain resolved" (nothing_placed r 0);
       (* The suppression survives option validation as a present null. *)
       check "options.auth survives as a present null"
         (getprop_raw client.cl_options "auth" = Null));
@@ -461,7 +574,7 @@ let () =
       let client = live ~sdkopts:[("auth", Null); ("apikey", Str "OPTKEY01")] fetch
           [("providers", ja [working "CUSTOM01"])] in
       check "ok" (res_ok (direct client));
-      check "no header" (absent (auth_of r 0)));
+      check "nothing placed" (nothing_placed r 0));
 
   test "auth.null_suppresses_on_the_entity_path" (fun () ->
       let (r, fetch) = recorder () in
@@ -470,7 +583,7 @@ let () =
        | Ok () -> ()
        | Error msg -> failwith ("entity op failed: " ^ msg));
       check_int "reached the transport once" (List.length (api_calls r)) 1;
-      check "no header" (absent (auth_of r 0)));
+      check "nothing placed" (nothing_placed r 0));
 
   test "entity.carries_the_chain_resolved_credential" (fun () ->
       let (r, fetch) = recorder () in

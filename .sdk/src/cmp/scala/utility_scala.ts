@@ -17,12 +17,6 @@ function projectPath(suffix?: string): string {
 }
 
 
-// The Scala package root for the generated SDK, mirroring how the go target
-// derives GOMODULE and the java target derives its package: org segment from
-// model.origin, name segment from the model name (e.g. origin voxgig-sdk +
-// name solardemo -> voxgig.solardemosdk). Each runtime piece lives under it:
-// <pkg>.core, <pkg>.utility, <pkg>.utility.struct, <pkg>.feature,
-// <pkg>.entity, <pkg>.sdktest.
 function scalaPackage(model: any): string {
   const org = String(model.origin || 'voxgig-sdk')
     .replace(/-sdk$/, '')
@@ -55,8 +49,6 @@ const SCALA_KEYWORDS = new Set([
 ])
 
 
-// A camelCase Scala identifier for a snake_case model name
-// (`status_embed_config` -> `statusEmbedConfig`), with a reserved-word guard.
 function scalaVarName(name: string): string {
   const pascal = camelify(name)
   const out = pascal.charAt(0).toLowerCase() + pascal.slice(1)
@@ -64,29 +56,6 @@ function scalaVarName(name: string): string {
 }
 
 
-// Strip model bookkeeping keys (ending in $) from a config subtree.
-// Emission-time normalisation of a model subtree (L0).
-//
-// Always drops jostraca's iteration metadata (`$`-suffixed keys: index$,
-// key$, val$). With `dropDefaults`, also drops keys whose value IS the
-// default the runtime already assumes when the key is absent, which is pure
-// payload — see CONFIG_DEFAULT.
-//
-// Rebuilds the tree rather than mutating during a walk. The previous
-// implementation walked a clone calling `delete p[k]`, but walk() assigns its
-// callback's result back over the child (`setprop(out, ckey, walk(...))`), so
-// the delete was undone on the way out and the helper silently did nothing.
-// Returning `undefined` from the callback does not fix it either: setprop
-// stores undefined rather than removing the key, which then emits as a null.
-//
-// `dropDefaults` is opt-in and must be passed ONLY for the entity subtree.
-// `active` means something different in feature config, where absent reads as
-// INACTIVE (see feature_init) — dropping `active: true` there would silently
-// disable the feature.
-// jostraca's iteration metadata, injected by each()/names() while it walks the
-// model. Listed explicitly rather than matched by trailing-dollar suffix: a
-// trailing dollar is not exclusive to jostraca -- Seneca uses entity$ as real
-// data -- so a blanket suffix match can silently drop a legitimate API field.
 const MODEL_META = ['index$', 'key$', 'val$']
 
 // Keys whose value IS the default the runtime already assumes when the key is

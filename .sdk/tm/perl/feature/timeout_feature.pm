@@ -3,9 +3,11 @@
 # Per-request timeout. Wraps the active transport with a deadline of "ms"
 # milliseconds (default 30000; <= 0 disables). The transport is synchronous
 # (HTTP::Tiny), so a hanging request is interrupted with a SIGALRM timer
-# (Time::HiRes::ualarm); when an injectable "now" clock is supplied the
-# elapsed wall-clock time is checked instead, so tests can assert the
-# deadline deterministically. Expiry yields an error with code "timeout".
+# (Time::HiRes::ualarm) where the platform has one; where it has none
+# (Windows) the deadline is checked once the call returns. When an
+# injectable "now" clock is supplied the elapsed clock time is checked
+# instead, so tests can assert the deadline deterministically. Expiry
+# yields an error with code "timeout".
 
 use strict;
 use warnings;
@@ -75,23 +77,25 @@ sub with_timeout {
   # Live path: interrupt a hanging synchronous transport.
   my ($res, $err);
   my $timed_out = 0;
-  my $ok = do {
-    local $SIG{ALRM} = sub { $timed_out = 1; die "UnivecTimeout\n" };
-    eval {
-      Time::HiRes::ualarm(int($ms * 1000));
-      ($res, $err) = $inner->($ctx, $url, $fetchdef);
-      Time::HiRes::ualarm(0);
-      1;
-    };
+  my $start = Time::HiRes::time();
+  local $SIG{ALRM} = sub { $timed_out = 1; die "UnivecTimeout\n" };
+  my $armed = eval { Time::HiRes::ualarm(int($ms * 1000)); 1 };
+  my $ok = eval {
+    ($res, $err) = $inner->($ctx, $url, $fetchdef);
+    1;
   };
-  Time::HiRes::ualarm(0);
+  my $e = $@;
+  eval { Time::HiRes::ualarm(0) } if $armed;
   if (!$ok) {
-    my $e = $@;
     if ($timed_out) {
       $self->_track($ctx, $ms);
       return (undef, $ctx->make_error('timeout', "Request exceeded timeout of ${ms}ms"));
     }
     die $e;
+  }
+  if (!$armed && (Time::HiRes::time() - $start) * 1000 > $ms) {
+    $self->_track($ctx, $ms);
+    return (undef, $ctx->make_error('timeout', "Request exceeded timeout of ${ms}ms"));
   }
   return ($res, $err);
 }

@@ -8,15 +8,6 @@ import (
 	"github.com/voxgig-sdk/univec-sdk/go/core"
 )
 
-// Pagination support for list operations. On the way out (PreRequest) it
-// stamps page/limit (or a cursor) into the request query; on the way back
-// (PreResult) it reads the server's pagination signals — a `Link:
-// rel="next"` header, `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body — and records
-// them on `ctx.Result.Paging`. A per-call cursor/page from ctrl takes
-// priority (used by auto-iteration). Parameter names (`pageParam`,
-// `limitParam`, `cursorParam`), the page size (`limit`) and the start page
-// (`startPage`, default 1) are configurable.
 type PagingFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK
@@ -77,7 +68,11 @@ func (f *PagingFeature) PreRequest(ctx *core.Context) {
 	if cursor, has := paging["cursor"]; has && cursor != nil {
 		spec.Query[cursorParam] = cursor
 	} else if spec.Query[pageParam] == nil {
-		if page, has := paging["page"]; has && page != nil {
+		// A record written back by PreResult holds the page just fetched as
+		// "page" and the one to fetch as "nextPage", so nextPage wins.
+		if next, has := paging["nextPage"]; has && next != nil {
+			spec.Query[pageParam] = next
+		} else if page, has := paging["page"]; has && page != nil {
 			spec.Query[pageParam] = page
 		} else {
 			spec.Query[pageParam] = foptInt(f.options, "startPage", 1)
@@ -187,16 +182,35 @@ func (f *PagingFeature) PreResult(ctx *core.Context) {
 		}
 	}
 
-	// Body-level cursors.
+	// Body-level signals; snake_case forms are read first so camelCase wins.
 	if bm, ok := body.(map[string]any); ok {
 		if bm["next"] != nil && paging["next"] == nil {
 			paging["next"] = bm["next"]
+		}
+		if bm["next_cursor"] != nil {
+			paging["cursor"] = bm["next_cursor"]
 		}
 		if bm["cursor"] != nil {
 			paging["cursor"] = bm["cursor"]
 		}
 		if bm["nextCursor"] != nil {
 			paging["cursor"] = bm["nextCursor"]
+		}
+		if paging["nextPage"] == nil {
+			np := bm["nextPage"]
+			if np == nil {
+				np = bm["next_page"]
+			}
+			switch n := np.(type) {
+			case float64:
+				paging["nextPage"] = int(n)
+			case int, string:
+				paging["nextPage"] = n
+			}
+		}
+		if hasMore, ok := bm["has_more"].(bool); ok {
+			paging["hasMore"] = hasMore
+			explicitMore = true
 		}
 		if hasMore, ok := bm["hasMore"].(bool); ok {
 			paging["hasMore"] = hasMore
@@ -216,6 +230,21 @@ func (f *PagingFeature) PreResult(ctx *core.Context) {
 
 	result.Paging = paging
 	f.Last = paging
+
+	if ctx.Ctrl != nil {
+		// The Context shares the caller's paging map by reference, so refill
+		// it in place; a fresh map on Ctrl would never reach the caller.
+		if ctx.Ctrl.Paging != nil {
+			for k := range ctx.Ctrl.Paging {
+				delete(ctx.Ctrl.Paging, k)
+			}
+			for k, v := range paging {
+				ctx.Ctrl.Paging[k] = v
+			}
+		} else {
+			ctx.Ctrl.Paging = paging
+		}
+	}
 }
 
 func (f *PagingFeature) isList(ctx *core.Context) bool {

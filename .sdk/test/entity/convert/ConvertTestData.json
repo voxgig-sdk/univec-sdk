@@ -32,16 +32,24 @@
   },
   "requests": {
     "POST /v1/convert": {
-      "provenance": "operation-contract"
+      "provenance": "operation-contract",
+      "version": 2,
+      "source": "openapi3"
     },
     "POST /v1/embed-bridge": {
-      "provenance": "operation-contract"
+      "provenance": "operation-contract",
+      "version": 2,
+      "source": "openapi3"
     },
     "POST /v1/ephemeral/convert": {
-      "provenance": "operation-contract"
+      "provenance": "operation-contract",
+      "version": 2,
+      "source": "openapi3"
     },
     "POST /v1/ephemeral/embed-bridge": {
-      "provenance": "operation-contract"
+      "provenance": "operation-contract",
+      "version": 2,
+      "source": "openapi3"
     }
   }
 }

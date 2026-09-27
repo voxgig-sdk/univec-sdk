@@ -2,12 +2,21 @@ package KOTLINPACKAGE.utility
 
 import KOTLINPACKAGE.core.Context
 import KOTLINPACKAGE.core.Helpers
-import KOTLINPACKAGE.core.Spec
 import KOTLINPACKAGE.utility.struct.Struct
 
-private const val HEADER_AUTH = "authorization"
-private const val OPTION_APIKEY = "apikey"
-private const val NOT_FOUND = "__NOTFOUND__"
+// prepareAuth IS NOT HERE. It moved to utility/PrepareAuth.kt, which is
+// GENERATED from the model rather than copied from tm/: where the credential
+// goes (header, query parameter or cookie) and under what name are facts
+// about the API, resolved by apidef into main.kit.info.security, and a
+// template can only carry one answer. Hardcoding `authorization` here is
+// exactly why an apiKey-in-query API got a header it does not read.
+//
+// It is still a top-level function in THIS package, so nothing changed for
+// its callers: Register.kt still binds `u.prepareAuth = ::prepareAuth`.
+// See src/cmp/kotlin/PrepareAuth_kotlin.ts.
+//
+// HEADER_AUTH, OPTION_APIKEY and NOT_FOUND went with it - they were
+// file-private and nothing else in this file used them.
 
 private val METHOD_MAP: Map<String, String> = mapOf(
   "create" to "POST",
@@ -77,48 +86,6 @@ fun param(ctx: Context, paramdef: Any?): Any? {
   }
 
   return v
-}
-
-fun prepareAuth(ctx: Context): Spec {
-  val spec = ctx.spec
-    ?: throw ctx.makeError("auth_no_spec", "Expected context spec property to be defined.")
-
-  val headers = spec.headers
-  val options = ctx.client!!.optionsMap()
-
-  // Public APIs that need no auth omit the options.auth block entirely.
-  if (options["auth"] == null) {
-    headers.remove(HEADER_AUTH)
-    return spec
-  }
-
-  val apikey = Struct.getprop(options, OPTION_APIKEY, NOT_FOUND)
-
-  var skip = false
-  if (apikey == null) {
-    skip = true
-  } else if (apikey is String && (NOT_FOUND == apikey || "" == apikey)) {
-    skip = true
-  }
-
-  if (skip) {
-    headers.remove(HEADER_AUTH)
-  } else {
-    var authPrefix = ""
-    val ap = Struct.getpath(options, listOf("auth", "prefix"))
-    if (ap is String) {
-      authPrefix = ap
-    }
-    val apikeyVal = if (apikey is String) apikey else ""
-    // Empty prefix (raw apiKey credential) must not add a leading space.
-    if ("" == authPrefix) {
-      headers[HEADER_AUTH] = apikeyVal
-    } else {
-      headers[HEADER_AUTH] = "$authPrefix $apikeyVal"
-    }
-  }
-
-  return spec
 }
 
 fun prepareBody(ctx: Context): Any? {
@@ -227,7 +194,7 @@ fun prepareQuery(ctx: Context): MutableMap<String, Any?> {
   for (item in Struct.items(reqmatch)) {
     val key = if (item[0] is String) item[0] as String else ""
     val v = item[1]
-    if (v != null && !containsStr(params, key)) {
+    if (v != null && "\$action" != key && !containsStr(params, key)) {
       out[key] = v
     }
   }

@@ -1,10 +1,3 @@
-// Statistics capture (mirrors go feature/metrics_feature.go). Records
-// per-operation counters and latency for every call: totals plus a
-// breakdown keyed by `<entity>.<op>`. Timing starts at endpoint resolution
-// (PrePoint) and stops when the call returns (PreDone) or fails
-// (PreUnexpected); each operation is recorded exactly once (the
-// per-context start marker in ctx.out is consumed on record). The clock is
-// injectable (`now`) for deterministic tests.
 
 use std::collections::HashMap;
 use std::rc::Rc;

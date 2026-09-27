@@ -10,6 +10,7 @@ my $__dir;
 BEGIN { $__dir = File::Basename::dirname(Cwd::abs_path(__FILE__)) }
 require(Cwd::abs_path("$__dir/../lib/Voxgig/Struct.pm"));
 require(Cwd::abs_path("$__dir/../core/helpers.pm"));
+require(Cwd::abs_path("$__dir/../schema.pm"));
 
 package UnivecUtilities;
 
@@ -110,43 +111,33 @@ $REGISTRY{make_options} = sub {
     $opts->{feature} = \%fmap;
   }
 
-  # Normalize plain-scalar booleans at the known boolean slots so
-  # validation sees proper JSON booleans.
-  UnivecHelpers::coerce_bools($opts);
-
   my $config = $ctx->{config} || {};
   my $cfgopts = Voxgig::Struct::ismap($config->{options}) ? $config->{options} : {};
 
-  my $JT = Voxgig::Struct::JTRUE();
-  my $JF = Voxgig::Struct::JFALSE();
+  # THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
+  #
+  # Built from the model: `main.kit.optspec` for the standard options, plus one
+  # entry per feature this target carries, from that feature's own
+  # `config.options` / `config.optspec`. Editing this file to add an option
+  # would put it back where it was - one of twenty hand-maintained copies of a
+  # schema nothing cross-checked - so add it to the model instead and every
+  # ported target validates it.
+  #
+  # It also carries perl's booleans correctly without anyone remembering to:
+  # schema.pm parses its JSON, so every boolean slot holds the JTRUE/JFALSE
+  # singleton `$BOOLEAN` matches, where the literal this replaces had to name
+  # them by hand.
+  #
+  # Parsed once and shared: validate reads the spec and writes into the
+  # options, never into the spec.
+  my $optspec = UnivecSchema::optspec();
 
-  my $optspec = {
-    'apikey' => '',
-    'base' => 'http://localhost:8000',
-    'secret' => '',
-    'prefix' => '',
-    'suffix' => '',
-    # `basic` and `secret`: HTTP Basic Auth needs a second credential and a
-    # flag to say the pair is Basic rather than a single bearer token.
-    'auth' => { 'prefix' => '', 'basic' => $JF },
-    'headers' => { '`$CHILD`' => '`$STRING`' },
-    'allow' => {
-      'method' => 'GET,PUT,POST,PATCH,DELETE,OPTIONS',
-      'op' => 'create,update,load,list,remove,command,direct,graphql',
-    },
-    'entity' => { '`$CHILD`' => { '`$OPEN`' => $JT, 'active' => $JF, 'alias' => {} } },
-    'feature' => { '`$CHILD`' => { '`$OPEN`' => $JT, 'active' => $JF } },
-    'utility' => {},
-    'system' => {},
-    'test' => { 'active' => $JF, 'entity' => { '`$OPEN`' => $JT } },
-    'clean' => { 'keys' => 'key,token,id' },
-    # Server-variable values for a templated base URL (OpenAPI server
-    # variables). The embedded config (configDefinition) carries the
-    # spec defaults; user values override them. This port does not yet
-    # substitute {name} placeholders into base - the entry keeps the
-    # config's server block valid under this optspec.
-    'server' => { '`$CHILD`' => '' },
-  };
+  # Normalize plain-scalar booleans at the slots the SPEC says are boolean, so
+  # validation sees proper JSON booleans. AFTER the spec is in hand, because
+  # this reads it: perl has no native boolean, and `$BOOLEAN` matches only the
+  # struct's own JTRUE/JFALSE singletons, so `cache => 0` - what a perl author
+  # writes - is otherwise a validation error rather than a false.
+  UnivecHelpers::coerce_bools($opts, $optspec);
 
   my $sys_fetch = UnivecHelpers::gpath($opts, 'system.fetch');
 

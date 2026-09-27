@@ -1,0 +1,37 @@
+
+main: kit: feature: telemetry: {
+
+  name: key()
+  title: "Telemetry"
+  description: "Distributed tracing spans with W3C trace-context propagation"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+    }
+  }
+
+  hook: {
+    PrePoint: active: true
+    PreRequest: active: true
+    PreDone: active: true
+    PreUnexpected: active: true
+  }
+}
+
+
+main: kit: feature: telemetry: config: optspec: {
+  # receives each finished span
+  exporter: '`$FUNCTION`'
+  # extra headers merged into the propagated context
+  headers: '`$MAP`'
+  # supplies trace and span ids
+  idgen: '`$FUNCTION`'
+  # injected clock
+  now: '`$FUNCTION`'
+}

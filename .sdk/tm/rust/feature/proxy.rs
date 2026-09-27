@@ -1,11 +1,3 @@
-// Outbound HTTP(S) proxy support (mirrors go feature/proxy_feature.go).
-// Wraps the active transport and annotates each request's fetch definition
-// with the proxy target (`fetchdef.proxy`). The default ureq transport
-// honours the annotation by routing the request through an agent
-// configured with that proxy (see utility/fetcher.rs); custom transports
-// can do the same. The proxy target comes from options (`url`) or, when
-// `fromEnv` is set, the standard HTTPS_PROXY / HTTP_PROXY / NO_PROXY
-// environment variables. Hosts matching `noProxy` bypass the proxy.
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -4,26 +4,6 @@ import { cmp, File, Content } from '@voxgig/sdkgen'
 import { javaPackage } from './utility_java'
 
 
-// Emits test/ReadmeExamplesTest.java — a JUnit PRESENCE + STRUCTURE gate over
-// every ```java fenced block in the repository ROOT README.md, the
-// per-language java/README.md, AND the per-language java/REFERENCE.md.
-//
-// SCOPE NOTE (deliberate, documented): the Python/TS/Go equivalents EXECUTE and
-// type-check every documented block. That is infeasible here — the generated
-// Java SDK compiles with plain `javac`/Maven only (no in-process Java compiler
-// dependency wired into the test classpath), so a test cannot compile-and-run
-// arbitrary doc snippets at test time. This gate therefore guarantees the
-// weaker-but-real invariant that keeps the docs honest as the generator evolves:
-//   1. every doc exists and contains at least one ```java block (nothing was
-//      dropped);
-//   2. every ```java block is structurally well-formed — its braces,
-//      parentheses and brackets balance (catches a truncated or malformed
-//      generated snippet).
-// A per-doc summary line makes the coverage visible in the test output.
-//
-// The emitted Java is written WITHOUT literal backticks (the fence marker is
-// built at runtime as String.valueOf((char) 96).repeat(3)) so this TS template
-// literal stays clean.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { target, ctx$: { model } } = props
 

@@ -17,12 +17,6 @@ import type {
 import { crateIdent, crateName } from './utility_rust'
 
 
-// Cargo.toml (the rust manifest). Dependencies come from the target model
-// (`deps` block, kind prod|dev) plus any feature-declared rust deps, via
-// the shared collectDeps helper. The vendored voxgig struct port needs no
-// external crate. The lib path is the crate root `lib.rs` (the generated
-// SDK mirrors the go layout: core/, feature/, utility/, entity/ at the
-// repo root rather than under src/).
 const Package = cmp(async function Package(props: any) {
   const ctx$ = props.ctx$
   const target = props.target
@@ -74,21 +68,6 @@ path = "lib.rs"
       }
     }
 
-    // [[test]] stanzas for the feature suites.
-    //
-    // cargo auto-discovers `tests/*.rs` and `tests/<dir>/main.rs`, but NOT
-    // `tests/<dir>/<dir>/main.rs` - and the two-level path is not
-    // negotiable: a feature's tests must live inside a `feature/`
-    // container so `target add` trims them WITH the feature
-    // (helpers/featureSource), exactly as go's tm/go/test/feature/secrets/
-    // and py's tm/py/test/feature/secrets/ do. A one-level
-    // tests/secrets/main.rs would auto-discover and then be left behind in
-    // a project that does not select the feature, carrying a suite that
-    // cannot compile.
-    //
-    // So the suite is DECLARED, and only for a feature that both applies
-    // to this target and is active in the model - which is also exactly
-    // when `target add` kept its directory.
     const suites = Object.keys(targetFeatures(model, target))
       .filter((name: string) => null != FEATURE_TESTS[name])
       .sort()
@@ -113,15 +92,6 @@ const FEATURE_TESTS: Record<string, string> = {
 }
 
 
-// One Cargo dependency's value: the bare version string, or the TABLE form
-// when the model asks for anything more.
-//
-// `default: false` and `features: [...]` are not decoration. The secrets
-// feature's vendored HTTP helper speaks rustls, and `rustls = "0.23"` with
-// DEFAULT features pulls aws-lc-rs/aws-lc-sys and a cmake C build, while
-// the ring feature set is what the target's existing `ureq` dep already
-// compiles. Without the table form, turning on one feature would add a
-// native toolchain requirement to every SDK that selected it.
 function depValue(version: string, raw: any): string {
   const features: string[] = Array.isArray(raw?.features) ? raw.features : []
   const nodefault = false === raw?.default

@@ -27,7 +27,7 @@ make test
 
 | Source | Path | Edit when… |
 | --- | --- | --- |
-| Target definition | `.sdk/model/target/rb.aon` | deps, module, extension, phases change |
+| Target definition | `.sdk/model/target/rb.aontu` | deps, module, extension, phases change |
 | Templates | `.sdk/tm/rb/` | the file is the **same for every API** (runtime, transport, base classes) — copied verbatim with placeholder substitution |
 | Components | `.sdk/src/cmp/rb/` | the file's shape **depends on the API** (entities, constructor, README, tests) — TypeScript that walks the model |
 
@@ -38,30 +38,30 @@ component.* After editing a component run `npm run build` before
 ## Features in this target
 
 Each feature is a flat file in the `feature/` package. Its hooks and
-default activation come from `.sdk/model/feature/<name>.aon`; customise
+default activation come from `.sdk/model/feature/<name>.aontu`; customise
 the runtime under `.sdk/tm/rb/feature/` and regenerate.
 
 | Feature | Runtime file | Active hooks |
 | --- | --- | --- |
-| **audit** — Structured audit trail of operations | `feature/audit_feature.rb` | `PreDone`, `PreUnexpected` |
-| **cache** — Response caching for safe read requests | `feature/cache_feature.rb` | — |
-| **clienttrack** — Client identity and per-request correlation headers | `feature/clienttrack_feature.rb` | `PostConstruct`, `PreRequest` |
-| **cost** — Cost tracking and spend budget for API calls | `feature/cost_feature.rb` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **debug** — Request/response capture ring buffer for debugging | `feature/debug_feature.rb` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
-| **idempotency** — Idempotency keys for safe retries of mutating operations | `feature/idempotency_feature.rb` | `PreRequest` |
-| **log** — Structured request and response logging | `feature/log_feature.rb` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **metrics** — Statistics capture: per-operation counters and latency | `feature/metrics_feature.rb` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **netsim** — Network behaviour simulation for offline testing (latency, failures, outages) | `feature/netsim_feature.rb` | — |
-| **paging** — Pagination signals for list operations | `feature/paging_feature.rb` | `PreRequest`, `PreResult` |
-| **proxy** — Outbound HTTP(S) proxy routing | `feature/proxy_feature.rb` | — |
-| **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.rb` | — |
-| **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.rb` | `PrePoint` |
-| **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.rb` | — |
-| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/secrets_feature.rb` | `PreSpec` |
-| **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.rb` | `PreResult` |
-| **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.rb` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
-| **test** — In-memory mock transport for testing without a live server | `feature/test_feature.rb` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **timeout** — Per-request timeout with transport abort | `feature/timeout_feature.rb` | — |
+| **audit** — Audit trail | `feature/audit_feature.rb` | `PreDone`, `PreUnexpected` |
+| **cache** — Response cache | `feature/cache_feature.rb` | — |
+| **clienttrack** — Client tracking | `feature/clienttrack_feature.rb` | `PostConstruct`, `PreRequest` |
+| **cost** — Cost tracking | `feature/cost_feature.rb` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **debug** — Debug capture | `feature/debug_feature.rb` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
+| **idempotency** — Idempotency | `feature/idempotency_feature.rb` | `PreRequest` |
+| **log** — Logging | `feature/log_feature.rb` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **metrics** — Metrics | `feature/metrics_feature.rb` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **netsim** — Network simulation | `feature/netsim_feature.rb` | — |
+| **paging** — Paging | `feature/paging_feature.rb` | `PreRequest`, `PreResult` |
+| **proxy** — Proxy | `feature/proxy_feature.rb` | — |
+| **ratelimit** — Rate limiting | `feature/ratelimit_feature.rb` | — |
+| **rbac** — Access control | `feature/rbac_feature.rb` | `PrePoint` |
+| **retry** — Retry | `feature/retry_feature.rb` | — |
+| **secrets** — Secrets | `feature/secrets_feature.rb` | `PreSpec` |
+| **streaming** — Streaming | `feature/streaming_feature.rb` | `PreResult` |
+| **telemetry** — Telemetry | `feature/telemetry_feature.rb` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
+| **test** — Test transport | `feature/test_feature.rb` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **timeout** — Timeout | `feature/timeout_feature.rb` | — |
 
 ---
 

@@ -4,15 +4,6 @@ import (
 	"GOMODULE/core"
 )
 
-// Client-side role/permission enforcement. Before an operation resolves its
-// endpoint, the required permission for that entity+operation is checked
-// against the permissions the client holds; a disallowed call is
-// short-circuited with an `rbac_denied` error (via ctx.Out["point"], which
-// MakePoint surfaces) and never touches the network. Required permissions
-// come from `rules` (keyed by `<entity>.<op>`, `<op>`, or `*`); the default
-// when no rule matches is controlled by `deny` (default: allow when
-// unspecified). Held permissions are the `permissions` list (a `*` grants
-// everything).
 type RbacFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK
@@ -53,7 +44,6 @@ func (f *RbacFeature) PrePoint(ctx *core.Context) {
 
 	required, has := f.required(ctx)
 	if !has {
-		// No rule: honour the default policy.
 		if foptBool(f.options, "deny", false) {
 			f.reject(ctx, "<default-deny>")
 		}

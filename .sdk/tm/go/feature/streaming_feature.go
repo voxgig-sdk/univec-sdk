@@ -4,13 +4,6 @@ import (
 	"GOMODULE/core"
 )
 
-// Streaming result support. For list-style operations it attaches a
-// `Result.Stream` function yielding a channel so callers can consume items
-// incrementally with `for item := range result.Stream()` instead of
-// materialising the whole slice at once. A `chunkSize` groups items into
-// []any batches when set; a `chunkDelay` (ms) paces delivery via the
-// injectable `sleep` for offline tests. The channel is fully buffered, so
-// abandoning a stream never leaks the producing goroutine.
 type StreamingFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK

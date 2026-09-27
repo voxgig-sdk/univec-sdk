@@ -16,26 +16,6 @@ import {
 } from './featureextra_clojure'
 
 
-// deps.edn — the tools.deps manifest. The vendored voxgig struct port needs no
-// external dependency; the library itself only needs org.clojure/clojure. The
-// tools.deps shim used to run the tests supports `-M:alias` reading :paths /
-// :extra-paths / :main-opts, but NOT per-alias :extra-deps, so every dependency
-// lives at the top-level :deps.
-//
-// `test/vendor/omni` is a SECOND test source root, not a subdirectory of the
-// first: the vendored @voxgig/omni port declares `voxgig.omni.runner`, so its
-// namespaces resolve only when the directory holding `voxgig/` is itself on
-// the classpath. Rooting it at `test` instead would demand the namespace
-// `vendor.omni.voxgig.omni.runner`, which the vendored file cannot carry -
-// it is read-only, resynced from upstream.
-//
-// A feature whose source ships as its own tree - `secrets`, which vendors
-// a whole @voxgig/sekreto port - needs the SAME treatment for the SAME
-// reason: the vendored files declare `voxgig.sekreto.chain`, so they
-// resolve only when the directory holding `voxgig/` is on the classpath.
-// So `feature/<name>` joins :paths, and only when the model selects that
-// feature: an SDK that did not ask for secrets gets the deps.edn it always
-// had, naming no directory that is not there.
 const Package = cmp(async function Package(props: any) {
   const ctx$ = props.ctx$
   const target = props.target

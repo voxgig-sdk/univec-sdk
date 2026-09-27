@@ -9,6 +9,8 @@ import {
   each,
   isAuthActive,
   isConfigData,
+  resolveAuthIn,
+  resolveAuthName,
   resolveAuthPrefix,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -27,25 +29,6 @@ import {
 } from './utility_c'
 
 
-// PLUGIN DEFINITIONS PER FEATURE (the c peer of Config_go's featurePlugins
-// map and Main_rust's generated plugins.rs).
-//
-// Upstream sekreto retired its self-registration registry for voxgig/plugin
-// definitions: a provider kind the caller did not pass in `sek_options.
-// plugins` is unknown to that Sekreto. So the model's choice of plugin
-// groups IS the SDK's provider vocabulary, and the generated code names each
-// active group's constructor symbol (`def: c:` in model/feature/secrets.aon
-// - `sek_plugin_hashicorp`, the `Definition *(void)` each vendored kind
-// file defines) and nothing else. A symbol named here whose file the plugin
-// trim removed is an unresolved reference at link time - a loud failure,
-// which is the right kind.
-//
-// One entry per ACTIVE feature that declares a `plugin` map at all, read
-// with `only_active: false` (pluginExcludesFor's subtlety: the feature
-// object a component is handed has already been filtered, so a feature
-// whose groups are all off would otherwise look like one with no plugin
-// machinery, and its kinds.c - which the Makefile reads as the feature's
-// WIRING - would not be emitted).
 function pluginDefinitions(model: Model, target: any):
   Record<string, { syms: string[], groups: number }> {
   const out: Record<string, { syms: string[], groups: number }> = {}
@@ -76,39 +59,6 @@ function pluginDefinitions(model: Model, target: any):
 }
 
 
-// feature/<name>/kinds.c - GENERATED, one per plugin-bearing active feature.
-//
-// It cannot live in core/config.c: that translation unit must not name the
-// vendored voxgig/plugin's `Definition` type, which is why sdk.h types the
-// accessor as void** (the same reason go hides its list behind []any). It
-// sits one level ABOVE the vendored sekreto/, plugin/ and plugins/
-// directories on purpose: the vendoring guard fails any non-vendored file
-// inside a vendor dir, and this one is generated.
-//
-// Beside it goes feature/<name>/kinds.mk, the feature's BUILD WIRING: a
-// generated make fragment that tm/c/Makefile reads through
-// `-include $(wildcard feature/*/kinds.mk)`. The Makefile itself names no
-// feature (the `nothing left behind names a dropped feature` guard holds a
-// trimmed template tree to that), so everything a payload needs from the
-// build is stated here, from the model: the vendored cores to compile, the
-// suite to run, and - only when a plugin group is active - the plugin layer
-// with the external libraries it brings. A tree whose model never
-// activated the feature has no fragment, compiles none of the payload and
-// links libc alone. Both files are emitted for an active feature with NO
-// active group as well - an [env, memory] chain still needs the sekreto
-// core - with an empty definitions list and no plugin layer.
-//
-// For `secrets` it additionally carries `secrets_rawfetch`, the
-// token-exchange transport of last resort (go's rawExchangeFetch). The c
-// core ships no HTTP client (utility/fetcher.c), and the decision for this
-// target is to bundle one INSIDE the gated feature: libcurl, compiled in
-// only when a plugin group is active, so that an SDK without secrets - or
-// with secrets and a chain of built-ins - still ships zero external
-// dependencies. The Makefile adds -lcurl on the same condition (a kind file
-// present), so the two cannot disagree. With no group active the exchange
-// still works through a caller-supplied options.system.fetch, which every
-// live c request already lives under; only the fallback is missing, and it
-// says so.
 const FeaturePlugins = cmp(async function FeaturePlugins(props: any) {
   const ctx$ = props.ctx$
   const target = props.target
@@ -122,11 +72,6 @@ const FeaturePlugins = cmp(async function FeaturePlugins(props: any) {
       const { syms, groups } = defs[fname]
 
       Folder({ name: fname }, () => {
-        // The build wiring (see above). Paths are SDK-root-relative, as the
-        // Makefile's own globs are. `feature/<name>.c` is NOT listed: the
-        // Makefile's feature/*.c glob already compiles every feature's own
-        // file, and its headers are on INC through the generic payload
-        // -I paths.
         File({ name: 'kinds.mk' }, () => {
           Content(`# Generated beside kinds.c: what the \`${fname}\` feature needs from the
 # build, read by the Makefile through \`-include $(wildcard feature/*/kinds.mk)\`.
@@ -352,16 +297,17 @@ const Config = cmp(async function Config(props: any) {
 
   const authActive = isAuthActive(model)
   const authPrefix = resolveAuthPrefix(model)
+  // `in` and `name` travel with the prefix now. They were resolved by apidef
+  // all along and dropped here, so an apiKey-in-query API got an
+  // Authorization header it does not read. Emitted only when they differ from
+  // the defaults, so a header/Authorization SDK's config.c is byte-identical
+  // to what it generated before (Config_ts and Config_go do the same).
+  const authIn = resolveAuthIn(model)
+  const authName = resolveAuthName(model)
 
   let baseUrl = ''
   try { baseUrl = getModelPath(model, `main.${KIT}.info.servers.0.url`) } catch (_e) { }
 
-  // The same config as an OBJECT, built by the shared helper so this target's
-  // literal and the data that replaces it above the threshold are the same
-  // config by construction. The JSON is what the threshold is measured on -
-  // emitted source size varies by language, the model does not. Passing
-  // target.name opts this target into the main slug/version/target identity
-  // fields (read by station's descriptor - see configDefinition).
   const { def: configDef, json: configJson } = configDefinition(model, target.name)
   const asData = isConfigData(configJson, configReprSetting(model))
 
@@ -385,14 +331,14 @@ const Config = cmp(async function Config(props: any) {
   }
   if (authActive) {
     options.auth = { prefix: authPrefix }
+    if ('header' !== authIn) {
+      options.auth.in = authIn
+    }
+    if ('Authorization' !== authName) {
+      options.auth.name = authName
+    }
   }
 
-  // configDefinition's `def.entity` verbatim, NOT rebuilt here. This reduce
-  // was one of fourteen copies of that function's entityDefs loop, and when
-  // configDefinition started reconstructing a point's `parts` from apidef's
-  // segment vector (its ADR-003), only the copies that read `configDef` got
-  // it — this target's literal config emitted paths with no parts at all
-  // while its data config had them. One rule, one place.
   const entityConfig = configDef.entity
 
   const config = {
@@ -407,15 +353,6 @@ const Config = cmp(async function Config(props: any) {
 
   File({ name: 'config.c' }, () => {
 
-    // ABOVE THE THRESHOLD: emit the model as DATA.
-    //
-    // The literal is a single nested `cmap(...)`/`clist(...)` expression. For a
-    // real model that is one function whose expression nests hundreds of
-    // thousands of calls deep - the shape that makes a C compiler's parser and
-    // register allocator quadratic, and the reason gcc can be seen taking
-    // minutes on a generated config. A string constant is one token, and
-    // `json_parse` (declared in sdk.h, reached through api.h) builds the same
-    // voxgig_value tree at runtime.
     if (asData) {
       Content(`// Generated API configuration (mirrors core/config.go).
 
@@ -494,28 +431,12 @@ voxgig_value* shared_config(void) {
 `)
     }
 
-    // Dispatch to the features the MODEL declares, and only those.
-    //
-    // This used to merge in a hardcoded list of every feature the C target
-    // ships, on the reasoning that the runtime templates
-    // (tm/c/feature/*.c) are always present. `target add` now trims feature
-    // source to the model's selection, so that reasoning is false: a
-    // reference to `feature_timeout_new` for an undeclared feature is an
-    // unresolved symbol at LINK time — the whole test suite fails to link,
-    // which is how this was found. Sorted for byte-stability.
     const featureNames = new Set<string>()
     each(feature, (f: any) => {
       if (f.name && f.name !== 'base') featureNames.add(f.name)
     })
     const sortedNames = Array.from(featureNames).sort()
 
-    // Constructor prototypes for every declared feature. sdk.h declares the
-    // BUNDLED set, but an externally-installed feature (e.g. station, whose
-    // source arrives by package overlay) is not in sdk.h — and without a
-    // prototype its make_feature arm is an implicit int-returning
-    // declaration: a warning that happens to link on gcc 13, a hard error on
-    // gcc 14+/clang 15+. Redeclaring the bundled ones is identical-prototype
-    // C, which is legal and keeps this a single sorted list.
     Content(`
 `)
     for (const fname of sortedNames) {
@@ -535,12 +456,6 @@ Feature* make_feature(const char* name) {
 }
 `)
 
-    // The plugin-definitions accessor (sdk.h feature_plugins), EMITTED
-    // UNCONDITIONALLY so the prototype in sdk.h always has a definition,
-    // and EMPTY unless a plugin-bearing feature is active: each such
-    // feature's list lives in its generated feature/<name>/kinds.c (see
-    // FeaturePlugins above), which this dispatches to by name, so this
-    // translation unit never names the vendored plugin's types.
     const plugged = Object.keys(pluginDefinitions(model, target)).sort()
 
     Content(`

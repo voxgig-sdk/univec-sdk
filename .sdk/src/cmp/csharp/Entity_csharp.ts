@@ -33,7 +33,6 @@ const Entity = cmp(function Entity(props: any) {
 
   const ff = Path.normalize(__dirname + '/../../../src/cmp/csharp/fragment/')
 
-  // Entity files go to entity/ with PascalCase class-file names.
   Folder({ name: 'entity' }, () => {
 
     File({ name: cls + '.' + target.ext }, () => {

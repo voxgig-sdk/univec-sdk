@@ -1,5 +1,5 @@
 
-import { cmp, Content, isPublished, repoInfo, packageVersion } from '@voxgig/sdkgen'
+import { cmp, Content, isPublished, repoInfo, packageVersion, sdkName } from '@voxgig/sdkgen'
 
 import { mavenGroupId } from './utility_java'
 
@@ -9,7 +9,7 @@ const ReadmeInstall = cmp(function ReadmeInstall(props: any) {
   const { model } = ctx$
 
   const groupId = mavenGroupId(model)
-  const artifactId = `${model.name}-sdk`
+  const artifactId = sdkName(model.name)
 
   if (isPublished(model, target.name)) {
     Content(`Add the dependency to your \`pom.xml\`:

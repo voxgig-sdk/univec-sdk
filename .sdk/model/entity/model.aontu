@@ -1,0 +1,121 @@
+# Entity: model
+
+main: kit: entity: model: {
+
+  alias: field: {}
+
+  fields: {
+    eval: {
+      h: "Eval"
+      n: "eval"
+      r: false
+      sh: "Retrieval-fidelity metrics for a convert model."
+      t: "`$OBJECT`"
+    }
+    executionProvider: {
+      h: "Execution Provider"
+      n: "executionProvider"
+      r: false
+      sh: "Hardware backend, e.g."
+      t: "`$STRING`"
+    }
+    modelCard: {
+      h: "Model Card"
+      n: "modelCard"
+      r: false
+      sh: "Convert models only: training provenance and architecture detail."
+      t: "`$OBJECT`"
+    }
+    modelType: {
+      h: "Model Type"
+      n: "modelType"
+      r: true
+      sh: "`embed` for text-to-vector models, `convert` for space-translation models."
+      t: "`$STRING`"
+    }
+    name: {
+      h: "Name"
+      n: "name"
+      r: true
+      sh: "Model identifier used in requests."
+      t: "`$STRING`"
+    }
+    sequenceLen: {
+      h: "Sequence Len"
+      n: "sequenceLen"
+      r: false
+      sh: "Embed models only: maximum input sequence length."
+      t: "`$INTEGER`"
+    }
+    sourceDim: {
+      h: "Source Dim"
+      n: "sourceDim"
+      r: false
+      sh: "Convert models only: source vector dimension."
+      t: "`$INTEGER`"
+    }
+    sourceModel: {
+      h: "Source Model"
+      n: "sourceModel"
+      r: false
+      sh: "Convert models only: the source model space."
+      t: "`$STRING`"
+    }
+    targetDim: {
+      h: "Target Dim"
+      n: "targetDim"
+      r: true
+      sh: "Dimension of the produced vectors."
+      t: "`$INTEGER`"
+    }
+    targetModel: {
+      h: "Target Model"
+      n: "targetModel"
+      r: true
+      sh: "The model space produced."
+      t: "`$STRING`"
+    }
+  }
+
+  name: "model"
+  op: {
+    list: {
+      name: "list"
+      points: [
+        {
+          co: {
+            id: "GET /v1/models"
+            source: "openapi3"
+            version: 2
+          }
+          li: {
+            assert: {
+              nonempty: [
+                ""
+              ]
+            }
+            auth: "public"
+            id: "models"
+          }
+          m: "GET"
+          o: "/v1/models"
+          s: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "models"
+            }
+          ]
+          t: {
+            req: "`reqdata`"
+            res: "`body.data`"
+          }
+        }
+      ]
+    }
+  }
+
+
+
+}

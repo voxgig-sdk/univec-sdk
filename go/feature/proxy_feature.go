@@ -8,13 +8,6 @@ import (
 	"github.com/voxgig-sdk/univec-sdk/go/core"
 )
 
-// Outbound HTTP(S) proxy support. Wraps the active transport and annotates
-// each request's fetch definition with the proxy target (`fetchdef.proxy`).
-// The default net/http transport honours the annotation by routing the
-// request through an http.Transport with Proxy set (see utility/fetcher.go);
-// custom transports can do the same. The proxy target comes from options
-// (`url`) or, when `fromEnv` is set, the standard HTTPS_PROXY / HTTP_PROXY /
-// NO_PROXY environment variables. Hosts matching `noProxy` bypass the proxy.
 type ProxyFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK

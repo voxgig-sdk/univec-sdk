@@ -1,0 +1,84 @@
+# Entity: ephemeral_key
+
+main: kit: entity: ephemeral_key: {
+
+  alias: field: {}
+
+  fields: {
+    dailyLimit: {
+      h: "Daily Limit"
+      n: "dailyLimit"
+      r: true
+      sh: "Calls permitted per day."
+      t: "`$INTEGER`"
+    }
+    dailyUsed: {
+      h: "Daily Used"
+      n: "dailyUsed"
+      r: true
+      sh: "Calls already used today."
+      t: "`$INTEGER`"
+    }
+    key: {
+      h: "Key"
+      n: "key"
+      r: true
+      sh: "The ephemeral API key, prefixed `eph_`."
+      t: "`$STRING`"
+    }
+    resetsAt: {
+      fo: "date-time"
+      h: "Resets At"
+      n: "resetsAt"
+      r: true
+      sh: "When the daily allowance resets."
+      t: "`$STRING`"
+    }
+  }
+
+  name: "ephemeral_key"
+  op: {
+    create: {
+      name: "create"
+      points: [
+        {
+          co: {
+            id: "POST /v1/ephemeral/key"
+            source: "openapi3"
+            version: 2
+          }
+          li: {
+            assert: {
+              nonempty: [
+                "key"
+              ]
+            }
+            auth: "public"
+            id: "key"
+            retention: "No deletion endpoint; issued key is subject to the service daily allowance"
+          }
+          m: "POST"
+          o: "/v1/ephemeral/key"
+          s: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "ephemeral"
+            }
+            {
+              lit: "key"
+            }
+          ]
+          t: {
+            req: "`reqdata`"
+            res: "`body.data`"
+          }
+        }
+      ]
+    }
+  }
+
+
+
+}

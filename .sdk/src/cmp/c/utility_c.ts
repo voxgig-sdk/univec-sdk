@@ -4,6 +4,8 @@ import {
   walk,
 } from '@voxgig/struct'
 
+import { sdkName } from '@voxgig/sdkgen'
+
 
 // C reserved keywords illegal as identifiers.
 const C_RESERVED = new Set<string>([
@@ -23,13 +25,6 @@ function cVarName(name: string): string {
 }
 
 
-// The C project identifier used as a function-name prefix, e.g. solar. Must
-// match the SQUASHED `projectname` token that the umbrella header/fragment use
-// for the constructor (`<ident>_sdk_new`): a hyphenated slug
-// (bluefin-decryptx-p2pe) squashes to `bluefindecryptxp2pe`, so drop every
-// non-alphanumeric char rather than mapping them to `_` (which produced
-// `bluefin_decryptx_p2pe_sdk_new` callers that never linked against the
-// squashed definition). No-op for single-word names.
 function cIdent(model: any): string {
   return String(model.name).toLowerCase().replace(/[^a-z0-9]/g, '')
 }
@@ -38,7 +33,7 @@ function cIdent(model: any): string {
 // Package-ish name (used in comments only), e.g. voxgig-solar-sdk.
 function cName(model: any): string {
   const org = (model.origin || 'voxgig-sdk').replace(/-sdk$/, '')
-  return `${org}-${model.name}-sdk`.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  return `${org}-${sdkName(model.name)}`.toLowerCase().replace(/[^a-z0-9-]/g, '-')
 }
 
 
@@ -88,29 +83,6 @@ function formatCValue(val: any, indent: number = 0): string {
 }
 
 
-// Deep-remove meta keys (`foo$`) from a model subtree (twin of go/rust clean).
-// Emission-time normalisation of a model subtree (L0).
-//
-// Always drops jostraca's iteration metadata (`$`-suffixed keys: index$,
-// key$, val$). With `dropDefaults`, also drops keys whose value IS the
-// default the runtime already assumes when the key is absent, which is pure
-// payload — see CONFIG_DEFAULT.
-//
-// Rebuilds the tree rather than mutating during a walk. The previous
-// implementation walked a clone calling `delete p[k]`, but walk() assigns its
-// callback's result back over the child (`setprop(out, ckey, walk(...))`), so
-// the delete was undone on the way out and the helper silently did nothing.
-// Returning `undefined` from the callback does not fix it either: setprop
-// stores undefined rather than removing the key, which then emits as a null.
-//
-// `dropDefaults` is opt-in and must be passed ONLY for the entity subtree.
-// `active` means something different in feature config, where absent reads as
-// INACTIVE (see feature_init) — dropping `active: true` there would silently
-// disable the feature.
-// jostraca's iteration metadata, injected by each()/names() while it walks the
-// model. Listed explicitly rather than matched by trailing-dollar suffix: a
-// trailing dollar is not exclusive to jostraca -- Seneca uses entity$ as real
-// data -- so a blanket suffix match can silently drop a legitimate API field.
 const MODEL_META = ['index$', 'key$', 'val$']
 
 // Keys whose value IS the default the runtime already assumes when the key is
@@ -151,23 +123,6 @@ function clean(o: any, dropDefaults?: boolean): any {
 
 
 
-// The JSON as a C string literal, split into ADJACENT literals.
-//
-// C99 only guarantees 4095 characters in a single string literal, and a real
-// model runs to hundreds of kilobytes. Adjacent literals are concatenated by
-// the translation phase before that limit applies, so this stays portable
-// rather than relying on gcc/clang having no practical limit.
-//
-// Only `\` and `"` need escaping: JSON.stringify output contains no raw
-// control characters (it writes them as the six TEXT characters \u00XX), and
-// C string literals take UTF-8 bytes verbatim. Escaping the backslash also
-// means no `\uXXXX` ever reaches the C lexer, which matters - a universal
-// character name below 0xA0 is ill-formed C, so the JSON's own escapes would
-// have been rejected if they had been passed through.
-//
-// Chunks are cut from the RAW text and escaped afterwards, so a cut can never
-// land inside an escape sequence. Surrogate pairs are kept whole, or the cut
-// would emit a lone surrogate as invalid UTF-8.
 function cStringLiteral(json: string, chunkSize: number = 2000): string {
   const parts: string[] = []
   let i = 0

@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (cpp/src/host.cpp)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (cpp/src/host.cpp)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* The host: the lifecycle state machine (§5), extension points (§6),
  * and resource capture (§8). See host.hpp for the two rules that shape
@@ -257,6 +257,25 @@ void Inst::exportvalue(const std::string& key, const V& value) {
 }
 
 void Inst::provides(const V& p) { push(provides_, p); }
+
+/* WHICH provider this instance is bound to for `name` (§11.1), as a
+ * ref, or null when nothing provides it.
+ *
+ * The host's own `capability` answers with the live providers RANKED,
+ * not with the one THIS instance took; §11.4's reluctant rebinding
+ * makes those differ. A REF, not the instance. The selection is
+ * REMEMBERED, because this is the instance asking. */
+V Inst::capability(const std::string& name) const {
+  V reqs = requirements(options_);
+  for (size_t i = 0; i < len(reqs); i++) {
+    V r = at(reqs, i);
+    V rn = get(r, "name");
+    if (!isstr(rn) || asstr(rn) != name) continue;
+    const std::string picked = owner_->chosen(owner_->find(ref_), r, true);
+    return picked.empty() ? vnull() : vstr(picked);
+  }
+  return vnull();
+}
 
 HostPtr Inst::nest(const HostOptions& opts) {
   if (!owner_->intransition_) {

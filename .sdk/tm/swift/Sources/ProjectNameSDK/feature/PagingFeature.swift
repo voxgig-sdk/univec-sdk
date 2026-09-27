@@ -2,8 +2,8 @@
 // stamps page/limit (or a cursor) into the request query; on the way back
 // (PreResult) it reads the server's pagination signals - a `Link:
 // rel="next"` header, `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body - and records
-// them on `ctx.result.paging`. A per-call cursor/page from ctrl takes
+// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body (snake_case
+// forms too) - and records them on `ctx.result.paging` and `ctrl.paging`. A per-call cursor/page from ctrl takes
 // priority (used by auto-iteration). Parameter names (`pageParam`,
 // `limitParam`, `cursorParam`), the page size (`limit`) and the start page
 // (`startPage`, default 1) are configurable.
@@ -68,8 +68,11 @@ public final class PagingFeature: BaseFeature {
     } else if isNil(gp(spec.query, pageParam)) {
       var page: Value? = nil
       if let paging = paging {
+        // A record written back by preResult holds the page just fetched as
+        // "page" and the one to fetch as "nextPage", so nextPage wins.
+        let np = gp(paging, "nextPage")
         let p = gp(paging, "page")
-        if !isNil(p) { page = p }
+        if !isNil(np) { page = np } else if !isNil(p) { page = p }
       }
       spec.query.entries[pageParam] = page ?? .int(Int64(foptInt(options, "startPage", 1)))
     }
@@ -177,11 +180,15 @@ public final class PagingFeature: BaseFeature {
       }
     }
 
-    // Body-level cursors.
+    // Body-level signals; snake_case forms are read first so camelCase wins.
     if let bm = body.asMap {
       let next = gp(bm, "next")
       if !isNil(next) && isNil(gp(paging, "next")) {
         paging.entries["next"] = next
+      }
+      let snakeCursor = gp(bm, "next_cursor")
+      if !isNil(snakeCursor) {
+        paging.entries["cursor"] = snakeCursor
       }
       let cursor = gp(bm, "cursor")
       if !isNil(cursor) {
@@ -190,6 +197,18 @@ public final class PagingFeature: BaseFeature {
       let nextCursor = gp(bm, "nextCursor")
       if !isNil(nextCursor) {
         paging.entries["cursor"] = nextCursor
+      }
+      if isNil(gp(paging, "nextPage")) {
+        var np = gp(bm, "nextPage")
+        if isNil(np) { np = gp(bm, "next_page") }
+        switch np {
+        case .int, .double, .string: paging.entries["nextPage"] = np
+        default: break
+        }
+      }
+      if let smb = gp(bm, "has_more").asBool {
+        paging.entries["hasMore"] = .bool(smb)
+        explicitMore = true
       }
       if let hmb = gp(bm, "hasMore").asBool {
         paging.entries["hasMore"] = .bool(hmb)
@@ -210,6 +229,14 @@ public final class PagingFeature: BaseFeature {
 
     result.paging = paging
     last = paging
+
+    // VMap is a class, so the caller's map is refilled in place; a fresh map
+    // on ctrl never reaches the caller.
+    if let shared = ctx.ctrl.paging {
+      shared.entries = paging.entries
+    } else {
+      ctx.ctrl.paging = paging
+    }
   }
 
   private func isList(_ ctx: Context) -> Bool {

@@ -32,10 +32,10 @@ function normalizePathParams(
       const snaked = snakify(rawName)
       const depluralized = depluralize(snaked)
       const param = params.find((p: any) =>
-          p.name === snaked || p.name === depluralized) ||
+          p.n === snaked || p.n === depluralized) ||
         params.find((p: any) =>
-          p.orig === snaked || p.orig === depluralized)
-      if (param) return '{' + param.name + '}'
+          p.or === snaked || p.or === depluralized)
+      if (param) return '{' + param.n + '}'
 
       if (rename) {
         for (const [origCamel, renamedTo] of Object.entries(rename)) {
@@ -43,10 +43,10 @@ function normalizePathParams(
             const origSnaked = snakify(origCamel)
             const origDepluralized = depluralize(origSnaked)
             const renamedParam = params.find(
-              (p: any) => p.orig === origSnaked || p.name === origSnaked ||
-                p.orig === origDepluralized || p.name === origDepluralized
+              (p: any) => p.or === origSnaked || p.n === origSnaked ||
+                p.or === origDepluralized || p.n === origDepluralized
             )
-            if (renamedParam) return '{' + renamedParam.name + '}'
+            if (renamedParam) return '{' + renamedParam.n + '}'
           }
         }
       }
@@ -57,13 +57,6 @@ function normalizePathParams(
 }
 
 
-// Render a JSON value as a Java literal for query examples.
-// A Java source literal for an example value from the model.
-//
-// An integer beyond Java's int range needs the L suffix: javac rejects a bare
-// 120615523104 outright ("integer number too large"), so one large id in a
-// spec's example makes the whole generated test package fail to compile.
-// A non-integral double is fine unsuffixed.
 function javaLiteral(v: any): string {
   if (null == v) return 'null'
   if ('boolean' === typeof v) return String(v)
@@ -117,8 +110,8 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   // Get load point info
   const loadPoint = loadOp?.points?.[0]
-  const loadPath = loadPoint ? normalizePathParams(pointParts(loadPoint), loadPoint?.args?.params || [], loadPoint?.rename?.param) : ''
-  const allLoadParams = loadPoint?.args?.params || []
+  const loadPath = loadPoint ? normalizePathParams(pointParts(loadPoint), loadPoint?.g?.params || [], loadPoint?.r?.param) : ''
+  const allLoadParams = loadPoint?.g?.params || []
   // Only path params that actually appear in the URL template drive
   // direct-test path-param setup and URL-substitution asserts.
   const _pathPlaceholders = new Set<string>()
@@ -127,7 +120,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
       _pathPlaceholders.add(part.slice(1, -1))
     }
   }
-  const _renameMap = (loadPoint?.rename?.param || {}) as Record<string, string>
+  const _renameMap = (loadPoint?.r?.param || {}) as Record<string, string>
   const _renamedPlaceholders = new Set<string>()
   for (const ph of _pathPlaceholders) {
     _renamedPlaceholders.add(ph)
@@ -136,28 +129,28 @@ const TestDirect = cmp(function TestDirect(props: any) {
     }
   }
   const loadParams = allLoadParams.filter((p: any) =>
-    _renamedPlaceholders.has(p.name) || _renamedPlaceholders.has(p.orig))
+    _renamedPlaceholders.has(p.n) || _renamedPlaceholders.has(p.or))
 
   // Get list point info
   const listPoint = listOp?.points?.[0]
-  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listPoint?.args?.params || [], listPoint?.rename?.param) : ''
-  const listParams = listPoint?.args?.params || []
+  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listPoint?.g?.params || [], listPoint?.r?.param) : ''
+  const listParams = listPoint?.g?.params || []
 
   // Required query params with spec-provided examples — needed in live mode.
-  const loadQuery = loadPoint?.args?.query || []
+  const loadQuery = loadPoint?.g?.query || []
   const loadLiveQueryEntries = loadQuery
-    .filter((q: any) => q.reqd && undefined !== q.example && null !== q.example)
+    .filter((q: any) => q.r && undefined !== q.ex && null !== q.ex)
   const loadLiveQueryLines = loadLiveQueryEntries
-    .map((q: any) => `      query.put("${q.name}", ${javaLiteral(q.example)});`)
+    .map((q: any) => `      query.put("${q.n}", ${javaLiteral(q.ex)});`)
     .join('\n')
 
   // Path params with spec-provided examples — when ALL load params have
   // spec examples, prefer them over list-bootstrap.
   const loadAllHaveExamples =
     loadParams.length > 0 &&
-    loadParams.every((p: any) => undefined !== p.example && null !== p.example)
+    loadParams.every((p: any) => undefined !== p.ex && null !== p.ex)
   const loadExampleLines = loadAllHaveExamples
-    ? loadParams.map((p: any) => `      params.put("${p.name}", ${javaLiteral(p.example)});`).join('\n')
+    ? loadParams.map((p: any) => `      params.put("${p.n}", ${javaLiteral(p.ex)});`).join('\n')
     : ''
 
   // Build the ENTID env var name for this entity
@@ -202,10 +195,10 @@ public class ${entity.Name}DirectTest {
     if (hasList && listPoint) {
       // Build live params for list
       const listLiveParams = listParams.map((p: any) => {
-        const key = p.name === 'id'
+        const key = p.n === 'id'
           ? entity.name + '01'
-          : p.name.replace(/_id$/, '') + '01'
-        return { name: p.name, key }
+          : p.n.replace(/_id$/, '') + '01'
+        return { name: p.n, key }
       })
 
       const listLiveIdKeys = listParams.length > 0
@@ -311,18 +304,18 @@ ${listSkipBlock}    ${SDK} client = setup.client;
     // Generate load test - in live mode, first list to get a real entity ID
     if (hasLoad && loadPoint) {
       // Identify ancestor params (not 'id') for live mode
-      const ancestorParams = loadParams.filter((p: any) => p.name !== 'id')
+      const ancestorParams = loadParams.filter((p: any) => p.n !== 'id')
 
       let loadLiveIdKeys: string[] = []
       if (loadParams.length > 0 && !loadAllHaveExamples) {
         if (hasList) {
           loadLiveIdKeys = listParams.map((p: any) => {
-            return p.name === 'id'
+            return p.n === 'id'
               ? entity.name + '01'
-              : p.name.replace(/_id$/, '') + '01'
+              : p.n.replace(/_id$/, '') + '01'
           })
         } else {
-          loadLiveIdKeys = loadParams.map((p: any) => p.name + '01')
+          loadLiveIdKeys = loadParams.map((p: any) => p.n + '01')
         }
       }
       const loadSkipBlock = loadLiveIdKeys.length > 0
@@ -366,10 +359,10 @@ ${loadSkipBlock}    ${SDK} client = setup.client;
           Content(`      Map<String, Object> listParams = new LinkedHashMap<>();
 `)
           for (const p of listParams) {
-            const key = p.name === 'id'
+            const key = p.n === 'id'
               ? entity.name + '01'
-              : p.name.replace(/_id$/, '') + '01'
-            Content(`      listParams.put("${p.name}", setup.idmap.get("${key}"));
+              : p.n.replace(/_id$/, '') + '01'
+            Content(`      listParams.put("${p.n}", setup.idmap.get("${key}"));
 `)
           }
 
@@ -388,8 +381,8 @@ ${loadSkipBlock}    ${SDK} client = setup.client;
       params.put("id", firstEnt.get("id"));
 `)
           for (const p of ancestorParams) {
-            const key = p.name.replace(/_id$/, '') + '01'
-            Content(`      params.put("${p.name}", setup.idmap.get("${key}"));
+            const key = p.n.replace(/_id$/, '') + '01'
+            Content(`      params.put("${p.n}", setup.idmap.get("${key}"));
 `)
           }
         }
@@ -399,7 +392,7 @@ ${loadSkipBlock}    ${SDK} client = setup.client;
     else {
 `)
           for (let i = 0; i < loadParams.length; i++) {
-            Content(`      params.put("${loadParams[i].name}", "direct0${i + 1}");
+            Content(`      params.put("${loadParams[i].n}", "direct0${i + 1}");
 `)
           }
         }

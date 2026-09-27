@@ -2,29 +2,6 @@
 import { cmp, File, Content } from '@voxgig/sdkgen'
 
 
-// Emits test/ReadmeExamplesTest.cs — an xUnit PRESENCE + STRUCTURE gate over
-// every ```csharp fenced block in the repository ROOT README.md, the
-// per-language csharp/README.md, AND the per-language csharp/REFERENCE.md.
-//
-// SCOPE NOTE (deliberate, documented): the Python/TS/Go equivalents EXECUTE and
-// type-check every documented block. That is infeasible here — the generated
-// C# SDK targets the .NET BCL only (no Roslyn scripting dependency), so a test
-// project cannot compile-and-run arbitrary doc snippets at test time without a
-// dependency the target explicitly forbids. This gate therefore guarantees the
-// weaker-but-real invariant that keeps the docs honest as the generator
-// evolves:
-//   1. every doc exists and contains at least one ```csharp block (nothing was
-//      dropped);
-//   2. every ```csharp block is structurally well-formed — its braces,
-//      parentheses and brackets balance (catches a truncated or malformed
-//      generated snippet), and it references the SDK/client surface so it is a
-//      real example, not an empty fence.
-// A per-doc summary line makes the coverage visible in the test output.
-//
-// The emitted C# is written WITHOUT literal backticks (the fence marker is
-// built at runtime as new string((char)96, 3)) so this TS template literal
-// stays clean — the only interpolations are the SDK class name and the
-// generated entity map.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { target, ctx$: { model } } = props
 

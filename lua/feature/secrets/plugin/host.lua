@@ -1,5 +1,5 @@
--- VENDORED: @voxgig/plugin sdk-20260908-1556-0 (lua/src/plugin/host.lua)
--- Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+-- VENDORED: @voxgig/plugin sdk-20260925-1316-0 (lua/src/plugin/host.lua)
+-- Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 -- License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 -- The host: the lifecycle state machine (section 5), extension points
 -- (section 6), and resource capture (section 8).
@@ -142,6 +142,22 @@ end
 function Inst:export(key, value)
   self.entry.exports[key] = value
   self.entry.exportkeys[key] = true
+end
+
+-- WHICH provider this instance is bound to for `name` (11.1), as a ref,
+-- or nil when nothing provides it.
+--
+-- The host's own `capability` answers with the live providers RANKED,
+-- not with the one THIS instance took; 11.4's reluctant rebinding makes
+-- those differ. A REF, not the instance. The selection is REMEMBERED,
+-- because this is the instance asking.
+function Inst:capability(name)
+  for _, req in ipairs(Dep.requirements(self.entry.options)) do
+    if req.name == name then
+      return self.host:chosen(self.entry, req, true)
+    end
+  end
+  return nil
 end
 
 -- What this instance can do for others (section 11.1).

@@ -342,21 +342,24 @@ pub fn make_config() -> Value {
                 ("fields".to_string(), Value::list(vec![
                     Value::map_of([
                         ("name".to_string(), Value::str("embeddings")),
+                        ("title".to_string(), Value::str("Embeddings")),
+                        ("type".to_string(), Value::str("`$ARRAY`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Translated vectors, in the target model's dimension.")),
-                        ("type".to_string(), Value::str("`$ARRAY`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("source_model")),
+                        ("title".to_string(), Value::str("Source Model")),
+                        ("type".to_string(), Value::str("`$STRING`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Model space the supplied vectors are currently in.")),
-                        ("type".to_string(), Value::str("`$STRING`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("target_model")),
+                        ("title".to_string(), Value::str("Target Model")),
+                        ("type".to_string(), Value::str("`$STRING`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Model space to translate into.")),
-                        ("type".to_string(), Value::str("`$STRING`")),
                     ]),
                 ])),
                 ("name".to_string(), Value::str("convert")),
@@ -366,8 +369,28 @@ pub fn make_config() -> Value {
                         ("name".to_string(), Value::str("create")),
                         ("points".to_string(), Value::list(vec![
                             Value::map_of([
-                                ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("method".to_string(), Value::str("POST")),
+                                ("orig".to_string(), Value::str("/v1/convert")),
+                                ("segments".to_string(), Value::list(vec![
+                                    Value::map_of([
+                                        ("lit".to_string(), Value::str("v1")),
+                                    ]),
+                                    Value::map_of([
+                                        ("lit".to_string(), Value::str("convert")),
+                                    ]),
+                                ])),
+                                ("parts".to_string(), Value::list(vec![
+                                    Value::str("v1"),
+                                    Value::str("convert"),
+                                ])),
+                                ("rename".to_string(), Value::empty_map()),
+                                ("transform".to_string(), Value::map_of([
+                                    ("req".to_string(), Value::str("`reqdata`")),
+                                    ("res".to_string(), Value::str("`body.data`")),
+                                ])),
+                                ("args".to_string(), Value::empty_map()),
+                                ("select".to_string(), Value::empty_map()),
                                 ("live".to_string(), Value::map_of([
                                     ("assert".to_string(), Value::map_of([
                                         ("equal".to_string(), Value::map_of([
@@ -461,29 +484,32 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                            ]),
+                            Value::map_of([
+                                ("kind".to_string(), Value::str("http")),
                                 ("method".to_string(), Value::str("POST")),
-                                ("orig".to_string(), Value::str("/v1/convert")),
+                                ("orig".to_string(), Value::str("/v1/embed-bridge")),
                                 ("segments".to_string(), Value::list(vec![
                                     Value::map_of([
                                         ("lit".to_string(), Value::str("v1")),
                                     ]),
                                     Value::map_of([
-                                        ("lit".to_string(), Value::str("convert")),
+                                        ("lit".to_string(), Value::str("embed-bridge")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::empty_map()),
+                                ("parts".to_string(), Value::list(vec![
+                                    Value::str("v1"),
+                                    Value::str("embed-bridge"),
+                                ])),
+                                ("rename".to_string(), Value::empty_map()),
                                 ("transform".to_string(), Value::map_of([
                                     ("req".to_string(), Value::str("`reqdata`")),
                                     ("res".to_string(), Value::str("`body.data`")),
                                 ])),
-                                ("parts".to_string(), Value::list(vec![
-                                    Value::str("v1"),
-                                    Value::str("convert"),
-                                ])),
-                            ]),
-                            Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
-                                ("kind".to_string(), Value::str("http")),
+                                ("select".to_string(), Value::map_of([
+                                    ("$action".to_string(), Value::str("bridge")),
+                                ])),
                                 ("live".to_string(), Value::map_of([
                                     ("assert".to_string(), Value::map_of([
                                         ("equal".to_string(), Value::map_of([
@@ -576,31 +602,36 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                            ]),
+                            Value::map_of([
+                                ("kind".to_string(), Value::str("http")),
                                 ("method".to_string(), Value::str("POST")),
-                                ("orig".to_string(), Value::str("/v1/embed-bridge")),
+                                ("orig".to_string(), Value::str("/v1/ephemeral/convert")),
                                 ("segments".to_string(), Value::list(vec![
                                     Value::map_of([
                                         ("lit".to_string(), Value::str("v1")),
                                     ]),
                                     Value::map_of([
-                                        ("lit".to_string(), Value::str("embed-bridge")),
+                                        ("lit".to_string(), Value::str("ephemeral")),
+                                    ]),
+                                    Value::map_of([
+                                        ("lit".to_string(), Value::str("convert")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::map_of([
-                                    ("$action".to_string(), Value::str("bridge")),
+                                ("parts".to_string(), Value::list(vec![
+                                    Value::str("v1"),
+                                    Value::str("ephemeral"),
+                                    Value::str("convert"),
                                 ])),
+                                ("rename".to_string(), Value::empty_map()),
                                 ("transform".to_string(), Value::map_of([
                                     ("req".to_string(), Value::str("`reqdata`")),
                                     ("res".to_string(), Value::str("`body.data`")),
                                 ])),
-                                ("parts".to_string(), Value::list(vec![
-                                    Value::str("v1"),
-                                    Value::str("embed-bridge"),
-                                ])),
-                            ]),
-                            Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
-                                ("kind".to_string(), Value::str("http")),
+                                ("select".to_string(), Value::map_of([
+                                    ("$action".to_string(), Value::str("ephemeral")),
+                                ])),
                                 ("live".to_string(), Value::map_of([
                                     ("assert".to_string(), Value::map_of([
                                         ("equal".to_string(), Value::map_of([
@@ -698,8 +729,11 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                            ]),
+                            Value::map_of([
+                                ("kind".to_string(), Value::str("http")),
                                 ("method".to_string(), Value::str("POST")),
-                                ("orig".to_string(), Value::str("/v1/ephemeral/convert")),
+                                ("orig".to_string(), Value::str("/v1/ephemeral/embed-bridge")),
                                 ("segments".to_string(), Value::list(vec![
                                     Value::map_of([
                                         ("lit".to_string(), Value::str("v1")),
@@ -708,25 +742,23 @@ pub fn make_config() -> Value {
                                         ("lit".to_string(), Value::str("ephemeral")),
                                     ]),
                                     Value::map_of([
-                                        ("lit".to_string(), Value::str("convert")),
+                                        ("lit".to_string(), Value::str("embed-bridge")),
                                     ]),
-                                ])),
-                                ("select".to_string(), Value::map_of([
-                                    ("$action".to_string(), Value::str("ephemeral")),
-                                ])),
-                                ("transform".to_string(), Value::map_of([
-                                    ("req".to_string(), Value::str("`reqdata`")),
-                                    ("res".to_string(), Value::str("`body.data`")),
                                 ])),
                                 ("parts".to_string(), Value::list(vec![
                                     Value::str("v1"),
                                     Value::str("ephemeral"),
-                                    Value::str("convert"),
+                                    Value::str("embed-bridge"),
                                 ])),
-                            ]),
-                            Value::map_of([
+                                ("rename".to_string(), Value::empty_map()),
+                                ("transform".to_string(), Value::map_of([
+                                    ("req".to_string(), Value::str("`reqdata`")),
+                                    ("res".to_string(), Value::str("`body.data`")),
+                                ])),
                                 ("args".to_string(), Value::empty_map()),
-                                ("kind".to_string(), Value::str("http")),
+                                ("select".to_string(), Value::map_of([
+                                    ("$action".to_string(), Value::str("ephemeral_bridge")),
+                                ])),
                                 ("live".to_string(), Value::map_of([
                                     ("assert".to_string(), Value::map_of([
                                         ("equal".to_string(), Value::map_of([
@@ -823,31 +855,6 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
-                                ("method".to_string(), Value::str("POST")),
-                                ("orig".to_string(), Value::str("/v1/ephemeral/embed-bridge")),
-                                ("segments".to_string(), Value::list(vec![
-                                    Value::map_of([
-                                        ("lit".to_string(), Value::str("v1")),
-                                    ]),
-                                    Value::map_of([
-                                        ("lit".to_string(), Value::str("ephemeral")),
-                                    ]),
-                                    Value::map_of([
-                                        ("lit".to_string(), Value::str("embed-bridge")),
-                                    ]),
-                                ])),
-                                ("select".to_string(), Value::map_of([
-                                    ("$action".to_string(), Value::str("ephemeral_bridge")),
-                                ])),
-                                ("transform".to_string(), Value::map_of([
-                                    ("req".to_string(), Value::str("`reqdata`")),
-                                    ("res".to_string(), Value::str("`body.data`")),
-                                ])),
-                                ("parts".to_string(), Value::list(vec![
-                                    Value::str("v1"),
-                                    Value::str("ephemeral"),
-                                    Value::str("embed-bridge"),
-                                ])),
                             ]),
                         ])),
                     ])),
@@ -860,21 +867,24 @@ pub fn make_config() -> Value {
                 ("fields".to_string(), Value::list(vec![
                     Value::map_of([
                         ("name".to_string(), Value::str("embeddings")),
+                        ("title".to_string(), Value::str("Embeddings")),
+                        ("type".to_string(), Value::str("`$ARRAY`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("One vector per input text, in input order.")),
-                        ("type".to_string(), Value::str("`$ARRAY`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("model")),
+                        ("title".to_string(), Value::str("Model")),
+                        ("type".to_string(), Value::str("`$STRING`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Model that produced the vectors.")),
-                        ("type".to_string(), Value::str("`$STRING`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("texts")),
+                        ("title".to_string(), Value::str("Texts")),
+                        ("type".to_string(), Value::str("`$ARRAY`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Texts to embed.")),
-                        ("type".to_string(), Value::str("`$ARRAY`")),
                     ]),
                 ])),
                 ("name".to_string(), Value::str("embed")),
@@ -884,8 +894,28 @@ pub fn make_config() -> Value {
                         ("name".to_string(), Value::str("create")),
                         ("points".to_string(), Value::list(vec![
                             Value::map_of([
-                                ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
+                                ("method".to_string(), Value::str("POST")),
+                                ("orig".to_string(), Value::str("/v1/embed")),
+                                ("segments".to_string(), Value::list(vec![
+                                    Value::map_of([
+                                        ("lit".to_string(), Value::str("v1")),
+                                    ]),
+                                    Value::map_of([
+                                        ("lit".to_string(), Value::str("embed")),
+                                    ]),
+                                ])),
+                                ("parts".to_string(), Value::list(vec![
+                                    Value::str("v1"),
+                                    Value::str("embed"),
+                                ])),
+                                ("rename".to_string(), Value::empty_map()),
+                                ("transform".to_string(), Value::map_of([
+                                    ("req".to_string(), Value::str("`reqdata`")),
+                                    ("res".to_string(), Value::str("`body.data`")),
+                                ])),
+                                ("args".to_string(), Value::empty_map()),
+                                ("select".to_string(), Value::empty_map()),
                                 ("live".to_string(), Value::map_of([
                                     ("assert".to_string(), Value::map_of([
                                         ("equal".to_string(), Value::map_of([
@@ -948,29 +978,36 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                            ]),
+                            Value::map_of([
+                                ("kind".to_string(), Value::str("http")),
                                 ("method".to_string(), Value::str("POST")),
-                                ("orig".to_string(), Value::str("/v1/embed")),
+                                ("orig".to_string(), Value::str("/v1/ephemeral/embed")),
                                 ("segments".to_string(), Value::list(vec![
                                     Value::map_of([
                                         ("lit".to_string(), Value::str("v1")),
                                     ]),
                                     Value::map_of([
+                                        ("lit".to_string(), Value::str("ephemeral")),
+                                    ]),
+                                    Value::map_of([
                                         ("lit".to_string(), Value::str("embed")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::empty_map()),
+                                ("parts".to_string(), Value::list(vec![
+                                    Value::str("v1"),
+                                    Value::str("ephemeral"),
+                                    Value::str("embed"),
+                                ])),
+                                ("rename".to_string(), Value::empty_map()),
                                 ("transform".to_string(), Value::map_of([
                                     ("req".to_string(), Value::str("`reqdata`")),
                                     ("res".to_string(), Value::str("`body.data`")),
                                 ])),
-                                ("parts".to_string(), Value::list(vec![
-                                    Value::str("v1"),
-                                    Value::str("embed"),
-                                ])),
-                            ]),
-                            Value::map_of([
                                 ("args".to_string(), Value::empty_map()),
-                                ("kind".to_string(), Value::str("http")),
+                                ("select".to_string(), Value::map_of([
+                                    ("$action".to_string(), Value::str("ephemeral")),
+                                ])),
                                 ("live".to_string(), Value::map_of([
                                     ("assert".to_string(), Value::map_of([
                                         ("equal".to_string(), Value::map_of([
@@ -1037,31 +1074,6 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
-                                ("method".to_string(), Value::str("POST")),
-                                ("orig".to_string(), Value::str("/v1/ephemeral/embed")),
-                                ("segments".to_string(), Value::list(vec![
-                                    Value::map_of([
-                                        ("lit".to_string(), Value::str("v1")),
-                                    ]),
-                                    Value::map_of([
-                                        ("lit".to_string(), Value::str("ephemeral")),
-                                    ]),
-                                    Value::map_of([
-                                        ("lit".to_string(), Value::str("embed")),
-                                    ]),
-                                ])),
-                                ("select".to_string(), Value::map_of([
-                                    ("$action".to_string(), Value::str("ephemeral")),
-                                ])),
-                                ("transform".to_string(), Value::map_of([
-                                    ("req".to_string(), Value::str("`reqdata`")),
-                                    ("res".to_string(), Value::str("`body.data`")),
-                                ])),
-                                ("parts".to_string(), Value::list(vec![
-                                    Value::str("v1"),
-                                    Value::str("ephemeral"),
-                                    Value::str("embed"),
-                                ])),
                             ]),
                         ])),
                     ])),
@@ -1074,28 +1086,32 @@ pub fn make_config() -> Value {
                 ("fields".to_string(), Value::list(vec![
                     Value::map_of([
                         ("name".to_string(), Value::str("dailyLimit")),
+                        ("title".to_string(), Value::str("Daily Limit")),
+                        ("type".to_string(), Value::str("`$INTEGER`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Calls permitted per day.")),
-                        ("type".to_string(), Value::str("`$INTEGER`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("dailyUsed")),
+                        ("title".to_string(), Value::str("Daily Used")),
+                        ("type".to_string(), Value::str("`$INTEGER`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Calls already used today.")),
-                        ("type".to_string(), Value::str("`$INTEGER`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("key")),
+                        ("title".to_string(), Value::str("Key")),
+                        ("type".to_string(), Value::str("`$STRING`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("The ephemeral API key, prefixed `eph_`.")),
-                        ("type".to_string(), Value::str("`$STRING`")),
                     ]),
                     Value::map_of([
-                        ("format".to_string(), Value::str("date-time")),
                         ("name".to_string(), Value::str("resetsAt")),
+                        ("title".to_string(), Value::str("Resets At")),
+                        ("type".to_string(), Value::str("`$STRING`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("When the daily allowance resets.")),
-                        ("type".to_string(), Value::str("`$STRING`")),
+                        ("format".to_string(), Value::str("date-time")),
                     ]),
                 ])),
                 ("name".to_string(), Value::str("ephemeral_key")),
@@ -1105,18 +1121,7 @@ pub fn make_config() -> Value {
                         ("name".to_string(), Value::str("create")),
                         ("points".to_string(), Value::list(vec![
                             Value::map_of([
-                                ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
-                                ("live".to_string(), Value::map_of([
-                                    ("assert".to_string(), Value::map_of([
-                                        ("nonempty".to_string(), Value::list(vec![
-                                            Value::str("key"),
-                                        ])),
-                                    ])),
-                                    ("auth".to_string(), Value::str("public")),
-                                    ("id".to_string(), Value::str("key")),
-                                    ("retention".to_string(), Value::str("No deletion endpoint; issued key is subject to the service daily allowance")),
-                                ])),
                                 ("method".to_string(), Value::str("POST")),
                                 ("orig".to_string(), Value::str("/v1/ephemeral/key")),
                                 ("segments".to_string(), Value::list(vec![
@@ -1130,15 +1135,27 @@ pub fn make_config() -> Value {
                                         ("lit".to_string(), Value::str("key")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::empty_map()),
-                                ("transform".to_string(), Value::map_of([
-                                    ("req".to_string(), Value::str("`reqdata`")),
-                                    ("res".to_string(), Value::str("`body.data`")),
-                                ])),
                                 ("parts".to_string(), Value::list(vec![
                                     Value::str("v1"),
                                     Value::str("ephemeral"),
                                     Value::str("key"),
+                                ])),
+                                ("rename".to_string(), Value::empty_map()),
+                                ("transform".to_string(), Value::map_of([
+                                    ("req".to_string(), Value::str("`reqdata`")),
+                                    ("res".to_string(), Value::str("`body.data`")),
+                                ])),
+                                ("args".to_string(), Value::empty_map()),
+                                ("select".to_string(), Value::empty_map()),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("nonempty".to_string(), Value::list(vec![
+                                            Value::str("key"),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("public")),
+                                    ("id".to_string(), Value::str("key")),
+                                    ("retention".to_string(), Value::str("No deletion endpoint; issued key is subject to the service daily allowance")),
                                 ])),
                             ]),
                         ])),
@@ -1152,57 +1169,67 @@ pub fn make_config() -> Value {
                 ("fields".to_string(), Value::list(vec![
                     Value::map_of([
                         ("name".to_string(), Value::str("eval")),
-                        ("short".to_string(), Value::str("Retrieval-fidelity metrics for a convert model.")),
+                        ("title".to_string(), Value::str("Eval")),
                         ("type".to_string(), Value::str("`$OBJECT`")),
+                        ("short".to_string(), Value::str("Retrieval-fidelity metrics for a convert model.")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("executionProvider")),
-                        ("short".to_string(), Value::str("Hardware backend, e.g.")),
+                        ("title".to_string(), Value::str("Execution Provider")),
                         ("type".to_string(), Value::str("`$STRING`")),
+                        ("short".to_string(), Value::str("Hardware backend, e.g.")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("modelCard")),
-                        ("short".to_string(), Value::str("Convert models only: training provenance and architecture detail.")),
+                        ("title".to_string(), Value::str("Model Card")),
                         ("type".to_string(), Value::str("`$OBJECT`")),
+                        ("short".to_string(), Value::str("Convert models only: training provenance and architecture detail.")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("modelType")),
+                        ("title".to_string(), Value::str("Model Type")),
+                        ("type".to_string(), Value::str("`$STRING`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("`embed` for text-to-vector models, `convert` for space-translation models.")),
-                        ("type".to_string(), Value::str("`$STRING`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("name")),
+                        ("title".to_string(), Value::str("Name")),
+                        ("type".to_string(), Value::str("`$STRING`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Model identifier used in requests.")),
-                        ("type".to_string(), Value::str("`$STRING`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("sequenceLen")),
-                        ("short".to_string(), Value::str("Embed models only: maximum input sequence length.")),
+                        ("title".to_string(), Value::str("Sequence Len")),
                         ("type".to_string(), Value::str("`$INTEGER`")),
+                        ("short".to_string(), Value::str("Embed models only: maximum input sequence length.")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("sourceDim")),
-                        ("short".to_string(), Value::str("Convert models only: source vector dimension.")),
+                        ("title".to_string(), Value::str("Source Dim")),
                         ("type".to_string(), Value::str("`$INTEGER`")),
+                        ("short".to_string(), Value::str("Convert models only: source vector dimension.")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("sourceModel")),
-                        ("short".to_string(), Value::str("Convert models only: the source model space.")),
+                        ("title".to_string(), Value::str("Source Model")),
                         ("type".to_string(), Value::str("`$STRING`")),
+                        ("short".to_string(), Value::str("Convert models only: the source model space.")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("targetDim")),
+                        ("title".to_string(), Value::str("Target Dim")),
+                        ("type".to_string(), Value::str("`$INTEGER`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("Dimension of the produced vectors.")),
-                        ("type".to_string(), Value::str("`$INTEGER`")),
                     ]),
                     Value::map_of([
                         ("name".to_string(), Value::str("targetModel")),
+                        ("title".to_string(), Value::str("Target Model")),
+                        ("type".to_string(), Value::str("`$STRING`")),
                         ("req".to_string(), Value::Bool(true)),
                         ("short".to_string(), Value::str("The model space produced.")),
-                        ("type".to_string(), Value::str("`$STRING`")),
                     ]),
                 ])),
                 ("name".to_string(), Value::str("model")),
@@ -1212,17 +1239,7 @@ pub fn make_config() -> Value {
                         ("name".to_string(), Value::str("list")),
                         ("points".to_string(), Value::list(vec![
                             Value::map_of([
-                                ("args".to_string(), Value::empty_map()),
                                 ("kind".to_string(), Value::str("http")),
-                                ("live".to_string(), Value::map_of([
-                                    ("assert".to_string(), Value::map_of([
-                                        ("nonempty".to_string(), Value::list(vec![
-                                            Value::str(""),
-                                        ])),
-                                    ])),
-                                    ("auth".to_string(), Value::str("public")),
-                                    ("id".to_string(), Value::str("models")),
-                                ])),
                                 ("method".to_string(), Value::str("GET")),
                                 ("orig".to_string(), Value::str("/v1/models")),
                                 ("segments".to_string(), Value::list(vec![
@@ -1233,14 +1250,25 @@ pub fn make_config() -> Value {
                                         ("lit".to_string(), Value::str("models")),
                                     ]),
                                 ])),
-                                ("select".to_string(), Value::empty_map()),
+                                ("parts".to_string(), Value::list(vec![
+                                    Value::str("v1"),
+                                    Value::str("models"),
+                                ])),
+                                ("rename".to_string(), Value::empty_map()),
                                 ("transform".to_string(), Value::map_of([
                                     ("req".to_string(), Value::str("`reqdata`")),
                                     ("res".to_string(), Value::str("`body.data`")),
                                 ])),
-                                ("parts".to_string(), Value::list(vec![
-                                    Value::str("v1"),
-                                    Value::str("models"),
+                                ("args".to_string(), Value::empty_map()),
+                                ("select".to_string(), Value::empty_map()),
+                                ("live".to_string(), Value::map_of([
+                                    ("assert".to_string(), Value::map_of([
+                                        ("nonempty".to_string(), Value::list(vec![
+                                            Value::str(""),
+                                        ])),
+                                    ])),
+                                    ("auth".to_string(), Value::str("public")),
+                                    ("id".to_string(), Value::str("models")),
                                 ])),
                             ]),
                         ])),

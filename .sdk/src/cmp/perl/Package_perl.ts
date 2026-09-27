@@ -28,14 +28,6 @@ const Package = cmp(async function Package(props: any) {
   // (e.g. "Voxgig::SDK::Solar" -> dist voxgig-sdk-solar).
   const Name = model.const.Name
 
-  // THE PERL FLOOR IS A FUNCTION OF THE FEATURE SET, not a constant.
-  //
-  // The base SDK is pure 5.018 perl. The secrets feature is not: the
-  // vendored voxgig/plugin runtime it depends on opens with
-  // `use builtin qw(is_bool)`, which is 5.36's and is the only way that
-  // port can tell `true` from `1`. Shipping 5.018 in the manifest of an
-  // SDK that cannot run on 5.018 installs cleanly and then dies at
-  // require time, so the floor moves with the feature.
   const secrets = null != (targetFeatures(model, target) as any).secrets
   const minperl = secrets ? '5.036' : '5.018'
 

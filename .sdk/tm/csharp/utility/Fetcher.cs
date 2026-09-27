@@ -11,7 +11,19 @@ namespace UnivecSdk.Util;
 
 public static partial class SdkUtility
 {
-    private static readonly HttpClient DefaultHttpClient = new();
+    // Cookies OFF on every handler. The clients are process-wide, so a
+    // CookieContainer would send one call's Set-Cookie on the next, under a
+    // different credential — and .NET ADDS container cookies to a request
+    // that already carries a Cookie header, which an `apiKey in: cookie`
+    // scheme does. Pooling is the handler's own and is unaffected.
+    private static HttpClientHandler CookielessHandler(bool allowRedirect) =>
+        new HttpClientHandler
+        {
+            AllowAutoRedirect = allowRedirect,
+            UseCookies = false,
+        };
+
+    private static readonly HttpClient DefaultHttpClient = new(CookielessHandler(true));
 
     // Non-following twin of DefaultHttpClient. The station feature's
     // middleware sets `redirect: manual` on the fetch definition under a
@@ -20,11 +32,8 @@ public static partial class SdkUtility
     // to a Location no policy approved (the ts donor's fetch honours the
     // same key natively; redirect policy is per-handler in .NET, hence a
     // second client).
-    private static readonly HttpClient ManualRedirectHttpClient = new(
-        new HttpClientHandler
-        {
-            AllowAutoRedirect = false,
-        });
+    private static readonly HttpClient ManualRedirectHttpClient =
+        new(CookielessHandler(false));
 
     // Proxy-routed clients, cached per proxy URL and redirect policy (see
     // the proxy feature's fetchdef annotation).
@@ -43,12 +52,10 @@ public static partial class SdkUtility
                 var key = (manual ? "manual|" : "auto|") + proxy;
                 if (!ProxyClients.TryGetValue(key, out var client))
                 {
-                    client = new HttpClient(new HttpClientHandler
-                    {
-                        Proxy = new System.Net.WebProxy(proxy),
-                        UseProxy = true,
-                        AllowAutoRedirect = !manual,
-                    });
+                    var handler = CookielessHandler(!manual);
+                    handler.Proxy = new System.Net.WebProxy(proxy);
+                    handler.UseProxy = true;
+                    client = new HttpClient(handler);
                     ProxyClients[key] = client;
                 }
                 return client;

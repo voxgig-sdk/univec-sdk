@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (go/plugins/hashicorp/hashicorp.go)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (go/plugins/hashicorp/hashicorp.go)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 // The hashicorp plugin: HashiCorp Vault, and OpenBao. Needs HTTPS, and
 // the filesystem for a kubernetes service-account JWT. A port of
@@ -18,20 +18,6 @@ import (
 	"github.com/voxgig-sdk/univec-sdk/go/feature/secrets/sekreto"
 )
 
-// Provider reads HashiCorp Vault.
-//
-// KV v2 (the default): api.token reads {addr}/v1/{mount}/data/api and takes
-// the `token` field of data.data. KV v1 (KV: 1) reads {addr}/v1/{mount}/api
-// and takes the field of data. A 404 means "not here", which is a miss
-// rather than an error, so a vault can sit in a chain with fallbacks.
-//
-// A Vault Enterprise namespace rides the X-Vault-Namespace header, on
-// logins as well as reads.
-//
-// Instead of being handed a token, the provider can log in: Kubernetes
-// auth (the pod's service-account JWT, from its conventional path) or
-// AppRole. A failed login is an error, never a miss - it means this store
-// could not answer at all.
 type Provider struct {
 	Addr           string
 	Token          string

@@ -1,12 +1,3 @@
-// Distributed-tracing telemetry (mirrors go feature/telemetry_feature.go).
-// Opens a span per operation (PrePoint), propagates trace context to the
-// server as W3C `traceparent` plus `X-Trace-Id` / `X-Span-Id` headers
-// (PreRequest), and closes the span on completion (PreDone) or failure
-// (PreUnexpected). Each span closes exactly once (the per-context marker
-// in ctx.out is consumed on close). Finished spans accumulate on the
-// feature; an `exporter` callback, when provided, is invoked with each
-// finished span. Trace/span id generation (`idgen`) and the clock (`now`)
-// are injectable for deterministic tests.
 
 use std::rc::Rc;
 

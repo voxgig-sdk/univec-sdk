@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (c/src/host.c)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (c/src/host.c)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* The host: the lifecycle state machine (§5), extension points (§6),
  * and resource capture (§8). See host.h for the two rules that shape
@@ -420,6 +420,29 @@ void inst_export(Inst *e, const char *key, Value *value) {
 }
 
 void inst_provides(Inst *e, Value *p) { vpush(e->provides, p); }
+
+/* Defined with the rest of §11.4's selection, below; `inst_capability`
+ * is the one caller that comes before it. */
+static const char *chosen(Host *h, Inst *e, Value *req, bool remember);
+
+/* WHICH provider this instance is bound to for `name` (§11.1), as a ref,
+ * or NULL when nothing provides it.
+ *
+ * The host's own `capability` answers with the live providers RANKED,
+ * not with the one THIS instance took; §11.4's reluctant rebinding makes
+ * those differ. A REF, not the instance. The selection is REMEMBERED,
+ * because this is the instance asking. */
+const char *inst_capability(Inst *e, const char *name) {
+  Value *reqs = requirements(e->options);
+  for (size_t i = 0; i < vlen(reqs); i++) {
+    Value *r = vat(reqs, i);
+    const char *rn = vasstr(vget(r, "name"));
+    if (NULL != rn && 0 == strcmp(rn, name)) {
+      return chosen(inst_host(e), e, r, true);
+    }
+  }
+  return NULL;
+}
 
 /* The scope entry carries the inner host as its context — C's stand-in
  * for the closure every other port writes here. */

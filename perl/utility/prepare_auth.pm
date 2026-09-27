@@ -15,7 +15,7 @@ package UnivecUtilities;
 
 our %REGISTRY;
 
-my $HEADER_AUTH = 'authorization';
+my $CRED_NAME = 'authorization';
 my $OPTION_APIKEY = 'apikey';
 my $NOT_FOUND = '__NOTFOUND__';
 
@@ -30,7 +30,7 @@ $REGISTRY{prepare_auth} = sub {
 
   # Public APIs that need no auth omit the options.auth block entirely.
   if (!defined UnivecHelpers::gp($options, 'auth')) {
-    delete $headers->{$HEADER_AUTH};
+    delete $headers->{$CRED_NAME};
     return ($spec, undef);
   }
 
@@ -39,14 +39,14 @@ $REGISTRY{prepare_auth} = sub {
   if (!defined $apikey || Voxgig::Struct::is_none($apikey)
     || Voxgig::Struct::is_jnull($apikey)
     || (!ref $apikey && ($apikey eq $NOT_FOUND || $apikey eq ''))) {
-    delete $headers->{$HEADER_AUTH};
+    delete $headers->{$CRED_NAME};
   }
   else {
     my $auth_prefix = UnivecHelpers::gpath($options, 'auth.prefix');
     $auth_prefix = '' unless defined $auth_prefix && !ref $auth_prefix;
     my $apikey_val = (!ref $apikey) ? "$apikey" : '';
     # Empty prefix (raw apiKey credential) must not add a leading space.
-    $headers->{$HEADER_AUTH} =
+    $headers->{$CRED_NAME} =
       ('' eq $auth_prefix) ? $apikey_val : "$auth_prefix $apikey_val";
   }
 

@@ -1,30 +1,6 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (rust/src/providers.rs)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (rust/src/providers.rs)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! What a provider is, what its declarative form looks like, how a
-//! provider kind becomes a voxgig/plugin definition - and the four
-//! BUILT-IN kinds.
-//!
-//! A provider answers one question: "do you have this secret?" It returns
-//! the value, or None to mean "ask the next one". Nothing else about a
-//! provider is visible to the caller - which is the point: an app reads
-//! `api.token` and never learns whether it came from the environment, a
-//! .env file, HashiCorp Vault, AWS, GCP, Azure or a boru vault.
-//!
-//! Two failure shapes, and they are never interchangeable. A store that
-//! does not hold the secret is a MISS (None) - the chain carries on. A
-//! store that could not answer - bad credentials, unreachable host,
-//! missing configuration - is an ERROR: falling through there would
-//! quietly reach for a weaker store.
-//!
-//! THIS CRATE LINKS NO TLS, NO SOCKET AND NO SUBPROCESS. What makes a
-//! kind built in is that it needs nothing of the platform beyond reading
-//! a local file; every kind that opens a socket, signs a request or
-//! spawns a process is a plugin in its own crate under `plugins/`, linked
-//! only by a binary that names it (docs/design/plugin-providers.md).
-//!
-//! A port of typescript/src/provider/support.ts and
-//! typescript/src/provider/builtin.ts, which are canonical.
 
 use std::collections::BTreeMap;
 use std::env;
@@ -41,12 +17,9 @@ use super::super::plugin::value::Value;
 
 use super::sekreto::{envkey, Answer, SekretoError};
 
-/// A source of secrets.
 pub trait Provider {
-    /// The value, or None if this provider does not have it.
     fn lookup(&self, name: &str) -> Answer<Option<String>>;
 
-    /// A short description, shown by `Sekreto::sources`.
     fn describe(&self) -> String;
 }
 
@@ -57,19 +30,13 @@ pub trait Provider {
 /// hand-written impl below.
 #[derive(Clone, Default)]
 pub struct AuthSpec {
-    /// `kubernetes` or `approle`.
     pub method: String,
-    /// The auth mount, defaulting to the method name.
     pub mount: String,
-    /// kubernetes: the Vault role to log in as.
     pub role: String,
     /// kubernetes: the service-account JWT itself (tests); None means the
     /// jwt file is read instead.
     pub jwt: Option<String>,
-    /// kubernetes: where the JWT lives; the conventional pod path by
-    /// default.
     pub jwtfile: String,
-    /// approle: the role and secret ids.
     pub roleid: String,
     pub secretid: String,
 }
@@ -82,41 +49,22 @@ pub struct AuthSpec {
 #[derive(Clone, Default)]
 pub struct ProviderSpec {
     pub kind: String,
-    /// The store name `Sekreto::getfrom` addresses. Defaults to `kind`.
     pub name: String,
     pub prefix: String,
-    /// dotenv: the file to read.
     pub file: String,
-    /// memory: literal values, keyed like environment variables.
     pub values: BTreeMap<String, String>,
-    /// file: the directory of one-secret-per-file entries.
     pub dir: String,
-    /// hashicorp / boru (wire) / gcp / 1password / doppler / infisical:
-    /// the base URL.
     pub addr: String,
-    /// hashicorp / boru (wire) / gcp / azure / 1password / doppler /
-    /// infisical: the access token.
     pub token: String,
-    /// hashicorp / boru (wire): the KV mount (default `secret`).
     pub mount: String,
-    /// hashicorp: KV engine version, 1 or 2 (0 means the default, 2).
     pub kv: u32,
-    /// hashicorp: Vault Enterprise namespace (X-Vault-Namespace).
     pub vaultnamespace: String,
     /// hashicorp: log in for a token instead of being handed one.
     pub auth: Option<AuthSpec>,
-    /// boru / secretspec: the executable to run (default: the kind's own
-    /// name).
     pub command: String,
-    /// boru: the namespace qualifying the alias.
     pub namespace: String,
-    /// boru: the vault home, passed as BORU_HOME.
     pub home: String,
-    /// secretspec: the profile to read (`--profile`).
     pub profile: String,
-    /// secretspec: which of ITS backends to read from (`--provider`),
-    /// e.g. `keyring` or `dotenv://.env`. Named `backend` because
-    /// `provider` already means a sekreto provider.
     pub backend: String,
     /// secretspec: the audit reason recorded for the read (`--reason`).
     /// SecretSpec refuses to read without one.
@@ -130,11 +78,7 @@ pub struct ProviderSpec {
     /// gcp / doppler / infisical: the project (GCP project id, Doppler
     /// project slug, Infisical workspace id).
     pub project: String,
-    /// azure: the Key Vault name or full URL. 1password: the vault name
-    /// or id.
     pub vault: String,
-    /// azure: client-credential login. infisical: universal-auth login
-    /// (tenant is Azure-only).
     pub tenant: String,
     pub clientid: String,
     pub clientsecret: String,
@@ -144,13 +88,17 @@ pub struct ProviderSpec {
     pub loginaddr: String,
     pub imdsaddr: String,
     pub metadataaddr: String,
-    /// azure: the Key Vault API version (default 7.4).
     pub apiversion: String,
-    /// doppler: the config slug (with `project`).
     pub config: String,
-    /// infisical: the environment slug and secret path.
     pub environment: String,
     pub path: String,
+    pub passphrase: String,
+    /// minivault: which key in the vault file to open with, defaulting to
+    /// `master`. Named apart from `key` and `keyid` because those already
+    /// mean a secret name and an AWS access key id.
+    pub vaultkey: String,
+    pub iterations: u32,
+    pub create: bool,
 
     /// A provider already built, joining the chain as it is - `kind`
     /// empty. This is how a custom provider that is not a plugin gets in.
@@ -168,7 +116,6 @@ impl ProviderSpec {
 }
 
 
-/// Environment variables: `api.token` from `API_TOKEN`.
 pub struct EnvProvider {
     pub prefix: String,
 }
@@ -187,7 +134,6 @@ impl Provider for EnvProvider {
     }
 }
 
-/// A `.env` file, read once, keyed exactly like the environment.
 pub struct DotenvProvider {
     pub file: String,
     pub prefix: String,
@@ -267,14 +213,6 @@ impl Provider for MemoryProvider {
     }
 }
 
-/// A directory of one-secret-per-file entries, keyed like the
-/// environment: `api.token` reads `<dir>/API_TOKEN`.
-///
-/// This is the shape of a mounted Kubernetes Secret, a Docker or Swarm
-/// secret, and a systemd credentials directory, so those all work with no
-/// further configuration. One trailing newline is stripped - tools that
-/// write these files disagree about it, and a newline is never part of a
-/// secret on purpose.
 pub struct FileProvider {
     pub dir: String,
     pub prefix: String,
@@ -318,13 +256,6 @@ impl Provider for FileProvider {
     }
 }
 
-/// Printed without its credentials.
-///
-/// A derived `Debug` puts the Vault token, the AWS secret access key and
-/// the Azure client secret into whatever formatted it - and
-/// `tracing::error!(?spec, "chain build failed")` is exactly what someone
-/// writes when a chain will not build. Fields that hold a credential
-/// report whether they are set, never what they are.
 impl fmt::Debug for AuthSpec {
     fn fmt(&self, form: &mut fmt::Formatter<'_>) -> fmt::Result {
         form.debug_struct("AuthSpec")
@@ -353,7 +284,6 @@ impl fmt::Debug for ProviderSpec {
     }
 }
 
-/// What a credential field reports about itself.
 fn setornot(value: &str) -> &'static str {
     if value.is_empty() {
         "[unset]"
@@ -361,46 +291,13 @@ fn setornot(value: &str) -> &'static str {
         "[set]"
     }
 }
-// --- providers as voxgig/plugin definitions ----------------------------
 
 /// The export key under which a provider definition publishes the
 /// provider it built. `Sekreto::new` reads `<ref>/provider` off the host.
 pub const PROVIDER_EXPORT: &str = "provider";
 
-/// The voxgig/plugin error code a `SekretoError` travels under when a
-/// definition's `define` refuses.
-///
-/// plugin wraps a code-less error raised by a callback as
-/// `plugin_define_failed`, and keeps one that already carries a code. A
-/// provider that refuses its own configuration - `kv: 3`, a missing
-/// project - returns a `SekretoError`, and that message is pinned by the
-/// spec byte for byte, so it must come back out of the host exactly as it
-/// went in. `providerplugin` puts this code on; `Sekreto::new` takes it
-/// off. Nowhere else catches and rewraps.
 pub const ERROR_CODE: &str = "sekreto_error";
 
-/// A provider kind, as a voxgig/plugin definition.
-///
-/// This is the whole bridge between the two libraries. The definition's
-/// name is the `kind` a `ProviderSpec` names; its `define` reads the spec
-/// back off the instance's options, builds the provider with `make`, and
-/// exports it. Nothing runs at activate: a provider opens nothing until
-/// its first `lookup`, so there is nothing to capture - a provider that
-/// does hold a resource acquires it there and lets the instance scope
-/// unwind it.
-///
-/// Every built-in and every plugin is made this way, so a custom provider
-/// kind is one call:
-///
-/// ```ignore
-/// providerplugin("mystore", |spec| {
-///     Ok(Rc::new(MyStore { addr: spec.addr.clone() }) as Rc<dyn Provider>)
-/// })
-/// ```
-///
-/// The provider crosses the boundary as `Value::Opaque` - plugin's own
-/// escape hatch for "a client the library never inspects" (§11). The
-/// value model carries JSON, and a `Provider` is not JSON.
 pub fn providerplugin<F>(kind: &str, make: F) -> Definition
 where
     F: Fn(&ProviderSpec) -> Answer<Rc<dyn Provider>> + 'static,
@@ -415,8 +312,6 @@ where
                 inst.export(PROVIDER_EXPORT, Value::Opaque(Rc::new(provider)));
                 Ok(())
             }
-            // The message is the spec's, byte for byte. `cause` is where
-            // `Sekreto::new` reads it back from.
             Err(err) => Err(PluginError::new(
                 ERROR_CODE,
                 &err.message,
@@ -494,6 +389,10 @@ pub fn specof(options: &Value) -> ProviderSpec {
         config: gettext(options, "config"),
         environment: gettext(options, "environment"),
         path: gettext(options, "path"),
+        passphrase: gettext(options, "passphrase"),
+        vaultkey: gettext(options, "vaultkey"),
+        iterations: options.get("iterations").as_num().unwrap_or(0.0) as u32,
+        create: matches!(options.get("create"), Value::Bool(true)),
         provider: None,
     }
 }
@@ -566,6 +465,16 @@ pub fn optionsof(spec: &ProviderSpec) -> Value {
     puttext(&mut out, "config", &spec.config);
     puttext(&mut out, "environment", &spec.environment);
     puttext(&mut out, "path", &spec.path);
+    puttext(&mut out, "passphrase", &spec.passphrase);
+    puttext(&mut out, "vaultkey", &spec.vaultkey);
+
+    if 0 != spec.iterations {
+        out.set("iterations", Value::Num(spec.iterations as f64));
+    }
+
+    if spec.create {
+        out.set("create", Value::Bool(true));
+    }
 
     out
 }
@@ -580,10 +489,6 @@ fn gettext(value: &Value, key: &str) -> String {
     value.get(key).as_str().unwrap_or("").to_string()
 }
 
-/// The four built-in provider kinds, as definitions, in a fresh vector:
-/// `env`, `memory`, `dotenv` and `file` - the same four in every port.
-/// `Sekreto::new` puts them in every catalog ahead of the plugins it is
-/// handed.
 pub fn builtins() -> Vec<Definition> {
     vec![
         providerplugin("env", |spec| {
@@ -614,16 +519,9 @@ pub fn builtins() -> Vec<Definition> {
     ]
 }
 
-/// The four kinds built into this crate.
 pub const BUILTIN_KINDS: [&str; 4] = ["env", "memory", "dotenv", "file"];
 
-/// Every kind that ships as a plugin, so that an unknown kind can be told
-/// from a plugin that was not passed in.
-///
-/// The core names the KINDS, which are spec, and links none of the crates
-/// that implement them - the list is ten strings, and a string reaches
-/// nothing.
-pub const PLUGIN_KINDS: [&str; 10] = [
+pub const PLUGIN_KINDS: [&str; 11] = [
     "hashicorp",
     "boru",
     "awssecrets",
@@ -634,4 +532,5 @@ pub const PLUGIN_KINDS: [&str; 10] = [
     "doppler",
     "infisical",
     "secretspec",
+    "minivault",
 ];

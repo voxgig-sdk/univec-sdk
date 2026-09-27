@@ -20,6 +20,7 @@ is a hashref.
 ${target.name}/
 ├── lib/${model.const.Name}SDK.pm    -- Main SDK module (package ${model.const.Name}SDK)
 ├── config.pm                    -- Configuration
+├── schema.pm                    -- Generated option + entity specs
 ├── features.pm                  -- Feature factory
 ├── core/                        -- Core types and context
 ├── entity/                      -- Entity implementations

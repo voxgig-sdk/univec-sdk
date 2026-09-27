@@ -1,0 +1,46 @@
+main: kit: target: swift: {
+
+  title: "Swift"
+  ext: swift
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  provides: { sekreto: true, schema: true }
+
+  superseded: []
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct utility is vendored under Sources/ProjectNameSDK/Struct - no manifest dep needed.
+  # The runtime uses only Foundation (URLSession + the in-tree JSON parser).
+  deps: {}
+}
+
+
+main: kit: feature: &: target: swift: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: swift: publish: {
+  registry: {
+    name: 'swiftpm'
+    url: 'https://swift.org/package-manager'
+    vault: { alias: 'swiftpm', env: 'SWIFTPM_TOKEN' }
+  }
+}
+
+
+# Feature source may be trimmed to the model's selection. The one template
+# needing the COMPLETE set is the cross-feature test suite, which
+# constructs every *Feature type — so it is dropped alongside the
+# features it exercises whenever the set is trimmed.
+main: kit: target: swift: feature: {
+  trim: true
+  fullset: ['Tests/ProjectNameSDKTests/FeatureTest.swift']
+}

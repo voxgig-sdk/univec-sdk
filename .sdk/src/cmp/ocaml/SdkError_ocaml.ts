@@ -7,10 +7,6 @@ import {
 } from '@voxgig/sdkgen'
 
 
-// sdk_error.ml — a thin API-facing view of the branded SDK error. The error
-// type and exception themselves live in the runtime (Sdk_types.sdk_error /
-// Sdk_error_exc); this module re-exports them under stable names so callers
-// have a single place to catch/inspect errors (twin of rust core/error.rs).
 const SdkError = cmp(async function SdkError(props: any) {
   const ctx$ = props.ctx$
   const target = props.target

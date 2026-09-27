@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (javascript/src/host.js)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (javascript/src/host.js)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* The host: the lifecycle state machine (§5), extension points (§6), and
  * resource capture (§8).
@@ -193,6 +193,21 @@ function makehost(options) {
 
       /** Published for other plugins and for the application (§11). */
       export: (key, value) => { e.exports[key] = value },
+
+      /** WHICH provider this instance is bound to for `name` (§11.1),
+       * as a ref, or undefined when nothing provides it.
+       *
+       * The host's own `capability` answers with the live providers
+       * RANKED, not with the one THIS instance took; §11.4's reluctant
+       * rebinding makes those differ. A REF, not the instance: every
+       * port can return a string and a corpus entry can assert on one.
+       * The selection is REMEMBERED, because this is the instance
+       * asking. */
+      capability: (name) => {
+        const req = requirements(e.options).find((r) => r.name === name)
+        if (undefined === req) return undefined
+        return chosen(e, req, true)
+      },
 
       /** What this instance can do for others (§11.1). */
       provides: (p) => { e.provides.push(p) },

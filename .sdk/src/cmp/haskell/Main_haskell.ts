@@ -32,12 +32,6 @@ const Main = cmp(async function Main(props: any) {
 
   Gitignore({})
 
-  // Copy tm/haskell verbatim: the runtime under src/ (VoxgigStruct, Vregex,
-  // SdkTypes, SdkHelpers, SdkRuntime, SdkFeatures), the test suite under
-  // test/, and Makefile/LICENSE/VERSION. The per-feature custom-source
-  // scaffold under src/feature is excluded (this target does not use it —
-  // entities are generic and config-driven, so there are no per-entity or
-  // per-feature generated modules). Placeholder substitution applies.
   Copy({
     from: 'tm/' + target.name,
     exclude: [/src\/feature\//],

@@ -36,7 +36,9 @@
   },
   "requests": {
     "POST /v1/ephemeral/key": {
-      "provenance": "operation-contract"
+      "provenance": "operation-contract",
+      "version": 2,
+      "source": "openapi3"
     }
   }
 }

@@ -1,0 +1,47 @@
+main: kit: target: csharp: {
+
+  title: "C#"
+  ext: cs
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  provides: { sekreto: true, schema: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the struct corpus engine. Runner.cs (class
+  # TestRunner) is support-only and RETAINED, name unchanged so emitted
+  # call sites need no churn; the StructRunner support members live on
+  # inside it. `doctor` reports leftovers; `doctor prune` deletes them.
+  superseded: [
+    'test/StructRunner.cs'
+  ]
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  deps: {}
+}
+
+
+main: kit: feature: &: target: csharp: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: csharp: publish: {
+  registry: {
+    name: 'nuget'
+    url: 'https://www.nuget.org'
+    vault: { alias: 'nuget', env: 'NUGET_API_KEY' }
+  }
+}
+
+
+main: kit: target: csharp: feature: {
+  trim: true
+  fullset: ['test/FeatureTest.cs']
+}

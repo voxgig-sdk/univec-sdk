@@ -1,5 +1,3 @@
-import 'voxgig_struct.dart' as vs;
-
 dynamic prepareMethod(dynamic ctx) {
   final op = ctx.op;
   final opname = op.name;

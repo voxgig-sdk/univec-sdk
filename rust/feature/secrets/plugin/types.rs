@@ -1,29 +1,13 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (rust/src/types.rs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (rust/src/types.rs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! Shared types. Deliberately small: the design's §19 budget says the
-//! library owns naming, configuration, lifecycle, ordering, binding and
-//! teardown, and nothing else.
-//!
-//! RUST FOLLOWS GO'S ONE DELIBERATE CHANGE (§18, P4): errors are RETURNED,
-//! not raised. Every fallible signature is `Result<_, PluginError>`, and
-//! the corpus compares by CODE, which survives the change intact.
 
 use super::value::Value;
 
-/// §5.1's seven statuses, and no more. A port that adds an eighth is
-/// diverging. `loading` and `closing` are observable only from inside a
-/// callback or from another thread.
 pub const STATUSES: [&str; 7] = [
     "declared", "loaded", "pending", "live", "failed", "loading", "closing",
 ];
 
-/// §12's detail fields, IN THIS FIXED ORDER.
-///
-/// The order is part of the contract, not a formatting preference. An
-/// earlier draft named six fields while other sections promised
-/// diagnostics that had nowhere to go, which would have left each port
-/// inventing its own order and breaking message parity.
 pub const DETAIL_ORDER: [&str; 16] = [
     "host", "ref", "name", "tag", "point", "key", "capability", "range", "version", "match",
     "candidates", "cycle", "holders", "refs", "path", "cause",
@@ -50,11 +34,6 @@ pub fn formaterror(code: &str, text: &str, details: &Value) -> String {
     format!("plugin/{}: {}{}", code, text, tail)
 }
 
-/// Every error carries a §12 code. Ports compare by CODE and never by
-/// message: wording is a port's own business, and pinning the words would
-/// make every translation a corpus change. The FORMAT, however, is pinned
-/// - a parseable message is what makes a log searchable across twenty
-/// languages.
 #[derive(Clone, Debug)]
 pub struct PluginError {
     pub code: String,
@@ -102,12 +81,10 @@ pub fn fail<T>(code: &str, text: &str, details: Value) -> Result<T, PluginError>
     Err(PluginError::new(code, text, details))
 }
 
-/// The §12 code of an error, or "" for one this library did not raise.
 pub fn codeof(err: &PluginError) -> &str {
     err.code.as_str()
 }
 
-/// A detail map, spelled once rather than at forty call sites.
 pub fn details(pairs: &[(&str, Value)]) -> Value {
     let mut out = Value::map();
     for (k, v) in pairs {
@@ -116,9 +93,6 @@ pub fn details(pairs: &[(&str, Value)]) -> Value {
     out
 }
 
-/// STABLE sort by a computed key. `sort_by` in the standard library is
-/// already stable, which is what the canonical's comparators need where
-/// they fall through to a `pos` or ref tie-break.
 pub fn stable_sort_by<T, K, F>(list: &mut [T], keyof: F)
 where
     F: Fn(&T) -> K,

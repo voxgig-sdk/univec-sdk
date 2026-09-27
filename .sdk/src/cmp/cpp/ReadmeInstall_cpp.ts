@@ -1,5 +1,5 @@
 
-import { cmp, Content, repoInfo } from '@voxgig/sdkgen'
+import { cmp, Content, repoInfo, sdkName } from '@voxgig/sdkgen'
 
 
 const ReadmeInstall = cmp(function ReadmeInstall(props: any) {
@@ -20,7 +20,7 @@ Releases are cut as the git tag \`${target.name}/vX.Y.Z\` (see
 
 \`\`\`bash
 # Add the SDK as a submodule (or copy the cpp/ directory into your tree).
-git submodule add <repo-url> third_party/${model.const.Name.toLowerCase()}-sdk
+git submodule add <repo-url> third_party/${sdkName(model.const.Name.toLowerCase())}
 \`\`\`
 
 Then include the umbrella header and compile with C++17:
@@ -30,7 +30,7 @@ Then include the umbrella header and compile with C++17:
 \`\`\`
 
 \`\`\`bash
-g++ -std=c++17 -Ithird_party/${model.const.Name.toLowerCase()}-sdk/cpp your_app.cpp -o your_app
+g++ -std=c++17 -Ithird_party/${sdkName(model.const.Name.toLowerCase())}/cpp your_app.cpp -o your_app
 \`\`\`
 
 `)

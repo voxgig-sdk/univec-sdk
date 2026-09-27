@@ -7,8 +7,9 @@ const { BaseFeature } = require('../base/BaseFeature')
 // stamps page/limit (or a cursor) into the request query; on the way back
 // (PreResult) it reads the server's pagination signals — a `Link:
 // rel="next"` header, `X-Next-Page`/`X-Total-Count` headers, or `next`/
-// `cursor`/`hasMore` fields in the body — and records them on
-// `ctx.result.paging`. Generated SDKs build auto-iteration on top of this
+// `cursor`/`hasMore` fields in the body (snake_case forms too) — and
+// records them on `ctx.result.paging` and the caller's `ctrl.paging`.
+// Generated SDKs build auto-iteration on top of this
 // (advance the cursor/page and re-issue the list call until `hasMore` is
 // false). Parameter names and page size are configurable.
 class PagingFeature extends BaseFeature {
@@ -28,7 +29,7 @@ class PagingFeature extends BaseFeature {
 
 
   PreRequest(ctx) {
-    if (!this._isList(ctx)) {
+    if (!this.active || !this._isList(ctx)) {
       return
     }
     const spec = ctx.spec
@@ -58,7 +59,10 @@ class PagingFeature extends BaseFeature {
       spec.query[cursorParam] = paging.cursor
     }
     else if (null == spec.query[pageParam]) {
-      spec.query[pageParam] = null != paging.page ? paging.page : (this._options.startPage || 1)
+      // A record written back by PreResult holds the page just fetched as
+      // `page` and the one to fetch as `nextPage`, so nextPage wins.
+      spec.query[pageParam] = null != paging.nextPage ? paging.nextPage :
+        null != paging.page ? paging.page : (this._options.startPage || 1)
     }
 
     if (null != this._options.limit && null == spec.query[limitParam]) {
@@ -68,7 +72,7 @@ class PagingFeature extends BaseFeature {
 
 
   PreResult(ctx) {
-    if (!this._isList(ctx)) {
+    if (!this.active || !this._isList(ctx)) {
       return
     }
     const result = ctx.result
@@ -124,11 +128,20 @@ class PagingFeature extends BaseFeature {
       }
     }
 
-    // Body-level cursors.
+    // Body-level signals; snake_case forms are read first so camelCase wins.
     if (body && 'object' === typeof body) {
       if (null != body.next) { paging.next = paging.next || body.next }
+      if (null != body.next_cursor) { paging.cursor = body.next_cursor }
       if (null != body.cursor) { paging.cursor = body.cursor }
       if (null != body.nextCursor) { paging.cursor = body.nextCursor }
+      if (null == paging.nextPage) {
+        const np = null != body.nextPage ? body.nextPage : body.next_page
+        if ('number' === typeof np || 'string' === typeof np) { paging.nextPage = np }
+      }
+      if ('boolean' === typeof body.has_more) {
+        paging.hasMore = body.has_more
+        explicitMore = true
+      }
       if ('boolean' === typeof body.hasMore) {
         paging.hasMore = body.hasMore
         explicitMore = true
@@ -146,6 +159,11 @@ class PagingFeature extends BaseFeature {
     }
 
     result.paging = paging
+
+    // ctx.ctrl is the caller's own object, so the record reaches them.
+    if (null != ctx.ctrl) {
+      ctx.ctrl.paging = paging
+    }
 
     const client = this._client
     client._paging = { last: paging }

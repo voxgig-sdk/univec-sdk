@@ -28,7 +28,8 @@ voxgig_value* prepare_query_util(Context* ctx) {
     for (size_t i = 0; i < rm->len; i++) {
       const char* key = rm->entries[i].key;
       voxgig_value* val = rm->entries[i].value;
-      if (!v_is_noval(val) && !v_is_null(val) && !params_contains(params, key)) {
+      if (!v_is_noval(val) && !v_is_null(val) && strcmp(key, "$action") != 0 &&
+          !params_contains(params, key)) {
         setp(out, key, v_share(val));
       }
     }

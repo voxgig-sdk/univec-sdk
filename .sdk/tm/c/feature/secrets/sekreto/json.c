@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (c/src/json.c)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (c/src/json.c)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* sekreto's own JSON.
  *
@@ -93,7 +93,7 @@ static void pushitem(sek_pool *pool, sek_json *arr, sek_json *item) {
   arr->itemlen++;
 }
 
-static void sek_json_assign_member(sek_pool *pool, sek_json *obj, const char *key, sek_json *val) {
+static void putkey(sek_pool *pool, sek_json *obj, const char *key, sek_json *val) {
   size_t index;
 
   for (index = 0; index < obj->maplen; index++) {
@@ -128,7 +128,7 @@ void sek_json_push(sek_pool *pool, sek_json *arr, sek_json *item) {
 }
 
 void sek_json_set(sek_pool *pool, sek_json *obj, const char *key, sek_json *val) {
-  sek_json_assign_member(pool, obj, key, val);
+  putkey(pool, obj, key, val);
 }
 
 /* ---- reads --------------------------------------------------------- */
@@ -607,7 +607,7 @@ static sek_json *readobject(reader *rd) {
       return NULL;
     }
 
-    sek_json_assign_member(rd->pool, out, key, val);
+    putkey(rd->pool, out, key, val);
     skipspace(rd);
 
     if (rd->at >= rd->len) {

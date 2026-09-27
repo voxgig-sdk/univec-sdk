@@ -1,0 +1,46 @@
+
+main: kit: target: 'py-data': {
+
+  title: 'Python Data'
+  ext: py
+  comment: line: "#"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  phase: {
+    entity:     { active: false }
+    feature:    { active: false }
+    readme:     { active: false }
+    agentguide: { active: false }
+    test:       { active: false }
+  }
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # pandas is a HARD dependency, not an optional extra: DataFrames are this
+  # package's entire reason to exist, and an import guard reading "please
+  # install pandas" is worse than declaring it. The sibling py SDK dep is
+  # emitted by Main from the model name, so it is not declared here.
+  # The base `py` package keeps its single-dependency (requests) footprint.
+  deps: {
+    'pandas': { active: true, version: '2.0' }
+  }
+}
+
+
+main: kit: feature: &: target: 'py-data': deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: 'py-data': publish: {
+  registry: {
+    name: 'pypi'
+    url: 'https://pypi.org'
+    vault: { recipe: 'pypi', alias: 'pypi' }
+  }
+}

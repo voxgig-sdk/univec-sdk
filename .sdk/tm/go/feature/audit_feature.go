@@ -4,15 +4,6 @@ import (
 	"GOMODULE/core"
 )
 
-// Audit trail. Emits a structured record for every operation — who (actor),
-// what (entity + op), the outcome, and a correlation id — suitable for
-// compliance logging. Records accumulate on the feature (bounded by `max`,
-// default 1000) and, when a `sink` callback is supplied, are also pushed to
-// it (e.g. to forward to a SIEM). The actor is the per-call ctrl actor,
-// falling back to the options `actor`, then "anonymous". Each operation is
-// audited exactly once (the per-context marker in ctx.Out prevents a
-// PreDone + PreUnexpected double-log). Timestamps use the injectable `now`
-// clock so tests stay deterministic.
 type AuditFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK

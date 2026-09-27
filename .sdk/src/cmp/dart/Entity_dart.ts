@@ -56,8 +56,6 @@ const Entity = cmp(function Entity(props: any) {
           SdkName: model.const.Name,
           EntityName: entity.Name,
 
-          // Class token decoupled from the EntityName data-type token in
-          // Entity.fragment.dart so the class can be renamed independently.
           EntyClass: cls,
 
           '#TypeImports': ({ indent }: any) => Content({ indent },

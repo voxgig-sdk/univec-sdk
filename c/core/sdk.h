@@ -375,6 +375,10 @@ struct Context {
   voxgig_value* out_point_val;
   PNError* out_point_err;
   Spec* out_spec;
+  // A PreSpec hook (e.g. validate) rejecting the operation. `out_spec` above
+  // is a Spec, so it cannot carry the error the way go's `out["spec"]` map
+  // slot does; this is the same seam as out_point_err, one stage later.
+  PNError* out_spec_err;
   Response* out_request;
   Response* out_response;
   SdkResult* out_result;
@@ -407,6 +411,7 @@ Utility* context_util(Context* ctx);
 // ctx.out helpers.
 void ctx_out_set_point_val(Context* ctx, voxgig_value* v);
 void ctx_out_set_point_err(Context* ctx, PNError* e);
+void ctx_out_set_spec_err(Context* ctx, PNError* e);
 voxgig_value* ctx_out_extra_get(Context* ctx, const char* key);
 void ctx_out_extra_set(Context* ctx, const char* key, voxgig_value* v);
 
@@ -446,6 +451,15 @@ voxgig_value* sdk_graphql(UnivecSDK* sdk, const char* query,
 // Generated config (core/config.c).
 voxgig_value* make_config(void);
 voxgig_value* shared_config(void);
+
+// Generated schemas (core/schema.c): the model's option spec, which
+// make_options validates client options against, and the per-entity field
+// specs. The shared_* accessors parse once and hand back a value that is
+// READ-ONLY to the caller, exactly as shared_config does.
+voxgig_value* make_optspec(void);
+voxgig_value* shared_optspec(void);
+voxgig_value* make_entityspec(void);
+voxgig_value* shared_entityspec(void);
 Feature* make_feature(const char* name);
 
 // The plugin DEFINITIONS the model selected for one feature's chain - the c

@@ -1,22 +1,6 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (go/plugins/aws/sigv4.go)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (go/plugins/aws/sigv4.go)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-// AWS Signature Version 4, hand-rolled.
-//
-// The AWS providers need exactly one thing from the AWS SDK - request
-// signing - and taking the SDK for it would break the no-dependency rule
-// that keeps ten ports honest. SigV4 is a stable, published algorithm
-// built from HMAC-SHA256, which the standard library already has.
-//
-// SigV4 is pure: the caller passes the timestamp, so the same input yields
-// the same signature everywhere. That is what lets the shared spec carry
-// known-answer cases that all ten ports must reproduce bit-for-bit, and
-// lets the integration mock recompute the signature server-side.
-//
-// A port of typescript/plugins/sigv4.ts, which is canonical. It lives
-// with the aws plugin because it is the one place the library needs
-// HMAC-SHA256, and a built-in must not.
-
 package aws
 
 import (
@@ -35,11 +19,8 @@ import (
 // Sigv4Input is one request to sign. The JSON tags match the shared
 // spec's sigv4 group, so a spec case decodes straight into it.
 type Sigv4Input struct {
-	Method string `json:"method"`
-	// URL is the full request URL; the host, path and query are signed.
-	URL string `json:"url"`
-	// Headers are extra headers to sign, e.g. content-type and
-	// x-amz-target.
+	Method  string            `json:"method"`
+	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers"`
 	Body    string            `json:"body"`
 	Service string            `json:"service"`
@@ -130,12 +111,6 @@ func SigV4(input *Sigv4Input) (map[string]string, error) {
 	}
 	body := input.Body
 
-	// Every header that will be signed: the caller's extras, plus host and
-	// x-amz-date (and the session token when present), lower-cased and
-	// trimmed the way the canonical form requires.
-	// Canonical header values are trimmed AND internally collapsed -
-	// AWS folds sequential whitespace to one space before signing, so a
-	// header like "a  b" must sign as "a b" or the service refuses it.
 	headers := map[string]string{}
 	for key, value := range input.Headers {
 		headers[strings.ToLower(key)] = whitespace.ReplaceAllString(strings.TrimSpace(value), " ")

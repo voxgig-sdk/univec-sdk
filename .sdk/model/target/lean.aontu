@@ -1,0 +1,53 @@
+
+main: kit: target: lean: {
+
+  title: Lean
+  ext: lean
+  comment: line: "--"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen-langpack/.sdk'
+  package: '@voxgig/sdkgen-langpack'
+  srcfeature: false
+
+  provides: { sekreto: true }
+
+  superseded: []
+
+  phase: {
+    entity:     { active: false }
+    feature:    { active: false }
+    readme:     { active: true }
+    agentguide: { active: true }
+    test:       { active: true }
+  }
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct is vendored under src/ (VoxgigStruct.lean + Vregex.lean) and the
+  # runtime is dependency-free: it compiles with the stock Lean 4 toolchain
+  # (only the built-in prelude + Std), no Lake package dependencies. The HTTP
+  # transport shells out to `curl` via IO.Process, so there are no manifest
+  # deps.
+  deps: {}
+}
+
+
+main: kit: feature: &: target: lean: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: lean: publish: {
+  registry: {
+    name: 'reservoir'
+    url: 'https://reservoir.lean-lang.org'
+    vault: { alias: 'reservoir', env: 'RESERVOIR_TOKEN' }
+  }
+}
+
+
+main: kit: target: lean: feature: {
+  trim: false
+}

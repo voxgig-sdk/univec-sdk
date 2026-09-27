@@ -1,5 +1,5 @@
 # VENDORED: @voxgig/struct 0.1.1 (perl/lib/Voxgig/Struct.pm)
-# Source: https://github.com/voxgig/struct @ abd93227e3295151f8dcd18597c3f3f2577af8b7  [tag: sdk-20260911-2013-0]
+# Source: https://github.com/voxgig/struct @ 3a42881b1d26c75ebbed9f1897f0ba94cf3cf780  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 # Copyright (c) 2025-2026 Voxgig Ltd. MIT LICENSE.
 # Perl port of the canonical TypeScript implementation (ts/src/StructUtility.ts).
@@ -2452,7 +2452,6 @@ sub validate_ONE {
         $inj->{keyI} = size($inj->{keys});
         _inj_setval($inj, $inj->{dparent}, 2);
         $inj->{path} = slice($inj->{path}, -1);
-        $inj->{key} = getelem($inj->{path}, -1);
         my $tvals = slice($parent, 1);
         if (size($tvals) == 0) {
             push @{ $inj->{errs} },
@@ -2470,7 +2469,9 @@ sub validate_ONE {
                 meta  => $inj->{meta},
             });
             _inj_setval($inj, $vcurrent, -2);
-            return if size($terrs) == 0;
+            # SKIP: the alternative validated this subtree, so the walker must
+            # not run its generic pass over a slot $ONE has consumed.
+            return SKIP() if size($terrs) == 0;
         }
         my $valdesc = CORE::join(', ', map { stringify($_) } @$tvals);
         $valdesc =~ s/`\$([A-Z]+)`/lc($1)/ge;
@@ -2575,6 +2576,10 @@ sub _validation {
     }
     if (ismap($cval)) {
         if (!ismap($pval)) {
+            warn "[V0020] key=" . (defined $key ? $key : 'undef')
+              . " parent=" . stringify($parent)
+              . " pval=" . (defined $pval ? stringify($pval) : 'undef')
+              . " path=@{$inj->{path}}\n" if $ENV{STRUCT_TRACE};
             push @{ $inj->{errs} },
                 _invalid_type_msg($inj->{path}, typename($ptype), $ctype, $cval, 'V0020');
             return;

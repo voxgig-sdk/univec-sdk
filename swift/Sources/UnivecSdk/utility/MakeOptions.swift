@@ -3,65 +3,6 @@
 
 import Foundation
 
-private func buildOptSpec() -> Value {
-  let authPrefix = VMap()
-  authPrefix.entries["prefix"] = .string("")
-
-  let headers = VMap()
-  headers.entries["`$CHILD`"] = .string("`$STRING`")
-
-  let allow = VMap()
-  allow.entries["method"] = .string("GET,PUT,POST,PATCH,DELETE,OPTIONS")
-  allow.entries["op"] = .string("create,update,load,list,remove,command,direct,graphql")
-
-  let entityChild = VMap()
-  entityChild.entries["`$OPEN`"] = .bool(true)
-  entityChild.entries["active"] = .bool(false)
-  entityChild.entries["alias"] = .map(VMap())
-  let entity = VMap()
-  entity.entries["`$CHILD`"] = .map(entityChild)
-
-  let featureChild = VMap()
-  featureChild.entries["`$OPEN`"] = .bool(true)
-  featureChild.entries["active"] = .bool(false)
-  let feature = VMap()
-  feature.entries["`$CHILD`"] = .map(featureChild)
-
-  let testEntity = VMap()
-  testEntity.entries["`$OPEN`"] = .bool(true)
-  let test = VMap()
-  test.entries["active"] = .bool(false)
-  test.entries["entity"] = .map(testEntity)
-
-  let clean = VMap()
-  clean.entries["keys"] = .string("key,token,id")
-
-  let spec = VMap()
-  spec.entries["apikey"] = .string("")
-  spec.entries["base"] = .string("http://localhost:8000")
-  spec.entries["prefix"] = .string("")
-  spec.entries["suffix"] = .string("")
-  spec.entries["auth"] = .map(authPrefix)
-  spec.entries["headers"] = .map(headers)
-  spec.entries["allow"] = .map(allow)
-  spec.entries["entity"] = .map(entity)
-  spec.entries["feature"] = .map(feature)
-  spec.entries["utility"] = .map(VMap())
-  // `extend` is the runtime feature-injection seam: a list of feature
-  // objects the constructor adds after the model-activated ones. Without
-  // this entry the seam is dead: the constructor reads options.extend, but
-  // validate rejected the key, so a caller could not hand in a feature the
-  // model did not activate, although the README documents the option - and
-  // every test that adopts a feature through it passed VACUOUSLY. Ported
-  // from MakeOptionsUtility.ts / make_options.go / MakeOptions.cs, which all
-  // carry it.
-  spec.entries["extend"] = .string("`$ANY`")
-  spec.entries["system"] = .map(VMap())
-  spec.entries["test"] = .map(test)
-  spec.entries["clean"] = .map(clean)
-
-  return .map(spec)
-}
 
 func makeOptionsUtil(_ ctx: Context) -> VMap {
   let options = ctx.options ?? VMap()
@@ -135,7 +76,18 @@ func makeOptionsUtil(_ ctx: Context) -> VMap {
   let config = ctx.config ?? VMap()
   let cfgopts = gp(config, "options").asMap ?? VMap()
 
-  let optspec = buildOptSpec()
+  // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
+  //
+  // Built from the model: `main.kit.optspec` for the standard options, plus
+  // one entry per feature this target carries, from that feature's own
+  // `config.options` / `config.optspec`. Editing this file to add an option
+  // would put it back where it was - one of twenty hand-maintained copies of
+  // a schema nothing cross-checked - so add it to the model instead and every
+  // ported target validates it.
+  //
+  // Already parsed, and shared: makeOptions validates AGAINST the spec and
+  // writes into the options, never into the spec.
+  let optspec = SdkSchema.optspec
 
   // Preserve system.fetch across merge/validate (closures survive Clone, but
   // validation reshapes the system block).

@@ -43,10 +43,6 @@ const Entity = cmp(function Entity(props: any) {
 
       const opnames = Object.keys(entity.op || {})
 
-      // For each CRUD op: if the spec defines it, splice in the real
-      // implementation. Otherwise emit a stub that satisfies the SdkEntity
-      // interface (so the package compiles) but errors at runtime if the
-      // caller invokes an unsupported op.
       const opfrags =
         (['load', 'list', 'create', 'update', 'remove']
           .reduce((a: any, opname: string) =>

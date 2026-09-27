@@ -33,10 +33,10 @@ function normalizePathParams(
       const snaked = snakify(rawName)
       const depluralized = depluralize(snaked)
       const param = params.find((p: any) =>
-          p.name === snaked || p.name === depluralized) ||
+          p.n === snaked || p.n === depluralized) ||
         params.find((p: any) =>
-          p.orig === snaked || p.orig === depluralized)
-      if (param) return '{' + param.name + '}'
+          p.or === snaked || p.or === depluralized)
+      if (param) return '{' + param.n + '}'
 
       if (rename) {
         for (const [origCamel, renamedTo] of Object.entries(rename)) {
@@ -44,10 +44,10 @@ function normalizePathParams(
             const origSnaked = snakify(origCamel)
             const origDepluralized = depluralize(origSnaked)
             const renamedParam = params.find(
-              (p: any) => p.orig === origSnaked || p.name === origSnaked ||
-                p.orig === origDepluralized || p.name === origDepluralized
+              (p: any) => p.or === origSnaked || p.n === origSnaked ||
+                p.or === origDepluralized || p.n === origDepluralized
             )
-            if (renamedParam) return '{' + renamedParam.name + '}'
+            if (renamedParam) return '{' + renamedParam.n + '}'
           }
         }
       }
@@ -76,13 +76,6 @@ const TestDirect = cmp(function TestDirect(props: any) {
     ? `("apikey", getp(&env, "${PROJECTNAME}_APIKEY"))`
     : ''
 
-  // A templated server URL (OpenAPI server variables) makes a LIVE client
-  // impossible to construct without values: makeOptions raises rather than
-  // request a URL with a literal `{account_id}` in it. So the live suite
-  // takes them from the environment the same way it takes the apikey.
-  //
-  // Emitted as a jo() tuple entry, so it carries its own leading comma only
-  // when an apikey entry precedes it - otherwise `jo(vec![, ...])`.
   const svars = serverVariables(model)
   const serverEnvEntry = svars
     .map((v: any) => `\n        ("${serverVarEnv(PROJECTNAME, v.name)}", Value::str(${JSON.stringify(v.dflt)})),`).join('')
@@ -105,8 +98,8 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   // Load point info.
   const loadPoint = loadOp?.points?.[0]
-  const loadPath = loadPoint ? normalizePathParams(pointParts(loadPoint), loadPoint?.args?.params || [], loadPoint?.rename?.param) : ''
-  const allLoadParams = loadPoint?.args?.params || []
+  const loadPath = loadPoint ? normalizePathParams(pointParts(loadPoint), loadPoint?.g?.params || [], loadPoint?.r?.param) : ''
+  const allLoadParams = loadPoint?.g?.params || []
   // Only path params that actually appear in the URL template drive the
   // direct-test path-param setup and URL-substitution asserts.
   const _pathPlaceholders = new Set<string>()
@@ -115,7 +108,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
       _pathPlaceholders.add(part.slice(1, -1))
     }
   }
-  const _renameMap = (loadPoint?.rename?.param || {}) as Record<string, string>
+  const _renameMap = (loadPoint?.r?.param || {}) as Record<string, string>
   const _renamedPlaceholders = new Set<string>()
   for (const ph of _pathPlaceholders) {
     _renamedPlaceholders.add(ph)
@@ -124,12 +117,12 @@ const TestDirect = cmp(function TestDirect(props: any) {
     }
   }
   const loadParams = allLoadParams.filter((p: any) =>
-    _renamedPlaceholders.has(p.name) || _renamedPlaceholders.has(p.orig))
+    _renamedPlaceholders.has(p.n) || _renamedPlaceholders.has(p.or))
 
   // List point info.
   const listPoint = listOp?.points?.[0]
-  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listPoint?.args?.params || [], listPoint?.rename?.param) : ''
-  const listParams = listPoint?.args?.params || []
+  const listPath = listPoint ? normalizePathParams(pointParts(listPoint), listPoint?.g?.params || [], listPoint?.r?.param) : ''
+  const listParams = listPoint?.g?.params || []
 
   const entidEnvVar = `${PROJECTNAME}_TEST_${envToken(entity.name)}_ENTID`
 
@@ -231,10 +224,10 @@ fn ${evar}_direct_setup(mockres: Value) -> ${entity.Name}DirectSetup {
     if (hasList && listPoint) {
       // Live params: idmap keys per param.
       const listLiveParams = listParams.map((p: any) => {
-        const key = p.name === 'id'
+        const key = p.n === 'id'
           ? entity.name + '01'
-          : p.name.replace(/_id$/, '') + '01'
-        return { name: p.name, key }
+          : p.n.replace(/_id$/, '') + '01'
+        return { name: p.n, key }
       })
 
       Content(`
@@ -352,10 +345,10 @@ fn ${evar}_direct_list() {
     if (hasLoad && loadPoint) {
       // idmap keys consumed by load in live mode.
       const loadLiveParams = loadParams.map((p: any) => {
-        const key = p.name === 'id'
+        const key = p.n === 'id'
           ? entity.name + '01'
-          : p.name.replace(/_id$/, '') + '01'
-        return { name: p.name, key }
+          : p.n.replace(/_id$/, '') + '01'
+        return { name: p.n, key }
       })
 
       Content(`

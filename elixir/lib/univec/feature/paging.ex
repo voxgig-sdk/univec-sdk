@@ -4,8 +4,8 @@
 # stamps page/limit (or a cursor) into the request query; on the way back
 # (PreResult) it reads the server's pagination signals — a `Link: rel="next"`
 # header, `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-# `next`/`cursor`/`nextCursor`/`hasMore` fields in the body — and records them
-# on `ctx.result.paging`. A per-call cursor/page supplied via ctrl paging
+# `next`/`cursor`/`nextCursor`/`hasMore` fields in the body (snake_case forms
+# too) — and records them on `ctx.result.paging` and the caller's ctrl paging. A per-call cursor/page supplied via ctrl paging
 # takes priority (used by auto-iteration). Parameter names
 # (`pageParam`/`limitParam`/`cursorParam`), `startPage` and page size
 # (`limit`) are configurable.
@@ -67,7 +67,10 @@ defmodule Univec.Feature.Paging do
               S.setprop(query, cursor_param, S.getprop(paging, "cursor"))
 
             S.getprop(query, page_param) == nil ->
-              page = S.getprop(paging, "page")
+              # A record written back by pre_result holds the page just fetched
+              # as "page" and the one to fetch as "nextPage", so nextPage wins.
+              page = S.getprop(paging, "nextPage")
+              page = if page == nil, do: S.getprop(paging, "page"), else: page
               page = if page == nil, do: por(S.getprop(opts, "startPage"), 1), else: page
               S.setprop(query, page_param, page)
 
@@ -182,18 +185,16 @@ defmodule Univec.Feature.Paging do
                 bnext -> por(next_from_link, bnext)
               end
 
+            # snake_case forms rank below the camelCase ones.
             c =
               cond do
                 S.getprop(body, "nextCursor") != nil -> S.getprop(body, "nextCursor")
                 S.getprop(body, "cursor") != nil -> S.getprop(body, "cursor")
+                S.getprop(body, "next_cursor") != nil -> S.getprop(body, "next_cursor")
                 true -> nil
               end
 
-            hm =
-              case S.getprop(body, "hasMore") do
-                v when is_boolean(v) -> v
-                _ -> false
-              end
+            {hm, _} = body_more(body)
 
             {n, c, hm}
           else
@@ -239,10 +240,19 @@ defmodule Univec.Feature.Paging do
                 # No usable relay `more` path, but a top-level body hasMore is
                 # still an outright statement — keep it explicit, or cursor
                 # inference below would flip an explicit false to true.
-                {c, has_more, is_boolean(S.getprop(body, "hasMore"))}
+                {c, has_more, elem(body_more(body), 1)}
             end
           else
-            {cursor_val, has_more, is_boolean(S.getprop(body, "hasMore"))}
+            {cursor_val, has_more, elem(body_more(body), 1)}
+          end
+
+        next_page =
+          if next_page == nil and S.ismap(body) do
+            np = S.getprop(body, "nextPage")
+            np = if np == nil, do: S.getprop(body, "next_page"), else: np
+            if is_number(np) or is_binary(np), do: np, else: nil
+          else
+            next_page
           end
 
         # Cursor presence only INFERS another page. When the server stated the
@@ -268,11 +278,43 @@ defmodule Univec.Feature.Paging do
           ])
 
         S.setprop(result, "paging", paging)
+        write_back(S.getprop(ctx, "ctrl"), paging)
         S.setprop(S.getprop(f, "client"), "_paging", S.jm(["last", paging]))
       end
     end
 
     nil
+  end
+
+  # The Context shares the caller's paging map by reference, so refill it in
+  # place; a fresh map on ctrl never reaches the caller.
+  defp write_back(ctrl, paging) do
+    shared = if ctrl == nil, do: nil, else: S.getprop(ctrl, "paging")
+
+    cond do
+      ctrl == nil ->
+        nil
+
+      S.ismap(shared) ->
+        Enum.each(S.keysof(shared), fn k -> S.delprop(shared, k) end)
+        Enum.each(S.keysof(paging), fn k -> S.setprop(shared, k, S.getprop(paging, k)) end)
+
+      true ->
+        S.setprop(ctrl, "paging", paging)
+    end
+
+    nil
+  end
+
+  # Body `hasMore`, or `has_more` when the camelCase form is absent: {value,
+  # stated outright}.
+  defp body_more(body) do
+    cond do
+      not S.ismap(body) -> {false, false}
+      is_boolean(S.getprop(body, "hasMore")) -> {S.getprop(body, "hasMore"), true}
+      is_boolean(S.getprop(body, "has_more")) -> {S.getprop(body, "has_more"), true}
+      true -> {false, false}
+    end
   end
 
   defp is_list_op(f, ctx) do

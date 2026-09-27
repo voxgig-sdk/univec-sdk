@@ -1,5 +1,5 @@
 // VENDORED: @voxgig/sekreto 0.2.0 (typescript/plugins/secretspec.ts)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* Copyright (c) 2025 Voxgig Ltd, MIT License */
 
@@ -7,15 +7,6 @@ import {
   ProviderSpec, Provider, SekretoError, envkey, nodemod, providerplugin,
 } from '../provider/support'
 
-/** SecretSpec — https://secretspec.dev
- *
- * A declaration plus a chain of its own backends: the same shape as
- * sekreto one level down. A project that has declared its secrets there
- * should not have to declare them again here, so this reads through the
- * `secretspec` CLI rather than reimplementing its resolution.
- *
- * SecretSpec audits every read and refuses without `--reason`; sekreto
- * sends `sekreto` unless configured otherwise. */
 export function secretspecprovider(options?: {
   command?: string
   file?: string
@@ -68,19 +59,6 @@ export function secretspecprovider(options?: {
   }
 }
 
-/** Does this SecretSpec failure mean "no such secret" rather than "I
- * could not answer"?
- *
- * SecretSpec says `Secret 'API_TOKEN' not found` for both a name it does
- * not declare and one declared with no value, and both are misses: this
- * store does not hold it, so the chain carries on.
- *
- * MATCHED ON THE WHOLE PHRASE, NOT ON "not found". SecretSpec also says
- * `Provider backend 'keyring' not found`, which is a store that could
- * not answer at all - and reading that as a miss is the worst failure
- * this library has, because the chain then falls through to a weaker
- * store without saying so. The key is required to appear, so the two
- * cannot be confused. */
 function secretspecmiss(why: string, key: string): boolean {
   return why.includes("Secret '" + key + "' not found")
 }

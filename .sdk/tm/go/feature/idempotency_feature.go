@@ -8,12 +8,6 @@ import (
 	"GOMODULE/core"
 )
 
-// Idempotency keys for mutating operations. Adds an `Idempotency-Key`
-// header (name configurable via `header`) to unsafe requests so a server
-// can de-duplicate retried writes. The key is set once, at PreRequest,
-// before the request is built — so it is stable across transport-level
-// retries of the same call. A caller-supplied header is never overwritten
-// (case-insensitive). The key generator is injectable (`keygen`).
 type IdempotencyFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK

@@ -30,20 +30,36 @@ static voxgig_value* envelope(Context* ctx, voxgig_value* data) {
   if (NULL == spec) {
     return data;
   }
-  // Exactly `body.<key>`; a deeper path is not an envelope this mock can
-  // synthesise, so it is left alone rather than guessed at.
+  // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+  // GraphQL ops unwrap `body.data.<field>` (and `body.data.<field>.<entity>`
+  // for mutation payloads), not just a single envelope property.
   size_t n = strlen(spec);
   if (n < 8 || 0 != strncmp(spec, "`body.", 6) || '`' != spec[n - 1]) {
     return data;
   }
   size_t inner_len = n - 7;
-  if (0 == inner_len || NULL != memchr(spec + 6, '.', inner_len)) {
+  if (0 == inner_len) {
     return data;
   }
   char* inner = (char*)malloc(inner_len + 1);
   memcpy(inner, spec + 6, inner_len);
   inner[inner_len] = '\0';
-  voxgig_value* out = cmap(1, inner, data);
+  // Innermost segment first, so walk back from the end, terminating each
+  // segment in place as it is consumed. cmap copies the key.
+  voxgig_value* out = data;
+  size_t pos = inner_len;
+  while (1) {
+    size_t start = pos;
+    while (start > 0 && '.' != inner[start - 1]) {
+      start--;
+    }
+    inner[pos] = '\0';
+    out = cmap(1, inner + start, out);
+    if (0 == start) {
+      break;
+    }
+    pos = start - 1;
+  }
   free(inner);
   return out;
 }
@@ -76,23 +92,61 @@ static const char* test_entity_name(Context* ctx) {
   return ctx->op->entity;
 }
 
+static bool point_terminal(voxgig_value* p) {
+  voxgig_value* parts = getp(p, "parts");
+  if (!voxgig_is_list(parts)) return false;
+  voxgig_list* l = voxgig_as_list(parts);
+  if (0 == l->len) return false;
+  voxgig_value* last = l->items[l->len - 1];
+  return voxgig_is_string(last) && '{' == voxgig_as_string(last)[0];
+}
+
+static size_t point_depth(voxgig_value* p) {
+  voxgig_value* parts = getp(p, "parts");
+  return voxgig_is_list(parts) ? voxgig_as_list(parts)->len : 0;
+}
+
+// The entity's own endpoint: a terminal `{param}` marks a record route, and
+// among equals the shallower path wins (the same rule as make_point).
+static voxgig_value* pick_point(voxgig_value* points) {
+  if (!voxgig_is_list(points)) return NULL;
+  voxgig_list* l = voxgig_as_list(points);
+  if (0 == l->len) return NULL;
+  voxgig_value* point = l->items[0];
+  for (size_t i = 1; i < l->len; i++) {
+    voxgig_value* cand = l->items[i];
+    if (point_terminal(cand) != point_terminal(point)) {
+      if (point_terminal(cand)) point = cand;
+    } else if (point_depth(cand) < point_depth(point)) {
+      point = cand;
+    }
+  }
+  return point;
+}
+
+static voxgig_value* reqd_names(voxgig_value* point, const char* kind) {
+  voxgig_value* args_path = getpath2(point, "args", kind);
+  voxgig_value* reqd_args = voxgig_select(args_path, cmap(1, "reqd", v_bool(true)));
+  voxgig_value* reqd_spec =
+      clist(3, v_str("`$EACH`"), v_str(""), v_str("`$KEY.name`"));
+  voxgig_value* reqd = voxgig_transform(reqd_args, reqd_spec, NULL);
+  if (!voxgig_is_list(reqd)) reqd = v_list();
+  return reqd;
+}
+
 static voxgig_value* build_args(Context* ctx, voxgig_value* args) {
   Operation* op = ctx->op;
   const char* opname = op->name;
   const char* entname = test_entity_name(ctx);
 
-  // Get last point from config.
   const char* ppath[6] = {"entity", entname, "op", opname, "points", NULL};
   voxgig_value* points = getpath_c(ctx->config, ppath);
-  voxgig_value* point = voxgig_getelem(points, v_int(-1), NULL);
+  voxgig_value* point = pick_point(points);
 
-  // Get required params.
-  voxgig_value* params_path = getpath2(point, "args", "params");
-  voxgig_value* reqd_params = voxgig_select(params_path, cmap(1, "reqd", v_bool(true)));
-  voxgig_value* reqd_spec =
-      clist(3, v_str("`$EACH`"), v_str(""), v_str("`$KEY.name`"));
-  voxgig_value* reqd = voxgig_transform(reqd_params, reqd_spec, NULL);
-  if (!voxgig_is_list(reqd)) reqd = v_list();
+  // Path AND query: a path-only read misses a query-addressed record
+  // (e.g. GET /result?trace_id=), which has no path param at all.
+  voxgig_value* reqd_params = reqd_names(point, "params");
+  voxgig_value* reqd_query = reqd_names(point, "query");
 
   voxgig_value* qand = v_list();
   voxgig_value* q = cmap(1, "`$AND`", qand);
@@ -102,8 +156,8 @@ static voxgig_value* build_args(Context* ctx, voxgig_value* args) {
     for (size_t ki = 0; ki < keys.len; ki++) {
       const char* key = keys.data[ki];
       bool is_id = strcmp(key, "id") == 0;
-      voxgig_value* selected = voxgig_select(reqd, v_str(key));
-      bool is_reqd = !voxgig_isempty(selected);
+      bool is_reqd = !voxgig_isempty(voxgig_select(reqd_params, v_str(key))) ||
+                     !voxgig_isempty(voxgig_select(reqd_query, v_str(key)));
 
       if (is_id || is_reqd) {
         voxgig_value* v = param_util(ctx, v_str(key));
@@ -193,28 +247,14 @@ static voxgig_value* test_fetch(voxgig_value* entity, Context* ctx, const char* 
     voxgig_value* args = build_args(ctx, update_match);
     voxgig_value* found = voxgig_select(entmap, args);
     voxgig_value* ent = voxgig_getelem(found, v_int(0), NULL);
-    if ((v_is_noval(ent) || v_is_null(ent)) && voxgig_size(entmap) > 0) {
-      // Fall back to any entity in the fixture.
-      voxgig_value* items = voxgig_items_v(entmap);
-      voxgig_list* il = voxgig_as_list(items);
-      for (size_t i = 0; i < il->len; i++) {
-        voxgig_value* e = voxgig_getelem(il->items[i], v_int(1), NULL);
-        if (voxgig_is_map(e)) {
-          ent = e;
-          break;
-        }
-      }
-    }
     if (v_is_noval(ent) || v_is_null(ent)) {
+      // update miss: 404, never another record
       voxgig_value* r = respond(ctx, 404, v_undef());
       setp(r, "statusText", v_str("Not found"));
       return r;
     }
     if (voxgig_is_map(ent) && voxgig_is_map(reqdata)) {
-      voxgig_map* rm = voxgig_as_map(reqdata);
-      for (size_t i = 0; i < rm->len; i++) {
-        setp(ent, rm->entries[i].key, rm->entries[i].value);
-      }
+      ent = voxgig_merge(clist(2, v_share(ent), v_share(reqdata)), VOXGIG_MAXDEPTH);
     }
     voxgig_delprop(ent, v_str("$KEY"));
     return respond(ctx, 200, voxgig_clone(ent));

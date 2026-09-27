@@ -33,10 +33,6 @@ final class ${entity.Name}EntityTest: XCTestCase {
   }
 `)
 
-    // Stream test (PR #4): the entity `stream` method runs the op pipeline and
-    // returns an AsyncStream. With the streaming feature active it yields from
-    // the feature's incremental iterator; otherwise it falls back to the
-    // materialised items. Only emitted for entities that support list.
     if (hasList) {
       Content(`
   func testStream() async throws {

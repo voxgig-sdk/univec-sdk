@@ -10,7 +10,7 @@
 //
 // The Scala peer of tm/java/test/OmniSmokeTest.java, tm/lua/test/
 // omni_smoke_test.lua and tm/ts/test/omni.test.ts. There is no test
-// framework in this target (see model/target/scala.aon), so it is a plain
+// framework in this target (see model/target/scala.aontu), so it is a plain
 // scala-cli main that exits non-zero on failure, like the corpus mains
 // beside it.
 

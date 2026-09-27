@@ -1,6 +1,6 @@
 # NetsimFeature — Agent Guide
 
-Network behaviour simulation for offline testing (latency, failures, outages) (v0.0.1).
+Network simulation (v0.0.1).
 
 A **feature** is a pipeline extension: an object of hooks that fire at named
 stages of every entity operation (load, list, create, update, remove) and of
@@ -16,8 +16,8 @@ in the model). It only runs when explicitly enabled (e.g. the `test` feature is 
 
 | Part | Path |
 | --- | --- |
-| Model definition | `.sdk/model/feature/netsim.aon` (name, title, version, `config.options.active`, the `hook` map, per-language `deps`) |
-| Registered in | `.sdk/model/feature/feature-index.aon` (`@"netsim.aon"`) |
+| Model definition | `.sdk/model/feature/netsim.aontu` (name, title, version, `config.options.active`, the `hook` map, per-language `deps`) |
+| Registered in | `.sdk/model/feature/feature-index.aontu` (`@"netsim.aontu"`) |
 | Runtime template | `.sdk/tm/ts/src/feature/netsim/` (copied here on `generate`; `FEATURE_Name`/`FEATURE_VERSION` substituted) |
 
 (Paths are relative to the **project root** — four levels up from here.)
@@ -25,7 +25,7 @@ in the model). It only runs when explicitly enabled (e.g. the `test` feature is 
 ## Customising this feature
 
 - **Turn hooks on/off**: edit the `hook` map in
-  `.sdk/model/feature/netsim.aon` (`<Stage>: active: true|false`).
+  `.sdk/model/feature/netsim.aontu` (`<Stage>: active: true|false`).
 - **Change default activation**: set `config.options.active` in the same file.
 - **Dependencies**: edit `deps.<lang>` in the same file.
 - **Behaviour**: edit the runtime template under

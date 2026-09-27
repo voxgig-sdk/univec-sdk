@@ -67,7 +67,6 @@ ${ctor}
   if (exampleEntity) {
     const eName = nom(exampleEntity, 'Name')
     const article = /^[aeiou]/i.test(eName) ? 'an' : 'a'
-    // The client accessor is the entity's snake_case name (client->planet()).
     const acc = cppVarName(exampleEntity.name)
     const eVar = acc
     const opnames = entityOps(exampleEntity)
@@ -135,8 +134,6 @@ try {
 `)
     }
     else if (opnames.includes('load')) {
-      // Every REQUIRED load-match key (id first, then parent path params like
-      // page_id) — the same shape the runtime resolves path params from.
       const loadRequired = opRequestShape(exampleEntity, 'load').items
         .filter((it: any) => !it.optional || it.name === idF)
         .sort((a: any, b: any) =>
@@ -163,8 +160,6 @@ try {
 `)
     }
 
-    // Model-driven example fields: derive the create/update body from the op
-    // shape (opRequestShape) so the docs reference REAL writable fields.
     const examplePairs = (opname: string): string[] => {
       const items = opRequestShape(exampleEntity, opname).items
         .filter((it: any) => (it.name !== idF && it.name !== 'id') ||
@@ -208,8 +203,6 @@ client->${acc}()->update(vmap({${updatePairs.join(', ')}}), Value::undef());
 `)
       }
       if (opnames.includes('remove')) {
-        // Every REQUIRED remove-match key: the id (off the created record
-        // when possible) plus parent keys like page_id.
         const removePairs = opRequestShape(exampleEntity, 'remove').items
           .filter((it: any) => !it.optional || it.name === idF)
           .sort((a: any, b: any) =>

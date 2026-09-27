@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (kotlin/src/Support.kt)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (kotlin/src/Support.kt)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 // How a provider kind becomes a voxgig/plugin definition.
 //
@@ -142,6 +142,10 @@ fun optionsof(spec: ProviderSpec): Map<String, Any?> {
     put(out, "config", spec.config)
     put(out, "environment", spec.environment)
     put(out, "path", spec.path)
+    put(out, "passphrase", spec.passphrase)
+    put(out, "vaultkey", spec.vaultkey)
+    put(out, "iterations", spec.iterations?.toDouble())
+    put(out, "create", spec.create)
 
     return out
 }
@@ -201,5 +205,9 @@ fun specof(options: Map<String, Any?>): ProviderSpec {
         config = str(options, "config"),
         environment = str(options, "environment"),
         path = str(options, "path"),
+        passphrase = str(options, "passphrase"),
+        vaultkey = str(options, "vaultkey"),
+        iterations = (options["iterations"] as? Number)?.toInt(),
+        create = options["create"] as? Boolean,
     )
 }

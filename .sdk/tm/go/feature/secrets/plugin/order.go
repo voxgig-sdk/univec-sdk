@@ -1,22 +1,6 @@
 // VENDORED: @voxgig/plugin 0.1.6 (go/plugin/order.go)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-/* Ordering (§7) — one rule, one place.
- *
- * sdkgen grew two special cases in `makeOptions` (`test`, then
- * `station`) and the third was not far off. This sort is the whole
- * replacement, and the tiers are in this order for a reason:
- *
- *   1 constraints   before/after edges, by ref or by name
- *   2 bands         integer, lower first, default 0
- *   3 declaration   ties break by `pos`
- *
- * CONSTRAINTS BEAT BANDS precisely so the correct tool wins when both
- * are present. A band expresses a genuine cross-cutting layer; a
- * constraint expresses a relationship between two specific things; and a
- * band chosen by trial and error to fix an ordering bug is a bug wearing
- * a number. */
-
 package plugin
 
 import (
@@ -30,10 +14,6 @@ type Binding struct {
 	Order *OrderBlock `json:"order,omitempty"`
 }
 
-// Pin is where a host has pinned a binding. Positional, not ordinal:
-// §6.2 composes b1(b2(b3(base))) with the FIRST binding OUTERMOST, so
-// `first` and `innermost` are opposites, and a pin spelled in sort terms
-// would be read backwards by exactly the people it protects.
 type Pin map[string]string
 
 func ResolveOrder(bindings []Binding, pin Pin) ([]string, error) {
@@ -135,9 +115,6 @@ func band(b Binding) int {
 	return *b.Order.Band
 }
 
-// targets: matching is by REF, or by NAME across all of that
-// definition's instances (§7) — which is the whole reason the two
-// spellings exist.
 func targets(spec OrderRef, nodes []Binding) []string {
 	hit := []string{}
 	// A list fans out to the UNION of what each spelling names, so
@@ -179,19 +156,6 @@ func seen(hit []string, ref string) bool {
 	return false
 }
 
-/* A PIN IS NOT A CONSTRAINT (§7).
- *
- * Constraints and bands are negotiable by definition — they are what
- * plugins and documents say they want, and the sort's job is to satisfy
- * them all. A pin is the host stating a structural invariant of its own
- * architecture, which is a different kind of claim and must not lose a
- * tie to a document.
- *
- * So a pin PLACES the binding at the named end, and an ordering that
- * would move it away is `plugin_order_pinned` — rejected, not honoured
- * into a broken wrap. Station's transport adapter must sit immediately
- * outside the base transport; an `order` list that moves it has to be an
- * error rather than a preference. */
 func applypin(order []string, edges map[string][]string, pin Pin) ([]string, error) {
 	if nil == pin {
 		return order, nil
@@ -211,10 +175,6 @@ func applypin(order []string, edges map[string][]string, pin Pin) ([]string, err
 			continue
 		}
 
-		// `first`/`outermost` is index 0; `last`/`innermost` is the end.
-		// §6.2 makes the first chain binding outermost, which is why the
-		// vocabulary is positional and why the two spellings pair this
-		// way.
 		wantfirst := "first" == want || "outermost" == want
 		ref := out[idx]
 		out = append(out[:idx], out[idx+1:]...)

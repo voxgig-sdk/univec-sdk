@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (zig/src/host.zig)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (zig/src/host.zig)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 //! The host: the lifecycle state machine (§5), extension points (§6),
 //! and resource capture (§8).
@@ -422,6 +422,22 @@ fn chosen(h: *Host, e: *Inst, req: ?*v.Value, remember: bool) ?[]const u8 {
     const first = v.asStr(v.get(v.at(cands, 0), "ref"));
     if (remember) v.set(e.selected, name, v.vstr(first));
     return first;
+}
+
+/// WHICH provider this instance is bound to for `name` (§11.1), as a
+/// ref, or null when nothing provides it.
+///
+/// The host's own `capability` answers with the live providers RANKED,
+/// not with the one THIS instance took; §11.4's reluctant rebinding
+/// makes those differ. A REF, not the instance. The selection is
+/// REMEMBERED, because this is the instance asking.
+pub fn instcapability(e: *Inst, name: []const u8) ?[]const u8 {
+    for (v.items(dep.requirements(e.options))) |r| {
+        const rn = v.get(r, "name");
+        if (!v.isStr(rn) or !std.mem.eql(u8, v.asStr(rn), name)) continue;
+        return chosen(e.owner, e, r, true);
+    }
+    return null;
 }
 
 /// The instance currently SELECTED for each of this one's

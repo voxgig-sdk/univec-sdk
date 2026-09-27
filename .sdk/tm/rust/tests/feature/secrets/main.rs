@@ -1,28 +1,3 @@
-// Behavioural tests for the secrets feature (vendored @voxgig/sekreto).
-//
-// The contract under test: the `apikey` OPTION keeps its exact old meaning
-// and always wins, because the feature places it FIRST in the provider
-// chain (a `memory` store named `options`) - explicit-beats-lookup falls
-// out of sekreto's first-hit rule rather than from special-case logic. With
-// the feature inactive nothing changes at all. With it active and the
-// option unset, the chain supplies the credential instead.
-//
-// EVERY CLIENT HERE IS LIVE, and the thing counted is `system.fetch` - the
-// real transport the whole fetcher chain ends at. That is deliberate, and
-// it is the mistake this file exists to avoid: under `test_sdk` the test
-// feature REPLACES the transport with its own in-memory mock, so a counter
-// hung off `system.fetch` is never reached, and "no request was sent" would
-// hold for a healthy SDK carrying no secrets feature at all. An assertion
-// that cannot fail pins no rule. So each fail-closed case proves its own
-// counter FIRST, with the same construction and a WORKING provider: one
-// request must reach `system.fetch` carrying the resolved credential. Only
-// then does a zero from the broken provider mean REFUSED rather than
-// UNWIRED. And the refusal is matched on the PROVIDER'S OWN message, so an
-// unrelated failure cannot stand in for fail-closed.
-//
-// This file lives in the `feature/` container on purpose: `target add`
-// trims it, along with the feature source and the vendored library, for a
-// project whose model does not select `secrets`.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -38,14 +13,6 @@ const BASE: &str = "http://secrets.test/api";
 
 // ---- the counted transport ---------------------------------------------
 
-/// One recorded request, SNAPSHOT at the moment it was handed to the
-/// transport.
-///
-/// A snapshot, not the fetchdef itself, and that is load-bearing: the
-/// fetchdef's `headers` map is an Rc the retry path rewrites IN PLACE, so
-/// a recorder that kept the live map would report every earlier call as
-/// carrying the LAST token - and "the retry carried a new credential"
-/// would pass whether or not it did.
 #[derive(Clone)]
 struct Call {
     url: String,
@@ -205,12 +172,6 @@ fn authof(fetchdef: &Value) -> Option<String> {
     }
 }
 
-// The Authorization header carries the SPEC's credential prefix, which a
-// TEMPLATE cannot know: an OpenAPI `http`/`bearer` scheme gives
-// `Bearer <token>`, an apiKey scheme the raw token. So assert on the
-// CREDENTIAL and let the prefix be whatever this SDK's API declares -
-// pinning the whole header value passes only for a prefix-less API, and
-// this file ships to every project that selects the feature.
 fn credential_is(header: Option<String>, token: &str) {
     let got = header.unwrap_or_default();
     assert!(
@@ -227,14 +188,6 @@ fn call_auth(calls: &[Call], i: usize) -> Option<String> {
 
 // ---- clients ------------------------------------------------------------
 
-// `allow.op` is named explicitly: a project that narrows the default set
-// would otherwise turn the raw-path cases into a false RED (the control leg
-// refused before it reached the transport), and the rule under test lives
-// at the transport, downstream of the allow gate either way.
-//
-// `base` is named explicitly too: a LIVE client whose model has a templated
-// base URL panics on a missing server variable at construction, and this
-// file ships to every project.
 fn sdk(wire: &Wire, secrets: Vec<(&str, Value)>) -> Rc<UnivecSDK> {
     let fopts = jo(vec![("active", Value::Bool(true))]);
     for (k, v) in secrets {
@@ -303,15 +256,6 @@ fn secrets_call(client: &Rc<UnivecSDK>, args: Vec<Value>) -> Value {
 
 // ---- the ENTITY path ----------------------------------------------------
 
-/// One request through the REAL entity-request utility, on the client's own
-/// utility - the one the feature wrapped.
-///
-/// `direct()` and `graphql()` are the raw paths and are exercised as
-/// themselves below; this is the OTHER half, and it cannot be reached by
-/// naming an entity because this file is a TEMPLATE and no project's entity
-/// names are known here. `make_request` is the utility every generated
-/// entity op ends at, so driving it directly exercises the same seam with
-/// the same wiring.
 fn entity_request(client: &Rc<UnivecSDK>, path: &str) -> Option<String> {
     let rootctx = client.get_root_ctx();
     let utility = rootctx.util();
@@ -514,12 +458,6 @@ fn auth_null_suppresses_the_credential_chain_or_no_chain() {
         wire.trace()
     );
 
-    // The suppression survives option validation rather than being replaced
-    // by the optspec's default auth map.
-    //
-    // Read from the RAW map: `getp` applies the Group A rule and answers
-    // the alt for a stored null, so it cannot tell an absent auth from a
-    // suppressed one - and only the latter is a suppression.
     let opts = client.options_map();
     let suppressed = match &opts {
         Value::Map(m) => matches!(m.borrow().get("auth"), Some(Value::Null)),
@@ -787,13 +725,6 @@ fn an_unknown_provider_kind_refuses_rather_than_sending() {
     assert_eq!(control.sent(), 1, "the control request never reached the wire");
 }
 
-// A MALFORMED entry is the same rule again, and the one a typed port can
-// get wrong silently: `providers` is a Value list, so an entry that is
-// neither a callable nor a spec map (a bare "hashicorp" where a spec was
-// meant) matches no arm. Dropping it leaves the chain quietly SHORTER than
-// the options say - a fail-OPEN that sends the request without the
-// credential the project configured. It must refuse instead, carrying
-// sekreto's own wording, on every wire path.
 const MALFORMED_MSG: &str = "sekreto: not a provider or a provider spec";
 
 #[test]
@@ -879,15 +810,6 @@ fn the_selected_plugin_kinds_have_distinct_names() {
     );
 }
 
-// A SELECTED plugin kind is really in the vocabulary.
-//
-// Construction is where an unknown kind is refused, so a chain that names
-// the kind and still reaches the wire IS the check. The memory store comes
-// FIRST so sekreto's first-hit rule answers from it and the vault is never
-// contacted - the kind has to be declarable, not reachable.
-//
-// Conditional on the kind being selected, because this file ships to
-// projects that take the feature without the `vault` plugin group.
 #[test]
 fn a_selected_plugin_kind_is_in_the_sdk_vocabulary() {
     let defs = RUSTCRATE::feature::secrets::plugins::definitions();
@@ -990,13 +912,10 @@ fn cache_false_asks_the_chain_on_every_request() {
 }
 
 // A MISS IS NOT A CACHEABLE ANSWER - sekreto's own rule, which this feature
-// used to override from the layer above.
 //
 // DEFAULT caching here, which is the whole point: `cache: true` is about
 // holding a HIT (the test below pins that half), and keeping the settled
 // resolution after a miss meant the chain was never asked again for the life
-// of the client. A secret provisioned after startup (a mounted file, a vault
-// policy granted a minute late) was invisible forever.
 #[test]
 fn cache_true_re_asks_after_a_miss() {
     let wire = Wire::new();
@@ -1153,12 +1072,6 @@ fn sekreto_is_live_for_arbitrary_secrets_and_redaction() {
     );
 }
 
-// ---- ACCESS-TOKEN EXCHANGE ----------------------------------------------
-//
-// What the chain resolves is a REFRESH token, which is POSTed to a token
-// endpoint for a short-lived ACCESS token; the access token is what the
-// Authorization header carries; and when the API answers 401 the client
-// buys another and tries the same request again, once.
 
 const REFRESH: &str = "REFRESH01";
 
@@ -1252,7 +1165,6 @@ fn an_expiry_buys_another_token_and_retries_the_same_request() {
     assert_eq!(wire.token().len(), 2, "expected a second token purchase");
     assert_eq!(wire.api().len(), 2, "expected the request to be retried");
     credential_is(call_auth(&wire.api(), 0), "ACCESS01");
-    // The retry must carry the NEW token, not the spent one.
     credential_is(call_auth(&wire.api(), 1), "ACCESS02");
     assert_eq!(
         getp(&res, "ok"),
@@ -1489,7 +1401,6 @@ fn exchange_auth_null_suppresses_and_is_never_retried() {
     );
 
     // AND NO PURCHASE. resolve() runs before with_refresh's suppression
-    // check, so the refresh token used to go to the token endpoint in a
     // request body even here. Stopping the retry does not unsend it, and
     // only the token endpoint can see this.
     assert_eq!(
@@ -1501,12 +1412,6 @@ fn exchange_auth_null_suppresses_and_is_never_retried() {
     );
 }
 
-// The exchange with NO system.fetch: the ordinary case, where make_options
-// leaves the seam unset and the purchase takes its own raw HTTP path. There
-// is no token endpoint to talk to here, so what this pins is that the
-// fallback EXISTS and reports - before this, `buy` with no custom transport
-// simply had nothing to call - and that a failed purchase refuses the
-// operation rather than sending it unauthenticated.
 #[test]
 fn the_exchange_has_a_raw_transport_when_no_system_fetch_is_given() {
     // Port 1 is reserved and never listening, so the connection is refused

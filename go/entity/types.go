@@ -1,7 +1,7 @@
 // Typed models for the Univec SDK.
 //
-// GENERATED from the API model: main.kit.entity.<e>.fields[] and per-op
-// params (op.<name>.points[].args.params[]). Field/param types come from the
+// GENERATED from the API model: main.kit.entity.<e>.fields{} and per-op
+// params (op.<name>.points[].g.params[]). Field/param types come from the
 // canonical type sentinels via @voxgig/sdkgen canonToType (source of truth:
 // @voxgig/apidef VALID_CANON). Do not edit by hand.
 package entity
@@ -14,9 +14,6 @@ import (
 
 // Convert is the typed data model for the convert entity.
 type Convert struct {
-	Embeddings []any `json:"embeddings"`
-	SourceModel string `json:"source_model"`
-	TargetModel string `json:"target_model"`
 }
 
 // ConvertCreateData is the typed request payload for Convert.CreateTyped.
@@ -28,9 +25,6 @@ type ConvertCreateData struct {
 
 // Embed is the typed data model for the embed entity.
 type Embed struct {
-	Embeddings []any `json:"embeddings"`
-	Model string `json:"model"`
-	Texts []any `json:"texts"`
 }
 
 // EmbedCreateData is the typed request payload for Embed.CreateTyped.
@@ -42,10 +36,6 @@ type EmbedCreateData struct {
 
 // EphemeralKey is the typed data model for the ephemeral_key entity.
 type EphemeralKey struct {
-	DailyLimit int `json:"dailyLimit"`
-	DailyUsed int `json:"dailyUsed"`
-	Key string `json:"key"`
-	ResetsAt string `json:"resetsAt"`
 }
 
 // EphemeralKeyCreateData is the typed request payload for EphemeralKey.CreateTyped.
@@ -58,16 +48,6 @@ type EphemeralKeyCreateData struct {
 
 // Model is the typed data model for the model entity.
 type Model struct {
-	Eval *map[string]any `json:"eval,omitempty"`
-	ExecutionProvider *string `json:"executionProvider,omitempty"`
-	ModelCard *map[string]any `json:"modelCard,omitempty"`
-	ModelType string `json:"modelType"`
-	Name string `json:"name"`
-	SequenceLen *int `json:"sequenceLen,omitempty"`
-	SourceDim *int `json:"sourceDim,omitempty"`
-	SourceModel *string `json:"sourceModel,omitempty"`
-	TargetDim int `json:"targetDim"`
-	TargetModel string `json:"targetModel"`
 }
 
 // ModelListMatch is the typed request payload for Model.ListTyped.

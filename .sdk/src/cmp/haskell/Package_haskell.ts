@@ -17,9 +17,6 @@ function pkgName(model: any): string {
 }
 
 
-// The cabal package file (for Hackage publication). The offline test build
-// uses the Makefile (stock ghc, boot libraries only: base + containers +
-// array + time), so no cabal solve is required to run the suite.
 const Package = cmp(async function Package(props: any) {
   const ctx$ = props.ctx$
   const target = props.target

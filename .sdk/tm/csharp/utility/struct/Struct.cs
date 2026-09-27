@@ -1,5 +1,5 @@
 // VENDORED: @voxgig/struct 0.1.1 (csharp/Struct.cs)
-// Source: https://github.com/voxgig/struct @ abd93227e3295151f8dcd18597c3f3f2577af8b7  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/struct @ 3a42881b1d26c75ebbed9f1897f0ba94cf3cf780  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* Copyright (c) 2025-2026 Voxgig Ltd. MIT LICENSE. */
 
@@ -2941,7 +2941,6 @@ namespace Voxgig.Struct
 
             inj.SetVal(inj.DParent, 2);
             inj.Path = (List<object?>)Slice(inj.Path, -1)!;
-            inj.Key = StrKey(GetElem(inj.Path, -1)) ?? S_MT;
 
             var tvals = (List<object?>)Slice(inj.Parent, 1)!;
             if (0 == Size(tvals))
@@ -2952,14 +2951,19 @@ namespace Voxgig.Struct
                 return null;
             }
 
+            // GetProp answers null for a missing key where ts hands the nested
+            // call `undefined`, so `$NIL` rejected every optional entry the
+            // caller omitted and no default client could be constructed.
+            object? dval = inj.DParent ?? NONE;
+
             foreach (object? tval in tvals)
             {
                 var terrs = new List<object?>();
                 var vstore = (Dictionary<string, object?>)Merge(
                     new List<object?> { new Dictionary<string, object?>(), store }, 1)!;
-                vstore[S_DTOP] = inj.DParent;
+                vstore[S_DTOP] = dval;
 
-                object? vcurrent = Validate(inj.DParent, tval, new InjectState
+                object? vcurrent = Validate(dval, tval, new InjectState
                 {
                     Extra = vstore,
                     Errs = terrs,

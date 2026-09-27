@@ -6,12 +6,6 @@ import (
 	"GOMODULE/core"
 )
 
-// Request/response capture for debugging. Records a bounded ring buffer of
-// per-operation traces — method, URL, redacted headers, response status and
-// timing — on the feature's Entries. Sensitive header values (matching
-// `redact`, default authorization/cookie/api-key style names) are masked.
-// An optional `onEntry` callback receives each finished entry (e.g. to
-// stream to a console). `max` caps the buffer (default 100).
 type DebugFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK

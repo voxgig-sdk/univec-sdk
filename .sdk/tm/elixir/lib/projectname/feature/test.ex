@@ -55,16 +55,22 @@ defmodule Univec.Feature.Test do
   defp envelope(fctx, data) do
     spec = S.getprop(S.getprop(S.getprop(fctx, "point"), "transform"), "res")
 
-    # Exactly `body.<key>`; a deeper path is not an envelope this mock can
-    # synthesise, so it is left alone rather than guessed at.
+    # Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+    # GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
     case {data, spec} do
       {nil, _} ->
         data
 
       {_, s} when is_binary(s) ->
-        case Regex.run(~r/^`body\.([^`.]+)`$/, s) do
-          [_, inner] -> S.jm([inner, data])
-          _ -> data
+        case Regex.run(~r/^`body\.(.+)`$/, s) do
+          [_, inner] ->
+            inner
+            |> String.split(".")
+            |> Enum.reverse()
+            |> Enum.reduce(data, fn seg, out -> S.jm([seg, out]) end)
+
+          _ ->
+            data
         end
 
       _ ->
@@ -161,20 +167,11 @@ defmodule Univec.Feature.Test do
         found = S.select(entmap, args)
         ent = S.getelem(found, 0)
 
-        ent =
-          if ent == nil and S.ismap(entmap) do
-            ks = S.keysof(entmap)
-            Enum.find_value(ks, fn k -> v = S.getprop(entmap, k); if S.ismap(v), do: v end)
-          else
-            ent
-          end
-
         if ent == nil do
+          # update miss: 404, never another record
           respond(fctx, 404, nil, S.jm(["statusText", "Not found"]))
         else
-          if S.ismap(ent) and reqdata != nil do
-            Enum.each(H.entries(reqdata), fn {k, v} -> S.setprop(ent, k, v) end)
-          end
+          if S.ismap(ent) and S.ismap(reqdata), do: S.merge(S.jt([ent, reqdata]))
 
           S.delprop(ent, "$KEY")
           respond(fctx, 200, S.clone(ent))
@@ -216,6 +213,45 @@ defmodule Univec.Feature.Test do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
   end
 
+  defp point_terminal?(p) do
+    parts = S.getprop(p, "parts")
+    n = if S.islist(parts), do: S.size(parts), else: 0
+    last = if n > 0, do: S.getelem(parts, n - 1), else: nil
+    is_binary(last) and String.starts_with?(last, "{")
+  end
+
+  defp point_depth(p) do
+    parts = S.getprop(p, "parts")
+    if S.islist(parts), do: S.size(parts), else: 0
+  end
+
+  # The entity's own endpoint: a terminal `{param}` marks a record route,
+  # and among equals the shallower path wins (the same rule as make_point).
+  defp pick_point(points) do
+    n = if S.islist(points), do: S.size(points), else: 0
+
+    if n == 0 do
+      nil
+    else
+      rest = if n > 1, do: Enum.to_list(1..(n - 1)), else: []
+
+      Enum.reduce(rest, S.getelem(points, 0), fn i, point ->
+        cand = S.getelem(points, i)
+
+        cond do
+          point_terminal?(cand) != point_terminal?(point) -> if point_terminal?(cand), do: cand, else: point
+          point_depth(cand) < point_depth(point) -> cand
+          true -> point
+        end
+      end)
+    end
+  end
+
+  defp reqd_names(point, kind) do
+    reqd_args = S.select(S.getpath(point, "args." <> kind), S.jm(["reqd", true]))
+    S.transform(reqd_args, S.jt(["`$EACH`", "", "`$KEY.name`"]))
+  end
+
   # Build a struct select query ($AND of $OR alternatives) from the required
   # params + id, resolving each value through the pipeline param resolver.
   def build_args(_f, ctx, op, args) do
@@ -223,10 +259,11 @@ defmodule Univec.Feature.Test do
     config = S.getprop(ctx, "config")
     entname = Context.entity_name(S.getprop(ctx, "entity"))
     points = S.getpath(config, "entity." <> entname <> ".op." <> opname <> ".points")
-    point = S.getelem(points, -1)
-    params_path = S.getpath(point, "args.params")
-    reqd_params = S.select(params_path, S.jm(["reqd", true]))
-    reqd = S.transform(reqd_params, S.jt(["`$EACH`", "", "`$KEY.name`"]))
+    point = pick_point(points)
+    # Path AND query: a path-only read misses a query-addressed record
+    # (e.g. GET /result?trace_id=), which has no path param at all.
+    reqd_params = reqd_names(point, "params")
+    reqd_query = reqd_names(point, "query")
 
     qand = S.jt([])
     q = S.jm(["`$AND`", qand])
@@ -234,8 +271,7 @@ defmodule Univec.Feature.Test do
     if args != nil do
       Enum.each(S.keysof(args), fn key ->
         is_id = key == "id"
-        selected = S.select(reqd, key)
-        is_reqd = not S.isempty(selected)
+        is_reqd = not S.isempty(S.select(reqd_params, key)) or not S.isempty(S.select(reqd_query, key))
 
         if is_id or is_reqd do
           v = Utility.param(ctx, key)

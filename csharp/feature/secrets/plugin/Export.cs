@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (csharp/src/Export.cs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (csharp/src/Export.cs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 using System;
 using System.Collections.Generic;
@@ -37,7 +37,7 @@ namespace Voxgig.Plugin
 
         public static object ResolveExport(string spec, List<Exported> exported)
         {
-            var cut = spec.IndexOf('/');
+            var cut = spec.LastIndexOf('/');
             if (cut < 0)
             {
                 Types.Fail("plugin_export_ambiguous", "export spec needs a key: " + spec,

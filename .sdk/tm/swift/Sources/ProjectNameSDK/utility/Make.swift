@@ -131,9 +131,15 @@ func makePointUtil(_ ctx: Context) throws -> VMap? {
 }
 
 func makeSpecUtil(_ ctx: Context) throws -> Spec {
-  if let cached = ctx.out["spec"] as? Spec {
-    ctx.spec = cached
-    return cached
+  if let stored = ctx.out["spec"], let sp = stored {
+    // A PreSpec feature hook (e.g. validate) may short-circuit the operation
+    // by storing an error here; surface it before the request is built, the
+    // same way makePointUtil surfaces out["point"].
+    if let err = sp as? Error { throw err }
+    if let cached = sp as? Spec {
+      ctx.spec = cached
+      return cached
+    }
   }
 
   let options = ctx.options

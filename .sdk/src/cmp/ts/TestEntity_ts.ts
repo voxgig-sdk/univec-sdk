@@ -1,3 +1,6 @@
+import { boundedFacts, pointFacts } from '@voxgig/sdkgen'
+import { buildIdNames } from '@voxgig/sdkgen'
+import { flowSteps } from '@voxgig/sdkgen'
 
 import * as Path from 'node:path'
 
@@ -105,6 +108,8 @@ const TestEntity = cmp(function TestEntity(props: any) {
         const basicflow = getModelPath(model, `main.${KIT}.flow.Basic${nom(entity, 'Name')}Flow`)
 
         const dobasic = basicflow && true === basicflow.active
+        const liveFacts = Object.fromEntries(Object.values(entity.op || {}).flatMap((op: any) =>
+          (op.points || []).map((point: any) => [point.m + ' ' + point.o, boundedFacts(pointFacts(ctx$, point))])))
 
         if (!dobasic) {
           return;
@@ -112,15 +117,7 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
         const indent = 2
 
-        const idlist = flatten([
-          entity.name + '01',
-          entity.name + '02',
-          entity.name + '03',
-          flatten(items(entity.relations.ancestors, (ap: any) =>
-            items(ap[1], (a: any) =>
-              items(['01', '02', '03'], (n: any) =>
-                a[1] + n[1]))), 2)
-        ])
+        const idlist = buildIdNames(entity, basicflow)
 
         Slot({ name: 'basicSetup' }, () => {
           Content(`
@@ -208,8 +205,8 @@ function basicSetup(extra?: any) {
 
 
         Slot({ name: 'basic' }, () => {
-          const flowHasCreate = Object.values(basicflow.step).some(
-            (s: any) => s.op === 'create'
+          const flowHasCreate = Object.values(flowSteps(basicflow)).some(
+            (s: any) => s.o === 'create'
           )
 
           // The basic test exercises a flow with one or more ops (load,
@@ -218,7 +215,7 @@ function basicSetup(extra?: any) {
           // dependent (e.g. update needs prior load), skipping ANY op the
           // flow exercises skips the whole basic test.
           const flowOps = Array.from(new Set(
-            (basicflow.step as any[]).map((s: any) => s.op).filter(Boolean)
+            (flowSteps(basicflow) as any[]).map((s: any) => s.o).filter(Boolean)
           ))
           const flowOpsLiteral = '[' + flowOps.map((o: any) => `'${o}'`).join(', ') + ']'
 
@@ -231,7 +228,7 @@ function basicSetup(extra?: any) {
     ${hasLiveScenarios(model) ? `if (live) { t.skip('Covered by live operation scenarios'); return }` : ''}
     const setup = basicSetup()
     if (setup.live) {
-      return runLiveEntity(setup, ${JSON.stringify(entity)}, ${JSON.stringify(basicflow)}, '${nom(entity, 'Name')}')
+      return runLiveEntity(setup, ${JSON.stringify(entity)}, ${JSON.stringify(basicflow)}, '${nom(entity, 'Name')}', ${JSON.stringify(liveFacts)})
     }
     const client = setup.client
     const struct = setup.struct
@@ -253,16 +250,16 @@ function basicSetup(extra?: any) {
           const genCtx: GenCtx = {
             model, entity, flow: basicflow, PROJUPPER: PROJENVNAME,
           }
-          each(basicflow.step, (step: ModelEntityFlowStep, index: number) => {
+          each(flowSteps(basicflow), (step: ModelEntityFlowStep, index: number) => {
             // Never emit a REMOVE (or its removed-item verify LIST) without a
             // preceding CREATE: a coherent CRUD flow only removes what it made,
             // so a create-less remove would mutate pre-existing (live) data.
             if (!flowHasCreate) {
-              if ('remove' === step.op) { return }
-              if ('list' === step.op &&
-                (step.valid || []).some((v: any) => 'ItemNotExists' === v.apply)) { return }
+              if ('remove' === step.o) { return }
+              if ('list' === step.o &&
+                (step.v || []).some((v: any) => 'ItemNotExists' === v.apply)) { return }
             }
-            const opgen = GENERATE_OP[step.op]
+            const opgen = GENERATE_OP[step.o]
             if (null != opgen) {
               opgen(genCtx, step, index)
               Content('\n')
@@ -277,18 +274,18 @@ function basicSetup(extra?: any) {
 
 const generateCreate: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = step.input.entvar ?? ref + '_ent'
-  const datavar = step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? ''))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = step.i.entvar ?? ref + '_ent'
+  const datavar = step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? ''))
 
-  const priorSteps = flow.step.slice(0, Number(index))
+  const priorSteps = flowSteps(flow).slice(0, Number(index))
   const needsEnt = !priorSteps.some(s =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   const hasDatvar = priorSteps.some(s => {
-    if ('create' === s.op) {
-      const priorRef = s.input.ref ?? entity.name + '_ref01'
-      const priorDatvar = s.input.datavar ?? (priorRef + '_data' + (s.input.suffix ?? ''))
+    if ('create' === s.o) {
+      const priorRef = s.i.ref ?? entity.name + '_ref01'
+      const priorDatvar = s.i.datavar ?? (priorRef + '_data' + (s.i.suffix ?? ''))
       return priorDatvar === datavar
     }
     return false
@@ -309,7 +306,7 @@ const generateCreate: OpGen = (ctx, step, index) => {
 `)
   }
 
-  each(step.match, (mi: any) => {
+  each(step.m, (mi: any) => {
     Content(`    ${datavar}['${mi.key$}'] = setup.idmap['${mi.val$}']
 `)
   })
@@ -333,14 +330,14 @@ const generateCreate: OpGen = (ctx, step, index) => {
 const generateList: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
   const hasDataId = null != entityDataIdField(entity)
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = step.input.entvar ?? ref + '_ent'
-  const matchvar = step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? ''))
-  const listvar = step.input.listvar ?? (ref + '_list' + (step.input.suffix ?? ''))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = step.i.entvar ?? ref + '_ent'
+  const matchvar = step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? ''))
+  const listvar = step.i.listvar ?? (ref + '_list' + (step.i.suffix ?? ''))
 
-  const priorSteps = flow.step.slice(0, Number(index))
+  const priorSteps = flowSteps(flow).slice(0, Number(index))
   const needsEnt = !priorSteps.some(s =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   Content(`
     // LIST
@@ -352,7 +349,7 @@ const generateList: OpGen = (ctx, step, index) => {
   Content(`    const ${matchvar}: any = {}
 `)
 
-  each(step.match, (mi: any) => {
+  each(step.m, (mi: any) => {
     Content(`    ${matchvar}['${mi.key$}'] = setup.idmap['${mi.val$}']
 `)
   })
@@ -360,12 +357,12 @@ const generateList: OpGen = (ctx, step, index) => {
   Content(`
     const ${listvar} = (await ${entvar}.list(${matchvar})).map((e: any) => e.data())
 `)
-  const allSteps = flow.step
-  for (let vI = 0; vI < step.valid.length; vI++) {
-    const validator = step.valid[vI]
+  const allSteps = flowSteps(flow)
+  for (let vI = 0; vI < step.v.length; vI++) {
+    const validator = step.v[vI]
     const validRef = validator.def?.ref
-    const hasRefData = validRef && allSteps.some(s => 'create' === s.op &&
-      ((s.input.ref ?? entity.name + '_ref01') === validRef))
+    const hasRefData = validRef && allSteps.some(s => 'create' === s.o &&
+      ((s.i.ref ?? entity.name + '_ref01') === validRef))
 
     if ('ItemExists' === validator.apply && hasRefData && hasDataId) {
       Content(`
@@ -383,16 +380,16 @@ const generateList: OpGen = (ctx, step, index) => {
 
 const generateUpdate: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = step.input.entvar ?? ref + '_ent'
-  const datavar = step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? ''))
-  const resdatavar = step.input.resdatavar ?? (ref + '_resdata' + (step.input.suffix ?? ''))
-  const markdefvar = step.input.markdefvar ?? (ref + '_markdef' + (step.input.suffix ?? ''))
-  const srcdatavar = step.input.srcdatavar ?? (ref + '_data' + (step.input.suffix ?? ''))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = step.i.entvar ?? ref + '_ent'
+  const datavar = step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? ''))
+  const resdatavar = step.i.resdatavar ?? (ref + '_resdata' + (step.i.suffix ?? ''))
+  const markdefvar = step.i.markdefvar ?? (ref + '_markdef' + (step.i.suffix ?? ''))
+  const srcdatavar = step.i.srcdatavar ?? (ref + '_data' + (step.i.suffix ?? ''))
 
-  const priorSteps = flow.step.slice(0, Number(index))
+  const priorSteps = flowSteps(flow).slice(0, Number(index))
   const needsEnt = !priorSteps.some(s =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   const hasEntIdU = null != entity.id
 
@@ -410,7 +407,7 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 `)
   }
 
-  each(step.data, (mi: any) => {
+  each(step.d, (mi: any) => {
     if ('id' !== mi.key$) {
       Content(`    ${datavar} ['${mi.key$}'] = setup.idmap['${mi.key$}']
 `)
@@ -418,10 +415,10 @@ const generateUpdate: OpGen = (ctx, step, index) => {
   })
 
 
-  for (let sI = 0; sI < step.spec.length; sI++) {
-    const spec = step.spec[sI]
-    if ('TextFieldMark' === spec.apply && null != step.input.textfield) {
-      const fieldname = step.input.textfield
+  for (let sI = 0; sI < step.s.length; sI++) {
+    const spec = step.s[sI]
+    if ('TextFieldMark' === spec.apply && null != step.i.textfield) {
+      const fieldname = step.i.textfield
       const fieldvalue = spec.def.mark
       Content(`
     const ${markdefvar} = { name: '${fieldname}', value: '${fieldvalue}_' + setup.now }
@@ -442,9 +439,9 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 `)
   }
 
-  for (let sI = 0; sI < step.spec.length; sI++) {
-    const spec = step.spec[sI]
-    if ('TextFieldMark' === spec.apply && null != step.input.textfield) {
+  for (let sI = 0; sI < step.s.length; sI++) {
+    const spec = step.s[sI]
+    if ('TextFieldMark' === spec.apply && null != step.i.textfield) {
       Content(`
     assert((${resdatavar} as any)[${markdefvar}.name] === ${markdefvar}.value)
 `)
@@ -456,25 +453,25 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 
 const generateLoad: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = step.input.entvar ?? ref + '_ent'
-  const matchvar = step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? ''))
-  const datavar = step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? ''))
-  const srcdatavar = step.input.srcdatavar ?? (ref + '_data' + (step.input.suffix ?? ''))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = step.i.entvar ?? ref + '_ent'
+  const matchvar = step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? ''))
+  const datavar = step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? ''))
+  const srcdatavar = step.i.srcdatavar ?? (ref + '_data' + (step.i.suffix ?? ''))
 
-  const priorSteps = flow.step.slice(0, Number(index))
+  const priorSteps = flowSteps(flow).slice(0, Number(index))
   const hasEntVar = priorSteps.some(s =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   // Check if srcdatavar was declared by a prior create step or by the
   // preamble bootstrap (which runs when the flow has no create step)
-  const flowHasCreate = flow.step.some(s => s.op === 'create')
+  const flowHasCreate = flowSteps(flow).some(s => s.o === 'create')
   const preambleRef = entity.name + '_ref01'
   const hasSrcData = (!flowHasCreate && srcdatavar === preambleRef + '_data') ||
     priorSteps.some(s => {
-      if ('create' === s.op) {
-        const priorRef = s.input.ref ?? entity.name + '_ref01'
-        const priorDatvar = s.input.datavar ?? (priorRef + '_data' + (s.input.suffix ?? ''))
+      if ('create' === s.o) {
+        const priorRef = s.i.ref ?? entity.name + '_ref01'
+        const priorDatvar = s.i.datavar ?? (priorRef + '_data' + (s.i.suffix ?? ''))
         return priorDatvar === srcdatavar
       }
       return false
@@ -484,8 +481,8 @@ const generateLoad: OpGen = (ctx, step, index) => {
 
   const loadOp = entity.op?.load
   const loadPoint = loadOp?.points?.[0]
-  const loadPathParams = loadPoint?.args?.params || []
-  const loadHasRequiredParams = loadPathParams.some((p: any) => p.reqd !== false)
+  const loadPathParams = loadPoint?.g?.params || []
+  const loadHasRequiredParams = loadPathParams.some((p: any) => p.r !== false)
   if (!hasEntId && loadHasRequiredParams) {
     if (!hasEntVar) {
       Content(`
@@ -526,14 +523,14 @@ const generateLoad: OpGen = (ctx, step, index) => {
 
 const generateRemove: OpGen = (ctx, step, index) => {
   const { entity, flow } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = step.input.entvar ?? ref + '_ent'
-  const matchvar = step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? ''))
-  const srcdatavar = step.input.srcdatavar ?? (ref + '_data')
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = step.i.entvar ?? ref + '_ent'
+  const matchvar = step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? ''))
+  const srcdatavar = step.i.srcdatavar ?? (ref + '_data')
 
-  const priorSteps = flow.step.slice(0, Number(index))
+  const priorSteps = flowSteps(flow).slice(0, Number(index))
   const needsEnt = !priorSteps.some(s =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   // "Remove what you created" needs the created record's id. An entity with
   // no DATA id field (entityDataIdField null — e.g. Multichannel's Template)

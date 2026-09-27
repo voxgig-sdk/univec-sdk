@@ -29,7 +29,7 @@ OMNI_INC := -I tests -I tests/vendor/omni
 TEST_INC := -I tests
 LDLIBS := -lm
 
-# ---- gated feature payloads (model/feature/<name>.aon plugin groups) --------
+# ---- gated feature payloads (model/feature/<name>.aontu plugin groups) --------
 #
 # A gated feature's vendored payload sits two levels under feature/
 # (feature/<name>/<lib>/*.c) - out of reach of the feature/*/*.c glob below,

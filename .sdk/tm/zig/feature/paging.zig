@@ -3,8 +3,8 @@
 // (or a cursor) into the request query; on the way back (PreResult) it reads
 // the server's pagination signals — a `Link: rel="next"` header,
 // `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body — and records them
-// on `result.paging`. A per-call cursor/page from ctrl takes priority (used by
+// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body (snake_case forms
+// too) — and records them on `result.paging` and the caller's ctrl paging. A per-call cursor/page from ctrl takes priority (used by
 // auto-iteration). Parameter names (`pageParam`, `limitParam`, `cursorParam`),
 // the page size (`limit`) and the start page (`startPage`, default 1) are
 // configurable.
@@ -114,7 +114,10 @@ pub const PagingFeature = struct {
         if (!h.is_noval(cursor)) {
             h.setp(query, cursor_param, cursor);
         } else if (h.is_noval(h.getp(query, page_param))) {
-            const page = h.getp(paging, "page");
+            // A record written back by pre_result holds the page just fetched
+            // as "page" and the one to fetch as "nextPage", so nextPage wins.
+            var page = h.getp(paging, "nextPage");
+            if (h.is_noval(page)) page = h.getp(paging, "page");
             if (!h.is_noval(page)) {
                 h.setp(query, page_param, page);
             } else {
@@ -257,11 +260,15 @@ pub const PagingFeature = struct {
             }
         }
 
-        // Body-level cursors.
+        // Body-level signals; snake_case forms are read first so camelCase wins.
         if (body == .object) {
             const next = h.getp(body, "next");
             if (!h.is_noval(next) and h.is_noval(h.getp(paging, "next"))) {
                 h.setp(paging, "next", next);
+            }
+            const snake_cursor = h.getp(body, "next_cursor");
+            if (!h.is_noval(snake_cursor)) {
+                h.setp(paging, "cursor", snake_cursor);
             }
             const cursor = h.getp(body, "cursor");
             if (!h.is_noval(cursor)) {
@@ -270,6 +277,18 @@ pub const PagingFeature = struct {
             const next_cursor = h.getp(body, "nextCursor");
             if (!h.is_noval(next_cursor)) {
                 h.setp(paging, "cursor", next_cursor);
+            }
+            if (h.is_noval(h.getp(paging, "nextPage"))) {
+                var np = h.getp(body, "nextPage");
+                if (h.is_noval(np)) np = h.getp(body, "next_page");
+                switch (np) {
+                    .integer, .float, .string => h.setp(paging, "nextPage", np),
+                    else => {},
+                }
+            }
+            if (h.get_bool(body, "has_more")) |has_more| {
+                h.setp(paging, "hasMore", h.vbool(has_more));
+                explicit_more = true;
             }
             if (h.get_bool(body, "hasMore")) |has_more| {
                 h.setp(paging, "hasMore", h.vbool(has_more));
@@ -292,6 +311,17 @@ pub const PagingFeature = struct {
 
         result.paging = paging;
         self.last = paging;
+
+        // `.object` is a *MapRef, so the caller's map is refilled in place; a
+        // fresh map on ctrl never reaches the caller.
+        if (ctx.ctrl.paging == .object) {
+            const shared = ctx.ctrl.paging.object;
+            shared.data.clearRetainingCapacity();
+            var it = paging.object.iterator();
+            while (it.next()) |kv| h.setp(ctx.ctrl.paging, kv.key_ptr.*, kv.value_ptr.*);
+        } else {
+            ctx.ctrl.paging = paging;
+        }
     }
 
     fn vname(p: *anyopaque) []const u8 {

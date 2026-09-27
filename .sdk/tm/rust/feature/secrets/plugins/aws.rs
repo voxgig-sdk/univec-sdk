@@ -1,13 +1,6 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (rust/plugins/aws/src/lib.rs)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (rust/plugins/aws/src/lib.rs)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! The two AWS providers - Secrets Manager and SSM Parameter Store -
-//! and the request signing they need, as voxgig/plugin definitions.
-//!
-//! SIGV4 TRAVELS WITH THEM, which is the sharpest instance of the split:
-//! the core of no port imports a hash function, and `crypto.rs` here is
-//! the only SHA-256 in this repository's Rust. A chain of built-in kinds
-//! links neither it nor the HTTP client it signs for.
 
 pub mod crypto;
 pub mod sigv4;
@@ -23,7 +16,6 @@ use super::httpjson::{fetchjson, firstof, headerrefs, http, textat, trimslash, J
 
 pub use self::sigv4::{sigv4, Sigv4Input, Sigv4Output};
 
-/// The `YYYYMMDDTHHMMSSZ` timestamp SigV4 wants, for now.
 fn awsnow() -> String {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -44,9 +36,6 @@ fn awsnow() -> String {
     )
 }
 
-/// Days since the epoch as a civil date - the classic era-based
-/// conversion (Howard Hinnant's `civil_from_days`), exact for any date
-/// the epoch can name.
 fn civildate(days: i64) -> (i64, u32, u32) {
     let z = days + 719468;
     let era = if 0 <= z { z } else { z - 146096 } / 146097;
@@ -166,14 +155,6 @@ fn awsmiss(body: &Option<Json>, types: &[&str]) -> bool {
     types.iter().any(|name| errtype.contains(name))
 }
 
-/// AWS Secrets Manager.
-///
-/// `api.token` reads the secret named `api` (the vaultref path, so
-/// `db.pass.main` reads `db/pass`) and takes the `token` field of its
-/// JSON SecretString - the AWS idiom of one JSON map per secret. A
-/// SecretString that is not JSON is the value itself, under the
-/// conventional field `value`. Requests are SigV4-signed in-tree; see
-/// src/sigv4.rs.
 pub struct AwsSecretsProvider {
     pub region: String,
     pub keyid: String,

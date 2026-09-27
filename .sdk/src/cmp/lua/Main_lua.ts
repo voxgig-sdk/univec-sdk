@@ -22,20 +22,13 @@ import {
 
 import { Package } from './Package_lua'
 import { Config } from './Config_lua'
+import { Schema } from './Schema_lua'
+import { PrepareAuth } from './PrepareAuth_lua'
 import { Gitignore } from './Gitignore_lua'
 import { MainEntity } from './MainEntity_lua'
 import { EntityTypes } from './EntityTypes_lua'
 
 
-// Features whose source is a CONTAINER under the top-level feature/ dir,
-// beside the flat `<name>_feature.lua` every other lua feature is. Today
-// that is `secrets`: its folder holds a vendored @voxgig/sekreto port, the
-// voxgig/plugin runtime and the C transport helper - some forty files of
-// key-store, request-signing and child-process code that an SDK which never
-// asked for secrets must not ship. Anything named here is EXCLUDED from the
-// verbatim copy unless the model SELECTS the feature (see the Copy below);
-// its shipped test suite under test/feature/<name>/ goes with it. The
-// clojure target gates its container the same way (Main_clojure.ts).
 const CONTAINED = ['secrets']
 
 
@@ -54,12 +47,6 @@ const Main = cmp(async function Main(props: any) {
 
   Gitignore({})
 
-  // THE feature/<name>/ CONTAINER IS GATED HERE, at generate time - the
-  // top-level-container peer of the `srcFeatureExcludes` gate ts and js
-  // apply to src/feature/<name>/. `target add` keeps an unselected
-  // feature out of a project's tm/ in the first place; this covers a
-  // feature switched off after it was added, and the generator suite,
-  // which copies the whole scaffold tree.
   const containerExcludes = CONTAINED
     .filter((name: string) => null == feature[name])
     .flatMap((name: string) => [
@@ -68,13 +55,6 @@ const Main = cmp(async function Main(props: any) {
       new RegExp('(^|/)test/feature/' + name + '/'),
     ])
 
-  // Copy tm/lua files with replacements.
-  //
-  // pluginExcludes: the generate-time plugin trim (an ACTIVE feature's
-  // INACTIVE plugin group's declared files stay out of the tree). The
-  // model's lua `path` entries are target-root-relative, which is this
-  // Copy's root - helpers/featureSource documents that getting the root
-  // wrong makes the trim a silent no-op.
   Copy({
     from: 'tm/' + target.name,
     exclude: [/src\//, TEST_CONTROL_EXCLUDE,
@@ -84,64 +64,75 @@ const Main = cmp(async function Main(props: any) {
     }
   })
 
-  // THE NATIVE BUILD SEAM. sekreto's lua PLUGIN kinds (hashicorp, aws, ...)
-  // run a small compiled transport helper, because Lua 5.4 has no sockets
-  // and no TLS; the four built-in kinds never reach it. The helper's
-  // source is vendored with the feature (feature/secrets/native/
-  // sekretonet.c) and the template Makefile `-include`s this fragment, so
-  // it is compiled - and OpenSSL linked - ONLY when the model activates a
-  // plugin group that lua has definitions for. An SDK without secrets, or
-  // with the built-in chain alone, gets no fragment, no compiler run and
-  // no OpenSSL dependency.
-  //
-  // The vendored file opens with the vendoring tool's three-line `--`
-  // provenance header (every file under tm/lua is stamped in lua's comment
-  // syntax; the guard holds that), which the C compiler cannot read - so
-  // the rule feeds the compiler from line four. Line numbers in a compiler
-  // diagnostic are therefore three lower than in the file.
   const nativeGroups: string[] = []
+  let wantsVault = false
   each(feature, (f: any) => {
     each(f.plugin, (plugin: any) => {
       if (false === plugin.active || null == plugin.active) return
       if (0 < Object.keys(plugin.def?.lua || {}).length) {
         nativeGroups.push(f.name + '.' + plugin.name)
+        if ('minivault' === plugin.name) {
+          wantsVault = true
+        }
       }
     })
   })
+
+  // The transport helper serves every kind that reaches the network or a
+  // child process. The vault reaches neither, so a vault-only chain needs
+  // the module and not the program.
+  const wantsNet = nativeGroups.some((one) => !/\.minivault$/.test(one))
 
   if (0 < nativeGroups.length) {
     Folder({ name: 'feature' }, () => {
       Folder({ name: 'secrets' }, () => {
         File({ name: 'native.mk' }, () => {
-          Content(`# ${model.const.Name} SDK: the sekreto transport helper build.
+          Content(`# ${model.const.Name} SDK: the sekreto native helper build.
 #
 # GENERATED because a secrets plugin group is active
-# (${nativeGroups.sort().join(', ')}): the plugin provider kinds run this
-# helper for every socket and child process, since Lua 5.4 has none. An
-# SDK without an active plugin group has no such file, and its Makefile's
-# optional include of it is a no-op - nothing is compiled and OpenSSL is
-# not linked.
+# (${nativeGroups.sort().join(', ')}). Lua 5.4 has no sockets, no TLS and no
+# cryptography, so the kinds that need any of the three reach a small
+# compiled helper - and this file builds only the ones this SDK's chain
+# actually uses. An SDK without an active plugin group has no such file,
+# and its Makefile's optional include of it is a no-op: nothing is
+# compiled and nothing is linked.
 #
 # The source carries the vendoring tool's three-line provenance header in
 # lua comment syntax, which the compiler cannot read: it is fed the file
 # from line four. Compiler line numbers are therefore three lower than the
 # file's.
-NATIVE := feature/secrets/native/sekreto-net
+NATIVE := ${[
+            wantsNet ? 'feature/secrets/native/sekreto-net' : '',
+            wantsVault ? 'feature/secrets/native/sekretovault.so' : '',
+          ].filter((one) => '' !== one).join(' ')}
 
 CC ?= cc
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra
 LDLIBS ?= -lssl -lcrypto
-
+${wantsNet ? `
 feature/secrets/native/sekreto-net: feature/secrets/native/sekretonet.c
 	@command -v $(CC) >/dev/null 2>&1 || { echo "secrets: a C compiler ($(CC)) is needed to build the sekreto transport helper that this SDK's plugin provider kinds run - install one, or use only the built-in provider kinds" >&2; exit 1; }
 	tail -n +4 $< | $(CC) $(CFLAGS) -x c - -o $@ $(LDLIBS)
-`)
+` : ''}${wantsVault ? `
+# The mini vault's crypto is a LOADABLE MODULE, not a program: minivault.lua
+# opens it with package.loadlib and calls luaopen_sekretovault, so it is
+# compiled -shared -fPIC and keeps the .so name that call expects. It links
+# libcrypto alone - the vault reads a file and never opens a socket, so it
+# needs no TLS.
+#
+# LUA_CFLAGS is where a consumer points the compiler at lua.h when it is not
+# on the default include path (Homebrew, a pkg-config build, a vendored Lua).
+LUA_CFLAGS ?= $(shell pkg-config --cflags lua5.4 2>/dev/null || pkg-config --cflags lua 2>/dev/null)
+
+feature/secrets/native/sekretovault.so: feature/secrets/native/sekretovault.c
+	@command -v $(CC) >/dev/null 2>&1 || { echo "secrets: a C compiler ($(CC)) is needed to build the mini vault's crypto module - install one, or use only the built-in provider kinds" >&2; exit 1; }
+	tail -n +4 $< | $(CC) $(CFLAGS) $(LUA_CFLAGS) -fPIC -shared -x c - -o $@ -lcrypto
+` : ''}`)
         })
       })
     })
   }
 
-  // Generate main SDK file
   File({ name: model.name + '_sdk.' + target.ext }, () => {
 
     Fragment(
@@ -153,15 +144,12 @@ feature/secrets/native/sekreto-net: feature/secrets/native/sekretonet.c
           // Load the LuaLS typed-model annotations module so it is part of
           // the loaded program (module body is empty — no runtime effect) and
           // does not depend on workspace-wide language-server scanning.
-          // NOTE: plain marker keys must EMBED the lua comment prefix
           // (`-- #X`) — jostraca's bare `#X` form only matches `//`-style
           // comment lines (cf. the `'-- #LoadOp'` keys in Entity_lua.ts).
           '-- #TypesRequire': ({ indent }: any) => Content({ indent },
             `-- Typed-model annotations (LuaLS ---@class); empty at runtime.\n` +
             `require("${model.name}_types")`),
 
-          // Same embedded `-- ` prefix requirement as above (the bare
-          // '#BuildFeatures' key never matched the lua comment line).
           '-- #BuildFeatures': ({ indent }: any) => {
             each(feature, (feat: any) => {
               const fname = feat.name.charAt(0).toUpperCase() + feat.name.slice(1)
@@ -177,7 +165,6 @@ self._utility.feature_hook(self._rootctx, "${name}")
         }
       },
 
-      // Entities - injected at SLOT
       () => {
         each(entity, (entity: ModelEntity) => {
           const entitySDK = getModelPath(model, `main.${KIT}.entity.${entity.name}`)
@@ -187,15 +174,19 @@ self._utility.feature_hook(self._rootctx, "${name}")
       })
   })
 
-  // Generate typed-model annotations (LuaLS ---@class / ---@field)
   EntityTypes({ target })
 
-  // Generate config module
   Folder({ name: '.' }, () => {
     Config({ target })
+    Schema({ target })
   })
 
-  // Generate feature factory module
+  // GENERATED, NOT COPIED. Where the credential goes is a fact about the
+  // API - header, query or cookie, under the name the spec gives - and tm/
+  // Called at the TARGET ROOT, like Config above (that Folder({name:'.'})
+  // is the root itself), because the lua tree has no src/ wrapper: the
+  PrepareAuth({ target })
+
   File({ name: 'features.' + target.ext }, () => {
     Content(`-- ${model.const.Name} SDK feature factory
 
@@ -237,7 +228,6 @@ return features
   })
 
   // Generate _make_feature function referenced by Main.fragment.lua
-  // This is part of the main SDK class, inserted via the slot
 
 })
 

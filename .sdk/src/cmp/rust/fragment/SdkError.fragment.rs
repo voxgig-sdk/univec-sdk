@@ -1,5 +1,3 @@
-// ProjectNameError: the SDK error type (mirrors go core/error.go). The
-// pipeline error discipline is Result<T, ProjectNameError> throughout.
 
 use crate::utility::voxgigstruct::Value;
 
@@ -11,10 +9,6 @@ pub struct ProjectNameError {
     // Cleaned snapshots attached by makeError (Noval until then).
     pub result: Value,
     pub spec: Value,
-    // HTTP status of the response that caused this error, or -1 when the
-    // request never got one. PROMOTED to the top level: it used to be
-    // reachable only inside `result`, so every consumer coupled itself to
-    // the internal shape of that snapshot.
     pub status: i64,
 }
 

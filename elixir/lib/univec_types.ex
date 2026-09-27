@@ -1,7 +1,7 @@
 # Typed models for the Univec SDK.
 #
-# GENERATED from the API model: main.kit.entity.<e>.fields[] and per-op
-# params (op.<name>.points[].args.params[]). Member types come from the
+# GENERATED from the API model: main.kit.entity.<e>.fields{} and per-op
+# params (op.<name>.points[].g.params[]). Member types come from the
 # canonical type sentinels. The SDK carries data as string-keyed struct value
 # nodes, so each alias is an open string-keyed map; the @typedoc member lists
 # document the concrete shapes. Do not edit by hand.

@@ -6,14 +6,6 @@ import (
 	"GOMODULE/core"
 )
 
-// Network behaviour simulation. Wraps the active transport (the live
-// net/http fetch or the `test` feature's in-memory mock) and injects
-// realistic network conditions so offline unit tests can exercise slowness,
-// transient failures, rate limiting and outages deterministically.
-//
-// Every injection mode is counter-driven (per client instance) so tests
-// are reproducible without mocking timers. `failRate` adds optional
-// pseudo-random failures via a seeded LCG for coverage-style testing.
 type NetsimFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK

@@ -26,7 +26,7 @@ make test
 
 | Source | Path | Edit when… |
 | --- | --- | --- |
-| Target definition | `.sdk/model/target/kotlin.aon` | deps, module, extension, phases change |
+| Target definition | `.sdk/model/target/kotlin.aontu` | deps, module, extension, phases change |
 | Templates | `.sdk/tm/kotlin/` | the file is the **same for every API** (runtime, transport, base classes) — copied verbatim with placeholder substitution |
 | Components | `.sdk/src/cmp/kotlin/` | the file's shape **depends on the API** (entities, constructor, README, tests) — TypeScript that walks the model |
 
@@ -37,30 +37,30 @@ component.* After editing a component run `npm run build` before
 ## Features in this target
 
 Each feature is a flat file in the `feature/` package. Its hooks and
-default activation come from `.sdk/model/feature/<name>.aon`; customise
+default activation come from `.sdk/model/feature/<name>.aontu`; customise
 the runtime under `.sdk/tm/kotlin/feature/` and regenerate.
 
 | Feature | Runtime file | Active hooks |
 | --- | --- | --- |
-| **audit** — Structured audit trail of operations | `feature/audit_feature.kt` | `PreDone`, `PreUnexpected` |
-| **cache** — Response caching for safe read requests | `feature/cache_feature.kt` | — |
-| **clienttrack** — Client identity and per-request correlation headers | `feature/clienttrack_feature.kt` | `PostConstruct`, `PreRequest` |
-| **cost** — Cost tracking and spend budget for API calls | `feature/cost_feature.kt` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **debug** — Request/response capture ring buffer for debugging | `feature/debug_feature.kt` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
-| **idempotency** — Idempotency keys for safe retries of mutating operations | `feature/idempotency_feature.kt` | `PreRequest` |
-| **log** — Structured request and response logging | `feature/log_feature.kt` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **metrics** — Statistics capture: per-operation counters and latency | `feature/metrics_feature.kt` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **netsim** — Network behaviour simulation for offline testing (latency, failures, outages) | `feature/netsim_feature.kt` | — |
-| **paging** — Pagination signals for list operations | `feature/paging_feature.kt` | `PreRequest`, `PreResult` |
-| **proxy** — Outbound HTTP(S) proxy routing | `feature/proxy_feature.kt` | — |
-| **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.kt` | — |
-| **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.kt` | `PrePoint` |
-| **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.kt` | — |
-| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/secrets_feature.kt` | `PreSpec` |
-| **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.kt` | `PreResult` |
-| **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.kt` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
-| **test** — In-memory mock transport for testing without a live server | `feature/test_feature.kt` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **timeout** — Per-request timeout with transport abort | `feature/timeout_feature.kt` | — |
+| **audit** — Audit trail | `feature/audit_feature.kt` | `PreDone`, `PreUnexpected` |
+| **cache** — Response cache | `feature/cache_feature.kt` | — |
+| **clienttrack** — Client tracking | `feature/clienttrack_feature.kt` | `PostConstruct`, `PreRequest` |
+| **cost** — Cost tracking | `feature/cost_feature.kt` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **debug** — Debug capture | `feature/debug_feature.kt` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
+| **idempotency** — Idempotency | `feature/idempotency_feature.kt` | `PreRequest` |
+| **log** — Logging | `feature/log_feature.kt` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **metrics** — Metrics | `feature/metrics_feature.kt` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **netsim** — Network simulation | `feature/netsim_feature.kt` | — |
+| **paging** — Paging | `feature/paging_feature.kt` | `PreRequest`, `PreResult` |
+| **proxy** — Proxy | `feature/proxy_feature.kt` | — |
+| **ratelimit** — Rate limiting | `feature/ratelimit_feature.kt` | — |
+| **rbac** — Access control | `feature/rbac_feature.kt` | `PrePoint` |
+| **retry** — Retry | `feature/retry_feature.kt` | — |
+| **secrets** — Secrets | `feature/secrets_feature.kt` | `PreSpec` |
+| **streaming** — Streaming | `feature/streaming_feature.kt` | `PreResult` |
+| **telemetry** — Telemetry | `feature/telemetry_feature.kt` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
+| **test** — Test transport | `feature/test_feature.kt` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **timeout** — Timeout | `feature/timeout_feature.kt` | — |
 
 ---
 

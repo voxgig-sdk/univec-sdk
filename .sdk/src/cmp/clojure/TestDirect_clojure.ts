@@ -6,12 +6,6 @@ import {
 } from '@voxgig/sdkgen'
 
 
-// Emit per-entity direct()/prepare() checks INTO the shared gentest run body
-// (the clojure test runner drives a single sdk.gentest/run). Only entities
-// with a read op get a check — matching the py/elixir TestDirect gate — so an
-// op-less entity does not fabricate a request path. The checks exercise the
-// raw-HTTP escape hatch: prepare() builds a fetchdef without sending, and
-// direct() runs a live-mode client against an in-test mock system.fetch.
 const TestDirect = cmp(function TestDirect(props: any) {
   const { model } = props.ctx$
   const entity = props.entity

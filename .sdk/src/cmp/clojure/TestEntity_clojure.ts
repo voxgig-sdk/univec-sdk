@@ -2,13 +2,6 @@
 import { cmp, Content } from '@voxgig/sdkgen'
 
 
-// Emit per-entity model-driven checks INTO the shared gentest run body (the
-// clojure test runner drives a single sdk.gentest/run). Covers: entity
-// accessor existence, a create+list smoke run through the in-memory test-mode
-// mock transport (exercising the full operation pipeline, hooks and run-op),
-// and the streaming entity fn. API-agnostic behaviour (pipeline error
-// branches, all features, netsim, primary utility, struct corpus) lives in the
-// static template test namespaces.
 const TestEntity = cmp(function TestEntity(props: any) {
   const e = props.entity
 
@@ -46,9 +39,6 @@ const TestEntity = cmp(function TestEntity(props: any) {
 `)
   }
 
-  // stream(action, args, callopts): runs the op through the full pipeline and
-  // returns a lazy seq of items. Seeds three records via the test mock and
-  // streams them; needs only a list op.
   if (hasList) {
     Content(`  (t/run-check rec "gen-stream-${e.name}"
     (fn [] (let [seed (vs/jm "${e.name}" (vs/jm "S1" (vs/jm "id" "S1" "name" "a")

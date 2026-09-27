@@ -1,0 +1,47 @@
+
+main: kit: target: c: {
+
+  title: C
+  ext: c
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  # Applicability tags (docs/design/feature-tags.md): this target vendors
+  # the c port of @voxgig/sekreto (with voxgig/plugin under it) inside its
+  # gated `feature/secrets/` container, so the `secrets` feature applies.
+  provides: { sekreto: true, schema: true }
+
+  superseded: [
+    'tests/runner.h'
+  ]
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  deps: {
+  }
+}
+
+
+main: kit: feature: &: target: c: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: c: publish: {
+  registry: {
+    name: 'none'
+    url: ''
+    vault: { alias: 'none', env: 'NONE' }
+  }
+}
+
+
+main: kit: target: c: feature: {
+  trim: true
+  fullset: ['tests/feature_test.c', 'tests/sdk_pipeline_test.c']
+}

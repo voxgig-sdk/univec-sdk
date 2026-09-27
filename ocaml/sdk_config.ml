@@ -273,19 +273,22 @@ let make_config () : value =
         ("fields", (ja [
           (jo [
             ("name", (Str "embeddings"));
+            ("title", (Str "Embeddings"));
+            ("type", (Str "`$ARRAY`"));
             ("req", (Bool true));
-            ("short", (Str "Translated vectors, in the target model's dimension."));
-            ("type", (Str "`$ARRAY`")) ]);
+            ("short", (Str "Translated vectors, in the target model's dimension.")) ]);
           (jo [
             ("name", (Str "source_model"));
+            ("title", (Str "Source Model"));
+            ("type", (Str "`$STRING`"));
             ("req", (Bool true));
-            ("short", (Str "Model space the supplied vectors are currently in."));
-            ("type", (Str "`$STRING`")) ]);
+            ("short", (Str "Model space the supplied vectors are currently in.")) ]);
           (jo [
             ("name", (Str "target_model"));
+            ("title", (Str "Target Model"));
+            ("type", (Str "`$STRING`"));
             ("req", (Bool true));
-            ("short", (Str "Model space to translate into."));
-            ("type", (Str "`$STRING`")) ]) ]));
+            ("short", (Str "Model space to translate into.")) ]) ]));
         ("name", (Str "convert"));
         ("op", (jo [
           ("create", (jo [
@@ -293,8 +296,23 @@ let make_config () : value =
             ("name", (Str "create"));
             ("points", (ja [
               (jo [
-                ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("method", (Str "POST"));
+                ("orig", (Str "/v1/convert"));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "convert")) ]) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "convert") ]));
+                ("rename", (empty_map ()));
+                ("transform", (jo [
+                  ("req", (Str "`reqdata`"));
+                  ("res", (Str "`body.data`")) ]));
+                ("args", (empty_map ()));
+                ("select", (empty_map ()));
                 ("live", (jo [
                   ("assert", (jo [
                     ("equal", (jo [
@@ -361,24 +379,26 @@ let make_config () : value =
                         ("where", (jo [
                           ("modelType", (Str "embed")) ])) ]));
                       ("where", (jo [
-                        ("modelType", (Str "convert")) ])) ])) ])) ]));
+                        ("modelType", (Str "convert")) ])) ])) ])) ])) ]);
+              (jo [
+                ("kind", (Str "http"));
                 ("method", (Str "POST"));
-                ("orig", (Str "/v1/convert"));
+                ("orig", (Str "/v1/embed-bridge"));
                 ("segments", (ja [
                   (jo [
                     ("lit", (Str "v1")) ]);
                   (jo [
-                    ("lit", (Str "convert")) ]) ]));
-                ("select", (empty_map ()));
+                    ("lit", (Str "embed-bridge")) ]) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "embed-bridge") ]));
+                ("rename", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
                   ("res", (Str "`body.data`")) ]));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "convert") ])) ]);
-              (jo [
                 ("args", (empty_map ()));
-                ("kind", (Str "http"));
+                ("select", (jo [
+                  ("$action", (Str "bridge")) ]));
                 ("live", (jo [
                   ("assert", (jo [
                     ("equal", (jo [
@@ -444,25 +464,29 @@ let make_config () : value =
                       ("where", (jo [
                         ("modelType", (Str "convert")) ])) ]));
                     ("texts", (ja [
-                      (Str "SDK live coverage test.") ])) ])) ]));
+                      (Str "SDK live coverage test.") ])) ])) ])) ]);
+              (jo [
+                ("kind", (Str "http"));
                 ("method", (Str "POST"));
-                ("orig", (Str "/v1/embed-bridge"));
+                ("orig", (Str "/v1/ephemeral/convert"));
                 ("segments", (ja [
                   (jo [
                     ("lit", (Str "v1")) ]);
                   (jo [
-                    ("lit", (Str "embed-bridge")) ]) ]));
-                ("select", (jo [
-                  ("$action", (Str "bridge")) ]));
+                    ("lit", (Str "ephemeral")) ]);
+                  (jo [
+                    ("lit", (Str "convert")) ]) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "ephemeral");
+                  (Str "convert") ]));
+                ("rename", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
                   ("res", (Str "`body.data`")) ]));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "embed-bridge") ])) ]);
-              (jo [
                 ("args", (empty_map ()));
-                ("kind", (Str "http"));
+                ("select", (jo [
+                  ("$action", (Str "ephemeral")) ]));
                 ("live", (jo [
                   ("assert", (jo [
                     ("equal", (jo [
@@ -532,28 +556,29 @@ let make_config () : value =
                         ("where", (jo [
                           ("modelType", (Str "embed")) ])) ]));
                       ("where", (jo [
-                        ("modelType", (Str "convert")) ])) ])) ])) ]));
+                        ("modelType", (Str "convert")) ])) ])) ])) ])) ]);
+              (jo [
+                ("kind", (Str "http"));
                 ("method", (Str "POST"));
-                ("orig", (Str "/v1/ephemeral/convert"));
+                ("orig", (Str "/v1/ephemeral/embed-bridge"));
                 ("segments", (ja [
                   (jo [
                     ("lit", (Str "v1")) ]);
                   (jo [
                     ("lit", (Str "ephemeral")) ]);
                   (jo [
-                    ("lit", (Str "convert")) ]) ]));
-                ("select", (jo [
-                  ("$action", (Str "ephemeral")) ]));
-                ("transform", (jo [
-                  ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ]));
+                    ("lit", (Str "embed-bridge")) ]) ]));
                 ("parts", (ja [
                   (Str "v1");
                   (Str "ephemeral");
-                  (Str "convert") ])) ]);
-              (jo [
+                  (Str "embed-bridge") ]));
+                ("rename", (empty_map ()));
+                ("transform", (jo [
+                  ("req", (Str "`reqdata`"));
+                  ("res", (Str "`body.data`")) ]));
                 ("args", (empty_map ()));
-                ("kind", (Str "http"));
+                ("select", (jo [
+                  ("$action", (Str "ephemeral_bridge")) ]));
                 ("live", (jo [
                   ("assert", (jo [
                     ("equal", (jo [
@@ -622,44 +647,29 @@ let make_config () : value =
                       ("where", (jo [
                         ("modelType", (Str "convert")) ])) ]));
                     ("texts", (ja [
-                      (Str "SDK live coverage test.") ])) ])) ]));
-                ("method", (Str "POST"));
-                ("orig", (Str "/v1/ephemeral/embed-bridge"));
-                ("segments", (ja [
-                  (jo [
-                    ("lit", (Str "v1")) ]);
-                  (jo [
-                    ("lit", (Str "ephemeral")) ]);
-                  (jo [
-                    ("lit", (Str "embed-bridge")) ]) ]));
-                ("select", (jo [
-                  ("$action", (Str "ephemeral_bridge")) ]));
-                ("transform", (jo [
-                  ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ]));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "ephemeral");
-                  (Str "embed-bridge") ])) ]) ])) ])) ]));
+                      (Str "SDK live coverage test.") ])) ])) ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("embed", (jo [
         ("fields", (ja [
           (jo [
             ("name", (Str "embeddings"));
+            ("title", (Str "Embeddings"));
+            ("type", (Str "`$ARRAY`"));
             ("req", (Bool true));
-            ("short", (Str "One vector per input text, in input order."));
-            ("type", (Str "`$ARRAY`")) ]);
+            ("short", (Str "One vector per input text, in input order.")) ]);
           (jo [
             ("name", (Str "model"));
+            ("title", (Str "Model"));
+            ("type", (Str "`$STRING`"));
             ("req", (Bool true));
-            ("short", (Str "Model that produced the vectors."));
-            ("type", (Str "`$STRING`")) ]);
+            ("short", (Str "Model that produced the vectors.")) ]);
           (jo [
             ("name", (Str "texts"));
+            ("title", (Str "Texts"));
+            ("type", (Str "`$ARRAY`"));
             ("req", (Bool true));
-            ("short", (Str "Texts to embed."));
-            ("type", (Str "`$ARRAY`")) ]) ]));
+            ("short", (Str "Texts to embed.")) ]) ]));
         ("name", (Str "embed"));
         ("op", (jo [
           ("create", (jo [
@@ -667,8 +677,23 @@ let make_config () : value =
             ("name", (Str "create"));
             ("points", (ja [
               (jo [
-                ("args", (empty_map ()));
                 ("kind", (Str "http"));
+                ("method", (Str "POST"));
+                ("orig", (Str "/v1/embed"));
+                ("segments", (ja [
+                  (jo [
+                    ("lit", (Str "v1")) ]);
+                  (jo [
+                    ("lit", (Str "embed")) ]) ]));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "embed") ]));
+                ("rename", (empty_map ()));
+                ("transform", (jo [
+                  ("req", (Str "`reqdata`"));
+                  ("res", (Str "`body.data`")) ]));
+                ("args", (empty_map ()));
+                ("select", (empty_map ()));
                 ("live", (jo [
                   ("assert", (jo [
                     ("equal", (jo [
@@ -712,24 +737,29 @@ let make_config () : value =
                       ("where", (jo [
                         ("modelType", (Str "convert")) ])) ]));
                     ("texts", (ja [
-                      (Str "SDK live coverage test.") ])) ])) ]));
+                      (Str "SDK live coverage test.") ])) ])) ])) ]);
+              (jo [
+                ("kind", (Str "http"));
                 ("method", (Str "POST"));
-                ("orig", (Str "/v1/embed"));
+                ("orig", (Str "/v1/ephemeral/embed"));
                 ("segments", (ja [
                   (jo [
                     ("lit", (Str "v1")) ]);
                   (jo [
+                    ("lit", (Str "ephemeral")) ]);
+                  (jo [
                     ("lit", (Str "embed")) ]) ]));
-                ("select", (empty_map ()));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "ephemeral");
+                  (Str "embed") ]));
+                ("rename", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
                   ("res", (Str "`body.data`")) ]));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "embed") ])) ]);
-              (jo [
                 ("args", (empty_map ()));
-                ("kind", (Str "http"));
+                ("select", (jo [
+                  ("$action", (Str "ephemeral")) ]));
                 ("live", (jo [
                   ("assert", (jo [
                     ("equal", (jo [
@@ -776,50 +806,36 @@ let make_config () : value =
                       ("where", (jo [
                         ("modelType", (Str "convert")) ])) ]));
                     ("texts", (ja [
-                      (Str "SDK live coverage test.") ])) ])) ]));
-                ("method", (Str "POST"));
-                ("orig", (Str "/v1/ephemeral/embed"));
-                ("segments", (ja [
-                  (jo [
-                    ("lit", (Str "v1")) ]);
-                  (jo [
-                    ("lit", (Str "ephemeral")) ]);
-                  (jo [
-                    ("lit", (Str "embed")) ]) ]));
-                ("select", (jo [
-                  ("$action", (Str "ephemeral")) ]));
-                ("transform", (jo [
-                  ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ]));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "ephemeral");
-                  (Str "embed") ])) ]) ])) ])) ]));
+                      (Str "SDK live coverage test.") ])) ])) ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("ephemeral_key", (jo [
         ("fields", (ja [
           (jo [
             ("name", (Str "dailyLimit"));
+            ("title", (Str "Daily Limit"));
+            ("type", (Str "`$INTEGER`"));
             ("req", (Bool true));
-            ("short", (Str "Calls permitted per day."));
-            ("type", (Str "`$INTEGER`")) ]);
+            ("short", (Str "Calls permitted per day.")) ]);
           (jo [
             ("name", (Str "dailyUsed"));
+            ("title", (Str "Daily Used"));
+            ("type", (Str "`$INTEGER`"));
             ("req", (Bool true));
-            ("short", (Str "Calls already used today."));
-            ("type", (Str "`$INTEGER`")) ]);
+            ("short", (Str "Calls already used today.")) ]);
           (jo [
             ("name", (Str "key"));
+            ("title", (Str "Key"));
+            ("type", (Str "`$STRING`"));
             ("req", (Bool true));
-            ("short", (Str "The ephemeral API key, prefixed `eph_`."));
-            ("type", (Str "`$STRING`")) ]);
+            ("short", (Str "The ephemeral API key, prefixed `eph_`.")) ]);
           (jo [
-            ("format", (Str "date-time"));
             ("name", (Str "resetsAt"));
+            ("title", (Str "Resets At"));
+            ("type", (Str "`$STRING`"));
             ("req", (Bool true));
             ("short", (Str "When the daily allowance resets."));
-            ("type", (Str "`$STRING`")) ]) ]));
+            ("format", (Str "date-time")) ]) ]));
         ("name", (Str "ephemeral_key"));
         ("op", (jo [
           ("create", (jo [
@@ -827,15 +843,7 @@ let make_config () : value =
             ("name", (Str "create"));
             ("points", (ja [
               (jo [
-                ("args", (empty_map ()));
                 ("kind", (Str "http"));
-                ("live", (jo [
-                  ("assert", (jo [
-                    ("nonempty", (ja [
-                      (Str "key") ])) ]));
-                  ("auth", (Str "public"));
-                  ("id", (Str "key"));
-                  ("retention", (Str "No deletion endpoint; issued key is subject to the service daily allowance")) ]));
                 ("method", (Str "POST"));
                 ("orig", (Str "/v1/ephemeral/key"));
                 ("segments", (ja [
@@ -845,62 +853,81 @@ let make_config () : value =
                     ("lit", (Str "ephemeral")) ]);
                   (jo [
                     ("lit", (Str "key")) ]) ]));
-                ("select", (empty_map ()));
-                ("transform", (jo [
-                  ("req", (Str "`reqdata`"));
-                  ("res", (Str "`body.data`")) ]));
                 ("parts", (ja [
                   (Str "v1");
                   (Str "ephemeral");
-                  (Str "key") ])) ]) ])) ])) ]));
+                  (Str "key") ]));
+                ("rename", (empty_map ()));
+                ("transform", (jo [
+                  ("req", (Str "`reqdata`"));
+                  ("res", (Str "`body.data`")) ]));
+                ("args", (empty_map ()));
+                ("select", (empty_map ()));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("nonempty", (ja [
+                      (Str "key") ])) ]));
+                  ("auth", (Str "public"));
+                  ("id", (Str "key"));
+                  ("retention", (Str "No deletion endpoint; issued key is subject to the service daily allowance")) ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("model", (jo [
         ("fields", (ja [
           (jo [
             ("name", (Str "eval"));
-            ("short", (Str "Retrieval-fidelity metrics for a convert model."));
-            ("type", (Str "`$OBJECT`")) ]);
+            ("title", (Str "Eval"));
+            ("type", (Str "`$OBJECT`"));
+            ("short", (Str "Retrieval-fidelity metrics for a convert model.")) ]);
           (jo [
             ("name", (Str "executionProvider"));
-            ("short", (Str "Hardware backend, e.g."));
-            ("type", (Str "`$STRING`")) ]);
+            ("title", (Str "Execution Provider"));
+            ("type", (Str "`$STRING`"));
+            ("short", (Str "Hardware backend, e.g.")) ]);
           (jo [
             ("name", (Str "modelCard"));
-            ("short", (Str "Convert models only: training provenance and architecture detail."));
-            ("type", (Str "`$OBJECT`")) ]);
+            ("title", (Str "Model Card"));
+            ("type", (Str "`$OBJECT`"));
+            ("short", (Str "Convert models only: training provenance and architecture detail.")) ]);
           (jo [
             ("name", (Str "modelType"));
+            ("title", (Str "Model Type"));
+            ("type", (Str "`$STRING`"));
             ("req", (Bool true));
-            ("short", (Str "`embed` for text-to-vector models, `convert` for space-translation models."));
-            ("type", (Str "`$STRING`")) ]);
+            ("short", (Str "`embed` for text-to-vector models, `convert` for space-translation models.")) ]);
           (jo [
             ("name", (Str "name"));
+            ("title", (Str "Name"));
+            ("type", (Str "`$STRING`"));
             ("req", (Bool true));
-            ("short", (Str "Model identifier used in requests."));
-            ("type", (Str "`$STRING`")) ]);
+            ("short", (Str "Model identifier used in requests.")) ]);
           (jo [
             ("name", (Str "sequenceLen"));
-            ("short", (Str "Embed models only: maximum input sequence length."));
-            ("type", (Str "`$INTEGER`")) ]);
+            ("title", (Str "Sequence Len"));
+            ("type", (Str "`$INTEGER`"));
+            ("short", (Str "Embed models only: maximum input sequence length.")) ]);
           (jo [
             ("name", (Str "sourceDim"));
-            ("short", (Str "Convert models only: source vector dimension."));
-            ("type", (Str "`$INTEGER`")) ]);
+            ("title", (Str "Source Dim"));
+            ("type", (Str "`$INTEGER`"));
+            ("short", (Str "Convert models only: source vector dimension.")) ]);
           (jo [
             ("name", (Str "sourceModel"));
-            ("short", (Str "Convert models only: the source model space."));
-            ("type", (Str "`$STRING`")) ]);
+            ("title", (Str "Source Model"));
+            ("type", (Str "`$STRING`"));
+            ("short", (Str "Convert models only: the source model space.")) ]);
           (jo [
             ("name", (Str "targetDim"));
+            ("title", (Str "Target Dim"));
+            ("type", (Str "`$INTEGER`"));
             ("req", (Bool true));
-            ("short", (Str "Dimension of the produced vectors."));
-            ("type", (Str "`$INTEGER`")) ]);
+            ("short", (Str "Dimension of the produced vectors.")) ]);
           (jo [
             ("name", (Str "targetModel"));
+            ("title", (Str "Target Model"));
+            ("type", (Str "`$STRING`"));
             ("req", (Bool true));
-            ("short", (Str "The model space produced."));
-            ("type", (Str "`$STRING`")) ]) ]));
+            ("short", (Str "The model space produced.")) ]) ]));
         ("name", (Str "model"));
         ("op", (jo [
           ("list", (jo [
@@ -908,14 +935,7 @@ let make_config () : value =
             ("name", (Str "list"));
             ("points", (ja [
               (jo [
-                ("args", (empty_map ()));
                 ("kind", (Str "http"));
-                ("live", (jo [
-                  ("assert", (jo [
-                    ("nonempty", (ja [
-                      (Str "") ])) ]));
-                  ("auth", (Str "public"));
-                  ("id", (Str "models")) ]));
                 ("method", (Str "GET"));
                 ("orig", (Str "/v1/models"));
                 ("segments", (ja [
@@ -923,13 +943,21 @@ let make_config () : value =
                     ("lit", (Str "v1")) ]);
                   (jo [
                     ("lit", (Str "models")) ]) ]));
-                ("select", (empty_map ()));
+                ("parts", (ja [
+                  (Str "v1");
+                  (Str "models") ]));
+                ("rename", (empty_map ()));
                 ("transform", (jo [
                   ("req", (Str "`reqdata`"));
                   ("res", (Str "`body.data`")) ]));
-                ("parts", (ja [
-                  (Str "v1");
-                  (Str "models") ])) ]) ])) ])) ]));
+                ("args", (empty_map ()));
+                ("select", (empty_map ()));
+                ("live", (jo [
+                  ("assert", (jo [
+                    ("nonempty", (ja [
+                      (Str "") ])) ]));
+                  ("auth", (Str "public"));
+                  ("id", (Str "models")) ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ])) ])) ])
 

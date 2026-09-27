@@ -10,14 +10,6 @@ import { TestDirect } from './TestDirect_clojure'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_clojure'
 
 
-// Generates sdk/gentest.clj (ns sdk.gentest): the API-specific tests, driven by
-// the model. Exposes (run rec) which the template test-runner invokes. This is
-// the orchestrator: it emits the namespace form and the single (run rec) entry
-// point, then delegates the per-entity checks to TestEntity (accessor +
-// create/list smoke + stream) and TestDirect (prepare + direct escape hatch),
-// and finally the documentation clojure-examples syntax gate (ReadmeExamples).
-// API-agnostic behaviour (pipeline error branches, all features, netsim,
-// primary utility, struct corpus) lives in the static template test namespaces.
 const Test = cmp(function Test(props: any) {
   const { model } = props.ctx$
   const { target } = props

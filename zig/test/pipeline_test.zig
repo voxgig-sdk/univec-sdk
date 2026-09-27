@@ -367,6 +367,35 @@ test "pipeline feature_add: ordering before after replace" {
 // prepare_auth
 // =====================================================================
 
+// WHERE THE CREDENTIAL GOES IS MODEL-DRIVEN: core/prepare_auth.zig is
+// GENERATED from the API's security scheme, and has exactly one branch. The
+// cases below assert the HEADER shape - a key in `spec.headers` named
+// `authorization` - which is the right assertion for the default and the
+// wrong one for the other three. An SDK whose scheme puts the credential in
+// the query string (`?token=`) or a cookie, and one whose project set
+// `main.kit.config.auth.active: false`, correctly place NOTHING in the header
+// bag, so these would go red for a reason that is not a defect.
+//
+// The generated file exports what it chose as a COMPTIME constant, and
+// core/utility.zig re-exports it. Not read from the options: a query SDK's
+// `options.auth.in` does say "query", but an auth-OFF SDK looks exactly like
+// a header one there - Config omits `options.auth` entirely when auth is
+// inactive and the optspec then supplies the same empty defaults.
+//
+// A header SDK - every SDK whose scheme resolves to the default - runs all of
+// these exactly as it did before prepare_auth became a component.
+fn headerCred() bool {
+    return std.mem.eql(u8, sdk.utilmod.prepare_auth_placement, "header");
+}
+
+// The two cases that assert how a single token is SHAPED into the header
+// value need more than a header placement: genuine HTTP Basic replaces that
+// shaping with base64(apikey:secret), and refuses outright when the secret is
+// missing - which is exactly what those two fixtures leave out.
+fn singleTokenCred() bool {
+    return headerCred() and !sdk.utilmod.prepare_auth_basic;
+}
+
 test "pipeline prepare_auth: guards missing spec" {
     const client = sdk.test_sdk(vnull(), h.jo(&.{.{ "apikey", h.vstr("K") }}));
     const utility = client.get_utility();
@@ -381,6 +410,7 @@ test "pipeline prepare_auth: apikey with prefix space joined" {
         .{ "apikey", h.vstr("K") },
         .{ "auth", h.jo(&.{.{ "prefix", h.vstr("Bearer") }}) },
     }));
+    if (!singleTokenCred()) return;
     const utility = client.get_utility();
     const ctx = plCtx(client, utility, null);
     ctx.spec = authSpec(vnull());
@@ -393,6 +423,7 @@ test "pipeline prepare_auth: raw apikey empty prefix as is" {
         .{ "apikey", h.vstr("K") },
         .{ "auth", h.jo(&.{.{ "prefix", h.vstr("") }}) },
     }));
+    if (!singleTokenCred()) return;
     const utility = client.get_utility();
     const ctx = plCtx(client, utility, null);
     ctx.spec = authSpec(vnull());
@@ -405,6 +436,7 @@ test "pipeline prepare_auth: empty apikey drops header" {
         .{ "apikey", h.vstr("") },
         .{ "auth", h.jo(&.{.{ "prefix", h.vstr("Bearer") }}) },
     }));
+    if (!headerCred()) return;
     const utility = client.get_utility();
     const ctx = plCtx(client, utility, null);
     ctx.spec = authSpec(h.jo(&.{.{ "authorization", h.vstr("stale") }}));
@@ -416,6 +448,7 @@ test "pipeline prepare_auth: missing apikey drops header" {
     const client = sdk.test_sdk(vnull(), h.jo(&.{
         .{ "auth", h.jo(&.{.{ "prefix", h.vstr("Bearer") }}) },
     }));
+    if (!headerCred()) return;
     const utility = client.get_utility();
     const options = client.options_map();
     // Skip if this SDK's options happen to carry a configured apikey.
@@ -430,6 +463,7 @@ test "pipeline prepare_auth: missing apikey drops header" {
 
 test "pipeline prepare_auth: public api no auth block drops header" {
     const client = sdk.test_sdk(vnull(), h.jo(&.{.{ "apikey", h.vstr("K") }}));
+    if (!headerCred()) return;
     const utility = client.get_utility();
     // Option validation supplies an auth shape for this SDK, so a truly
     // auth-less client cannot be constructed here — mirror the rust skip.

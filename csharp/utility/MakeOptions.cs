@@ -164,80 +164,18 @@ public static partial class SdkUtility
             co is Dictionary<string, object?> cm
             ? cm : new Dictionary<string, object?>();
 
-        var optspec = new Dictionary<string, object?>
-        {
-            ["apikey"] = "",
-            ["secret"] = "",
-            ["base"] = "http://localhost:8000",
-            ["prefix"] = "",
-            ["suffix"] = "",
-            // `basic` and `secret`: HTTP Basic Auth needs a second credential
-            // and a flag to say the pair is Basic rather than a single bearer
-            // token.
-            ["auth"] = new Dictionary<string, object?>
-            {
-                ["prefix"] = "",
-                ["basic"] = false,
-            },
-            ["headers"] = new Dictionary<string, object?>
-            {
-                ["`$CHILD`"] = "`$STRING`",
-            },
-            // OpenAPI server-variable defaults, carried by the generated
-            // config whenever the spec's server URL is templated. Accepted
-            // here so validation does not reject the SDK's own config; the
-            // {name} substitution into base is a separate concern.
-            ["server"] = new Dictionary<string, object?>
-            {
-                ["`$CHILD`"] = "",
-            },
-            ["allow"] = new Dictionary<string, object?>
-            {
-                ["method"] = "GET,PUT,POST,PATCH,DELETE,OPTIONS",
-                ["op"] = "create,update,load,list,remove,command,direct,graphql",
-            },
-            ["entity"] = new Dictionary<string, object?>
-            {
-                ["`$CHILD`"] = new Dictionary<string, object?>
-                {
-                    ["`$OPEN`"] = true,
-                    ["active"] = false,
-                    ["alias"] = new Dictionary<string, object?>(),
-                },
-            },
-            ["feature"] = new Dictionary<string, object?>
-            {
-                ["`$CHILD`"] = new Dictionary<string, object?>
-                {
-                    ["`$OPEN`"] = true,
-                    ["active"] = false,
-                },
-            },
-            ["utility"] = new Dictionary<string, object?>(),
-            // Feature INSTANCES supplied at construction (the `extend` seam
-            // the client constructor reads after the config-driven features):
-            // class instances, not data, so `$ANY` accepts them verbatim.
-            // Without this entry the seam is DEAD - validate REJECTS the
-            // unknown key ("Unexpected keys at field <root>: extend"), so a
-            // caller cannot hand in a feature the model did not activate,
-            // although the README documents the option. Ported from
-            // MakeOptionsUtility.ts / make_options.go / MakeOptions.java,
-            // which all carry it.
-            ["extend"] = "`$ANY`",
-            ["system"] = new Dictionary<string, object?>(),
-            ["test"] = new Dictionary<string, object?>
-            {
-                ["active"] = false,
-                ["entity"] = new Dictionary<string, object?>
-                {
-                    ["`$OPEN`"] = true,
-                },
-            },
-            ["clean"] = new Dictionary<string, object?>
-            {
-                ["keys"] = "key,token,id",
-            },
-        };
+        // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
+        //
+        // Built from the model: `main.kit.optspec` for the standard options,
+        // plus one entry per feature this target carries, from that feature's
+        // own `config.options` / `config.optspec`. Editing this file to add an
+        // option would put it back where it was - one of twenty
+        // hand-maintained copies of a schema nothing cross-checked - so add it
+        // to the model instead and every ported target validates it.
+        //
+        // Shared, not copied: MakeOptions validates AGAINST the spec and
+        // writes into the options, never into the spec.
+        var optspec = SdkSchema.Optspec;
 
         // Preserve system.fetch across merge/validate (delegates survive
         // Clone, but validation may reshape the system block).

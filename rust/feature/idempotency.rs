@@ -1,10 +1,3 @@
-// Idempotency keys for mutating operations (mirrors go
-// feature/idempotency_feature.go). Adds an `Idempotency-Key` header (name
-// configurable via `header`) to unsafe requests so a server can
-// de-duplicate retried writes. The key is set once, at PreRequest, before
-// the request is built — so it is stable across transport-level retries of
-// the same call. A caller-supplied header is never overwritten
-// (case-insensitive). The key generator is injectable (`keygen`).
 
 use std::rc::Rc;
 

@@ -1,7 +1,7 @@
 // Typed models for the Univec SDK.
 //
-// GENERATED from the API model: main.kit.entity.<e>.fields[] and per-op
-// params (op.<name>.points[].args.params[]). Field/param types are mapped
+// GENERATED from the API model: main.kit.entity.<e>.fields{} and per-op
+// params (op.<name>.points[].g.params[]). Field/param types are mapped
 // from the canonical type sentinels. Do not edit by hand.
 //
 // These are DOCUMENTARY: the SDK runtime is dynamic (ops take/return

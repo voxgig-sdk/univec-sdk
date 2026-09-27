@@ -5,13 +5,6 @@ import type { UnivecSDK } from '../../UnivecSDK'
 import { BaseFeature } from '../base/BaseFeature'
 
 
-// Distributed-tracing telemetry. Opens a span per operation (PrePoint),
-// propagates trace context to the server as W3C `traceparent` plus
-// `X-Trace-Id` / `X-Span-Id` headers (PreRequest), and closes the span on
-// completion (PreDone) or failure (PreUnexpected). Finished spans are kept
-// on `client._telemetry.spans`; an `exporter` callback, when provided, is
-// invoked with each finished span. Trace/span id generation and the clock
-// are injectable for deterministic tests.
 class TelemetryFeature extends BaseFeature {
   version = '0.0.1'
   name = 'telemetry'

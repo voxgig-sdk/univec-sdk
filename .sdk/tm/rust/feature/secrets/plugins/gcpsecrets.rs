@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (rust/plugins/gcpsecrets/src/lib.rs)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (rust/plugins/gcpsecrets/src/lib.rs)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 //! The GCP Secret Manager provider, as a voxgig/plugin definition.
 
@@ -15,17 +15,6 @@ use super::httpjson::{
     expiryseconds, fetchjson, firstof, http, renewdue, renewtime, textat, trimslash,
 };
 
-/// GCP Secret Manager.
-///
-/// `api.token` reads secret `api_token` (dots flattened to `_`; Secret
-/// Manager ids have no hierarchy and reject dots), latest version. The
-/// token comes from config, then `GOOGLE_OAUTH_ACCESS_TOKEN`, then the
-/// GCE/GKE metadata server - so on Google's own platform no credential
-/// configuration is needed at all.
-///
-/// The metadata call itself is plain http to a link-local host by
-/// platform design; no credential rides on it, so `checkaddr` guards the
-/// Secret Manager address instead.
 #[derive(Default)]
 pub struct GcpSecretsProvider {
     pub project: String,

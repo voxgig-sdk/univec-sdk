@@ -1,5 +1,5 @@
 # VENDORED: @voxgig/struct 0.1.1 (python/voxgig_struct/voxgig_struct.py)
-# Source: https://github.com/voxgig/struct @ abd93227e3295151f8dcd18597c3f3f2577af8b7  [tag: sdk-20260911-2013-0]
+# Source: https://github.com/voxgig/struct @ 3a42881b1d26c75ebbed9f1897f0ba94cf3cf780  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 # Copyright (c) 2025 Voxgig Ltd. MIT LICENSE.
 #
@@ -2499,7 +2499,6 @@ def validate_ONE(inj, _val=UNDEF, _ref=UNDEF, store=UNDEF):
         inj.setval(inj.dparent, 2)
 
         inj.path = inj.path[:-1]
-        inj.key = getelem(inj.path, -1)
 
         tvals = parent[1:]
         if size(tvals) == 0:

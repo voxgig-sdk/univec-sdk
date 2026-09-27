@@ -1,12 +1,3 @@
-// Client-side role/permission enforcement (mirrors go
-// feature/rbac_feature.go). Before an operation resolves its endpoint, the
-// required permission for that entity+operation is checked against the
-// permissions the client holds; a disallowed call is short-circuited with
-// an `rbac_denied` error (via ctx.out["point"], which MakePoint surfaces)
-// and never touches the network. Required permissions come from `rules`
-// (keyed by `<entity>.<op>`, `<op>`, or `*`); the default when no rule
-// matches is controlled by `deny` (default: allow when unspecified). Held
-// permissions are the `permissions` list (a `*` grants everything).
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -131,7 +122,6 @@ impl Feature for RbacFeature {
 
         let required = match self.required(ctx) {
             None => {
-                // No rule: honour the default policy.
                 if fopt_bool(&self.options, "deny", false) {
                     self.reject(ctx, "<default-deny>");
                 }

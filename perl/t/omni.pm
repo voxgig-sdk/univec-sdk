@@ -587,7 +587,13 @@ sub make_runner {
   my ($testfile, $client) = @_;
 
   my $specref = $testfile;
-  if (defined $testfile && !ref $testfile && $testfile !~ m{^/}) {
+  # A leading slash alone is not the whole of absolute: a Windows path
+  # starts `C:/` or `\\host\share`, and joining one onto $DIR reads
+  # nothing. Spelled out rather than left to File::Spec, which an MSYS perl
+  # resolves to the Unix flavour and which answers no for a drive letter.
+  if (defined $testfile && !ref $testfile
+    && $testfile !~ m{^/} && $testfile !~ m{^[A-Za-z]:[\\/]}
+    && $testfile !~ m{^\\\\}) {
     $specref = Cwd::abs_path("$DIR/$testfile") || "$DIR/$testfile";
   }
 

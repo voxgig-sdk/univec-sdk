@@ -12,19 +12,6 @@ import { packageName } from './utility_ocaml'
 import { secretsBuild } from './Config_ocaml'
 
 
-// <name>.opam — opam package metadata (publish is declared pending in the
-// model; the build itself is stock ocamlc via the Makefile and needs no opam
-// packages). Twin of rust Cargo.toml, but the runtime is dependency-free so
-// there is no depends list beyond the OCaml compiler.
-//
-// The secrets feature's build model is NOT emitted from here, unlike
-// Package_rust's rustls dependency table: the Makefile reads the generated
-// feature/secrets/feature.mk (Main_ocaml), which lists the vendored modules
-// in dependency order and turns the OpenSSL binding on only when a plugin
-// group needing a transport is active. What this manifest CAN state is the
-// system dependency that binding introduces - `depexts`, opam's word for a
-// distribution package - and it states it on exactly the same condition,
-// read from the same helper, so the two cannot drift.
 const Package = cmp(async function Package(props: any) {
   const ctx$ = props.ctx$
   const target = props.target

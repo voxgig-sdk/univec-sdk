@@ -1,0 +1,519 @@
+# Entity: convert
+
+main: kit: entity: convert: {
+
+  alias: field: {}
+
+  fields: {
+    embeddings: {
+      h: "Embeddings"
+      n: "embeddings"
+      r: true
+      sh: "Translated vectors, in the target model's dimension."
+      t: "`$ARRAY`"
+    }
+    source_model: {
+      h: "Source Model"
+      n: "source_model"
+      r: true
+      sh: "Model space the supplied vectors are currently in."
+      t: "`$STRING`"
+    }
+    target_model: {
+      h: "Target Model"
+      n: "target_model"
+      r: true
+      sh: "Model space to translate into."
+      t: "`$STRING`"
+    }
+  }
+
+  name: "convert"
+  op: {
+    create: {
+      name: "create"
+      points: [
+        {
+          co: {
+            id: "POST /v1/convert"
+            source: "openapi3"
+            version: 2
+          }
+          li: {
+            assert: {
+              equal: {
+                source_model: {
+                  from: "models"
+                  path: "sourceModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                target_model: {
+                  from: "models"
+                  path: "targetModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+              }
+              vectors: {
+                count: 1
+                dimension: {
+                  from: "models"
+                  path: "targetDim"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                path: "embeddings"
+              }
+            }
+            auth: "account"
+            id: "account-convert"
+            input: {
+              embeddings: {
+                from: "account-embed"
+                path: "embeddings"
+              }
+              source_model: {
+                from: "models"
+                path: "sourceModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+              target_model: {
+                from: "models"
+                path: "targetModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+            }
+          }
+          m: "POST"
+          o: "/v1/convert"
+          s: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "convert"
+            }
+          ]
+          t: {
+            req: "`reqdata`"
+            res: "`body.data`"
+          }
+        }
+        {
+          co: {
+            id: "POST /v1/embed-bridge"
+            source: "openapi3"
+            version: 2
+          }
+          li: {
+            assert: {
+              equal: {
+                bridge_model: {
+                  from: "models"
+                  path: "sourceModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                target_model: {
+                  from: "models"
+                  path: "targetModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+              }
+              vectors: {
+                count: 1
+                dimension: {
+                  from: "models"
+                  path: "targetDim"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                path: "embeddings"
+              }
+            }
+            auth: "account"
+            id: "account-embed-bridge"
+            input: {
+              bridge_model: {
+                from: "models"
+                path: "sourceModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+              target_model: {
+                from: "models"
+                path: "targetModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+              texts: [
+                "SDK live coverage test."
+              ]
+            }
+          }
+          m: "POST"
+          o: "/v1/embed-bridge"
+          q: {
+            "$action": "bridge"
+          }
+          s: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "embed-bridge"
+            }
+          ]
+          t: {
+            req: "`reqdata`"
+            res: "`body.data`"
+          }
+        }
+        {
+          co: {
+            id: "POST /v1/ephemeral/convert"
+            source: "openapi3"
+            version: 2
+          }
+          li: {
+            assert: {
+              equal: {
+                source_model: {
+                  from: "models"
+                  path: "sourceModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                target_model: {
+                  from: "models"
+                  path: "targetModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+              }
+              vectors: {
+                count: 1
+                dimension: {
+                  from: "models"
+                  path: "targetDim"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                path: "embeddings"
+              }
+            }
+            auth: "issued"
+            credential: {
+              from: "key"
+              path: "key"
+            }
+            id: "ephemeral-convert"
+            input: {
+              embeddings: {
+                from: "ephemeral-embed"
+                path: "embeddings"
+              }
+              source_model: {
+                from: "models"
+                path: "sourceModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+              target_model: {
+                from: "models"
+                path: "targetModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+            }
+          }
+          m: "POST"
+          o: "/v1/ephemeral/convert"
+          q: {
+            "$action": "ephemeral"
+          }
+          s: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "ephemeral"
+            }
+            {
+              lit: "convert"
+            }
+          ]
+          t: {
+            req: "`reqdata`"
+            res: "`body.data`"
+          }
+        }
+        {
+          co: {
+            id: "POST /v1/ephemeral/embed-bridge"
+            source: "openapi3"
+            version: 2
+          }
+          li: {
+            assert: {
+              equal: {
+                bridge_model: {
+                  from: "models"
+                  path: "sourceModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                target_model: {
+                  from: "models"
+                  path: "targetModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+              }
+              vectors: {
+                count: 1
+                dimension: {
+                  from: "models"
+                  path: "targetDim"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                path: "embeddings"
+              }
+            }
+            auth: "issued"
+            credential: {
+              from: "key"
+              path: "key"
+            }
+            id: "ephemeral-embed-bridge"
+            input: {
+              bridge_model: {
+                from: "models"
+                path: "sourceModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+              target_model: {
+                from: "models"
+                path: "targetModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+              texts: [
+                "SDK live coverage test."
+              ]
+            }
+          }
+          m: "POST"
+          o: "/v1/ephemeral/embed-bridge"
+          q: {
+            "$action": "ephemeral_bridge"
+          }
+          s: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "ephemeral"
+            }
+            {
+              lit: "embed-bridge"
+            }
+          ]
+          t: {
+            req: "`reqdata`"
+            res: "`body.data`"
+          }
+        }
+      ]
+    }
+  }
+
+
+
+}

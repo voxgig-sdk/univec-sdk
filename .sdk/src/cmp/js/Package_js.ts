@@ -74,8 +74,8 @@ const Package = cmp(async function Package(props: any) {
 
     // What actually ships. Without `files`, `npm publish` packs the test
     // suite and the build scaffolding too. The js target runs from `src`
-    // directly (no build step), so that is the whole package.
-    files: ['src'],
+    // directly (no build step), so that and the README are the whole package.
+    files: ['src', 'README.md'],
     scripts: {
       ...(hasLiveScenarios(model) ? {
         'test:live': `${envName(model)}_TEST_LIVE=TRUE node --test test/live.test.js`,

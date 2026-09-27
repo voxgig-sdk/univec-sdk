@@ -5,13 +5,6 @@ import type { UnivecSDK } from '../../UnivecSDK'
 import { BaseFeature } from '../base/BaseFeature'
 
 
-// Streaming result support. For list-style operations it attaches a
-// `result.stream()` async-iterator so callers can consume items
-// incrementally with `for await (const item of result.stream())` instead of
-// materialising the whole array. The iterator reads the result's data
-// lazily, so it reflects the parsed entities. A `chunkDelay` (ms) simulates
-// paced/chunked delivery for offline tests via the injectable `sleep`; a
-// `chunkSize` groups items into batches when set.
 class StreamingFeature extends BaseFeature {
   version = '0.0.1'
   name = 'streaming'

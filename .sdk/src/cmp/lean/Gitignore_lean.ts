@@ -7,6 +7,11 @@ const Gitignore = cmp(async function Gitignore(_props: any) {
 build/
 lake-packages/
 
+# The secrets feature's C stubs and link response file, written by
+# \`make ffi\` (see Makefile)
+*.o
+src/feature/secrets/ffi/link.rsp
+
 # IDE / OS
 .idea/
 .vscode/

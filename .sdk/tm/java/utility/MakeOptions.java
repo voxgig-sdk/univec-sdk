@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 
 import JAVAPACKAGE.core.Context;
 import JAVAPACKAGE.core.Helpers;
+import JAVAPACKAGE.core.Schema;
 import JAVAPACKAGE.utility.struct.Struct;
 
 @SuppressWarnings({"unchecked"})
@@ -93,39 +94,18 @@ final class MakeOptions {
       cfgopts = new LinkedHashMap<>();
     }
 
-    Map<String, Object> optspec = (Map<String, Object>) Json.parse(
-        "{"
-        + "\"apikey\": \"\","
-        + "\"base\": \"http://localhost:8000\","
-        + "\"prefix\": \"\","
-        + "\"suffix\": \"\","
-        + "\"auth\": { \"prefix\": \"\" },"
-        + "\"headers\": { \"`$CHILD`\": \"`$STRING`\" },"
-        + "\"allow\": {"
-        + "  \"method\": \"GET,PUT,POST,PATCH,DELETE,OPTIONS\","
-        + "  \"op\": \"create,update,load,list,remove,command,direct,graphql\""
-        + "},"
-        + "\"entity\": { \"`$CHILD`\": {"
-        + "  \"`$OPEN`\": true, \"active\": false, \"alias\": {} } },"
-        + "\"feature\": { \"`$CHILD`\": {"
-        + "  \"`$OPEN`\": true, \"active\": false } },"
-        + "\"utility\": {},"
-        // Feature INSTANCES supplied at construction (the `extend` seam
-        // SdkClient's constructor reads at line 82): class instances, not
-        // data, so `$ANY` accepts them verbatim. Without this entry the
-        // seam is DEAD - validate drops the unknown key and the
-        // constructor's loop never sees a feature. Ported from
-        // MakeOptionsUtility.ts / make_options.go, which both carry it.
-        + "\"extend\": \"`$ANY`\","
-        + "\"system\": {},"
-        + "\"test\": { \"active\": false, \"entity\": { \"`$OPEN`\": true } },"
-        + "\"clean\": { \"keys\": \"key,token,id\" },"
-        // Server-variable values for a templated base URL (OpenAPI server
-        // variables): {name} placeholders in `base` are substituted from
-        // this map at construction. Spec defaults arrive via the generated
-        // Config; user values override them.
-        + "\"server\": { \"`$CHILD`\": \"\" }"
-        + "}");
+    // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
+    //
+    // Built from the model: `main.kit.optspec` for the standard options,
+    // plus one entry per feature this target carries, from that feature's
+    // own `config.options` / `config.optspec`. Editing this file to add an
+    // option would put it back where it was — one of twenty hand-maintained
+    // copies of a schema nothing cross-checked — so add it to the model
+    // instead and every ported target validates it.
+    //
+    // Already parsed, and shared: MakeOptions validates AGAINST the spec and
+    // writes into the options, never into the spec.
+    Map<String, Object> optspec = Schema.optspec();
 
     // Preserve system.fetch before merge/validate.
     Object sysFetch = Struct.getpath(opts, List.of("system", "fetch"));

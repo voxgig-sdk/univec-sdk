@@ -49,8 +49,6 @@ var client = ${ctor};
     // C# keyword gets a trailing underscore (csVarName) so the snippet compiles.
     const eVar = csVarName(exampleEntity.name)
     const opnames = Object.keys(exampleEntity.op || {})
-    // Model-driven id key: null when the entity has no id-like field, in which
-    // case the load example takes an empty match.
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {

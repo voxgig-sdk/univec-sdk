@@ -66,10 +66,12 @@ sub init {
     my $tm = UnivecHelpers::gp($fctx->{point}, 'transform');
     my $spec = UnivecHelpers::gp($tm, 'res');
     return $data unless defined $spec && !ref($spec);
-    # Exactly `body.<key>`; a deeper path is not an envelope this mock can
-    # synthesise, so it is left alone rather than guessed at.
-    return $data unless $spec =~ /^`body\.([^`.]+)`$/;
-    return { $1 => $data };
+    # Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+    # GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
+    return $data unless $spec =~ /^`body\.(.+)`$/;
+    my $out = $data;
+    $out = { $_ => $out } for reverse split /\./, $1, -1;
+    return $out;
   };
 
   my $respond = sub {
@@ -152,18 +154,11 @@ sub init {
       my $args = $test_self->build_args($fctx, $op, $update_match);
       my $found = Voxgig::Struct::select($entmap, $args);
       my $ent = UnivecHelpers::ge($found, 0);
-      if (!defined $ent && Voxgig::Struct::ismap($entmap) && keys %$entmap) {
-        for my $k (sort keys %$entmap) {
-          if (Voxgig::Struct::ismap($entmap->{$k})) {
-            $ent = $entmap->{$k};
-            last;
-          }
-        }
-      }
+      # update miss: 404, never another record
       return $respond->($fctx, 404, undef, { 'statusText' => 'Not found' })
         unless UnivecHelpers::rb_truthy($ent);
-      if (Voxgig::Struct::ismap($ent) && $fctx->{reqdata}) {
-        $ent->{$_} = $fctx->{reqdata}{$_} for keys %{ $fctx->{reqdata} };
+      if (Voxgig::Struct::ismap($ent) && Voxgig::Struct::ismap($fctx->{reqdata})) {
+        Voxgig::Struct::merge([$ent, $fctx->{reqdata}]);
       }
       Voxgig::Struct::delprop($ent, '$KEY');
       my $out = Voxgig::Struct::clone($ent);
@@ -288,18 +283,55 @@ sub make_netsim {
   };
 }
 
+sub _point_terminal {
+  my ($p) = @_;
+  my $parts = UnivecHelpers::gp($p, 'parts');
+  return 0 unless Voxgig::Struct::islist($parts) && @$parts;
+  my $last = $parts->[-1];
+  return (defined $last && !ref $last && 0 == index($last, '{')) ? 1 : 0;
+}
+
+sub _point_depth {
+  my ($p) = @_;
+  my $parts = UnivecHelpers::gp($p, 'parts');
+  return Voxgig::Struct::islist($parts) ? scalar @$parts : 0;
+}
+
+# The entity's own endpoint: a terminal `{param}` marks a record route, and
+# among equals the shallower path wins (the same rule as make_point).
+sub _pick_point {
+  my ($points) = @_;
+  return undef unless Voxgig::Struct::islist($points) && @$points;
+  my $point = $points->[0];
+  for my $cand (@$points[1 .. $#$points]) {
+    if (_point_terminal($cand) != _point_terminal($point)) {
+      $point = $cand if _point_terminal($cand);
+    }
+    elsif (_point_depth($cand) < _point_depth($point)) {
+      $point = $cand;
+    }
+  }
+  return $point;
+}
+
 sub build_args {
   my ($self, $ctx, $op, $args) = @_;
   my $opname = $op->{name};
   my $entname = $ctx->{entity}->get_name;
   my $points = UnivecHelpers::gpath($ctx->{config},
     "entity.$entname.op.$opname.points");
-  my $point = UnivecHelpers::ge($points, -1);
+  my $point = _pick_point($points);
 
-  my $params_path = UnivecHelpers::gpath($point, 'args.params');
-  my $reqd_params = Voxgig::Struct::select($params_path,
-    { 'reqd' => Voxgig::Struct::JTRUE() });
-  my $reqd = Voxgig::Struct::transform($reqd_params, ['`$EACH`', '', '`$KEY.name`']);
+  # Path AND query: a path-only read misses a query-addressed record
+  # (e.g. GET /result?trace_id=), which has no path param at all.
+  my $reqd = [];
+  for my $kind ('params', 'query') {
+    my $args_path = UnivecHelpers::gpath($point, "args.$kind");
+    my $reqd_args = Voxgig::Struct::select($args_path,
+      { 'reqd' => Voxgig::Struct::JTRUE() });
+    my $names = Voxgig::Struct::transform($reqd_args, ['`$EACH`', '', '`$KEY.name`']);
+    push @$reqd, @$names if Voxgig::Struct::islist($names);
+  }
 
   my $qand = [];
   my $q = { '`$AND`' => $qand };

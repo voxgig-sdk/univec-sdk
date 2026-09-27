@@ -68,14 +68,10 @@ ${javaServerLines}${SDK} client = new ${SDK}(options);
   }
 
   if (exampleEntity) {
-    // Sanitise the local variable name — an entity whose camelCased name is a
-    // Java keyword gets a trailing underscore (javaVarName) so the snippet compiles.
     const eVar = javaVarName(exampleEntity.name)
     const accessor = javaVarName(exampleEntity.name)
     const eNameLower = nom(exampleEntity, 'Name').toLowerCase()
     const opnames = Object.keys(exampleEntity.op || {})
-    // Model-driven id key: null when the entity has no id-like field, in which
-    // case the load example takes an empty match.
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
@@ -86,9 +82,6 @@ System.out.println(${eVar}List);
     }
 
     if (opnames.includes('load')) {
-      // Every REQUIRED load-match key (id first, then parent path params like
-      // page_id) — the same shape the runtime resolves path params from, so
-      // the example always works.
       const loadItems = opRequestShape(exampleEntity, 'load').items
         .filter((it: any) => !it.optional || it.name === idF)
         .sort((a: any, b: any) =>

@@ -11,7 +11,6 @@ package voxgig.univecsdk.sdktest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -23,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
@@ -529,11 +529,96 @@ public class PipelineTest {
 
   // --- prepareAuth --------------------------------------------------------------
 
-  static Spec authSpec(Map<String, Object> headers) {
+  // A cookie credential as prepareAuth writes it: `<scheme>=K` for the probe
+  // key, with no scheme prefix and nothing else in the bag.
+  static final Pattern COOKIE_PAIR = Pattern.compile("^[^=;]+=K$");
+
+  static Spec authSpec() {
     Map<String, Object> m = new LinkedHashMap<>();
-    m.put("headers", headers == null ? new LinkedHashMap<>() : headers);
+    m.put("headers", new LinkedHashMap<String, Object>());
+    m.put("query", new LinkedHashMap<String, Object>());
     m.put("step", "s");
     return new Spec(m);
+  }
+
+  // Where this SDK's prepareAuth actually puts the credential. The name is
+  // the API's OWN scheme name, not always "authorization", so it is
+  // discovered rather than asserted. `pair` is the `<scheme>=` lead-in of a
+  // COOKIE credential, which rides the header bag under the key "cookie"
+  // instead of taking a header of its own.
+  record AuthCred(String where, String name, Object value, String pair) {
+  }
+
+  // A cookie credential rides the header bag, because a cookie IS a header.
+  static Map<String, Object> authBag(Spec spec, String where) {
+    return "query".equals(where) ? spec.query : spec.headers;
+  }
+
+  // `basic: false` is explicit: an HTTP Basic API's generated config carries
+  // `auth.basic: true`, testSDK merges it in, and the branch it selects needs
+  // a secret as well. With none supplied that branch deliberately writes
+  // nothing, which the probe below would read as a public API.
+  static Map<String, Object> authBlock(String prefix) {
+    return fhMap("prefix", prefix, "basic", Boolean.FALSE);
+  }
+
+  // Run prepareAuth with both containers present and see which one the
+  // generated utility writes to, and under what name. Null means this SDK
+  // places no credential at all - a public API - which is a legitimate
+  // shape, and the tests below assert exactly that instead.
+  static AuthCred authProbe(Map<String, Object> sdkopts) {
+    UnivecSDK client = plClient(sdkopts);
+    Utility utility = client.getUtility();
+    Context ctx = plCtx(client, utility, null);
+    ctx.spec = authSpec();
+    utility.prepareAuth.apply(ctx);
+    for (String where : new String[] { "headers", "query" }) {
+      for (Map.Entry<String, Object> entry : authBag(ctx.spec, where).entrySet()) {
+        Object value = entry.getValue();
+        String pair = "";
+        if ("headers".equals(where) && "cookie".equals(entry.getKey())
+            && value instanceof String
+            && COOKIE_PAIR.matcher((String) value).matches()) {
+          String text = (String) value;
+          pair = text.substring(0, text.length() - 1);
+        }
+        return new AuthCred(where, entry.getKey(), value, pair);
+      }
+    }
+    return null;
+  }
+
+  static AuthCred authCredential() {
+    return authProbe(fhMap("apikey", "K", "auth", authBlock("Bearer")));
+  }
+
+  // Every credential this SDK could possibly place: both credentials and
+  // Basic switched on, so whichever branch the API has, something lands
+  // unless the API is public.
+  static AuthCred authAnyCredential() {
+    return authProbe(fhMap(
+        "apikey", "K",
+        "secret", "S",
+        "auth", fhMap("prefix", "Bearer", "basic", Boolean.TRUE)));
+  }
+
+  // Runs prepareAuth over a fresh spec, seeding the credential slot first
+  // when seed is non-null, and reports what is left there.
+  static Object[] authPlaced(Map<String, Object> sdkopts, Object seed) {
+    AuthCred cred = authCredential();
+    UnivecSDK client = plClient(sdkopts);
+    Utility utility = client.getUtility();
+    Context ctx = plCtx(client, utility, null);
+    ctx.spec = authSpec();
+    if (cred != null && seed != null) {
+      authBag(ctx.spec, cred.where()).put(cred.name(), seed);
+    }
+    utility.prepareAuth.apply(ctx);
+    if (cred == null) {
+      return new Object[] { null, Boolean.FALSE };
+    }
+    Map<String, Object> bag = authBag(ctx.spec, cred.where());
+    return new Object[] { bag.get(cred.name()), bag.containsKey(cred.name()) };
   }
 
   @Test
@@ -545,74 +630,82 @@ public class PipelineTest {
     assertEquals("auth_no_spec", errCodeOf(() -> utility.prepareAuth.apply(ctx)));
   }
 
+  // Without this the cases below cannot fail for an SDK whose credential the
+  // probe misses: every one of them takes the public-API path instead.
   @Test
-  public void prepareAuth_apikeyWithPrefixSpaceJoined() {
-    UnivecSDK client = plClient(fhMap(
-        "apikey", "K",
-        "auth", fhMap("prefix", "Bearer")));
-    Utility utility = client.getUtility();
-    Context ctx = plCtx(client, utility, null);
-    ctx.spec = authSpec(null);
-    utility.prepareAuth.apply(ctx);
-    assertEquals("Bearer K", ctx.spec.headers.get("authorization"));
+  public void prepareAuth_probeFindsTheCredentialThisSdkPlaces() {
+    assertEquals(null == authCredential(), null == authAnyCredential(),
+        "the probe missed a credential this SDK places, so every case "
+        + "takes the public-API path");
+  }
+
+  @Test
+  public void prepareAuth_placedWhereThisApiPutsIt() {
+    AuthCred cred = authCredential();
+    if (cred == null) {
+      // A public API places nothing, and that is the whole assertion.
+      Object[] got = authPlaced(fhMap(
+          "apikey", "K",
+          "auth", authBlock("Bearer")), null);
+      assertFalse((Boolean) got[1], "expected no credential placed at all");
+      return;
+    }
+    assertTrue("headers".equals(cred.where()) || "query".equals(cred.where()),
+        "unexpected credential container " + cred.where());
+    if (!"".equals(cred.pair())) {
+      // A cookie credential is a `<scheme>=<key>` pair, and the scheme name
+      // leaves no room for the option's prefix.
+      assertTrue(COOKIE_PAIR.matcher(String.valueOf(cred.value())).matches(),
+          "expected a cookie pair, got " + cred.value());
+      return;
+    }
+    // A header credential is prefix-joined; a query credential is the raw
+    // key, because a query parameter has nowhere to put a scheme name.
+    assertEquals("query".equals(cred.where()) ? "K" : "Bearer K", cred.value());
   }
 
   @Test
   public void prepareAuth_rawApikeyEmptyPrefixAsIs() {
-    UnivecSDK client = plClient(fhMap(
+    Object[] got = authPlaced(fhMap(
         "apikey", "K",
-        "auth", fhMap("prefix", "")));
-    Utility utility = client.getUtility();
-    Context ctx = plCtx(client, utility, null);
-    ctx.spec = authSpec(null);
-    utility.prepareAuth.apply(ctx);
-    assertEquals("K", ctx.spec.headers.get("authorization"));
+        "auth", authBlock("")), null);
+    AuthCred cred = authCredential();
+    if (cred == null) {
+      assertFalse((Boolean) got[1], "expected no credential placed at all");
+      return;
+    }
+    assertEquals(cred.pair() + "K", got[0]);
   }
 
   @Test
-  public void prepareAuth_emptyApikeyDropsHeader() {
-    UnivecSDK client = plClient(fhMap(
+  public void prepareAuth_emptyApikeyDropsCredential() {
+    Object[] got = authPlaced(fhMap(
         "apikey", "",
-        "auth", fhMap("prefix", "Bearer")));
-    Utility utility = client.getUtility();
-    Context ctx = plCtx(client, utility, null);
-    ctx.spec = authSpec(fhMap("authorization", "stale"));
-    utility.prepareAuth.apply(ctx);
-    assertFalse(ctx.spec.headers.containsKey("authorization"),
-        "expected authorization dropped");
+        "auth", authBlock("Bearer")), "stale");
+    assertFalse((Boolean) got[1], "expected the credential dropped");
   }
 
   @Test
-  public void prepareAuth_missingApikeyDropsHeader() {
-    UnivecSDK client = plClient(fhMap(
-        "auth", fhMap("prefix", "Bearer")));
-    Map<String, Object> options = client.optionsMap();
-    Object apikey = options.get("apikey");
+  public void prepareAuth_missingApikeyDropsCredential() {
+    Map<String, Object> sdkopts = fhMap("auth", authBlock("Bearer"));
+    Object apikey = plClient(sdkopts).optionsMap().get("apikey");
     if (apikey instanceof String && !"".equals(apikey)) {
       // SDK options carry a configured apikey; case not reproducible here.
       return;
     }
-    Utility utility = client.getUtility();
-    Context ctx = plCtx(client, utility, null);
-    ctx.spec = authSpec(fhMap("authorization", "stale"));
-    utility.prepareAuth.apply(ctx);
-    assertFalse(ctx.spec.headers.containsKey("authorization"),
-        "expected authorization dropped");
+    Object[] got = authPlaced(sdkopts, "stale");
+    assertFalse((Boolean) got[1], "expected the credential dropped");
   }
 
   @Test
-  public void prepareAuth_publicApiNoAuthBlockDropsHeader() {
-    UnivecSDK client = plClient(fhMap("apikey", "K"));
-    Map<String, Object> options = client.optionsMap();
-    if (options.get("auth") != null) {
+  public void prepareAuth_publicApiNoAuthBlockDropsCredential() {
+    Map<String, Object> sdkopts = fhMap("apikey", "K");
+    if (plClient(sdkopts).optionsMap().get("auth") != null) {
       // Option validation supplies an auth shape for this SDK, so a truly
       // auth-less client cannot be constructed here.
       return;
     }
-    Utility utility = client.getUtility();
-    Context ctx = plCtx(client, utility, null);
-    ctx.spec = authSpec(fhMap("authorization", "stale"));
-    utility.prepareAuth.apply(ctx);
-    assertNull(ctx.spec.headers.get("authorization"), "expected authorization dropped");
+    Object[] got = authPlaced(sdkopts, "stale");
+    assertFalse((Boolean) got[1], "expected the credential dropped");
   }
 }

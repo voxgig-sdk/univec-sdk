@@ -26,7 +26,7 @@ make test
 
 | Source | Path | Edit when… |
 | --- | --- | --- |
-| Target definition | `.sdk/model/target/haskell.aon` | deps, module, extension, phases change |
+| Target definition | `.sdk/model/target/haskell.aontu` | deps, module, extension, phases change |
 | Templates | `.sdk/tm/haskell/` | the file is the **same for every API** (runtime, transport, base classes) — copied verbatim with placeholder substitution |
 | Components | `.sdk/src/cmp/haskell/` | the file's shape **depends on the API** (entities, constructor, README, tests) — TypeScript that walks the model |
 

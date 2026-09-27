@@ -1,20 +1,7 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (rust/plugins/aws/src/crypto.rs)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (rust/plugins/aws/src/crypto.rs)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! SHA-256 and HMAC-SHA256, hand-rolled.
-//!
-//! The Rust standard library ships no hash functions, and SigV4 signing
-//! needs exactly these two. Taking a crate for them would break the
-//! no-dependency rule that keeps ten ports honest, so - like JSON, HTTP,
-//! PEM and base64 before them - they live in-tree.
-//!
-//! SHA-256 is FIPS 180-4, implemented straight from the standard; HMAC is
-//! RFC 2104 over it. Both are proven against the spec's sigv4 known-answer
-//! cases, which include AWS's own published test vector - a signature is a
-//! chain of these primitives, so a single wrong bit anywhere fails there.
 
-/// The FIPS 180-4 round constants: the fractional parts of the cube roots
-/// of the first 64 primes.
 const K: [u32; 64] = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -28,8 +15,6 @@ const K: [u32; 64] = [
 
 /// The SHA-256 digest of a byte string.
 pub fn sha256(data: &[u8]) -> [u8; 32] {
-    // The initial hash: the fractional parts of the square roots of the
-    // first 8 primes.
     let mut hash: [u32; 8] = [
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
         0x5be0cd19,

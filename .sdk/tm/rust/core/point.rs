@@ -1,6 +1,3 @@
-// Endpoint point description (mirrors go core/target.go NewPoint). Points
-// stay Value maps in the pipeline; this typed view is a convenience for
-// callers that want field access.
 
 use crate::core::helpers::{get_bool, get_str, getp, jo, to_map};
 use crate::utility::voxgigstruct::Value;

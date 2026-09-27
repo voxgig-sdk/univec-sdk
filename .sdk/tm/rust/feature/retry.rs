@@ -1,9 +1,3 @@
-// Automatic retry of transient failures with exponential backoff and
-// jitter (mirrors go feature/retry_feature.go). Wraps the active transport
-// so a single operation call may make several HTTP attempts. A failure is
-// retryable when the transport returns an error, or responds with a status
-// in `statuses` (default: 408, 425, 429, 500, 502, 503, 504). An HTTP
-// 429/503 with a `Retry-After` header overrides the computed backoff.
 
 use std::cell::RefCell;
 use std::rc::Rc;

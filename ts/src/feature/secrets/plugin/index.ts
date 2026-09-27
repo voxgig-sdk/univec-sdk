@@ -1,10 +1,6 @@
 // VENDORED: @voxgig/plugin 0.1.6 (typescript/src/index.ts)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-/* The canonical surface `make parity` checks (AGENTS.md §4). Small on
- * purpose (§19): everything else is methods on the host and instance
- * types, because a library that grows a second public entry point per
- * feature is a library twenty ports pay for twice. */
 
 export { makehost } from './Host'
 export { makecatalog } from './Catalog'

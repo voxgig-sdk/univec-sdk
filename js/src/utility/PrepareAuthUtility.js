@@ -1,5 +1,5 @@
 
-const HEADER_auth = 'authorization'
+const CRED_name = 'authorization'
 
 const OPTION_apikey = 'apikey'
 
@@ -26,18 +26,18 @@ function prepareAuth(ctx) {
 
   // Public APIs that need no auth omit the options.auth block entirely.
   if (null == options.auth) {
-    delprop(headers, HEADER_auth)
+    delprop(headers, CRED_name)
     return spec
   }
 
   const apikey = getprop(options, OPTION_apikey, NOTFOUND)
 
   if (NOTFOUND === apikey || null == apikey || '' === apikey) {
-    delprop(headers, HEADER_auth)
+    delprop(headers, CRED_name)
   }
   else {
     // Empty prefix (raw apiKey credential) must not add a leading space.
-    setprop(headers, HEADER_auth,
+    setprop(headers, CRED_name,
       options.auth.prefix ? options.auth.prefix + ' ' + apikey : apikey)
   }
 

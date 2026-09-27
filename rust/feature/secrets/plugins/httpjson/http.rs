@@ -1,22 +1,6 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (rust/plugins/httpjson/src/http.rs)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (rust/plugins/httpjson/src/http.rs)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! Just enough HTTP to ask a vault for a secret.
-//!
-//! The Rust standard library has no HTTP client, so this speaks HTTP/1.1
-//! over a TcpStream directly: a GET or POST with headers and an optional
-//! body, a status line, and a response body delimited by Content-Length,
-//! by chunks, or by the connection closing.
-//!
-//! https goes over rustls - the one dependency this repo takes, and a
-//! deliberate one. A secrets library reaching a remote vault needs TLS, and
-//! hand-rolling TLS would be far worse than taking a well-audited crate.
-//! Server certificates are verified against the Mozilla root set, plus any
-//! extra roots named by `SEKRETO_CA_BUNDLE` - an internal Vault behind a
-//! private CA is the common case, not the exotic one.
-//!
-//! It is still not a general-purpose client: no redirect following, no
-//! keep-alive, no client certificates.
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
@@ -26,7 +10,6 @@ use std::time::{Duration, Instant};
 use rustls::pki_types::{CertificateDer, ServerName};
 use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 
-/// The environment variable naming extra trust roots, as a PEM bundle.
 pub const CABUNDLE: &str = "SEKRETO_CA_BUNDLE";
 
 /// Anything the exchange can run over: a plain TcpStream, or a rustls
@@ -34,16 +17,12 @@ pub const CABUNDLE: &str = "SEKRETO_CA_BUNDLE";
 trait ReadWrite: Read + Write {}
 impl<T: Read + Write> ReadWrite for T {}
 
-/// What a vault answered: the status code and the raw body.
 pub struct Response {
     pub status: u16,
     pub body: String,
 }
 
-/// A url split into the parts a request needs.
 struct Target {
-    /// The bare host: what we connect to, and what the certificate is
-    /// checked against. An IPv6 literal appears here without brackets.
     host: String,
     /// The authority as it goes in the `Host:` header. An IPv6 literal
     /// keeps its brackets, because `Host: 2001:db8::1:8200` is not a valid
@@ -54,40 +33,12 @@ struct Target {
     tls: bool,
 }
 
-/// How much of a response body will be read before the store is treated as
-/// having answered incoherently. Ports carry the same bound.
-///
-/// Far above anything real - the largest legitimate payload this library
-/// fetches is Doppler's whole-config download, measured in kilobytes. A bound
-/// is needed because the read timeout is not one: it is per-read, so a server
-/// that keeps sending resets it forever.
 const MAXBODY: u64 = 8 * 1024 * 1024;
 
 /// How long reaching a vault may take before it is treated as unreachable.
 /// Ports carry the same bound.
 const TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Connect, but give up after TIMEOUT.
-///
-/// `TcpStream::connect` takes a host and a port and has NO bound: against an
-/// address that swallows SYNs it blocks for however long the kernel retries,
-/// which on Linux is a little over two minutes. Measured: still blocked at
-/// 25s against 10.255.255.1 where ten of the twelve ports gave up at 10 -
-/// this port and Zig were the two that did not.
-///
-/// `connect_timeout` is the bounded one, and it takes a resolved SocketAddr
-/// rather than a name, so the resolution has to happen here.
-///
-/// The bound is on the WHOLE attempt, not on each address. A name commonly
-/// resolves to several - a dual-stack host answers with both an A and an
-/// AAAA - and giving each the full ten seconds would make the real bound
-/// ten seconds times however many addresses the name cares to return, which
-/// is not a bound at all when the name is the attacker's. Each attempt gets
-/// what is left of the one deadline.
-///
-/// The bound does NOT cover the resolution itself, which std offers no way
-/// to bound - a DNS server that hangs still hangs. The connect is the part
-/// an attacker chooses.
 fn connect(host: &str, port: u16, url: &str) -> Result<TcpStream, String> {
     let unreachable =
         |why: String| format!("sekreto: cannot reach {}: {}", nakedurl(url), why);
@@ -99,10 +50,6 @@ fn connect(host: &str, port: u16, url: &str) -> Result<TcpStream, String> {
     connectall(addrs, TIMEOUT).map_err(unreachable)
 }
 
-/// Walk resolved addresses under one shared deadline.
-///
-/// Split out from `connect` so the deadline can be tested without waiting
-/// the real ten seconds.
 fn connectall(
     addrs: impl Iterator<Item = SocketAddr>,
     budget: Duration,
@@ -133,13 +80,6 @@ fn connectall(
     })
 }
 
-/// A url without its query string, for messages.
-///
-/// A query here carries the vault path, the secret name or a filter -
-/// `secretPath=/prod/payments/stripe` - which does not belong in a log or a
-/// stack trace. `providers.rs` strips it at every message it raises; this
-/// file did not, at nine sites, including the two most likely in production
-/// (an unreachable vault and a TLS failure).
 fn nakedurl(url: &str) -> &str {
     match url.find('?') {
         Some(at) => &url[..at],
@@ -195,8 +135,6 @@ fn split(url: &str) -> Result<Target, String> {
     })
 }
 
-/// Decode standard base64: a PEM body, a GCP secret payload, an AWS
-/// SecretBinary.
 pub fn unbase64(text: &str) -> Option<Vec<u8>> {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -223,7 +161,6 @@ pub fn unbase64(text: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Pull every certificate out of a PEM bundle.
 fn pemcerts(text: &str) -> Vec<CertificateDer<'static>> {
     const OPEN: &str = "-----BEGIN CERTIFICATE-----";
     const CLOSE: &str = "-----END CERTIFICATE-----";
@@ -271,12 +208,10 @@ fn rootstore() -> RootCertStore {
     roots
 }
 
-/// GET a url with one extra header.
 pub fn get(url: &str, header: &str, value: &str) -> Result<Response, String> {
     getwith(url, &[(header, value)])
 }
 
-/// GET a url with a set of headers.
 pub fn getwith(url: &str, headers: &[(&str, &str)]) -> Result<Response, String> {
     request("GET", url, headers, None)
 }
@@ -330,7 +265,6 @@ pub fn request(
     exchange(&mut stream, method, &target, headers, body, url)
 }
 
-/// Write the request and read the response, over whatever the transport is.
 fn exchange(
     stream: &mut impl ReadWrite,
     method: &str,
@@ -394,7 +328,6 @@ fn exchange(
     let head = String::from_utf8_lossy(&raw[..split_at]).to_string();
     let rawbody = &raw[split_at + 4..];
 
-    // "HTTP/1.1 200 OK" - the second field is the status.
     let status = head
         .lines()
         .next()
@@ -424,21 +357,11 @@ fn exchange(
     Ok(Response { status, body })
 }
 
-/// The offset of `needle` in `hay`, if it is there.
 fn findbytes(hay: &[u8], needle: &[u8]) -> Option<usize> {
     hay.windows(needle.len())
         .position(|window| window == needle)
 }
 
-/// Join a chunked body back together.
-///
-/// Each chunk is a hex length, CRLF, that many bytes, CRLF. A zero length
-/// ends the body; any trailer after it is ignored.
-///
-/// Bytes, not `str`: a chunk length counts bytes, and a boundary may fall
-/// inside a multibyte character. Slicing a `str` at such an offset panics,
-/// so a secret containing any non-ASCII character could take the process
-/// down rather than come back.
 fn dechunk(raw: &[u8]) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     let mut rest = raw;
@@ -446,7 +369,6 @@ fn dechunk(raw: &[u8]) -> Option<Vec<u8>> {
     loop {
         let at = findbytes(rest, b"\r\n")?;
 
-        // A chunk length may carry extensions after a `;`.
         let header = std::str::from_utf8(&rest[..at]).ok()?;
         let size = usize::from_str_radix(header.split(';').next()?.trim(), 16).ok()?;
 
@@ -466,7 +388,6 @@ fn dechunk(raw: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
-/// Percent-encode a query-string value.
 pub fn urlencode(text: &str) -> String {
     let mut out = String::new();
 
@@ -492,15 +413,6 @@ mod tests {
         format!("10.255.255.{}:8200", last).parse().unwrap()
     }
 
-    /// Several unreachable addresses must share one deadline, not each get
-    /// their own: a name that resolves to N of them would otherwise cost
-    /// N times the bound, and the name can be the attacker's.
-    ///
-    /// This needs addresses that SWALLOW a SYN rather than refuse it, and
-    /// whether any given address does is the network's business, not this
-    /// crate's. So the single-address case is measured first: if it comes
-    /// back fast the addresses are being refused, there is nothing to time,
-    /// and the test says so instead of passing on a technicality.
     #[test]
     fn addresses_share_one_deadline() {
         let start = Instant::now();
@@ -524,8 +436,6 @@ mod tests {
 
         assert!(three.is_err(), "10.255.255.0/24 must not connect");
 
-        // Three at 300ms each is 900ms; one shared deadline is 300ms. The
-        // slack is for a loaded machine, and is still far below per-address.
         assert!(
             took < BUDGET * 2,
             "three addresses took {:?} against a {:?} budget: \

@@ -1,0 +1,42 @@
+main: kit: target: scala: {
+
+  title: Scala
+  ext: scala
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  # Applicability (docs/design/feature-tags.md). A vendored sekreto port
+  # lives in this target's feature container, so a feature that resolves
+  # secrets through sekreto can apply here.
+  provides: { sekreto: true, schema: true }
+
+  superseded: []
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  deps: {}
+}
+
+
+main: kit: feature: &: target: scala: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: scala: publish: {
+  registry: {
+    name: 'maven-central'
+    url: 'https://central.sonatype.com'
+    vault: { recipe: 'maven', alias: 'central' }
+  }
+}
+
+
+main: kit: target: scala: feature: {
+  trim: false
+}

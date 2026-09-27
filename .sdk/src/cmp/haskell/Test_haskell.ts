@@ -22,9 +22,6 @@ const Test = cmp(function Test(props: any) {
 
   Folder({ name: 'test' }, () => {
 
-    // Structural gate over the documented Haskell examples (emits
-    // test/TReadmeExamples.hs); wired into genTests below so it runs in the
-    // standard Runner.
     ReadmeExamplesTest({ target })
 
     File({ name: 'SdkGenTests.' + target.ext }, () => {
@@ -41,8 +38,6 @@ const Test = cmp(function Test(props: any) {
         const hasUpdate = ops.includes('update')
         const hasRemove = ops.includes('remove')
 
-        // Pick a text field to mutate in update (first non-id field with a
-        // string value in the new-ref data, else "name").
         let updField = 'name'
         try {
           const nf = e.fields || {}
@@ -71,7 +66,6 @@ ${basicFn} c = do
   existing <- getp fixture "existing"
   opts <- jo [("entity", existing)]
 `
-        // Basic flow. Each op is an independent runTest.
         if (hasList) {
           defs += `  runTest c "${e.name}.list" $ do
     sdk <- C.testSdk opts VNoval
@@ -159,7 +153,6 @@ ${basicFn} c = do
           defs += `  pure ()\n`
         }
 
-        // Direct call test (via injected system.fetch mock).
         defs += `
 ${directFn} :: Counters -> IO ()
 ${directFn} c = runTest c "${e.name}.direct" $ do
@@ -181,11 +174,6 @@ ${directFn} c = runTest c "${e.name}.direct" $ do
   pure (isTrueV ok && toInt st == 200 && vstring did == "direct01" && n == 1)
 `
 
-        // PR review #4: entity eStream(action, args, callopts) runs the op
-        // through the full pipeline and returns a lazy list. Fallback (no
-        // streaming feature) yields the materialised items; with the streaming
-        // feature active it yields from the streaming iterator (chunkSize
-        // groups into batches). Needs a list op; seeds three records.
         if (hasList) {
           const streamFn = `${fn}StreamTest`
           calls += `  ${streamFn} c\n`

@@ -8,6 +8,8 @@ import {
   each,
   isAuthActive,
   isConfigData,
+  resolveAuthIn,
+  resolveAuthName,
   resolveAuthPrefix,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -26,40 +28,12 @@ import {
 } from './utility_ocaml'
 
 
-// THE SECRETS BUILD MODEL, derived from the model ONCE and read by both the
-// Makefile fragment (Main_ocaml emits feature/secrets/feature.mk from it)
-// and the generated config (the definitions list and the bundled transport
-// below), so the two cannot disagree about which kinds are compiled.
-//
-// Upstream sekreto retired its self-registration registry for voxgig/plugin
-// definitions: a provider kind the caller did not pass in `~plugins` is
-// unknown to that Sekreto. So the model's choice of plugin groups IS the
-// SDK's provider vocabulary, and the generated code names each active
-// group's constructor (`def: ocaml:` in model/feature/secrets.aon -
-// `Hashicorp.plugin`, the `unit -> Defs.definition` each vendored kind
-// module defines) and nothing else. A symbol named here whose module the
-// plugin trim removed is an "Unbound module" at compile time - a loud
-// failure, which is the right kind.
-//
-// MODULE ORDER IS THE DEPENDENCY ORDER, written down (upstream's own
-// Makefile is the source): the voxgig/plugin host, the sekreto core, the
-// shared helpers, the kinds. The helpers are ungrouped in the model (see the
-// ocaml note at the head of its `plugin` block) and are listed here only
-// when a selected kind needs them - the transport chain (crypto, sigv4, tls,
-// http, httpjson) when an active group declares `needs.fetch`, the
-// child-process helper (runcmd) when any kind is on - because OCaml
-// compiles exactly what it is handed: an [env, memory] chain compiles the
-// two cores alone, and `secretspec` alone compiles runcmd.ml and no TLS.
-//
-// Null when the model does not activate `secrets` for this target. Read
-// with `only_active: false` on the plugin map (pluginExcludesFor's
-// subtlety: the feature object a component is handed has already been
-// filtered, so a feature whose groups are all off would look like one
-// with no plugin machinery).
 type SecretsBuild = {
   groups: string[],
   tlsGroups: string[],
   tls: boolean,
+  stubs: string[],
+  stubGroups: string[],
   plugin: string[],
   core: string[],
   helpers: string[],
@@ -91,6 +65,8 @@ function secretsBuild(model: Model, target: any): SecretsBuild | null {
 
   const groups: string[] = []
   const tlsGroups: string[] = []
+  const stubGroups: string[] = []
+  const stubs = new Set<string>()
   const syms = new Set<string>()
   const kinds = new Set<string>()
 
@@ -103,6 +79,17 @@ function secretsBuild(model: Model, target: any): SecretsBuild | null {
     if (0 === Object.keys(defs).length) return
     groups.push(plugin.name)
     if (true === plugin.needs?.fetch) tlsGroups.push(plugin.name)
+
+    // `stub`, keyed by TARGET - not a filter over `path`, which is one flat
+    // list across every target: ocaml's minivault_stubs.c sits beside c's
+    // boru.c and hashicorp.c, and a prefix filter handed this build both of
+    // them. Declared per target, so what ocaml compiles is what the model
+    // says ocaml compiles.
+    const own = (plugin.stub?.[target.name] || []).map((one: any) => String(one))
+    if (0 < own.length) {
+      stubGroups.push(plugin.name)
+      for (const one of own) stubs.add(one)
+    }
     for (const [sym, path] of Object.entries(defs)) {
       syms.add(sym)
       kinds.add(String(path))
@@ -114,6 +101,8 @@ function secretsBuild(model: Model, target: any): SecretsBuild | null {
     groups: groups.sort(),
     tlsGroups: tlsGroups.sort(),
     tls,
+    stubs: Array.from(stubs).sort(),
+    stubGroups: stubGroups.sort(),
     plugin: SECRETS_PLUGIN_MODULES,
     core: SECRETS_CORE_MODULES,
     helpers: [
@@ -142,27 +131,25 @@ const Config = cmp(async function Config(props: any) {
 
   const secrets = secretsBuild(model, target)
 
-  // The canonical config OBJECT and its JSON, from the shared helper. Both
-  // representations render from the same `def`, so they cannot describe
-  // different configs - and this target picks up `options.server` (the OpenAPI
-  // server-variable defaults), which the hand-rolled build here omitted.
-  // Passing target.name opts this target into the main slug/version/target
-  // identity fields (read by station's descriptor - see configDefinition).
-  const { def: config, json: configJson } = configDefinition(model, target.name)
+  const { def: config } = configDefinition(model, target.name)
+
+  const authIn = resolveAuthIn(model)
+  const authName = resolveAuthName(model)
+  const authOpts = (config as any).options?.auth
+  if (null != authOpts) {
+    if ('header' !== authIn) {
+      authOpts.in = authIn
+    }
+    if ('Authorization' !== authName) {
+      authOpts.name = authName
+    }
+  }
+
+  const configJson = JSON.stringify(config)
   const asData = isConfigData(configJson, configReprSetting(model))
 
   File({ name: 'sdk_config.' + target.ext }, () => {
 
-    // ABOVE THE THRESHOLD: emit the model as DATA.
-    //
-    // The literal is one nested expression the compiler type-checks as a
-    // single item; a string is one token, and `Sdk_json.json_read` builds the
-    // same value tree at runtime. That reader used to live only in the corpus
-    // test harness - this rung is why it now lives in the runtime, and the
-    // harness uses it from there rather than keeping a second copy.
-    //
-    // No number-type question: `json_read` yields `Num (float)` and
-    // `formatOcamlValue` emits `(Num (5.))`, so both branches agree.
     if (asData) {
       Content(`(* Generated API configuration (mirrors go core/config.go).
  *
@@ -201,15 +188,6 @@ let make_config () : value =
 `)
     }
 
-    // THE PLUGIN DEFINITIONS the model selected, per feature (the ocaml
-    // peer of Config_go's featurePlugins map). EMITTED UNCONDITIONALLY, so
-    // every generated config answers the same question - but typed as
-    // `Defs.definition list` only when the secrets feature is active: the
-    // `Defs` module is part of the vendored voxgig/plugin tree, which is
-    // compiled only then, so an inactive model gets the polymorphic empty
-    // list instead (`'a list`, which unifies with anything a caller
-    // expects). DELIBERATE DIVERGENCE from the c/lua accessors, whose
-    // untyped return (void**, a table) needs no such split.
     if (null == secrets) {
       Content(`
 (* The plugin definitions the model selected, per feature: none - no
@@ -229,16 +207,6 @@ let feature_plugins (name : string) : Defs.definition list =
   | _ -> []
 `)
 
-      // THE EXCHANGE TRANSPORT OF LAST RESORT (go's rawExchangeFetch): the
-      // vendored sekreto HTTP client, which the active plugin groups
-      // compile and link anyway (feature/secrets/feature.mk adds the OpenSSL binding on
-      // exactly this condition). It exists so an exchange works with
-      // ordinary SDK options - requiring a custom transport for the COMMON
-      // case would refuse every live token purchase before a request was
-      // made. Same result shape the system.fetch seam promises ({status,
-      // statusText, headers, body, json()}). With no such group the feature
-      // is built without it and a purchase with no options.system.fetch
-      // fails with a named error (see secrets_feature.ml).
       if (secrets.tls) {
         Content(`
 (* The token-exchange transport of last resort: the vendored sekreto HTTP
@@ -269,16 +237,10 @@ let make_feature (name : string) : feature =
   match name with
 `)
 
-    // ONLY THE FEATURES THIS PORT ACTUALLY IMPLEMENTS. Emitting an arm for a
-    // name with no `<name>_feature` in tm/ocaml/sdk_features.ml is an
-    // "Unbound value" at COMPILE time — the whole SDK fails to build, not
-    // just the feature. That is how the missing `cost` was found, when an SDK
-    // first activated every feature; cost is implemented now, and this list
-    // is the guard against the next one.
     const OCAML_FEATURES = [
       'audit', 'cache', 'clienttrack', 'cost', 'debug', 'idempotency', 'log',
       'metrics', 'netsim', 'paging', 'proxy', 'ratelimit', 'rbac',
-      'retry', 'streaming', 'telemetry', 'test', 'timeout',
+      'retry', 'streaming', 'telemetry', 'test', 'timeout', 'validate',
     ]
 
     each(feature, (f: any) => {
@@ -288,13 +250,6 @@ let make_feature (name : string) : feature =
       }
     })
 
-    // The secrets feature is the one ocaml feature that lives OUTSIDE
-    // sdk_features.ml (a container: feature/secrets_feature.ml plus the
-    // vendored trees), so its arm names its own module and hands it the
-    // definitions the model selected and, when a plugin group needing a
-    // transport is active, the bundled exchange transport. Emitted only
-    // when the feature is active: the module is not compiled otherwise
-    // (Main_ocaml's container gate, and the Makefile's feature/secrets/feature.mk).
     if (null != secrets) {
       Content(`  | "secrets" -> Secrets_feature.make ~plugins:(feature_plugins "secrets")${secrets.tls ? ' ~transport:secrets_transport' : ''} ()
 `)

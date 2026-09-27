@@ -2,25 +2,6 @@
 import { cmp, Content, File } from '@voxgig/sdkgen'
 
 
-// Emits elixir/test/readme_examples_test.exs — an ExUnit SYNTAX + PRESENCE
-// gate over every ```elixir fenced block in the three docs that ship elixir
-// examples: the repository ROOT README.md, the per-language elixir/README.md,
-// and the per-language elixir/REFERENCE.md.
-//
-// For each block, tagged by (source doc, index), the gate PARSES it with
-// `Code.string_to_quoted/1` — catching malformed examples (a missing `end`, a
-// bad token, an unbalanced `%{}`). It also asserts each doc that exists ships
-// at least one elixir block.
-//
-// SCOPE NOTE: unlike the Python/Lua gates this does NOT execute blocks in a
-// seeded offline subprocess. Elixir's compile model makes running a README
-// fragment against the generated `<Name>` modules substantially heavier (each
-// block would need the SDK compiled and loaded, and the narrative aliases
-// resolved), so this port stops at the syntax gate — a real, useful guard that
-// keeps documented examples parseable as the generator evolves.
-//
-// The emitted Elixir avoids backticks (chr 96 via <<96>>) so this TS template
-// literal stays clean; the only interpolation is the SDK module name.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { ctx$: { model } } = props
 

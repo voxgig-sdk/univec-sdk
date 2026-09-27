@@ -1,5 +1,3 @@
-// Transport response wrapper (mirrors go core/response.go). The `json`
-// entry stays a Value::Func thunk so bodies can be re-read repeatedly.
 
 use crate::core::error::UnivecError;
 use crate::core::helpers::{get_str, getp, to_int};

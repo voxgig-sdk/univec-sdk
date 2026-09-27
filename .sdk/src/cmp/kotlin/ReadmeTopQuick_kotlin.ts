@@ -54,15 +54,10 @@ import ${kotlinPackage(model)}.core.${SDK}
   }
 
   if (exampleEntity) {
-    // Sanitise the local variable name — an entity whose camelCased name is a
-    // Kotlin keyword gets a trailing underscore (kotlinVarName) so the snippet
-    // compiles.
     const eVar = kotlinVarName(exampleEntity.name)
     const accessor = kotlinVarName(exampleEntity.name)
     const eNameLower = nom(exampleEntity, 'Name').toLowerCase()
     const opnames = Object.keys(exampleEntity.op || {})
-    // Model-driven id key: null when the entity has no id-like field, in which
-    // case the load example takes an empty match.
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {

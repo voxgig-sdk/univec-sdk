@@ -1,9 +1,3 @@
-// Direct unit tests for the operation-pipeline utilities (mirrors
-// tm/go/test/pipeline_test.go). The generated entity tests exercise the
-// happy path; these drive the error and edge branches (missing
-// spec/response/result, 4xx handling, transport failures, feature add
-// semantics, auth header shaping) that a normal success-path op never
-// reaches.
 
 mod common;
 

@@ -1,5 +1,5 @@
 # VENDORED: @voxgig/plugin 0.1.6 (python/voxgig_plugin/depend.py)
-# Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+# Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 """Dependency cardinality, policy, and the restart graph (section 11.3).
 

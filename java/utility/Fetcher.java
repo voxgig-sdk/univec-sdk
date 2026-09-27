@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
@@ -19,6 +20,40 @@ import voxgig.univecsdk.utility.struct.Struct;
 final class Fetcher {
 
   private Fetcher() {}
+
+  // Clients keyed by redirect policy and proxy. Each HttpClient owns a
+  // connection pool and a selector thread, so one per request reused
+  // nothing; one per key pools across calls.
+  private static final ConcurrentHashMap<String, HttpClient> CLIENTS =
+      new ConcurrentHashMap<>();
+
+  private static HttpClient clientFor(Map<String, Object> fetchdef) {
+    // "manual" (set by the station feature's middleware under a hosts
+    // policy) returns a 3xx like any other response: an automatic follow
+    // would carry injected credentials to a host no policy approved.
+    final HttpClient.Redirect redirectPolicy =
+        "manual".equals(fetchdef.get("redirect"))
+            ? HttpClient.Redirect.NEVER
+            : HttpClient.Redirect.NORMAL;
+
+    Object praw = fetchdef.get("proxy");
+    final String proxy = praw instanceof String ? (String) praw : "";
+
+    return CLIENTS.computeIfAbsent(redirectPolicy + "|" + proxy, key -> {
+      HttpClient.Builder clientb = HttpClient.newBuilder().followRedirects(redirectPolicy);
+      if (!"".equals(proxy)) {
+        try {
+          URI proxyUri = URI.create(proxy);
+          int port = proxyUri.getPort() < 0 ? 80 : proxyUri.getPort();
+          clientb.proxy(ProxySelector.of(new InetSocketAddress(proxyUri.getHost(), port)));
+        }
+        catch (RuntimeException e) {
+          // Unparseable proxy target: direct connection, as the go transport.
+        }
+      }
+      return clientb.build();
+    });
+  }
 
   static Map<String, Object> defaultHttpFetch(String fullurl, Map<String, Object> fetchdef) {
     String method = fetchdef.get("method") instanceof String
@@ -59,36 +94,9 @@ final class Fetcher {
       reqb.setHeader("User-Agent", "Mozilla/5.0 (compatible; UnivecSDK/1.0)");
     }
 
-    // Honour a redirect annotation on the fetch definition (set by the
-    // station feature's middleware under a hosts policy): "manual" returns
-    // a 3xx like any other response instead of following it — the ts
-    // donor's fetch honours the same key natively, and an automatic follow
-    // would carry injected credentials to a host no policy approved.
-    HttpClient.Redirect redirectPolicy =
-        "manual".equals(fetchdef.get("redirect"))
-            ? HttpClient.Redirect.NEVER
-            : HttpClient.Redirect.NORMAL;
-
-    // Honour a proxy annotation on the fetch definition (set by the proxy
-    // feature): route the request through a proxied HttpClient.
-    HttpClient.Builder clientb = HttpClient.newBuilder()
-        .followRedirects(redirectPolicy);
-    Object proxy = fetchdef.get("proxy");
-    if (proxy instanceof String && !"".equals(proxy)) {
-      try {
-        URI proxyUri = URI.create((String) proxy);
-        int port = proxyUri.getPort() < 0 ? 80 : proxyUri.getPort();
-        clientb.proxy(ProxySelector.of(new InetSocketAddress(proxyUri.getHost(), port)));
-      }
-      catch (RuntimeException e) {
-        // Unparseable proxy target: fall through to a direct connection,
-        // mirroring the go transport (bad proxy URL is ignored).
-      }
-    }
-
     HttpResponse<String> resp;
     try {
-      resp = clientb.build().send(reqb.build(), HttpResponse.BodyHandlers.ofString());
+      resp = clientFor(fetchdef).send(reqb.build(), HttpResponse.BodyHandlers.ofString());
     }
     catch (Exception e) {
       throw new RuntimeException("fetch: " + e.getMessage(), e);

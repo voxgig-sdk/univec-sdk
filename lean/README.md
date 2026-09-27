@@ -140,7 +140,7 @@ let sdk ← Sdk.newSdk opts
 
 ## Features
 
-This SDK ships 18 optional features. Each is **inactive until you
+This SDK ships 19 optional features. Each is **inactive until you
 switch it on**, so an SDK you have not configured behaves exactly as if none of
 them existed — no retries, no cache, no logging, no measurable overhead.
 
@@ -149,32 +149,33 @@ above:
 
 | Feature | What it does |
 |---|---|
-| [`audit`](#audit) | Structured audit trail of operations |
-| [`cache`](#cache) | Response caching for safe read requests |
-| [`clienttrack`](#clienttrack) | Client identity and per-request correlation headers |
-| [`cost`](#cost) | Cost tracking and spend budget for API calls |
-| [`debug`](#debug) | Request/response capture ring buffer for debugging |
-| [`idempotency`](#idempotency) | Idempotency keys for safe retries of mutating operations |
-| [`log`](#log) | Structured request and response logging |
-| [`metrics`](#metrics) | Statistics capture: per-operation counters and latency |
-| [`netsim`](#netsim) | Network behaviour simulation for offline testing (latency, failures, outages) |
-| [`paging`](#paging) | Pagination signals for list operations |
-| [`proxy`](#proxy) | Outbound HTTP(S) proxy routing |
-| [`ratelimit`](#ratelimit) | Client-side rate limiting via a token bucket |
-| [`rbac`](#rbac) | Client-side role/permission enforcement |
-| [`retry`](#retry) | Automatic retry of transient failures with exponential backoff |
-| [`streaming`](#streaming) | Incremental streaming of list results via async iteration |
-| [`telemetry`](#telemetry) | Distributed tracing spans with W3C trace-context propagation |
-| [`test`](#test) | In-memory mock transport for testing without a live server |
-| [`timeout`](#timeout) | Per-request timeout with transport abort |
+| [`audit`](#audit) | Audit trail |
+| [`cache`](#cache) | Response cache |
+| [`clienttrack`](#clienttrack) | Client tracking |
+| [`cost`](#cost) | Cost tracking |
+| [`debug`](#debug) | Debug capture |
+| [`idempotency`](#idempotency) | Idempotency |
+| [`log`](#log) | Logging |
+| [`metrics`](#metrics) | Metrics |
+| [`netsim`](#netsim) | Network simulation |
+| [`paging`](#paging) | Paging |
+| [`proxy`](#proxy) | Proxy |
+| [`ratelimit`](#ratelimit) | Rate limiting |
+| [`rbac`](#rbac) | Access control |
+| [`retry`](#retry) | Retry |
+| [`secrets`](#secrets) | Secrets |
+| [`streaming`](#streaming) | Streaming |
+| [`telemetry`](#telemetry) | Telemetry |
+| [`test`](#test) | Test transport |
+| [`timeout`](#timeout) | Timeout |
 
-> **`cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `timeout` wrap the transport**, so each one wraps
+> **`cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `secrets`, `timeout` wrap the transport**, so each one wraps
 > whatever is already installed. This SDK composes them in a fixed catalog
 > order, not the order you activate them in, and takes `feature` as a map.
 
 ### audit
 
-Structured audit trail of operations.
+Audit trail.
 
 | Option | Default |
 |---|---|
@@ -186,7 +187,7 @@ Set `feature.audit.active` to enable it, then override any of the options above.
 
 ### cache
 
-Response caching for safe read requests.
+Response cache.
 
 | Option | Default |
 |---|---|
@@ -203,7 +204,7 @@ activated earlier.
 
 ### clienttrack
 
-Client identity and per-request correlation headers.
+Client tracking.
 
 | Option | Default |
 |---|---|
@@ -214,7 +215,7 @@ Set `feature.clienttrack.active` to enable it, then override any of the options 
 
 ### cost
 
-Cost tracking and spend budget for API calls.
+Cost tracking.
 
 | Option | Default |
 |---|---|
@@ -236,7 +237,7 @@ activated earlier.
 
 ### debug
 
-Request/response capture ring buffer for debugging.
+Debug capture.
 
 | Option | Default |
 |---|---|
@@ -248,7 +249,7 @@ Set `feature.debug.active` to enable it, then override any of the options above.
 
 ### idempotency
 
-Idempotency keys for safe retries of mutating operations.
+Idempotency.
 
 | Option | Default |
 |---|---|
@@ -261,7 +262,7 @@ Set `feature.idempotency.active` to enable it, then override any of the options 
 
 ### log
 
-Structured request and response logging.
+Logging.
 
 | Option | Default |
 |---|---|
@@ -271,7 +272,7 @@ Set `feature.log.active` to enable it, then override any of the options above.
 
 ### metrics
 
-Statistics capture: per-operation counters and latency.
+Metrics.
 
 | Option | Default |
 |---|---|
@@ -281,7 +282,7 @@ Set `feature.metrics.active` to enable it, then override any of the options abov
 
 ### netsim
 
-Network behaviour simulation for offline testing (latency, failures, outages).
+Network simulation.
 
 | Option | Default |
 |---|---|
@@ -305,7 +306,7 @@ activated earlier.
 
 ### paging
 
-Pagination signals for list operations.
+Paging.
 
 | Option | Default |
 |---|---|
@@ -321,7 +322,7 @@ Set `feature.paging.active` to enable it, then override any of the options above
 
 ### proxy
 
-Outbound HTTP(S) proxy routing.
+Proxy.
 
 | Option | Default |
 |---|---|
@@ -338,7 +339,7 @@ activated earlier.
 
 ### ratelimit
 
-Client-side rate limiting via a token bucket.
+Rate limiting.
 
 | Option | Default |
 |---|---|
@@ -354,7 +355,7 @@ activated earlier.
 
 ### rbac
 
-Client-side role/permission enforcement.
+Access control.
 
 | Option | Default |
 |---|---|
@@ -367,7 +368,7 @@ Set `feature.rbac.active` to enable it, then override any of the options above.
 
 ### retry
 
-Automatic retry of transient failures with exponential backoff.
+Retry.
 
 | Option | Default |
 |---|---|
@@ -384,9 +385,27 @@ Set `feature.retry.active` to enable it, then override any of the options above.
 transport features decides what it sees. A feature activated later wraps one
 activated earlier.
 
+### secrets
+
+Secrets.
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `cache` | `true` |
+| `exchange` | `{active: false, method: 'POST', path: 'auth/token', refresh: '', request: 'refresh_token', response: 'access_token', retries: 1, statuses: [401]}` |
+| `name` | `'univec'` |
+| `providers` | `[{kind: 'boru', namespace: 'sdk'}]` |
+
+Set `feature.secrets.active` to enable it, then override any of the options above.
+
+`secrets` wraps the transport, so its position among the other
+transport features decides what it sees. A feature activated later wraps one
+activated earlier.
+
 ### streaming
 
-Incremental streaming of list results via async iteration.
+Streaming.
 
 | Option | Default |
 |---|---|
@@ -398,7 +417,7 @@ Set `feature.streaming.active` to enable it, then override any of the options ab
 
 ### telemetry
 
-Distributed tracing spans with W3C trace-context propagation.
+Telemetry.
 
 | Option | Default |
 |---|---|
@@ -408,7 +427,7 @@ Set `feature.telemetry.active` to enable it, then override any of the options ab
 
 ### test
 
-In-memory mock transport for testing without a live server.
+Test transport.
 
 | Option | Default |
 |---|---|
@@ -418,7 +437,7 @@ Set `feature.test.active` to enable it, then override any of the options above.
 
 ### timeout
 
-Per-request timeout with transport abort.
+Timeout.
 
 | Option | Default |
 |---|---|
@@ -470,24 +489,25 @@ a function that receives the context.
 
 The SDK ships with built-in features:
 
-- **AuditFeature**: Structured audit trail of operations
-- **CacheFeature**: Response caching for safe read requests
-- **ClienttrackFeature**: Client identity and per-request correlation headers
-- **CostFeature**: Cost tracking and spend budget for API calls
-- **DebugFeature**: Request/response capture ring buffer for debugging
-- **IdempotencyFeature**: Idempotency keys for safe retries of mutating operations
-- **LogFeature**: Structured request and response logging
-- **MetricsFeature**: Statistics capture: per-operation counters and latency
-- **NetsimFeature**: Network behaviour simulation for offline testing (latency, failures, outages)
-- **PagingFeature**: Pagination signals for list operations
-- **ProxyFeature**: Outbound HTTP(S) proxy routing
-- **RatelimitFeature**: Client-side rate limiting via a token bucket
-- **RbacFeature**: Client-side role/permission enforcement
-- **RetryFeature**: Automatic retry of transient failures with exponential backoff
-- **StreamingFeature**: Incremental streaming of list results via async iteration
-- **TelemetryFeature**: Distributed tracing spans with W3C trace-context propagation
-- **TestFeature**: In-memory mock transport for testing without a live server
-- **TimeoutFeature**: Per-request timeout with transport abort
+- **AuditFeature**: Audit trail
+- **CacheFeature**: Response cache
+- **ClienttrackFeature**: Client tracking
+- **CostFeature**: Cost tracking
+- **DebugFeature**: Debug capture
+- **IdempotencyFeature**: Idempotency
+- **LogFeature**: Logging
+- **MetricsFeature**: Metrics
+- **NetsimFeature**: Network simulation
+- **PagingFeature**: Paging
+- **ProxyFeature**: Proxy
+- **RatelimitFeature**: Rate limiting
+- **RbacFeature**: Access control
+- **RetryFeature**: Retry
+- **SecretsFeature**: Secrets
+- **StreamingFeature**: Streaming
+- **TelemetryFeature**: Telemetry
+- **TestFeature**: Test transport
+- **TimeoutFeature**: Timeout
 
 Features are initialized in order. Hooks fire in the order features
 were added, so later features can override earlier ones.

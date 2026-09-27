@@ -35,7 +35,7 @@ final class PrepareQuery {
     for (List<Object> item : Struct.items(reqmatch)) {
       String key = item.get(0) instanceof String ? (String) item.get(0) : "";
       Object val = item.get(1);
-      if (val != null && !containsStr(params, key)) {
+      if (val != null && !"$action".equals(key) && !containsStr(params, key)) {
         out.put(key, val);
       }
     }

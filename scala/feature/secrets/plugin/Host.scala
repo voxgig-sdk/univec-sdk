@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (scala/src/Host.scala)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (scala/src/Host.scala)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 package voxgig.plugin
 
@@ -246,6 +246,19 @@ final class Inst(val host: Host, private val entry: Entry) {
   }
 
   /** What this instance can do for others (section 11.1). */
+  /** WHICH provider this instance is bound to for `name` (§11.1), as a
+    * ref, or None when nothing provides it.
+    *
+    * The host's own `capability` answers with the live providers RANKED,
+    * not with the one THIS instance took; §11.4's reluctant rebinding
+    * makes those differ. A REF, not the instance. The selection is
+    * REMEMBERED, because this is the instance asking. */
+  def capability(name: String): Option[String] =
+    Depend
+      .requirements(entry.options)
+      .find(req => req.at("name").asString.contains(name))
+      .flatMap(req => host.instcapability(entry, req))
+
   def provides(prov: Value): Unit = { entry.provides += prov; () }
 
   /** Where this binding landed (section 6.6) - the plugin-side counterpart to a
@@ -664,6 +677,10 @@ final class Host(opts: HostOptions = HostOptions()) {
     * `remember` is false for the questions asked ABOUT an instance rather than
     * BY it: introspection must not create a binding.
     */
+  /** The instance api's way onto `chosen`, which is private. */
+  private[plugin] def instcapability(entry: Entry, req: Value): Option[String] =
+    chosen(entry, req, remember = true)
+
   private def chosen(entry: Entry, req: Value, remember: Boolean): Option[String] = {
     val cands = providersOf(req)
     if (cands.isEmpty) return None

@@ -19,7 +19,6 @@ import type {
   ModelListMatch,
 } from '../UnivecTypes'
 
-// TODO: needs Entity superclass
 class ModelEntity extends UnivecEntityBase<Model> {
 
   constructor(client: UnivecSDK, entopts: any) {

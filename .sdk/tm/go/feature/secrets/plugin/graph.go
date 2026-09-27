@@ -1,25 +1,6 @@
 // VENDORED: @voxgig/plugin 0.1.6 (go/plugin/graph.go)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-/* Whole-graph resolution (§11.4) — a phase, not a discovery.
- *
- * "Activate, and wait in `pending` if you must" is correct and, on its
- * own, produces a terrible experience: apply twenty instances against a
- * registry missing one thing and you get NINETEEN pending rows and no
- * statement of what is actually wrong.
- *
- * ResolveGraph is a PURE FUNCTION of the registry and the intended
- * activation set. No callbacks run, no state changes, nothing is
- * touched. It answers for the whole graph at once which instances can be
- * live, and for each blocked one THE SPECIFIC REQUIREMENT that is
- * unmet, and why.
- *
- * The failure mode being designed against is a famous one: OSGi's
- * resolver is correct and its diagnostics are legendarily unusable. A
- * resolver that says "blocked" without saying WHY has moved the problem
- * rather than solved it, so `why` is part of the contract and the
- * corpus pins its shape. */
-
 package plugin
 
 import "sort"
@@ -38,9 +19,6 @@ type Blocked struct {
 	Why   Why    `json:"why"`
 }
 
-// Why is the tagged union §11.4 pins. Go has no sum type, so the fields
-// carry `omitempty` and the corpus pins which are present per `kind` —
-// the same discrimination the canonical gets from its union.
 type Why struct {
 	Kind string `json:"kind"`
 	// kind: version
@@ -57,12 +35,6 @@ type Why struct {
 	Chain []string `json:"chain,omitempty"`
 }
 
-// MarshalJSON exists for one reason: `why.found` is a LIST OF VERSIONS
-// under `kind: version` and a SINGLE ATTRIBUTE VALUE under `kind:
-// match`. The canonical's union gives each variant its own `found`;
-// Go's struct cannot, so the two are separate fields that render to one
-// name. A `found` of `false` or `null` under `kind: match` must still
-// appear, which is why it is not merely another omitempty field.
 func (w Why) MarshalJSON() ([]byte, error) {
 	out := map[string]any{"kind": w.Kind}
 	switch w.Kind {
@@ -93,10 +65,6 @@ func ResolveGraph(nodes []Node) Resolution {
 	resolved := map[string]bool{}
 	blocked := map[string]Blocked{}
 
-	// Fixed point: a node resolves when every mandatory requirement is
-	// met by an ALREADY-RESOLVED provider. Iterating to a fixed point is
-	// what makes a provider that is itself blocked propagate, rather
-	// than each node being judged against the raw registry.
 	for moved := true; moved; {
 		moved = false
 		for _, n := range nodes {
@@ -130,13 +98,6 @@ func ResolveGraph(nodes []Node) Resolution {
 	return res
 }
 
-// firstunmet returns the FIRST unmet requirement, with the most specific
-// explanation available. Order matters: "no provider at all" and "a
-// provider at the wrong version" are different problems and a reader
-// must not have to guess which they have.
-//
-// The second return is the canonical's `null` — Go has no nullable
-// struct without a pointer, and a bool says what it means.
 func firstunmet(n Node, byref map[string]Node, resolved map[string]bool) (Blocked, bool) {
 	for _, req := range n.Requires {
 		if req.Optional {

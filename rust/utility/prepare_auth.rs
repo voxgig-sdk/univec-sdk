@@ -1,3 +1,9 @@
+// prepare_auth utility.
+//
+// GENERATED, not templated: where the credential goes - header, query or
+// cookie, and under what name - is a fact about THIS API, and tm/ can only
+// hold one answer. See PrepareAuth_rust.
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -8,7 +14,8 @@ use crate::core::spec::Spec;
 use crate::utility::voxgigstruct as vs;
 use crate::utility::voxgigstruct::Value;
 
-const HEADER_AUTH: &str = "authorization";
+/// The header this API reads the credential from.
+const CRED_NAME: &str = "authorization";
 const OPTION_APIKEY: &str = "apikey";
 const NOT_FOUND: &str = "__NOTFOUND__";
 
@@ -26,7 +33,7 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecE
     // Public APIs that need no auth omit the options.auth block entirely.
     let auth = getp(&options, "auth");
     if auth.is_noval() || auth.is_null() {
-        vs::del_prop(headers, &Value::str(HEADER_AUTH));
+        vs::del_prop(headers, &Value::str(CRED_NAME));
         return Ok(spec);
     }
 
@@ -39,7 +46,7 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecE
     };
 
     if skip {
-        vs::del_prop(headers, &Value::str(HEADER_AUTH));
+        vs::del_prop(headers, &Value::str(CRED_NAME));
     } else {
         let auth_prefix = match getpath(&["auth", "prefix"], &options) {
             Value::Str(s) => s,
@@ -51,11 +58,11 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecE
         };
         // Empty prefix (raw apiKey credential) must not add a leading space.
         if auth_prefix.is_empty() {
-            setp(&headers, HEADER_AUTH, Value::str(apikey_val));
+            setp(&headers, CRED_NAME, Value::str(apikey_val));
         } else {
             setp(
                 &headers,
-                HEADER_AUTH,
+                CRED_NAME,
                 Value::str(format!("{} {}", auth_prefix, apikey_val)),
             );
         }

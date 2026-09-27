@@ -9,9 +9,16 @@ use crate::core::types::OutVal;
 use crate::utility::voxgigstruct::Value;
 
 pub fn make_spec_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecError> {
-    if let Some(OutVal::Spec(sp)) = ctx.out_get("spec") {
-        *ctx.spec.borrow_mut() = Some(sp.clone());
-        return Ok(sp);
+    match ctx.out_get("spec") {
+        // A PreSpec feature hook (e.g. validate) may short-circuit the
+        // operation by storing an error here; surface it before the request
+        // is built, the same way make_point surfaces out["point"].
+        Some(OutVal::Err(err)) => return Err(err),
+        Some(OutVal::Spec(sp)) => {
+            *ctx.spec.borrow_mut() = Some(sp.clone());
+            return Ok(sp);
+        }
+        _ => {}
     }
 
     let point = ctx.point.borrow().clone();
@@ -58,10 +65,6 @@ pub fn make_spec_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecErro
     };
 
     if "graphql" == kind {
-        // GraphQL addresses one endpoint: no path parts, no query string,
-        // and the body carries the operation. prepare_body is skipped
-        // deliberately — it only emits a body for data-input ops, whereas
-        // every GraphQL op posts one, including load/list/remove.
         let body = crate::utility::graphql::graphql_body_util(ctx);
         spec.borrow_mut().body = body;
         spec.borrow_mut().path = String::new();

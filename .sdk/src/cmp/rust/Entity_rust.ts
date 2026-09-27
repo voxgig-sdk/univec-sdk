@@ -32,19 +32,12 @@ const Entity = cmp(function Entity(props: any) {
 
   const ff = Path.normalize(__dirname + '/../../../src/cmp/rust/fragment/')
 
-  // Entity files go to entity/ as one module per entity.
   Folder({ name: 'entity' }, () => {
 
     File({ name: rustVarName(entity.name) + '.' + target.ext }, () => {
 
       const opnames = Object.keys(entity.op || {})
 
-      // For each CRUD op: if the spec defines it, splice in the real
-      // implementation. Otherwise emit a stub that satisfies the static
-      // ProjectNameEntity trait (so the crate compiles) but errors at
-      // runtime if the caller invokes an unsupported op.
-      // Tag-form keys (`#LoadOp`) match the marker line `// #LoadOp` and
-      // capture its indent, so the spliced method nests inside the impl.
       const opfrags =
         (['load', 'list', 'create', 'update', 'remove']
           .reduce((a: any, opname: string) =>
@@ -74,8 +67,6 @@ const Entity = cmp(function Entity(props: any) {
           EntityName: entity.Name,
           entityname: entity.name,
 
-          // Class/constructor tokens are decoupled from the EntityName
-          // data-type token so the class can be renamed independently.
           EntyClass: cls,
 
           // Matches every `// #<Stage>-Hook` marker in the fragment (all of

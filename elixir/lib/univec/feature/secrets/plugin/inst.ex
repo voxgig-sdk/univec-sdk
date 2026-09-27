@@ -1,5 +1,5 @@
-# VENDORED: @voxgig/plugin sdk-20260908-1556-0 (elixir/lib/voxgig_plugin/inst.ex)
-# Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+# VENDORED: @voxgig/plugin sdk-20260925-1316-0 (elixir/lib/voxgig_plugin/inst.ex)
+# Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 defmodule Voxgig.Plugin.Inst do
   @moduledoc """
@@ -103,6 +103,19 @@ defmodule Voxgig.Plugin.Inst do
   @doc "Published for other plugins and for the application (section 11)."
   def export(%__MODULE__{host: host, ref: ref}, key, value) do
     Host.entry_update(host, ref, &Map.put(&1, "exports", Map.put(&1["exports"], key, value)))
+  end
+
+  @doc """
+  WHICH provider this instance is bound to for `name` (section 11.1), as
+  a ref, or nil when nothing provides it.
+
+  The host's own `capability` answers with the live providers RANKED, not
+  with the one THIS instance took; section 11.4's reluctant rebinding
+  makes those differ. A REF, not the instance. The selection is
+  REMEMBERED, because this is the instance asking.
+  """
+  def capability(%__MODULE__{host: host, ref: ref}, name) do
+    Host.instcapability(host, ref, name)
   end
 
   @doc "What this instance can do for others (section 11.1)."

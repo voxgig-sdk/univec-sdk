@@ -4,23 +4,7 @@ use crate::core::context::Context;
 use crate::core::helpers::{getp, setp};
 use crate::utility::voxgigstruct::Value;
 
-// GraphQL transport. API-INDEPENDENT: every GraphQL SDK this generator
-// produces uses this file unchanged. The API-specific part — which
-// operations exist and what each one's document is — is model data,
-// computed once by apidef and emitted into Config.
-//
-// Two jobs:
-//
-//   graphql_body_util   — build { query, variables } for a point, binding
-//                         the op's arguments to the document's declared
-//                         variables.
-//
-//   graphql_errors_util — lift a GraphQL failure into an SDK error.
-//                         GraphQL reports failures as a top-level `errors`
-//                         array under HTTP 200, so the status-driven path
-//                         in result_basic never sees them.
 
-/// Content type every GraphQL-over-HTTP request uses.
 pub const GRAPHQL_CONTENT_TYPE: &str = "application/json";
 
 fn as_str(v: &Value) -> String {
@@ -62,12 +46,6 @@ pub fn graphql_error_code(gqlerr: &Value) -> &'static str {
     "request_graphql"
 }
 
-/// Build the request body for a GraphQL point.
-///
-/// Variables come from the op's own arguments: a named variable binds to
-/// the like-named argument (`from`), and the input-object variable (empty
-/// `from`) takes the request data as a whole — which is what makes a
-/// generated create/update call look exactly like its REST equivalent.
 pub fn graphql_body_util(ctx: &Rc<Context>) -> Value {
     let point = ctx.point.borrow().clone();
     let gql = getp(&point, "graphql");
@@ -145,13 +123,6 @@ pub fn graphql_body_util(ctx: &Rc<Context>) -> Value {
     out
 }
 
-/// Inspect a decoded GraphQL response body and record a failure when the
-/// server reported one. Returns true when an error was recorded.
-///
-/// Partial data (`data` alongside `errors`) is treated as failure: the
-/// REST surface has no partial-success concept, and silently returning
-/// half an object would be worse than failing. The raw envelope stays
-/// available on the result for callers that need it.
 pub fn graphql_errors_util(ctx: &Rc<Context>) -> bool {
     let point = ctx.point.borrow().clone();
 

@@ -1,0 +1,218 @@
+# Entity: embed
+
+main: kit: entity: embed: {
+
+  alias: field: {}
+
+  fields: {
+    embeddings: {
+      h: "Embeddings"
+      n: "embeddings"
+      r: true
+      sh: "One vector per input text, in input order."
+      t: "`$ARRAY`"
+    }
+    model: {
+      h: "Model"
+      n: "model"
+      r: true
+      sh: "Model that produced the vectors."
+      t: "`$STRING`"
+    }
+    texts: {
+      h: "Texts"
+      n: "texts"
+      r: true
+      sh: "Texts to embed."
+      t: "`$ARRAY`"
+    }
+  }
+
+  name: "embed"
+  op: {
+    create: {
+      name: "create"
+      points: [
+        {
+          co: {
+            id: "POST /v1/embed"
+            source: "openapi3"
+            version: 2
+          }
+          li: {
+            assert: {
+              equal: {
+                model: {
+                  from: "models"
+                  path: "sourceModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+              }
+              vectors: {
+                count: 1
+                dimension: {
+                  from: "models"
+                  path: "sourceDim"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                path: "embeddings"
+              }
+            }
+            auth: "account"
+            id: "account-embed"
+            input: {
+              model: {
+                from: "models"
+                path: "sourceModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+              texts: [
+                "SDK live coverage test."
+              ]
+            }
+          }
+          m: "POST"
+          o: "/v1/embed"
+          s: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "embed"
+            }
+          ]
+          t: {
+            req: "`reqdata`"
+            res: "`body.data`"
+          }
+        }
+        {
+          co: {
+            id: "POST /v1/ephemeral/embed"
+            source: "openapi3"
+            version: 2
+          }
+          li: {
+            assert: {
+              equal: {
+                model: {
+                  from: "models"
+                  path: "sourceModel"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+              }
+              vectors: {
+                count: 1
+                dimension: {
+                  from: "models"
+                  path: "sourceDim"
+                  related: {
+                    foreign: "name"
+                    from: "models"
+                    local: "sourceModel"
+                    where: {
+                      modelType: "embed"
+                    }
+                  }
+                  where: {
+                    modelType: "convert"
+                  }
+                }
+                path: "embeddings"
+              }
+            }
+            auth: "issued"
+            credential: {
+              from: "key"
+              path: "key"
+            }
+            id: "ephemeral-embed"
+            input: {
+              model: {
+                from: "models"
+                path: "sourceModel"
+                related: {
+                  foreign: "name"
+                  from: "models"
+                  local: "sourceModel"
+                  where: {
+                    modelType: "embed"
+                  }
+                }
+                where: {
+                  modelType: "convert"
+                }
+              }
+              texts: [
+                "SDK live coverage test."
+              ]
+            }
+          }
+          m: "POST"
+          o: "/v1/ephemeral/embed"
+          q: {
+            "$action": "ephemeral"
+          }
+          s: [
+            {
+              lit: "v1"
+            }
+            {
+              lit: "ephemeral"
+            }
+            {
+              lit: "embed"
+            }
+          ]
+          t: {
+            req: "`reqdata`"
+            res: "`body.data`"
+          }
+        }
+      ]
+    }
+  }
+
+
+
+}

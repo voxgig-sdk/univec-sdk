@@ -8,6 +8,12 @@ import KOTLINPACKAGE.utility.struct.Struct
 @Suppress("UNCHECKED_CAST")
 fun makeSpec(ctx: Context): Spec {
   val outSpec = ctx.out["spec"]
+  // A PreSpec feature hook (e.g. validate) may short-circuit the operation by
+  // storing an error here; surface it before the request is built, the same
+  // way makePoint surfaces out["point"].
+  if (outSpec is RuntimeException) {
+    throw outSpec
+  }
   if (outSpec is Spec) {
     ctx.spec = outSpec
     return outSpec

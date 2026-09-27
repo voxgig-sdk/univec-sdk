@@ -1,13 +1,3 @@
-// Shared SDK test SUPPORT: the helpers the generated entity/direct tests and
-// the corpus call sites share — env loading, the sdk-test-control.json skip
-// and pacing machinery, corpus access, entity-data conversion, ctx
-// construction from a JSON test entry, and the fh* feature-test harness
-// (mirrors tm/go/test/testsupport_test.go plus the fh* harness from
-// tm/go/test/feature_test.go). Each test binary includes it with
-// `mod common;`.
-//
-// The corpus ENGINE half of this file was retired by the vendor-tag rollout:
-// see the note where it used to be, and tests/omni_resolver/mod.rs.
 
 #![allow(dead_code)]
 
@@ -40,7 +30,6 @@ pub fn read_json(path: &PathBuf) -> Value {
     json_parse(&txt).unwrap_or_else(|e| panic!("failed to parse {:?}: {}", path, e))
 }
 
-/// The shared test spec ../.sdk/test/test.json.
 pub fn load_test_spec() -> Value {
     let mut p = manifest_dir();
     p.push("..");
@@ -100,22 +89,6 @@ pub fn is_control_skipped(kind: &str, name: &str, mode: &str) -> (bool, String) 
     (false, String::new())
 }
 
-/// Extra SDK options every LIVE client is constructed with, read from
-/// sdk-test-control.json `test.client.options`.
-///
-/// The generated live client knows two things: the base URL (from the spec)
-/// and the credential (from the environment). Everything else about how a
-/// particular API wants to be talked to - which features to switch on, and
-/// with what settings - is a property of THAT API, known to the project and
-/// to nothing in the toolchain.
-///
-/// Merged UNDER the generated fields, so the suite's own base/apikey/server
-/// values win: this ADDS to the live client, it does not redirect it.
-///
-/// Reserved fields are stripped HERE rather than at each merge site: the
-/// generated map only names a field when the model calls for one, so a
-/// "base" in this block would face no competing value and would silently
-/// redirect the whole suite - credential included - to another host.
 pub const LIVE_RESERVED: [&str; 6] =
     ["base", "prefix", "suffix", "server", "apikey", "secret"];
 
@@ -240,14 +213,6 @@ pub fn json_normalize(v: &Value) -> Value {
     }
 }
 
-// The corpus ENGINE that used to live here — `runset` / `runset_named`
-// (the entry loop) and `match_deep` / `match_string` (the match engine) —
-// is superseded by the vendored @voxgig/omni runner, driven through the
-// adapter in tests/omni_resolver/mod.rs (vendor-tag rollout, Decision 4).
-// This file keeps its SUPPORT half under its own name — env loading, the
-// sdk-test-control skip/pacing machinery, corpus and entity-data access,
-// ctx construction from a JSON entry, and the fh feature harness — so the
-// emitted call sites did not move.
 
 // ---- ctx construction from JSON test entries --------------------------------------
 

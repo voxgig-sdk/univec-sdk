@@ -1,11 +1,12 @@
-# Univec SDK: the sekreto transport helper build.
+# Univec SDK: the sekreto native helper build.
 #
 # GENERATED because a secrets plugin group is active
-# (secrets.vault): the plugin provider kinds run this
-# helper for every socket and child process, since Lua 5.4 has none. An
-# SDK without an active plugin group has no such file, and its Makefile's
-# optional include of it is a no-op - nothing is compiled and OpenSSL is
-# not linked.
+# (secrets.vault). Lua 5.4 has no sockets, no TLS and no
+# cryptography, so the kinds that need any of the three reach a small
+# compiled helper - and this file builds only the ones this SDK's chain
+# actually uses. An SDK without an active plugin group has no such file,
+# and its Makefile's optional include of it is a no-op: nothing is
+# compiled and nothing is linked.
 #
 # The source carries the vendoring tool's three-line provenance header in
 # lua comment syntax, which the compiler cannot read: it is fed the file

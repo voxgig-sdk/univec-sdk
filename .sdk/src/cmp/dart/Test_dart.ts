@@ -23,15 +23,6 @@ const Test = cmp(function Test(props: any) {
   const entity = each(entityCollection(model))
     .filter((e: any) => false !== e.active)
 
-  // GATED SUITES. test/main.dart is a HAND-LISTED suite entry - dart has no
-  // `go test ./...` or pytest discovery - so a feature whose tests ship in
-  // its own trimmable folder has to be registered here or it is dead
-  // weight. Both halves matter, and they fail in opposite directions:
-  // register unconditionally and a project without the feature imports a
-  // file that is not there (a compile error); forget to register and the
-  // suite ships, never runs, and the lane stays green while nothing is
-  // checked. The feature list is tag-gated, so a target with no vendored
-  // sekreto never reaches this.
   const feature = targetFeatures(model, target)
   const secrets = null != feature.secrets
 

@@ -418,23 +418,26 @@ public static class SdkConfig
                         new Dictionary<string, object?>
                         {
                             ["name"] = "embeddings",
+                            ["title"] = "Embeddings",
+                            ["type"] = "`$ARRAY`",
                             ["req"] = true,
                             ["short"] = "Translated vectors, in the target model's dimension.",
-                            ["type"] = "`$ARRAY`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "source_model",
+                            ["title"] = "Source Model",
+                            ["type"] = "`$STRING`",
                             ["req"] = true,
                             ["short"] = "Model space the supplied vectors are currently in.",
-                            ["type"] = "`$STRING`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "target_model",
+                            ["title"] = "Target Model",
+                            ["type"] = "`$STRING`",
                             ["req"] = true,
                             ["short"] = "Model space to translate into.",
-                            ["type"] = "`$STRING`",
                         },
                     },
                     ["name"] = "convert",
@@ -448,8 +451,33 @@ public static class SdkConfig
                             {
                                 new Dictionary<string, object?>
                                 {
-                                    ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["method"] = "POST",
+                                    ["orig"] = "/v1/convert",
+                                    ["segments"] = new List<object?>
+                                    {
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "convert",
+                                        },
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "convert",
+                                    },
+                                    ["rename"] = new Dictionary<string, object?>(),
+                                    ["transform"] = new Dictionary<string, object?>
+                                    {
+                                        ["req"] = "`reqdata`",
+                                        ["res"] = "`body.data`",
+                                    },
+                                    ["args"] = new Dictionary<string, object?>(),
+                                    ["select"] = new Dictionary<string, object?>(),
                                     ["live"] = new Dictionary<string, object?>
                                     {
                                         ["assert"] = new Dictionary<string, object?>
@@ -569,8 +597,12 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                },
+                                new Dictionary<string, object?>
+                                {
+                                    ["kind"] = "http",
                                     ["method"] = "POST",
-                                    ["orig"] = "/v1/convert",
+                                    ["orig"] = "/v1/embed-bridge",
                                     ["segments"] = new List<object?>
                                     {
                                         new Dictionary<string, object?>
@@ -579,25 +611,25 @@ public static class SdkConfig
                                         },
                                         new Dictionary<string, object?>
                                         {
-                                            ["lit"] = "convert",
+                                            ["lit"] = "embed-bridge",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "embed-bridge",
+                                    },
+                                    ["rename"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
                                     },
-                                    ["parts"] = new List<object?>
-                                    {
-                                        "v1",
-                                        "convert",
-                                    },
-                                },
-                                new Dictionary<string, object?>
-                                {
                                     ["args"] = new Dictionary<string, object?>(),
-                                    ["kind"] = "http",
+                                    ["select"] = new Dictionary<string, object?>
+                                    {
+                                        ["$action"] = "bridge",
+                                    },
                                     ["live"] = new Dictionary<string, object?>
                                     {
                                         ["assert"] = new Dictionary<string, object?>
@@ -716,8 +748,12 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                },
+                                new Dictionary<string, object?>
+                                {
+                                    ["kind"] = "http",
                                     ["method"] = "POST",
-                                    ["orig"] = "/v1/embed-bridge",
+                                    ["orig"] = "/v1/ephemeral/convert",
                                     ["segments"] = new List<object?>
                                     {
                                         new Dictionary<string, object?>
@@ -726,28 +762,30 @@ public static class SdkConfig
                                         },
                                         new Dictionary<string, object?>
                                         {
-                                            ["lit"] = "embed-bridge",
+                                            ["lit"] = "ephemeral",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "convert",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>
+                                    ["parts"] = new List<object?>
                                     {
-                                        ["$action"] = "bridge",
+                                        "v1",
+                                        "ephemeral",
+                                        "convert",
                                     },
+                                    ["rename"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
                                     },
-                                    ["parts"] = new List<object?>
-                                    {
-                                        "v1",
-                                        "embed-bridge",
-                                    },
-                                },
-                                new Dictionary<string, object?>
-                                {
                                     ["args"] = new Dictionary<string, object?>(),
-                                    ["kind"] = "http",
+                                    ["select"] = new Dictionary<string, object?>
+                                    {
+                                        ["$action"] = "ephemeral",
+                                    },
                                     ["live"] = new Dictionary<string, object?>
                                     {
                                         ["assert"] = new Dictionary<string, object?>
@@ -872,8 +910,12 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                },
+                                new Dictionary<string, object?>
+                                {
+                                    ["kind"] = "http",
                                     ["method"] = "POST",
-                                    ["orig"] = "/v1/ephemeral/convert",
+                                    ["orig"] = "/v1/ephemeral/embed-bridge",
                                     ["segments"] = new List<object?>
                                     {
                                         new Dictionary<string, object?>
@@ -886,29 +928,26 @@ public static class SdkConfig
                                         },
                                         new Dictionary<string, object?>
                                         {
-                                            ["lit"] = "convert",
+                                            ["lit"] = "embed-bridge",
                                         },
-                                    },
-                                    ["select"] = new Dictionary<string, object?>
-                                    {
-                                        ["$action"] = "ephemeral",
-                                    },
-                                    ["transform"] = new Dictionary<string, object?>
-                                    {
-                                        ["req"] = "`reqdata`",
-                                        ["res"] = "`body.data`",
                                     },
                                     ["parts"] = new List<object?>
                                     {
                                         "v1",
                                         "ephemeral",
-                                        "convert",
+                                        "embed-bridge",
                                     },
-                                },
-                                new Dictionary<string, object?>
-                                {
+                                    ["rename"] = new Dictionary<string, object?>(),
+                                    ["transform"] = new Dictionary<string, object?>
+                                    {
+                                        ["req"] = "`reqdata`",
+                                        ["res"] = "`body.data`",
+                                    },
                                     ["args"] = new Dictionary<string, object?>(),
-                                    ["kind"] = "http",
+                                    ["select"] = new Dictionary<string, object?>
+                                    {
+                                        ["$action"] = "ephemeral_bridge",
+                                    },
                                     ["live"] = new Dictionary<string, object?>
                                     {
                                         ["assert"] = new Dictionary<string, object?>
@@ -1032,38 +1071,6 @@ public static class SdkConfig
                                             },
                                         },
                                     },
-                                    ["method"] = "POST",
-                                    ["orig"] = "/v1/ephemeral/embed-bridge",
-                                    ["segments"] = new List<object?>
-                                    {
-                                        new Dictionary<string, object?>
-                                        {
-                                            ["lit"] = "v1",
-                                        },
-                                        new Dictionary<string, object?>
-                                        {
-                                            ["lit"] = "ephemeral",
-                                        },
-                                        new Dictionary<string, object?>
-                                        {
-                                            ["lit"] = "embed-bridge",
-                                        },
-                                    },
-                                    ["select"] = new Dictionary<string, object?>
-                                    {
-                                        ["$action"] = "ephemeral_bridge",
-                                    },
-                                    ["transform"] = new Dictionary<string, object?>
-                                    {
-                                        ["req"] = "`reqdata`",
-                                        ["res"] = "`body.data`",
-                                    },
-                                    ["parts"] = new List<object?>
-                                    {
-                                        "v1",
-                                        "ephemeral",
-                                        "embed-bridge",
-                                    },
                                 },
                             },
                         },
@@ -1080,23 +1087,26 @@ public static class SdkConfig
                         new Dictionary<string, object?>
                         {
                             ["name"] = "embeddings",
+                            ["title"] = "Embeddings",
+                            ["type"] = "`$ARRAY`",
                             ["req"] = true,
                             ["short"] = "One vector per input text, in input order.",
-                            ["type"] = "`$ARRAY`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "model",
+                            ["title"] = "Model",
+                            ["type"] = "`$STRING`",
                             ["req"] = true,
                             ["short"] = "Model that produced the vectors.",
-                            ["type"] = "`$STRING`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "texts",
+                            ["title"] = "Texts",
+                            ["type"] = "`$ARRAY`",
                             ["req"] = true,
                             ["short"] = "Texts to embed.",
-                            ["type"] = "`$ARRAY`",
                         },
                     },
                     ["name"] = "embed",
@@ -1110,8 +1120,33 @@ public static class SdkConfig
                             {
                                 new Dictionary<string, object?>
                                 {
-                                    ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
+                                    ["method"] = "POST",
+                                    ["orig"] = "/v1/embed",
+                                    ["segments"] = new List<object?>
+                                    {
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "v1",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
+                                            ["lit"] = "embed",
+                                        },
+                                    },
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "embed",
+                                    },
+                                    ["rename"] = new Dictionary<string, object?>(),
+                                    ["transform"] = new Dictionary<string, object?>
+                                    {
+                                        ["req"] = "`reqdata`",
+                                        ["res"] = "`body.data`",
+                                    },
+                                    ["args"] = new Dictionary<string, object?>(),
+                                    ["select"] = new Dictionary<string, object?>(),
                                     ["live"] = new Dictionary<string, object?>
                                     {
                                         ["assert"] = new Dictionary<string, object?>
@@ -1192,8 +1227,12 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                },
+                                new Dictionary<string, object?>
+                                {
+                                    ["kind"] = "http",
                                     ["method"] = "POST",
-                                    ["orig"] = "/v1/embed",
+                                    ["orig"] = "/v1/ephemeral/embed",
                                     ["segments"] = new List<object?>
                                     {
                                         new Dictionary<string, object?>
@@ -1202,25 +1241,30 @@ public static class SdkConfig
                                         },
                                         new Dictionary<string, object?>
                                         {
+                                            ["lit"] = "ephemeral",
+                                        },
+                                        new Dictionary<string, object?>
+                                        {
                                             ["lit"] = "embed",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "ephemeral",
+                                        "embed",
+                                    },
+                                    ["rename"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
                                     },
-                                    ["parts"] = new List<object?>
-                                    {
-                                        "v1",
-                                        "embed",
-                                    },
-                                },
-                                new Dictionary<string, object?>
-                                {
                                     ["args"] = new Dictionary<string, object?>(),
-                                    ["kind"] = "http",
+                                    ["select"] = new Dictionary<string, object?>
+                                    {
+                                        ["$action"] = "ephemeral",
+                                    },
                                     ["live"] = new Dictionary<string, object?>
                                     {
                                         ["assert"] = new Dictionary<string, object?>
@@ -1306,38 +1350,6 @@ public static class SdkConfig
                                             },
                                         },
                                     },
-                                    ["method"] = "POST",
-                                    ["orig"] = "/v1/ephemeral/embed",
-                                    ["segments"] = new List<object?>
-                                    {
-                                        new Dictionary<string, object?>
-                                        {
-                                            ["lit"] = "v1",
-                                        },
-                                        new Dictionary<string, object?>
-                                        {
-                                            ["lit"] = "ephemeral",
-                                        },
-                                        new Dictionary<string, object?>
-                                        {
-                                            ["lit"] = "embed",
-                                        },
-                                    },
-                                    ["select"] = new Dictionary<string, object?>
-                                    {
-                                        ["$action"] = "ephemeral",
-                                    },
-                                    ["transform"] = new Dictionary<string, object?>
-                                    {
-                                        ["req"] = "`reqdata`",
-                                        ["res"] = "`body.data`",
-                                    },
-                                    ["parts"] = new List<object?>
-                                    {
-                                        "v1",
-                                        "ephemeral",
-                                        "embed",
-                                    },
                                 },
                             },
                         },
@@ -1354,31 +1366,35 @@ public static class SdkConfig
                         new Dictionary<string, object?>
                         {
                             ["name"] = "dailyLimit",
+                            ["title"] = "Daily Limit",
+                            ["type"] = "`$INTEGER`",
                             ["req"] = true,
                             ["short"] = "Calls permitted per day.",
-                            ["type"] = "`$INTEGER`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "dailyUsed",
+                            ["title"] = "Daily Used",
+                            ["type"] = "`$INTEGER`",
                             ["req"] = true,
                             ["short"] = "Calls already used today.",
-                            ["type"] = "`$INTEGER`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "key",
+                            ["title"] = "Key",
+                            ["type"] = "`$STRING`",
                             ["req"] = true,
                             ["short"] = "The ephemeral API key, prefixed `eph_`.",
-                            ["type"] = "`$STRING`",
                         },
                         new Dictionary<string, object?>
                         {
-                            ["format"] = "date-time",
                             ["name"] = "resetsAt",
+                            ["title"] = "Resets At",
+                            ["type"] = "`$STRING`",
                             ["req"] = true,
                             ["short"] = "When the daily allowance resets.",
-                            ["type"] = "`$STRING`",
+                            ["format"] = "date-time",
                         },
                     },
                     ["name"] = "ephemeral_key",
@@ -1392,21 +1408,7 @@ public static class SdkConfig
                             {
                                 new Dictionary<string, object?>
                                 {
-                                    ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
-                                    ["live"] = new Dictionary<string, object?>
-                                    {
-                                        ["assert"] = new Dictionary<string, object?>
-                                        {
-                                            ["nonempty"] = new List<object?>
-                                            {
-                                                "key",
-                                            },
-                                        },
-                                        ["auth"] = "public",
-                                        ["id"] = "key",
-                                        ["retention"] = "No deletion endpoint; issued key is subject to the service daily allowance",
-                                    },
                                     ["method"] = "POST",
                                     ["orig"] = "/v1/ephemeral/key",
                                     ["segments"] = new List<object?>
@@ -1424,17 +1426,32 @@ public static class SdkConfig
                                             ["lit"] = "key",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>(),
-                                    ["transform"] = new Dictionary<string, object?>
-                                    {
-                                        ["req"] = "`reqdata`",
-                                        ["res"] = "`body.data`",
-                                    },
                                     ["parts"] = new List<object?>
                                     {
                                         "v1",
                                         "ephemeral",
                                         "key",
+                                    },
+                                    ["rename"] = new Dictionary<string, object?>(),
+                                    ["transform"] = new Dictionary<string, object?>
+                                    {
+                                        ["req"] = "`reqdata`",
+                                        ["res"] = "`body.data`",
+                                    },
+                                    ["args"] = new Dictionary<string, object?>(),
+                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["live"] = new Dictionary<string, object?>
+                                    {
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["nonempty"] = new List<object?>
+                                            {
+                                                "key",
+                                            },
+                                        },
+                                        ["auth"] = "public",
+                                        ["id"] = "key",
+                                        ["retention"] = "No deletion endpoint; issued key is subject to the service daily allowance",
                                     },
                                 },
                             },
@@ -1452,66 +1469,76 @@ public static class SdkConfig
                         new Dictionary<string, object?>
                         {
                             ["name"] = "eval",
-                            ["short"] = "Retrieval-fidelity metrics for a convert model.",
+                            ["title"] = "Eval",
                             ["type"] = "`$OBJECT`",
+                            ["short"] = "Retrieval-fidelity metrics for a convert model.",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "executionProvider",
-                            ["short"] = "Hardware backend, e.g.",
+                            ["title"] = "Execution Provider",
                             ["type"] = "`$STRING`",
+                            ["short"] = "Hardware backend, e.g.",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "modelCard",
-                            ["short"] = "Convert models only: training provenance and architecture detail.",
+                            ["title"] = "Model Card",
                             ["type"] = "`$OBJECT`",
+                            ["short"] = "Convert models only: training provenance and architecture detail.",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "modelType",
+                            ["title"] = "Model Type",
+                            ["type"] = "`$STRING`",
                             ["req"] = true,
                             ["short"] = "`embed` for text-to-vector models, `convert` for space-translation models.",
-                            ["type"] = "`$STRING`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "name",
+                            ["title"] = "Name",
+                            ["type"] = "`$STRING`",
                             ["req"] = true,
                             ["short"] = "Model identifier used in requests.",
-                            ["type"] = "`$STRING`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "sequenceLen",
-                            ["short"] = "Embed models only: maximum input sequence length.",
+                            ["title"] = "Sequence Len",
                             ["type"] = "`$INTEGER`",
+                            ["short"] = "Embed models only: maximum input sequence length.",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "sourceDim",
-                            ["short"] = "Convert models only: source vector dimension.",
+                            ["title"] = "Source Dim",
                             ["type"] = "`$INTEGER`",
+                            ["short"] = "Convert models only: source vector dimension.",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "sourceModel",
-                            ["short"] = "Convert models only: the source model space.",
+                            ["title"] = "Source Model",
                             ["type"] = "`$STRING`",
+                            ["short"] = "Convert models only: the source model space.",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "targetDim",
+                            ["title"] = "Target Dim",
+                            ["type"] = "`$INTEGER`",
                             ["req"] = true,
                             ["short"] = "Dimension of the produced vectors.",
-                            ["type"] = "`$INTEGER`",
                         },
                         new Dictionary<string, object?>
                         {
                             ["name"] = "targetModel",
+                            ["title"] = "Target Model",
+                            ["type"] = "`$STRING`",
                             ["req"] = true,
                             ["short"] = "The model space produced.",
-                            ["type"] = "`$STRING`",
                         },
                     },
                     ["name"] = "model",
@@ -1525,20 +1552,7 @@ public static class SdkConfig
                             {
                                 new Dictionary<string, object?>
                                 {
-                                    ["args"] = new Dictionary<string, object?>(),
                                     ["kind"] = "http",
-                                    ["live"] = new Dictionary<string, object?>
-                                    {
-                                        ["assert"] = new Dictionary<string, object?>
-                                        {
-                                            ["nonempty"] = new List<object?>
-                                            {
-                                                "",
-                                            },
-                                        },
-                                        ["auth"] = "public",
-                                        ["id"] = "models",
-                                    },
                                     ["method"] = "GET",
                                     ["orig"] = "/v1/models",
                                     ["segments"] = new List<object?>
@@ -1552,16 +1566,30 @@ public static class SdkConfig
                                             ["lit"] = "models",
                                         },
                                     },
-                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["parts"] = new List<object?>
+                                    {
+                                        "v1",
+                                        "models",
+                                    },
+                                    ["rename"] = new Dictionary<string, object?>(),
                                     ["transform"] = new Dictionary<string, object?>
                                     {
                                         ["req"] = "`reqdata`",
                                         ["res"] = "`body.data`",
                                     },
-                                    ["parts"] = new List<object?>
+                                    ["args"] = new Dictionary<string, object?>(),
+                                    ["select"] = new Dictionary<string, object?>(),
+                                    ["live"] = new Dictionary<string, object?>
                                     {
-                                        "v1",
-                                        "models",
+                                        ["assert"] = new Dictionary<string, object?>
+                                        {
+                                            ["nonempty"] = new List<object?>
+                                            {
+                                                "",
+                                            },
+                                        },
+                                        ["auth"] = "public",
+                                        ["id"] = "models",
                                     },
                                 },
                             },

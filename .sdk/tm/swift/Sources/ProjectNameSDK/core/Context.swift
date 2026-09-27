@@ -56,7 +56,7 @@ public final class Context {
       if let e = cm.entries["explain"]?.asMap { ctrl.explain = e }
       if let a = cm.entries["actor"]?.asString { ctrl.actor = a }
       if let p = cm.entries["paging"]?.asMap { ctrl.paging = p }
-    } else if let b = basectx {
+    } else if let b = basectx, ctxProp(ctxmap, "opname") == nil {
       ctrl = b.ctrl
     }
 

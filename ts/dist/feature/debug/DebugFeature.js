@@ -2,12 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DebugFeature = void 0;
 const BaseFeature_1 = require("../base/BaseFeature");
-// Request/response capture for debugging. Records a bounded ring buffer of
-// per-operation traces — method, URL, redacted headers, response status and
-// timing — on `client._debug.entries`. Sensitive header values (matching
-// `redact`, default authorization/cookie/api-key style names) are masked.
-// An optional `onEntry` callback receives each finished entry (e.g. to
-// stream to a console). `max` caps the buffer (default 100).
 class DebugFeature extends BaseFeature_1.BaseFeature {
     version = '0.0.1';
     name = 'debug';

@@ -22,6 +22,7 @@ Build request maps with the \`jo\` / \`ja\` helpers and read fields back with
 ${target.name}/
 ├── sdk_client.ml               -- Main SDK client (constructors + accessors)
 ├── sdk_config.ml               -- Embedded API config + feature factory
+├── sdk_schema.ml               -- Generated option + entity specs
 ├── sdk_error.ml                -- Branded error re-exports
 ├── sdk_entity_*.ml             -- Per-entity implementations (one each)
 ├── sdk_types.ml                -- Core pipeline types

@@ -32,8 +32,6 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
     if (!exampleEntity || !primaryOp) return ''
     if ('list' === primaryOp) return ''
     if (isMatchOp) {
-      // Every REQUIRED match key (id first), not just idF — a composite-match
-      // entity (database_id + id) needs them all. Mirrors ReadmeTopTest.
       const items = opRequestShape(exampleEntity, primaryOp).items
         .filter((it: any) => !it.optional || it.name === idF)
         .sort((a: any, b: any) => (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))

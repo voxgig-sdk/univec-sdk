@@ -74,11 +74,6 @@ let () =
 `)
     }
 
-    // PR review #4: entity e_stream(action, args, callopts) runs the op through
-    // the full pipeline and returns a lazy Seq. Fallback (no streaming feature)
-    // yields the materialised items; with the streaming feature active it yields
-    // from the streaming iterator (chunkSize groups into batches). Needs a list
-    // op with seeded data.
     if (hasList) {
       Content(`
 let () =

@@ -24,7 +24,6 @@ const Entity = cmp(function Entity(props: any) {
 
   const ff = Path.normalize(__dirname + '/../../../src/cmp/clojure/fragment/')
 
-  // Entity files go to src/sdk/entity/<name>.clj (ns sdk.entity.<name>).
   Folder({ name: 'src' }, () => {
     Folder({ name: 'sdk' }, () => {
       Folder({ name: 'entity' }, () => {

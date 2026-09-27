@@ -46,8 +46,6 @@ my $client = ${ctor};
     const eName = nom(exampleEntity, 'Name')
     const eVar = eName.toLowerCase()
     const opnames = Object.keys(exampleEntity.op || {})
-    // Model-driven id key: null when the entity has no id-like field, in which
-    // case the load example takes no match argument.
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {

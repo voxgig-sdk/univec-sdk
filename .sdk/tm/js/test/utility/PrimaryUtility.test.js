@@ -79,10 +79,56 @@ describe('PrimaryUtility', async () => {
   })
 
 
+  function credential() {
+    const ctx = {
+      utility,
+      // `basic: false`: a Basic API's config defaults it true, and the
+      // branch it selects needs a secret, so the probe would find nothing.
+      client: { options: () => ({ apikey: 'PROBE', auth: { prefix: '', basic: false } }) },
+      spec: { headers: {}, query: {} },
+      error: (code, msg) => Object.assign(new Error(msg), { code }),
+    }
+    try { utility.prepareAuth(ctx) } catch (e) { return null }
+    for (const where of ['headers', 'query']) {
+      const name = Object.keys(ctx.spec[where] || {})[0]
+      if (null != name) return { where, name }
+    }
+    return null
+  }
+
+  // Rename the corpus's `headers` bag to the real container, and the
+  // `authorization` key inside it to the real credential name. Applied only
+  // to the prepareAuth section, so real header assertions elsewhere are
+  // untouched.
+  function retarget(node, cred) {
+    if (null == node || 'object' !== typeof node) return node
+    if (Array.isArray(node)) return node.map((n) => retarget(n, cred))
+    const out = {}
+    for (const key of Object.keys(node)) {
+      if ('headers' === key) {
+        const bag = {}
+        for (const bk of Object.keys(node[key] || {})) {
+          bag['authorization' === bk ? cred.name : bk] = retarget(node[key][bk], cred)
+        }
+        out[cred.where] = bag
+      }
+      else out[key] = retarget(node[key], cred)
+    }
+    return out
+  }
+
   test('auth-basic', async () => {
     const sdkopts = spec.prepareAuth?.DEF?.setup?.a || {}
     const authClient = SDK.test({}, sdkopts)
-    await runset(spec.prepareAuth.basic, (ctx) => {
+
+    const cred = credential()
+    ok(null != cred, 'prepareAuth placed no credential in headers or query')
+
+    const cases = 'headers' === cred.where && 'authorization' === cred.name
+      ? spec.prepareAuth.basic
+      : retarget(spec.prepareAuth.basic, cred)
+
+    await runset(cases, (ctx) => {
       ctx.client = authClient
       fixctx(ctx)
       return utility.prepareAuth(ctx)

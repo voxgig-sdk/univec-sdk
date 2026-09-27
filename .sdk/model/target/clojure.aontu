@@ -1,0 +1,47 @@
+
+main: kit: target: clojure: {
+
+  title: Clojure
+  ext: clj
+  comment: line: ";"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  provides: { sekreto: true, schema: true }
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  superseded: []
+
+  # struct is vendored under src/voxgig/struct.clj — no external dep.
+  # The library itself needs only org.clojure/clojure (declared in deps.edn).
+  deps: {
+  }
+}
+
+
+main: kit: feature: &: target: clojure: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: clojure: publish: {
+  registry: {
+    name: 'clojars'
+    url: 'https://clojars.org'
+    vault: { alias: 'clojars' }
+  }
+}
+
+
+# Feature source is NOT trimmed to the model's selection here: every
+# feature lives inside a single generated module (src/sdk/features.clj),
+# not in per-feature source files, so there is nothing per-feature to
+# leave out. Trimming waits on that module becoming model-driven.
+main: kit: target: clojure: feature: {
+  trim: false
+}

@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ModelEntity = void 0;
 const UnivecEntityBase_1 = require("../UnivecEntityBase");
-// TODO: needs Entity superclass
 class ModelEntity extends UnivecEntityBase_1.UnivecEntityBase {
     constructor(client, entopts) {
         super(client, entopts);

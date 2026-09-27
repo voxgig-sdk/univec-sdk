@@ -365,21 +365,24 @@ class UnivecConfig
           'fields' => [
             [
               'name' => 'embeddings',
+              'title' => 'Embeddings',
+              'type' => '`$ARRAY`',
               'req' => true,
               'short' => 'Translated vectors, in the target model\'s dimension.',
-              'type' => '`$ARRAY`',
             ],
             [
               'name' => 'source_model',
+              'title' => 'Source Model',
+              'type' => '`$STRING`',
               'req' => true,
               'short' => 'Model space the supplied vectors are currently in.',
-              'type' => '`$STRING`',
             ],
             [
               'name' => 'target_model',
+              'title' => 'Target Model',
+              'type' => '`$STRING`',
               'req' => true,
               'short' => 'Model space to translate into.',
-              'type' => '`$STRING`',
             ],
           ],
           'name' => 'convert',
@@ -389,8 +392,28 @@ class UnivecConfig
               'name' => 'create',
               'points' => [
                 [
-                  'args' => [],
                   'kind' => 'http',
+                  'method' => 'POST',
+                  'orig' => '/v1/convert',
+                  'segments' => [
+                    [
+                      'lit' => 'v1',
+                    ],
+                    [
+                      'lit' => 'convert',
+                    ],
+                  ],
+                  'parts' => [
+                    'v1',
+                    'convert',
+                  ],
+                  'rename' => [],
+                  'transform' => [
+                    'req' => '`reqdata`',
+                    'res' => '`body.data`',
+                  ],
+                  'args' => [],
+                  'select' => [],
                   'live' => [
                     'assert' => [
                       'equal' => [
@@ -484,29 +507,32 @@ class UnivecConfig
                       ],
                     ],
                   ],
+                ],
+                [
+                  'kind' => 'http',
                   'method' => 'POST',
-                  'orig' => '/v1/convert',
+                  'orig' => '/v1/embed-bridge',
                   'segments' => [
                     [
                       'lit' => 'v1',
                     ],
                     [
-                      'lit' => 'convert',
+                      'lit' => 'embed-bridge',
                     ],
                   ],
-                  'select' => [],
+                  'parts' => [
+                    'v1',
+                    'embed-bridge',
+                  ],
+                  'rename' => [],
                   'transform' => [
                     'req' => '`reqdata`',
                     'res' => '`body.data`',
                   ],
-                  'parts' => [
-                    'v1',
-                    'convert',
-                  ],
-                ],
-                [
                   'args' => [],
-                  'kind' => 'http',
+                  'select' => [
+                    '$action' => 'bridge',
+                  ],
                   'live' => [
                     'assert' => [
                       'equal' => [
@@ -599,31 +625,36 @@ class UnivecConfig
                       ],
                     ],
                   ],
+                ],
+                [
+                  'kind' => 'http',
                   'method' => 'POST',
-                  'orig' => '/v1/embed-bridge',
+                  'orig' => '/v1/ephemeral/convert',
                   'segments' => [
                     [
                       'lit' => 'v1',
                     ],
                     [
-                      'lit' => 'embed-bridge',
+                      'lit' => 'ephemeral',
+                    ],
+                    [
+                      'lit' => 'convert',
                     ],
                   ],
-                  'select' => [
-                    '$action' => 'bridge',
+                  'parts' => [
+                    'v1',
+                    'ephemeral',
+                    'convert',
                   ],
+                  'rename' => [],
                   'transform' => [
                     'req' => '`reqdata`',
                     'res' => '`body.data`',
                   ],
-                  'parts' => [
-                    'v1',
-                    'embed-bridge',
-                  ],
-                ],
-                [
                   'args' => [],
-                  'kind' => 'http',
+                  'select' => [
+                    '$action' => 'ephemeral',
+                  ],
                   'live' => [
                     'assert' => [
                       'equal' => [
@@ -721,8 +752,11 @@ class UnivecConfig
                       ],
                     ],
                   ],
+                ],
+                [
+                  'kind' => 'http',
                   'method' => 'POST',
-                  'orig' => '/v1/ephemeral/convert',
+                  'orig' => '/v1/ephemeral/embed-bridge',
                   'segments' => [
                     [
                       'lit' => 'v1',
@@ -731,25 +765,23 @@ class UnivecConfig
                       'lit' => 'ephemeral',
                     ],
                     [
-                      'lit' => 'convert',
+                      'lit' => 'embed-bridge',
                     ],
-                  ],
-                  'select' => [
-                    '$action' => 'ephemeral',
-                  ],
-                  'transform' => [
-                    'req' => '`reqdata`',
-                    'res' => '`body.data`',
                   ],
                   'parts' => [
                     'v1',
                     'ephemeral',
-                    'convert',
+                    'embed-bridge',
                   ],
-                ],
-                [
+                  'rename' => [],
+                  'transform' => [
+                    'req' => '`reqdata`',
+                    'res' => '`body.data`',
+                  ],
                   'args' => [],
-                  'kind' => 'http',
+                  'select' => [
+                    '$action' => 'ephemeral_bridge',
+                  ],
                   'live' => [
                     'assert' => [
                       'equal' => [
@@ -846,31 +878,6 @@ class UnivecConfig
                       ],
                     ],
                   ],
-                  'method' => 'POST',
-                  'orig' => '/v1/ephemeral/embed-bridge',
-                  'segments' => [
-                    [
-                      'lit' => 'v1',
-                    ],
-                    [
-                      'lit' => 'ephemeral',
-                    ],
-                    [
-                      'lit' => 'embed-bridge',
-                    ],
-                  ],
-                  'select' => [
-                    '$action' => 'ephemeral_bridge',
-                  ],
-                  'transform' => [
-                    'req' => '`reqdata`',
-                    'res' => '`body.data`',
-                  ],
-                  'parts' => [
-                    'v1',
-                    'ephemeral',
-                    'embed-bridge',
-                  ],
                 ],
               ],
             ],
@@ -883,21 +890,24 @@ class UnivecConfig
           'fields' => [
             [
               'name' => 'embeddings',
+              'title' => 'Embeddings',
+              'type' => '`$ARRAY`',
               'req' => true,
               'short' => 'One vector per input text, in input order.',
-              'type' => '`$ARRAY`',
             ],
             [
               'name' => 'model',
+              'title' => 'Model',
+              'type' => '`$STRING`',
               'req' => true,
               'short' => 'Model that produced the vectors.',
-              'type' => '`$STRING`',
             ],
             [
               'name' => 'texts',
+              'title' => 'Texts',
+              'type' => '`$ARRAY`',
               'req' => true,
               'short' => 'Texts to embed.',
-              'type' => '`$ARRAY`',
             ],
           ],
           'name' => 'embed',
@@ -907,8 +917,28 @@ class UnivecConfig
               'name' => 'create',
               'points' => [
                 [
-                  'args' => [],
                   'kind' => 'http',
+                  'method' => 'POST',
+                  'orig' => '/v1/embed',
+                  'segments' => [
+                    [
+                      'lit' => 'v1',
+                    ],
+                    [
+                      'lit' => 'embed',
+                    ],
+                  ],
+                  'parts' => [
+                    'v1',
+                    'embed',
+                  ],
+                  'rename' => [],
+                  'transform' => [
+                    'req' => '`reqdata`',
+                    'res' => '`body.data`',
+                  ],
+                  'args' => [],
+                  'select' => [],
                   'live' => [
                     'assert' => [
                       'equal' => [
@@ -971,29 +1001,36 @@ class UnivecConfig
                       ],
                     ],
                   ],
+                ],
+                [
+                  'kind' => 'http',
                   'method' => 'POST',
-                  'orig' => '/v1/embed',
+                  'orig' => '/v1/ephemeral/embed',
                   'segments' => [
                     [
                       'lit' => 'v1',
                     ],
                     [
+                      'lit' => 'ephemeral',
+                    ],
+                    [
                       'lit' => 'embed',
                     ],
                   ],
-                  'select' => [],
+                  'parts' => [
+                    'v1',
+                    'ephemeral',
+                    'embed',
+                  ],
+                  'rename' => [],
                   'transform' => [
                     'req' => '`reqdata`',
                     'res' => '`body.data`',
                   ],
-                  'parts' => [
-                    'v1',
-                    'embed',
-                  ],
-                ],
-                [
                   'args' => [],
-                  'kind' => 'http',
+                  'select' => [
+                    '$action' => 'ephemeral',
+                  ],
                   'live' => [
                     'assert' => [
                       'equal' => [
@@ -1060,31 +1097,6 @@ class UnivecConfig
                       ],
                     ],
                   ],
-                  'method' => 'POST',
-                  'orig' => '/v1/ephemeral/embed',
-                  'segments' => [
-                    [
-                      'lit' => 'v1',
-                    ],
-                    [
-                      'lit' => 'ephemeral',
-                    ],
-                    [
-                      'lit' => 'embed',
-                    ],
-                  ],
-                  'select' => [
-                    '$action' => 'ephemeral',
-                  ],
-                  'transform' => [
-                    'req' => '`reqdata`',
-                    'res' => '`body.data`',
-                  ],
-                  'parts' => [
-                    'v1',
-                    'ephemeral',
-                    'embed',
-                  ],
                 ],
               ],
             ],
@@ -1097,28 +1109,32 @@ class UnivecConfig
           'fields' => [
             [
               'name' => 'dailyLimit',
+              'title' => 'Daily Limit',
+              'type' => '`$INTEGER`',
               'req' => true,
               'short' => 'Calls permitted per day.',
-              'type' => '`$INTEGER`',
             ],
             [
               'name' => 'dailyUsed',
+              'title' => 'Daily Used',
+              'type' => '`$INTEGER`',
               'req' => true,
               'short' => 'Calls already used today.',
-              'type' => '`$INTEGER`',
             ],
             [
               'name' => 'key',
+              'title' => 'Key',
+              'type' => '`$STRING`',
               'req' => true,
               'short' => 'The ephemeral API key, prefixed `eph_`.',
-              'type' => '`$STRING`',
             ],
             [
-              'format' => 'date-time',
               'name' => 'resetsAt',
+              'title' => 'Resets At',
+              'type' => '`$STRING`',
               'req' => true,
               'short' => 'When the daily allowance resets.',
-              'type' => '`$STRING`',
+              'format' => 'date-time',
             ],
           ],
           'name' => 'ephemeral_key',
@@ -1128,18 +1144,7 @@ class UnivecConfig
               'name' => 'create',
               'points' => [
                 [
-                  'args' => [],
                   'kind' => 'http',
-                  'live' => [
-                    'assert' => [
-                      'nonempty' => [
-                        'key',
-                      ],
-                    ],
-                    'auth' => 'public',
-                    'id' => 'key',
-                    'retention' => 'No deletion endpoint; issued key is subject to the service daily allowance',
-                  ],
                   'method' => 'POST',
                   'orig' => '/v1/ephemeral/key',
                   'segments' => [
@@ -1153,15 +1158,27 @@ class UnivecConfig
                       'lit' => 'key',
                     ],
                   ],
-                  'select' => [],
-                  'transform' => [
-                    'req' => '`reqdata`',
-                    'res' => '`body.data`',
-                  ],
                   'parts' => [
                     'v1',
                     'ephemeral',
                     'key',
+                  ],
+                  'rename' => [],
+                  'transform' => [
+                    'req' => '`reqdata`',
+                    'res' => '`body.data`',
+                  ],
+                  'args' => [],
+                  'select' => [],
+                  'live' => [
+                    'assert' => [
+                      'nonempty' => [
+                        'key',
+                      ],
+                    ],
+                    'auth' => 'public',
+                    'id' => 'key',
+                    'retention' => 'No deletion endpoint; issued key is subject to the service daily allowance',
                   ],
                 ],
               ],
@@ -1175,57 +1192,67 @@ class UnivecConfig
           'fields' => [
             [
               'name' => 'eval',
-              'short' => 'Retrieval-fidelity metrics for a convert model.',
+              'title' => 'Eval',
               'type' => '`$OBJECT`',
+              'short' => 'Retrieval-fidelity metrics for a convert model.',
             ],
             [
               'name' => 'executionProvider',
-              'short' => 'Hardware backend, e.g.',
+              'title' => 'Execution Provider',
               'type' => '`$STRING`',
+              'short' => 'Hardware backend, e.g.',
             ],
             [
               'name' => 'modelCard',
-              'short' => 'Convert models only: training provenance and architecture detail.',
+              'title' => 'Model Card',
               'type' => '`$OBJECT`',
+              'short' => 'Convert models only: training provenance and architecture detail.',
             ],
             [
               'name' => 'modelType',
+              'title' => 'Model Type',
+              'type' => '`$STRING`',
               'req' => true,
               'short' => '`embed` for text-to-vector models, `convert` for space-translation models.',
-              'type' => '`$STRING`',
             ],
             [
               'name' => 'name',
+              'title' => 'Name',
+              'type' => '`$STRING`',
               'req' => true,
               'short' => 'Model identifier used in requests.',
-              'type' => '`$STRING`',
             ],
             [
               'name' => 'sequenceLen',
-              'short' => 'Embed models only: maximum input sequence length.',
+              'title' => 'Sequence Len',
               'type' => '`$INTEGER`',
+              'short' => 'Embed models only: maximum input sequence length.',
             ],
             [
               'name' => 'sourceDim',
-              'short' => 'Convert models only: source vector dimension.',
+              'title' => 'Source Dim',
               'type' => '`$INTEGER`',
+              'short' => 'Convert models only: source vector dimension.',
             ],
             [
               'name' => 'sourceModel',
-              'short' => 'Convert models only: the source model space.',
+              'title' => 'Source Model',
               'type' => '`$STRING`',
+              'short' => 'Convert models only: the source model space.',
             ],
             [
               'name' => 'targetDim',
+              'title' => 'Target Dim',
+              'type' => '`$INTEGER`',
               'req' => true,
               'short' => 'Dimension of the produced vectors.',
-              'type' => '`$INTEGER`',
             ],
             [
               'name' => 'targetModel',
+              'title' => 'Target Model',
+              'type' => '`$STRING`',
               'req' => true,
               'short' => 'The model space produced.',
-              'type' => '`$STRING`',
             ],
           ],
           'name' => 'model',
@@ -1235,17 +1262,7 @@ class UnivecConfig
               'name' => 'list',
               'points' => [
                 [
-                  'args' => [],
                   'kind' => 'http',
-                  'live' => [
-                    'assert' => [
-                      'nonempty' => [
-                        '',
-                      ],
-                    ],
-                    'auth' => 'public',
-                    'id' => 'models',
-                  ],
                   'method' => 'GET',
                   'orig' => '/v1/models',
                   'segments' => [
@@ -1256,14 +1273,25 @@ class UnivecConfig
                       'lit' => 'models',
                     ],
                   ],
-                  'select' => [],
+                  'parts' => [
+                    'v1',
+                    'models',
+                  ],
+                  'rename' => [],
                   'transform' => [
                     'req' => '`reqdata`',
                     'res' => '`body.data`',
                   ],
-                  'parts' => [
-                    'v1',
-                    'models',
+                  'args' => [],
+                  'select' => [],
+                  'live' => [
+                    'assert' => [
+                      'nonempty' => [
+                        '',
+                      ],
+                    ],
+                    'auth' => 'public',
+                    'id' => 'models',
                   ],
                 ],
               ],

@@ -76,7 +76,7 @@ class Context(ctxmap: MutableMap<String, Any?>?, basectx: Context?) {
       } else if (cv is Control) {
         this.ctrl = cv
       }
-    } else if (basectx != null) {
+    } else if (basectx != null && Helpers.getCtxProp(ctxmap, "opname") == null) {
       this.ctrl = basectx.ctrl
     }
 

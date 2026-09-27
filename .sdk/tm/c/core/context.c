@@ -32,6 +32,9 @@ void ctx_out_set_point_err(Context* ctx, PNError* e) {
   ctx->out_point_err = e;
   ctx->out_point_val = NULL;
 }
+void ctx_out_set_spec_err(Context* ctx, PNError* e) {
+  ctx->out_spec_err = e;
+}
 voxgig_value* ctx_out_extra_get(Context* ctx, const char* key) {
   return getp(ctx->out_extra, key);
 }
@@ -92,7 +95,9 @@ Context* context_new(CtxSpec cs, Context* basectx) {
     ctx->ctrl = c;
   } else if (cs.ctrl_obj) {
     ctx->ctrl = cs.ctrl_obj;
-  } else if (basectx) {
+    // An empty opname is no operation, exactly as resolve_op reads it below
+    // and as the cpp port's cs.opname.empty() reads it.
+  } else if (basectx && (!cs.opname || cs.opname[0] == '\0')) {
     ctx->ctrl = basectx->ctrl;
   } else {
     ctx->ctrl = control_new();

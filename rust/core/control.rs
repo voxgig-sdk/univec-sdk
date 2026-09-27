@@ -1,4 +1,3 @@
-// Per-call control state (mirrors go core/control.go).
 
 use crate::core::error::UnivecError;
 use crate::utility::voxgigstruct::Value;

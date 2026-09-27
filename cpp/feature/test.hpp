@@ -68,16 +68,27 @@ private:
     Value restf = getp(tm, "res");
     if (!restf.is_string()) return data;
     std::string spec = restf.as_string();
-    // Exactly `body.<key>`; a deeper path is not an envelope this mock can
-    // synthesise, so it is left alone rather than guessed at.
+    // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+    // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
     if (spec.size() < 8) return data;
     if (0 != spec.compare(0, 6, "`body.")) return data;
     if ('`' != spec[spec.size() - 1]) return data;
     std::string inner = spec.substr(6, spec.size() - 7);
-    if (inner.empty() || std::string::npos != inner.find('.')) return data;
-    Value wrapped = vmap();
-    map_put(wrapped, inner, data);
-    return wrapped;
+    if (inner.empty()) return data;
+    std::vector<std::string> segs;
+    for (size_t at = 0;;) {
+      size_t dot = inner.find('.', at);
+      if (std::string::npos == dot) { segs.push_back(inner.substr(at)); break; }
+      segs.push_back(inner.substr(at, dot - at));
+      at = dot + 1;
+    }
+    Value out = data;
+    for (size_t i = segs.size(); i > 0; i--) {
+      Value wrapped = vmap();
+      map_put(wrapped, segs[i - 1], out);
+      out = wrapped;
+    }
+    return out;
   }
 
   Value respond(CtxPtr ctx, int status, const Value& data, const Value& extra) {
@@ -159,14 +170,10 @@ private:
       Value args = buildArgs(ctx, op, updateMatch);
       std::vector<Value> found = Struct::select(entmap, args);
       Value ent = found.empty() ? Value::undef() : found[0];
-      if (is_nullish(ent) && entmap.is_map()) {
-        for (const auto& kv : *entmap.as_map()) {
-          if (kv.second.is_map()) { ent = kv.second; break; }
-        }
-      }
+      // update miss: 404, never another record
       if (is_nullish(ent)) return respond(ctx, 404, Value(nullptr), extra1("statusText", Value("Not found")));
       if (ent.is_map() && ctx->reqdata.is_map()) {
-        for (const auto& kv : *ctx->reqdata.as_map()) map_put(ent, kv.first, kv.second);
+        Struct::merge(vlist({ent, ctx->reqdata}));
       }
       Struct::delprop(ent, Value("$KEY"));
       Value out = Struct::clone(ent);
@@ -261,19 +268,51 @@ private:
     fopt::foptSleep(net)(ms);
   }
 
+  static bool pointTerminal(const Value& p) {
+    Value parts = getp(p, "parts");
+    if (!parts.is_list() || parts.as_list()->empty()) return false;
+    const Value& last = parts.as_list()->back();
+    return last.is_string() && 0 == last.as_string().rfind("{", 0);
+  }
+
+  static size_t pointDepth(const Value& p) {
+    Value parts = getp(p, "parts");
+    return parts.is_list() ? parts.as_list()->size() : 0;
+  }
+
+  // The entity's own endpoint: a terminal `{param}` marks a record route, and
+  // among equals the shallower path wins (the same rule as makePoint).
+  static Value pickPoint(const Value& points) {
+    if (!points.is_list() || points.as_list()->empty()) return Value::undef();
+    Value point = (*points.as_list())[0];
+    for (const Value& cand : *points.as_list()) {
+      if (pointTerminal(cand) != pointTerminal(point)) {
+        if (pointTerminal(cand)) point = cand;
+      } else if (pointDepth(cand) < pointDepth(point)) {
+        point = cand;
+      }
+    }
+    return point;
+  }
+
   Value buildArgs(CtxPtr ctx, OperationPtr op, const Value& args) {
     std::string opname = op->name;
 
     Value points = Struct::getpath(ctx->config,
         {"entity", ctx->entity == nullptr ? std::string("") : ctx->entity->getName(),
          "op", opname, "points"});
-    Value point = Struct::getelem(points, -1);
+    Value point = pickPoint(points);
 
-    Value paramsPath = Struct::getpath(point, {"args", "params"});
-    std::vector<Value> reqdParamsSel = Struct::select(paramsPath, vmap({{"reqd", Value(true)}}));
-    Value reqdParams = vlist();
-    for (auto& p : reqdParamsSel) reqdParams.as_list()->push_back(p);
-    Value reqd = Struct::transform(reqdParams, vlist({Value("`$EACH`"), Value(""), Value("`$KEY.name`")}));
+    // Path AND query: a path-only read misses a query-addressed record
+    // (e.g. GET /result?trace_id=), which has no path param at all.
+    Value reqdArgs = vlist();
+    for (const char* kind : {"params", "query"}) {
+      Value argsPath = Struct::getpath(point, {"args", kind});
+      for (auto& p : Struct::select(argsPath, vmap({{"reqd", Value(true)}}))) {
+        reqdArgs.as_list()->push_back(p);
+      }
+    }
+    Value reqd = Struct::transform(reqdArgs, vlist({Value("`$EACH`"), Value(""), Value("`$KEY.name`")}));
 
     Value qand = vlist();
     Value q = vmap({{"`$AND`", qand}});

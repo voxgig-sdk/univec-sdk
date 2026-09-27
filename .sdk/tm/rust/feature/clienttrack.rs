@@ -1,10 +1,3 @@
-// Client tracking (mirrors go feature/clienttrack_feature.go). Establishes
-// a stable per-client session id at construction and stamps identifying
-// headers on every request: a `User-Agent` (`<clientName>/<clientVersion>`),
-// an `X-Client-Id` (session), and a fresh per-request `X-Request-Id`.
-// Header names, client name/version and the id generator (`idgen`) are
-// configurable; caller-provided User-Agent / X-Client-Id values are never
-// clobbered.
 
 use std::rc::Rc;
 

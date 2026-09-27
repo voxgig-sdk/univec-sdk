@@ -2,13 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClienttrackFeature = void 0;
 const BaseFeature_1 = require("../base/BaseFeature");
-// Client tracking. Establishes a stable per-client session id at
-// construction and stamps identifying headers on every request: a
-// `User-Agent`, an `X-Client-Id` (session), and a fresh per-request
-// `X-Request-Id`. This lets a server correlate all traffic from one SDK
-// instance and each individual call. Header names, client name/version and
-// the id generator are configurable; the session id and request counter are
-// exposed on `client._clienttrack`.
 class ClienttrackFeature extends BaseFeature_1.BaseFeature {
     version = '0.0.1';
     name = 'clienttrack';

@@ -49,7 +49,7 @@ takes an entity handle built from the client:
     const EName = entity.Name
     const eVar = entity.name
     const opnames = Object.keys(entity.op || {})
-    const fields = entity.fields || []
+    const fields = Object.values(entity.fields || {})
     const idF = entityIdField(entity)
 
     Content(`
@@ -93,8 +93,8 @@ takes an entity handle built from the client:
 `)
 
       each(fields, (field: any) => {
-        const desc = field.short || ''
-        Content(`| \`${field.name}\` | \`${canonToType(field.type, target.name)}\` | ${desc} |
+        const desc = field.sh || ''
+        Content(`| \`${field.n}\` | \`${canonToType(field.t, target.name)}\` | ${desc} |
 `)
       })
 

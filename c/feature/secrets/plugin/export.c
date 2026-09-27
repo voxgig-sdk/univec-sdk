@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (c/src/export.c)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (c/src/export.c)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* Exports (§11).
  *
@@ -23,7 +23,7 @@ static int bytewise(const void *a, const void *b) {
 
 Value *resolveexport(Value *spec, Value *exported) {
   const char *s = visstr(spec) ? vasstr(spec) : "";
-  const char *cut = strchr(s, '/');
+  const char *cut = strrchr(s, '/');
   if (NULL == cut) {
     size_t sz = strlen(s) + 40;
     char *text = (char *)arena_alloc(sz);

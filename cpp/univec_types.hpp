@@ -1,6 +1,6 @@
 // Typed reference models for the Univec SDK (C++).
 //
-// GENERATED from the API model: main.kit.entity.<e>.fields[] and per-op
+// GENERATED from the API model: main.kit.entity.<e>.fields{} and per-op
 // params. The C++ SDK runtime is Value-based, so these structs are
 // DOCUMENTATION / convenience types only — the SDK neither includes nor
 // requires this header. Array fields surface as std::vector<Value>, object

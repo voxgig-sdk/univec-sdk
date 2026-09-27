@@ -29,8 +29,6 @@ const EntityOperation = cmp(function Operation(props: any) {
       EntityName: entity.Name,
       entityname: entity.name,
 
-      // Class tokens are decoupled from the EntityName data-type token so the
-      // class can be renamed independently (collision handling).
       EntyClass: cls,
 
       '#Feature-Hook': ({ name, indent }: any) =>

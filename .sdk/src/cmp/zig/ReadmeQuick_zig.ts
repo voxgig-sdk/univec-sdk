@@ -154,9 +154,6 @@ switch (client.${method}(h.vnull()).load(${loadArg}, h.vnull())) {
       const it = opRequestShape(exampleEntity, opname).items.find((x: any) => x.name === idF)
       return it && it.type
     }
-    // The id VALUE for an update/remove match: a type-correct literal (zig
-    // ops return an OpResult, so threading the created record's id through a
-    // switch scope would obscure the example).
     const idValueFor = (opname: string): string => zigLit(idParamType(opname), 'example_id')
 
     if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {

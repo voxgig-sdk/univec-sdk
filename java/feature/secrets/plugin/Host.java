@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (java/src/voxgig/plugin/Host.java)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (java/src/voxgig/plugin/Host.java)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 package voxgig.univecsdk.feature.secrets.plugin;
 
@@ -569,7 +569,7 @@ public final class Host {
    * <p>{@code remember} is false for the questions asked ABOUT an instance
    * rather than BY it: introspection must not create a binding.
    */
-  private String chosen(Entry entry, Object req, boolean remember) {
+  String chosen(Entry entry, Object req, boolean remember) {
     List<Object> cands = providersof(req);
     if (cands.isEmpty()) {
       return null;

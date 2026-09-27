@@ -14,7 +14,7 @@ Full documentation for this SDK: [https://voxgig-sdk.github.io/univec-sdk/](http
 
 > TypeScript, Python, PHP, Golang, Ruby, Lua, C, Clojure, C++, C#, Dart, Elixir, Haskell, Java, JavaScript, Kotlin, Lean, OCaml, Perl, Python Data, Rust, Scala, Swift, Zig SDKs, a CLI with an interactive REPL, and an MCP server for AI agents — all generated from one OpenAPI spec by [@voxgig/sdkgen](https://github.com/voxgig/sdkgen).
 
-> **Features:** `audit`, `cache`, `clienttrack`, `cost`, `debug`, `idempotency`, `log`, `metrics`, `netsim`, `paging`, `proxy`, `ratelimit`, `rbac`, `retry`, `secrets`, `streaming`, `telemetry`, `test`, `timeout` — opt-in,
+> **Features:** `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined` — opt-in,
 > inactive until switched on, and configured per client. See the Features
 > section of any SDK README below for what each one does.
 
@@ -288,30 +288,30 @@ switch (client.model(h.vnull()).list(h.vnull(), h.vnull())) {
 
 | Language | Package | Install |
 | --- | --- | --- |
-| TypeScript | `@voxgig-sdk/univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Python | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| PHP | `voxgig-sdk/univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| TypeScript | `@voxgig-sdk/univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Python | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| PHP | `voxgig-sdk/univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
 | Golang | `github.com/voxgig-sdk/univec-sdk/go` | `go get github.com/voxgig-sdk/univec-sdk/go@latest` |
-| Ruby | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Lua | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| C | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Clojure | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| C++ | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| C# | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Dart | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Elixir | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Haskell | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Java | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| JavaScript | `@voxgig-sdk/univec-js` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Kotlin | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Lean | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| OCaml | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Perl | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Python Data | `voxgig-sdk-univec-data` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Rust | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Scala | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Swift | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Zig | `voxgig-sdk-univec` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Ruby | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Lua | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| C | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Clojure | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| C++ | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| C# | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Dart | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Elixir | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Haskell | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Java | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| JavaScript | `@voxgig-sdk/univec-sdk-js` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Kotlin | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Lean | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| OCaml | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Perl | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Python Data | `voxgig-sdk-univec-sdk-data` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Rust | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Scala | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Swift | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| Zig | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
 | Go CLI | `github.com/voxgig-sdk/univec-sdk/go-cli` | `go install github.com/voxgig-sdk/univec-sdk/go-cli/cmd/univec@latest` |
 | Go MCP server | `github.com/voxgig-sdk/univec-sdk/go-mcp` | `go get github.com/voxgig-sdk/univec-sdk/go-mcp@latest` |
 
@@ -320,7 +320,7 @@ switch (client.model(h.vnull()).list(h.vnull(), h.vnull())) {
 ### TypeScript
 
 ```ts
-import { UnivecSDK } from '@voxgig-sdk/univec'
+import { UnivecSDK } from '@voxgig-sdk/univec-sdk'
 
 const client = new UnivecSDK({
   apikey: process.env.UNIVEC_APIKEY,
@@ -535,7 +535,7 @@ UnivecSDK client = new UnivecSDK(options);
 ### JavaScript
 
 ```js
-const { UnivecSDK } = require('@voxgig-sdk/univec-js')
+const { UnivecSDK } = require('@voxgig-sdk/univec-sdk-js')
 
 const client = new UnivecSDK({
   apikey: process.env.UNIVEC_APIKEY,
@@ -900,25 +900,25 @@ forking the SDK.
 
 | Feature | Purpose |
 | --- | --- |
-| **AuditFeature** | Structured audit trail of operations |
-| **CacheFeature** | Response caching for safe read requests |
-| **ClienttrackFeature** | Client identity and per-request correlation headers |
-| **CostFeature** | Cost tracking and spend budget for API calls |
-| **DebugFeature** | Request/response capture ring buffer for debugging |
-| **IdempotencyFeature** | Idempotency keys for safe retries of mutating operations |
-| **LogFeature** | Structured request and response logging |
-| **MetricsFeature** | Statistics capture: per-operation counters and latency |
-| **NetsimFeature** | Network behaviour simulation for offline testing (latency, failures, outages) |
-| **PagingFeature** | Pagination signals for list operations |
-| **ProxyFeature** | Outbound HTTP(S) proxy routing |
-| **RatelimitFeature** | Client-side rate limiting via a token bucket |
-| **RbacFeature** | Client-side role/permission enforcement |
-| **RetryFeature** | Automatic retry of transient failures with exponential backoff |
-| **SecretsFeature** | Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens |
-| **StreamingFeature** | Incremental streaming of list results via async iteration |
-| **TelemetryFeature** | Distributed tracing spans with W3C trace-context propagation |
-| **TestFeature** | In-memory mock transport for testing without a live server |
-| **TimeoutFeature** | Per-request timeout with transport abort |
+| **AuditFeature** | Audit trail |
+| **CacheFeature** | Response cache |
+| **ClienttrackFeature** | Client tracking |
+| **CostFeature** | Cost tracking |
+| **DebugFeature** | Debug capture |
+| **IdempotencyFeature** | Idempotency |
+| **LogFeature** | Logging |
+| **MetricsFeature** | Metrics |
+| **NetsimFeature** | Network simulation |
+| **PagingFeature** | Paging |
+| **ProxyFeature** | Proxy |
+| **RatelimitFeature** | Rate limiting |
+| **RbacFeature** | Access control |
+| **RetryFeature** | Retry |
+| **SecretsFeature** | Secrets |
+| **StreamingFeature** | Streaming |
+| **TelemetryFeature** | Telemetry |
+| **TestFeature** | Test transport |
+| **TimeoutFeature** | Timeout |
 
 Pass custom features via the `extend` option at construction time.
 

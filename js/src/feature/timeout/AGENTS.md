@@ -1,6 +1,6 @@
 # TimeoutFeature — Agent Guide
 
-Per-request timeout with transport abort (v0.0.1).
+Timeout (v0.0.1).
 
 A **feature** is a pipeline extension: an object of hooks that fire at named
 stages of every entity operation (load, list, create, update, remove) and of
@@ -16,8 +16,8 @@ in the model). It only runs when explicitly enabled (e.g. the `test` feature is 
 
 | Part | Path |
 | --- | --- |
-| Model definition | `.sdk/model/feature/timeout.aon` (name, title, version, `config.options.active`, the `hook` map, per-language `deps`) |
-| Registered in | `.sdk/model/feature/feature-index.aon` (`@"timeout.aon"`) |
+| Model definition | `.sdk/model/feature/timeout.aontu` (name, title, version, `config.options.active`, the `hook` map, per-language `deps`) |
+| Registered in | `.sdk/model/feature/feature-index.aontu` (`@"timeout.aontu"`) |
 | Runtime template | `.sdk/tm/js/src/feature/timeout/` (copied here on `generate`; `FEATURE_Name`/`FEATURE_VERSION` substituted) |
 
 (Paths are relative to the **project root** — four levels up from here.)
@@ -25,7 +25,7 @@ in the model). It only runs when explicitly enabled (e.g. the `test` feature is 
 ## Customising this feature
 
 - **Turn hooks on/off**: edit the `hook` map in
-  `.sdk/model/feature/timeout.aon` (`<Stage>: active: true|false`).
+  `.sdk/model/feature/timeout.aontu` (`<Stage>: active: true|false`).
 - **Change default activation**: set `config.options.active` in the same file.
 - **Dependencies**: edit `deps.<lang>` in the same file.
 - **Behaviour**: edit the runtime template under

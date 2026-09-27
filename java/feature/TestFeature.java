@@ -109,18 +109,23 @@ public class TestFeature extends BaseFeature {
       return data;
     }
     String spec = (String) restf;
-    // Exactly `body.<key>`; a deeper path is not an envelope this mock can
-    // synthesise, so it is left alone rather than guessed at.
+    // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+    // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
     if (!spec.startsWith("`body.") || !spec.endsWith("`") || spec.length() < 8) {
       return data;
     }
     String inner = spec.substring(6, spec.length() - 1);
-    if (inner.isEmpty() || inner.contains(".")) {
+    if (inner.isEmpty()) {
       return data;
     }
-    Map<String, Object> wrapped = new LinkedHashMap<>();
-    wrapped.put(inner, data);
-    return wrapped;
+    String[] segs = inner.split("\\.", -1);
+    Object out = data;
+    for (int i = segs.length - 1; 0 <= i; i--) {
+      Map<String, Object> wrapped = new LinkedHashMap<>();
+      wrapped.put(segs[i], out);
+      out = wrapped;
+    }
+    return out;
   }
 
   private Map<String, Object> respond(Context ctx, int status, Object data, Map<String, Object> extra) {
@@ -223,19 +228,12 @@ public class TestFeature extends BaseFeature {
       Object args = buildArgs(ctx, op, updateMatch);
       List<Object> found = Struct.select(entmap, args);
       Object ent = Struct.getelem(found, 0);
-      if (ent == null && entmap != null) {
-        for (Object e : entmap.values()) {
-          if (e instanceof Map) {
-            ent = e;
-            break;
-          }
-        }
-      }
       if (ent == null) {
+        // update miss: 404, never another record
         return respond(ctx, 404, null, extra("statusText", "Not found"));
       }
       if (ent instanceof Map && ctx.reqdata != null) {
-        ((Map<String, Object>) ent).putAll(ctx.reqdata);
+        Struct.merge(Struct.jt(ent, ctx.reqdata));
       }
       Struct.delprop(ent, "$KEY");
       Object out = Struct.clone(ent);
@@ -369,10 +367,14 @@ public class TestFeature extends BaseFeature {
       }
     }
 
-    // Get required params.
-    Object paramsPath = Struct.getpath(point, List.of("args", "params"));
-    Object reqdParams = Struct.select(paramsPath, Struct.jm("reqd", true));
-    Object reqd = Struct.transform(reqdParams,
+    // Path AND query: a path-only read misses a query-addressed record
+    // (e.g. GET /result?trace_id=), which has no path param at all.
+    List<Object> reqdArgs = Struct.jt();
+    for (String kind : new String[] { "params", "query" }) {
+      Object argsPath = Struct.getpath(point, List.of("args", kind));
+      reqdArgs.addAll(Struct.select(argsPath, Struct.jm("reqd", true)));
+    }
+    Object reqd = Struct.transform(reqdArgs,
         Struct.jt("`$EACH`", "", "`$KEY.name`"));
 
     List<Object> qand = Struct.jt();

@@ -22,12 +22,6 @@ import {
 } from '@voxgig/apidef'
 
 
-// Emits the two MSBuild project files (the C# twin of Package_go's go.mod):
-//   <Name>SDK.csproj       - the library, compiling everything except test/
-//   test/<Name>SDKTest.csproj - the xunit test project (mirrors the
-//                            voxgig/struct csharp two-csproj layout)
-// PackageReference entries come from collectDeps (feature + target deps);
-// the runtime itself is BCL-only.
 const Package = cmp(async function Package(props: any) {
   const ctx$ = props.ctx$
   const target = props.target
@@ -50,20 +44,6 @@ const Package = cmp(async function Package(props: any) {
     ? `  <ItemGroup>\n${depRefs}\n  </ItemGroup>\n`
     : ''
 
-  // CS8619, and ONLY when the secrets feature's `aws` plugin group is
-  // selected. Upstream sekreto builds its plugin assembly with <Nullable>
-  // disabled; vendored into an SDK that enables it, plugins/Aws.cs:87
-  // reports one nullability mismatch on a tuple conversion. It is a
-  // VENDORED file, so it cannot be fixed here (a silent tweak to vendored
-  // source is exactly what the vendoring guard exists to prevent), and it
-  // is the only such warning in the whole vendored set.
-  //
-  // Gated rather than added to the standing list because the standing list
-  // is a promise about EVERY generated SDK: CS8619 catches a real class of
-  // bug in ordinary code, and switching it off for everyone to quiet one
-  // line in one vendored file would be paying for a feature that is off by
-  // default. `getModelPath` is active-filtered, so this reads as present
-  // only when the group is really on.
   const awsPlugin = getModelPath(model,
     `main.${KIT}.feature.secrets.plugin.aws`, { required: false })
   const vendorNoWarn = null == awsPlugin ? '' : ';CS8619'

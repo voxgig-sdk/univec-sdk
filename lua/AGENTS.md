@@ -27,7 +27,7 @@ make test
 
 | Source | Path | Edit when… |
 | --- | --- | --- |
-| Target definition | `.sdk/model/target/lua.aon` | deps, module, extension, phases change |
+| Target definition | `.sdk/model/target/lua.aontu` | deps, module, extension, phases change |
 | Templates | `.sdk/tm/lua/` | the file is the **same for every API** (runtime, transport, base classes) — copied verbatim with placeholder substitution |
 | Components | `.sdk/src/cmp/lua/` | the file's shape **depends on the API** (entities, constructor, README, tests) — TypeScript that walks the model |
 
@@ -38,30 +38,30 @@ component.* After editing a component run `npm run build` before
 ## Features in this target
 
 Each feature is a flat file in the `feature/` package. Its hooks and
-default activation come from `.sdk/model/feature/<name>.aon`; customise
+default activation come from `.sdk/model/feature/<name>.aontu`; customise
 the runtime under `.sdk/tm/lua/feature/` and regenerate.
 
 | Feature | Runtime file | Active hooks |
 | --- | --- | --- |
-| **audit** — Structured audit trail of operations | `feature/audit_feature.lua` | `PreDone`, `PreUnexpected` |
-| **cache** — Response caching for safe read requests | `feature/cache_feature.lua` | — |
-| **clienttrack** — Client identity and per-request correlation headers | `feature/clienttrack_feature.lua` | `PostConstruct`, `PreRequest` |
-| **cost** — Cost tracking and spend budget for API calls | `feature/cost_feature.lua` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **debug** — Request/response capture ring buffer for debugging | `feature/debug_feature.lua` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
-| **idempotency** — Idempotency keys for safe retries of mutating operations | `feature/idempotency_feature.lua` | `PreRequest` |
-| **log** — Structured request and response logging | `feature/log_feature.lua` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **metrics** — Statistics capture: per-operation counters and latency | `feature/metrics_feature.lua` | `PreDone`, `PrePoint`, `PreUnexpected` |
-| **netsim** — Network behaviour simulation for offline testing (latency, failures, outages) | `feature/netsim_feature.lua` | — |
-| **paging** — Pagination signals for list operations | `feature/paging_feature.lua` | `PreRequest`, `PreResult` |
-| **proxy** — Outbound HTTP(S) proxy routing | `feature/proxy_feature.lua` | — |
-| **ratelimit** — Client-side rate limiting via a token bucket | `feature/ratelimit_feature.lua` | — |
-| **rbac** — Client-side role/permission enforcement | `feature/rbac_feature.lua` | `PrePoint` |
-| **retry** — Automatic retry of transient failures with exponential backoff | `feature/retry_feature.lua` | — |
-| **secrets** — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens | `feature/secrets_feature.lua` | `PreSpec` |
-| **streaming** — Incremental streaming of list results via async iteration | `feature/streaming_feature.lua` | `PreResult` |
-| **telemetry** — Distributed tracing spans with W3C trace-context propagation | `feature/telemetry_feature.lua` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
-| **test** — In-memory mock transport for testing without a live server | `feature/test_feature.lua` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
-| **timeout** — Per-request timeout with transport abort | `feature/timeout_feature.lua` | — |
+| **audit** — Audit trail | `feature/audit_feature.lua` | `PreDone`, `PreUnexpected` |
+| **cache** — Response cache | `feature/cache_feature.lua` | — |
+| **clienttrack** — Client tracking | `feature/clienttrack_feature.lua` | `PostConstruct`, `PreRequest` |
+| **cost** — Cost tracking | `feature/cost_feature.lua` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **debug** — Debug capture | `feature/debug_feature.lua` | `PreDone`, `PreRequest`, `PreResponse`, `PreUnexpected` |
+| **idempotency** — Idempotency | `feature/idempotency_feature.lua` | `PreRequest` |
+| **log** — Logging | `feature/log_feature.lua` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **metrics** — Metrics | `feature/metrics_feature.lua` | `PreDone`, `PrePoint`, `PreUnexpected` |
+| **netsim** — Network simulation | `feature/netsim_feature.lua` | — |
+| **paging** — Paging | `feature/paging_feature.lua` | `PreRequest`, `PreResult` |
+| **proxy** — Proxy | `feature/proxy_feature.lua` | — |
+| **ratelimit** — Rate limiting | `feature/ratelimit_feature.lua` | — |
+| **rbac** — Access control | `feature/rbac_feature.lua` | `PrePoint` |
+| **retry** — Retry | `feature/retry_feature.lua` | — |
+| **secrets** — Secrets | `feature/secrets_feature.lua` | `PreSpec` |
+| **streaming** — Streaming | `feature/streaming_feature.lua` | `PreResult` |
+| **telemetry** — Telemetry | `feature/telemetry_feature.lua` | `PreDone`, `PrePoint`, `PreRequest`, `PreUnexpected` |
+| **test** — Test transport | `feature/test_feature.lua` | `GetData`, `GetMatch`, `PostConstruct`, `PostConstructEntity`, `PrePoint`, `PreRequest`, `PreResponse`, `PreResult`, `PreSpec`, `SetData`, `SetMatch` |
+| **timeout** — Timeout | `feature/timeout_feature.lua` | — |
 
 ---
 

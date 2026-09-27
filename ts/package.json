@@ -1,5 +1,5 @@
 {
-  "name": "@voxgig-sdk/univec",
+  "name": "@voxgig-sdk/univec-sdk",
   "version": "0.1.2",
   "description": "Unofficial generated TypeScript SDK for the UniVec public API. Not affiliated with or endorsed by the upstream API provider.",
   "keywords": [
@@ -23,7 +23,8 @@
   "types": "dist/UnivecSDK.d.ts",
   "files": [
     "dist",
-    "src"
+    "src",
+    "README.md"
   ],
   "scripts": {
     "test:live": "npm run build && UNIVEC_TEST_LIVE=TRUE node --test dist-test/live.test.js",

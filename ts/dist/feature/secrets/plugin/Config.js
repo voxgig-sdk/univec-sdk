@@ -1,21 +1,7 @@
 "use strict";
 // VENDORED: @voxgig/plugin 0.1.6 (typescript/src/Config.ts)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-/* The declarative document (§9): normalization, and the ten-level
- * precedence ladder.
- *
- * TWO FUNCTIONS, AND THE SPLIT BETWEEN THEM IS FORCED.
- *
- * `normalizeconfig` normalizes STRUCTURE and ENTRY KEYS. It does not
- * merge options, and cannot: §9.4 makes merge behaviour a property of
- * the definition's option SHAPE, which normalization has never seen. A
- * normalizer that flattened the option layers would make
- * `$MERGE: append` unimplementable at load time, because the layers it
- * must concatenate would already be collapsed.
- *
- * `resolveoptions` applies the ladder, and it is the only place that
- * knows the shape. */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeconfig = normalizeconfig;
 exports.resolveoptions = resolveoptions;
@@ -29,18 +15,11 @@ function normalizeconfig(input) {
     const dkey = keys.default || 'default';
     const reserved = (input && input.reserved) || [];
     const profile = input && input.profile;
-    // The rename is applied at TWO PLACES AND NO OTHERS: the document
-    // root, and every profile.<name> overlay root (§9.1). A rename applied
-    // only at the root would leave `profile.prod.sdk` untranslated and
-    // silently drop every environment override the host depends on.
-    // Recursing further would be worse: option data is the definition's.
     const baseinst = doc[ikey];
     const basedef = doc[dkey] || {};
     const overlay = profile && doc.profile && doc.profile[profile];
     const overinst = overlay ? overlay[ikey] : undefined;
     const overdef = (overlay && overlay[dkey]) || {};
-    // Entry layers, base then overlay, each as {ref -> entry} plus the
-    // order the form implies.
     const base = entries(baseinst);
     const over = entries(overinst);
     for (const r of Object.keys(base.map))
@@ -72,15 +51,9 @@ function normalizeconfig(input) {
         const ref = order[i];
         const b = base.map[ref];
         const o = over.map[ref];
-        // MERGE THE ENTRIES AS AUTHORED, THEN APPLY DEFAULTS TO THE RESULT
-        // (§9.3). A safety rule, not a tidiness one: if the overlay had its
-        // defaults filled in before merging it would carry a synthesized
-        // active:true and overwrite a base's false — silently re-enabling a
-        // deliberately disabled integration in production.
         const active = pick(o, 'active', pick(b, 'active', true));
         const start = pick(o, 'start', pick(b, 'start', 'eager'));
         const ord = pick(o, 'order', pick(b, 'order', undefined));
-        // Option layers, levels 3-6, IN LADDER ORDER. Never merged here.
         const layers = [];
         const nm = (0, Ref_1.parseref)(ref).name;
         if (basedef[nm] && undefined !== basedef[nm].options)
@@ -116,9 +89,6 @@ function bytewise(a, b) {
 function pick(src, key, dflt) {
     return src && undefined !== src[key] ? src[key] : dflt;
 }
-/** Both document forms reduce to {ref -> entry} plus the order the form
- * implies: array POSITION for the array form, sorted refs for the map
- * form. */
 function entries(src) {
     const map = {};
     const order = [];
@@ -132,8 +102,6 @@ function entries(src) {
         }
     }
     else {
-        // Map-form refs arrive as KEYS, through a different path than an
-        // array element's `ref` field — and must canonicalize the same way.
         for (const key of Object.keys(src)) {
             map[(0, Ref_1.canonref)(key)] = src[key];
         }
@@ -159,22 +127,17 @@ function resolveoptions(input) {
     const name = (0, Ref_1.parseref)(ref).name;
     const doc = input.doc || {};
     const overlay = input.profile && doc.profile && doc.profile[input.profile];
-    // ONE ordered merge, lowest to highest. Levels 3-6 are not two
-    // namespaces collapsed separately and composed afterwards: that
-    // inverts the rule that PROFILE SPECIFICITY OUTRANKS DEFINITION
-    // SPECIFICITY, so a prod per-definition default would lose to a base
-    // instance value.
     const layers = [
-        defaultsof(shape), // 1
-        input.hostdefaults, // 2
-        optsof(doc.default, name), // 3
-        optsof(doc.instance, ref), // 4
-        optsof(overlay && overlay.default, name), // 5
-        optsof(overlay && overlay.instance, ref), // 6
-        input.env, // 7
-        input.hostoptions, // 8
-        input.loadoptions, // 9
-        input.patch, // 10
+        defaultsof(shape),
+        input.hostdefaults,
+        optsof(doc.default, name),
+        optsof(doc.instance, ref),
+        optsof(overlay && overlay.default, name),
+        optsof(overlay && overlay.instance, ref),
+        input.env,
+        input.hostoptions,
+        input.loadoptions,
+        input.patch,
     ];
     let out = {};
     for (const layer of layers) {
@@ -184,7 +147,6 @@ function resolveoptions(input) {
     }
     return out;
 }
-/** The shape's non-directive values are the level-1 defaults. */
 function defaultsof(shape) {
     const out = {};
     for (const k of Object.keys(shape)) {
@@ -198,7 +160,6 @@ function defaultsof(shape) {
 function optsof(src, key) {
     if (null == src)
         return undefined;
-    // The array form is equivalent to the map form (§9.1).
     if (Array.isArray(src)) {
         for (const item of src) {
             if ((0, Ref_1.canonref)(item.ref) === key)
@@ -212,10 +173,6 @@ function optsof(src, key) {
     }
     return undefined;
 }
-/** Merge ONE layer onto the accumulator, honouring the shape's
- * directives. The directive holds at EVERY precedence level, not only
- * between document levels — §9.4 makes it a property of the shape,
- * which does not know which layer a value arrived from. */
 function mergeone(base, over, shape) {
     if (null == over)
         return base;
@@ -249,7 +206,6 @@ function mergeone(base, over, shape) {
     }
     return out;
 }
-/** Merge N levels below this key, replace below that. */
 function deepto(base, over, n) {
     if (n <= 0)
         return clone(over);
@@ -263,14 +219,6 @@ function deepto(base, over, n) {
     }
     return out;
 }
-/** §9.4: N is an integer of at least 1, and everything else is an error.
- *
- * `{"deep": 0}` is rejected DESPITE having an obvious reading, because
- * "replace at this key" already has a spelling and two spellings for one
- * behaviour is the defect class this repo exists to avoid. Without the
- * stated domain each port picks its own reading — reject, replace,
- * unlimited merge, or clamp to 1 — and the same document resolves
- * differently per language. */
 const MERGE_WORDS = ['replace', 'append'];
 function checkshape(shape) {
     if (!isMap(shape))

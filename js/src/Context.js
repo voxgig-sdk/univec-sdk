@@ -57,7 +57,13 @@ class Context {
     this.client = getprop(ctxmap, 'client', getprop(basectx, 'client'))
     this.utility = getprop(ctxmap, 'utility', getprop(basectx, 'utility'))
 
-    this.ctrl = getprop(ctxmap, 'ctrl', getprop(basectx, 'ctrl', this.ctrl))
+    // An operation gets its OWN control unless the caller passed one: a
+    // paging cursor left on the client's control would otherwise be picked
+    // up by the next, unrelated call. A context with no opname is not an
+    // operation, so it still shares (an entity's, with the client's).
+    const opname = getprop(ctxmap, 'opname')
+    const basectrl = null == opname ? getprop(basectx, 'ctrl', this.ctrl) : this.ctrl
+    this.ctrl = getprop(ctxmap, 'ctrl', basectrl)
     this.meta = getprop(ctxmap, 'meta', getprop(basectx, 'meta', this.meta))
 
     this.config = getprop(ctxmap, 'config', getprop(basectx, 'config'))
@@ -78,7 +84,6 @@ class Context {
     this.result = getprop(ctxmap, 'result', getprop(basectx, 'result'))
     this.response = getprop(ctxmap, 'response', getprop(basectx, 'response'))
 
-    const opname = getprop(ctxmap, 'opname')
     this.op = this.resolveOp(opname)
   }
 

@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (scala/src/Spec.scala)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (scala/src/Spec.scala)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 // The declarative form of a provider, and the credentials it may carry.
 //
@@ -112,6 +112,17 @@ case class ProviderSpec(
     /** infisical: the environment slug and secret path. */
     environment: Option[String] = None,
     path: Option[String] = None,
+    /** minivault: the passphrase that unwraps `vaultkey`. */
+    passphrase: Option[String] = None,
+    /** minivault: which key in the vault file to open with, defaulting to
+      * `master`. Named apart from `key` and `keyid` because those already
+      * mean a secret name and an AWS access key id.
+      */
+    vaultkey: Option[String] = None,
+    /** minivault: PBKDF2 rounds, used only when a key is created. */
+    iterations: Option[Int] = None,
+    /** minivault: make the vault file if it is not there. */
+    create: Option[Boolean] = None,
 ):
 
   /** Printed without its credentials. See AuthSpec.toString: the generated

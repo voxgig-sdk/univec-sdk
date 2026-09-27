@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (rust/plugins/infisical/src/lib.rs)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (rust/plugins/infisical/src/lib.rs)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 //! The Infisical provider, as a voxgig/plugin definition.
 
@@ -15,12 +15,6 @@ use super::httpjson::{
     expiryseconds, fetchjson, http, renewdue, renewtime, textat, trimslash,
 };
 
-/// Infisical.
-///
-/// `api.token` reads the secret keyed `API_TOKEN` (Infisical's own
-/// convention is environment-style keys) at a secret path in one
-/// environment of a project. Auth is a token, or a universal-auth
-/// (machine identity) login with clientid/clientsecret.
 #[derive(Default)]
 pub struct InfisicalProvider {
     pub addr: String,

@@ -1,34 +1,56 @@
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::{Mutex, OnceLock};
 
 use crate::core::context::Context;
 use crate::core::error::UnivecError;
 use crate::core::helpers::{call_vfn, get_str, getp, getpath, ja, jo, json_thunk, setp};
 use crate::utility::voxgigstruct::Value;
 
-// Default live transport: ureq (blocking, minimal). Honours a `proxy`
-// annotation on the fetch definition (set by the proxy feature) by routing
-// the request through an agent configured with that proxy.
+// One agent per process: ureq pools keep-alive connections per agent, so
+// an agent per request reused nothing. Cloning shares the pool.
+pub(crate) fn default_agent() -> ureq::Agent {
+    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+    AGENT.get_or_init(|| ureq::AgentBuilder::new().build()).clone()
+}
+
+// Agents keyed by the `proxy` annotation (set by the proxy feature) and
+// manual redirects, for requests the default agent cannot serve.
+fn agent_for(fetchdef: &Value) -> ureq::Agent {
+    let proxy = get_str(fetchdef, "proxy").filter(|p| !p.is_empty());
+    let manual = get_str(fetchdef, "redirect").as_deref() == Some("manual");
+    if proxy.is_none() && !manual {
+        return default_agent();
+    }
+
+    static AGENTS: OnceLock<Mutex<HashMap<(Option<String>, bool), ureq::Agent>>> =
+        OnceLock::new();
+    let mut agents = AGENTS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    agents
+        .entry((proxy.clone(), manual))
+        .or_insert_with(|| {
+            let mut builder = ureq::AgentBuilder::new();
+            if let Some(p) = proxy.as_deref().and_then(|p| ureq::Proxy::new(p).ok()) {
+                builder = builder.proxy(p);
+            }
+            if manual {
+                builder = builder.redirects(0);
+            }
+            builder.build()
+        })
+        .clone()
+}
+
+// Default live transport: ureq (blocking, minimal).
 fn default_http_fetch(fullurl: &str, fetchdef: &Value) -> Result<Value, UnivecError> {
     let method = get_str(fetchdef, "method")
         .filter(|m| !m.is_empty())
         .unwrap_or_else(|| "GET".to_string());
 
-    let mut builder = ureq::AgentBuilder::new();
-    if let Some(proxy) = get_str(fetchdef, "proxy").filter(|p| !p.is_empty()) {
-        if let Ok(p) = ureq::Proxy::new(&proxy) {
-            builder = builder.proxy(p);
-        }
-    }
-    // A `redirect: "manual"` annotation (set by the station feature when a
-    // hosts policy is active - the same in-band channel as `proxy` above)
-    // disables automatic redirect following, so a 3xx rides back as a normal
-    // response: a Location pointing off an egress allowlist must never pull
-    // an automatic credentialed follow-up request.
-    if get_str(fetchdef, "redirect").as_deref() == Some("manual") {
-        builder = builder.redirects(0);
-    }
-    let agent = builder.build();
-
+    let agent = agent_for(fetchdef);
     let mut req = agent.request(&method, fullurl);
 
     let mut has_ua = false;

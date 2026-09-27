@@ -1,10 +1,6 @@
-// VENDORED: @voxgig/omni sdk-20260908-1556-0 (rust/src/util.rs)
-// Source: https://github.com/voxgig/omni @ 274708cc2d12b21707d975543953f845f8444be0  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/omni sdk-20260925-1316-0 (rust/src/util.rs)
+// Source: https://github.com/voxgig/omni @ b909ff51fc644e4955c850e30cc65e74be076df2  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! Omni internal JSON utilities.
-//!
-//! Self-contained by design: the omni runner must be able to test *any*
-//! library, including libraries that provide these same operations.
 
 use super::json::Json;
 
@@ -90,7 +86,6 @@ pub fn deepequal(a: &Json, b: &Json) -> bool {
     }
 }
 
-/// Render a number the same way in every port: 5.0 prints as 5.
 pub fn numstr(val: f64) -> String {
     if val.is_nan() || val.is_infinite() {
         return "null".to_string();

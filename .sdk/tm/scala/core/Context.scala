@@ -51,7 +51,8 @@ class Context(ctxmap: JMap[String, Object], basectx: Context) {
         case c: Control => ctrl = c
         case _ =>
       }
-    } else if (basectx != null && basectx.ctrl != null) {
+    } else if (basectx != null && basectx.ctrl != null
+        && Helpers.getCtxProp(ctxmap, "opname") == null) {
       ctrl = basectx.ctrl
     }
 

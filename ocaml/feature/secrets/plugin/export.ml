@@ -1,5 +1,5 @@
-(* VENDORED: @voxgig/plugin sdk-20260908-1556-0 (ocaml/src/export.ml) *)
-(* Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0] *)
+(* VENDORED: @voxgig/plugin sdk-20260925-1316-0 (ocaml/src/export.ml) *)
+(* Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0] *)
 (* License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream. *)
 (* Exports (§11).
 
@@ -18,7 +18,9 @@ module V = Value
    rather than a null Value. *)
 let resolveexport spec exported =
   let s = if V.is_str spec then V.as_str spec else "" in
-  match String.index_opt s '/' with
+  (* THE LAST `/`, not the first: a NAME may hold slashes (§4), a key
+     may not. *)
+  match String.rindex_opt s '/' with
   | None ->
     Types.fail "plugin_export_ambiguous"
       ("export spec needs a key: " ^ s)

@@ -1,10 +1,3 @@
-// Request/response capture for debugging (mirrors go
-// feature/debug_feature.go). Records a bounded ring buffer of
-// per-operation traces — method, URL, redacted headers, response status
-// and timing — on the feature's entries. Sensitive header values (matching
-// `redact`, default authorization/cookie/api-key style names) are masked.
-// An optional `onEntry` callback receives each finished entry. `max` caps
-// the buffer (default 100).
 
 use std::rc::Rc;
 

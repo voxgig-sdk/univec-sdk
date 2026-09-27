@@ -5,6 +5,7 @@ import {
   cmp,
   collectDeps,
   packageVersion,
+  sdkName,
 } from '@voxgig/sdkgen'
 
 
@@ -28,7 +29,7 @@ const Package = cmp(async function Package(props: any) {
   const model: Model = ctx$.model
 
   const groupId = mavenGroupId(model)
-  const artifactId = `${model.name}-sdk`
+  const artifactId = sdkName(model.name)
 
   // Dep name convention: "groupId:artifactId" with an explicit version.
   const deps: { groupId: string, artifactId: string, version: string, kind: string }[] = []

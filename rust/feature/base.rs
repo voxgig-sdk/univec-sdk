@@ -1,6 +1,3 @@
-// BaseFeature: the no-op feature every hook defaults to (mirrors go
-// feature/base_feature.go). Custom features can embed it for name/active
-// bookkeeping and add_options ordering support.
 
 use crate::core::types::Feature;
 use crate::utility::voxgigstruct::Value;

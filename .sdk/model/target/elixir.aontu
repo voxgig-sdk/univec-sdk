@@ -1,0 +1,41 @@
+
+main: kit: target: elixir: {
+
+  title: Elixir
+  ext: ex
+  comment: line: "#"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  provides: { sekreto: true, schema: true }
+
+  # Files earlier toolchains generated that this target has RETIRED
+  # (vendor-tag rollout): the hand-written corpus engine, replaced by the
+  # vendored @voxgig/omni runner under test/vendor/omni driven through
+  # test/support/omni.ex. `doctor` reports leftovers; `doctor prune` deletes
+  # them.
+  superseded: [
+    'test/support/struct_corpus.ex'
+  ]
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+}
+
+
+main: kit: feature: &: target: elixir: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: elixir: publish: {
+  registry: {
+    name: 'hex'
+    url: 'https://hex.pm'
+    vault: { recipe: 'hex', alias: 'hex' }
+  }
+}

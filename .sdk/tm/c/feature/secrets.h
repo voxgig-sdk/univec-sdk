@@ -6,8 +6,8 @@
 // and go's `Sekreto()` / `Credential()` accessors. Named for the feature so
 // the feature trim drops it with feature/secrets.c and feature/secrets/.
 //
-// The feature is GATED (model/feature/secrets.aon `needs: { sekreto: true }`
-// and model/target/c.aon `provides`), so its constructor is NOT in sdk.h's
+// The feature is GATED (model/feature/secrets.aontu `needs: { sekreto: true }`
+// and model/target/c.aontu `provides`), so its constructor is NOT in sdk.h's
 // bundled list: core/config.c emits the prototype for a project that
 // selected it, and this header repeats it for a caller that includes only
 // this file.

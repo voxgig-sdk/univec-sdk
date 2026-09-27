@@ -10,6 +10,12 @@ defmodule Univec.Utility do
   alias Voxgig.Struct, as: S
   alias Univec.Helpers, as: H
   alias Univec.{Context, Spec, Result, Response, Operation}
+  # prepare_auth IS GENERATED, not templated: where the credential goes
+  # (header | query | cookie, and under what name) is a fact about the API,
+  # which apidef resolves into main.kit.info.security and a template cannot
+  # express. It lives in Univec.PrepareAuth, emitted by
+  # src/cmp/elixir/PrepareAuth_elixir.ts into lib/<app>/prepare_auth.ex.
+  alias Univec.PrepareAuth
 
   @default_user_agent "Mozilla/5.0 (compatible; UnivecSDK/1.0)"
 
@@ -41,7 +47,7 @@ defmodule Univec.Utility do
       {"make_spec", &make_spec_impl/1},
       {"make_url", &make_url_impl/1},
       {"param", &param_impl/2},
-      {"prepare_auth", &prepare_auth_impl/1},
+      {"prepare_auth", &PrepareAuth.prepare_auth_impl/1},
       {"prepare_body", &prepare_body_impl/1},
       {"prepare_headers", &prepare_headers_impl/1},
       {"prepare_method", &prepare_method_impl/1},
@@ -298,41 +304,16 @@ defmodule Univec.Utility do
     co = S.getprop(config, "options")
     cfgopts = if S.ismap(co), do: co, else: S.jm([])
 
-    optspec =
-      H.deep(%{
-        "apikey" => "",
-        "secret" => "",
-        "base" => "http://localhost:8000",
-        "prefix" => "",
-        "suffix" => "",
-        # `basic` and `secret`: HTTP Basic Auth needs a second credential and
-        # a flag to say the pair is Basic rather than a single bearer token.
-        "auth" => %{"prefix" => "", "basic" => false},
-        "headers" => %{"`$CHILD`" => "`$STRING`"},
-        "allow" => %{
-          "method" => "GET,PUT,POST,PATCH,DELETE,OPTIONS",
-          "op" => "create,update,load,list,remove,command,direct,graphql"
-        },
-        "entity" => %{"`$CHILD`" => %{"`$OPEN`" => true, "active" => false, "alias" => %{}}},
-        "feature" => %{"`$CHILD`" => %{"`$OPEN`" => true, "active" => false}},
-        "utility" => %{},
-        # Feature INSTANCES supplied at construction (the station adopt
-        # path): consumed by the constructor's extend loop, so they are
-        # struct feature nodes, not data - `$ANY` accepts them verbatim.
-        # Without this entry the seam is dead: the constructor reads
-        # options.extend, but validate rejected the key.
-        "extend" => "`$ANY`",
-        "system" => %{},
-        "test" => %{"active" => false, "entity" => %{"`$OPEN`" => true}},
-        "clean" => %{"keys" => "key,token,id"},
-        # Server-variable values for a templated base URL (OpenAPI server
-        # variables): {name} placeholders in "base" are substituted from this
-        # map at construction. Spec defaults arrive via the generated config;
-        # user values override them. Mirrors go's make_options optspec - elixir
-        # was the only target validating options that did not accept it, so a
-        # spec with a templated server URL failed validation outright.
-        "server" => %{"`$CHILD`" => ""}
-      })
+    # THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
+    #
+    # `Univec.Schema.optspec/0` is built from the model:
+    # `main.kit.optspec` for the standard options, plus one entry per
+    # feature this target carries, taken from that feature's own
+    # `config.options` / `config.optspec`. Editing this file to add an
+    # option would put it back where it was — one of twenty hand-maintained
+    # copies of a schema nothing cross-checked — so add it to the model
+    # instead and every ported target validates it.
+    optspec = Univec.Schema.optspec()
 
     sys_fetch = S.getpath(opts0, "system.fetch")
 
@@ -1228,7 +1209,8 @@ defmodule Univec.Utility do
     out = S.jm([])
 
     Enum.each(H.entries(reqmatch), fn {key, val} ->
-      if val != nil and is_binary(key) and not Enum.member?(param_strs, key) do
+      if val != nil and is_binary(key) and key != "$action" and
+           not Enum.member?(param_strs, key) do
         S.setprop(out, key, val)
       end
     end)
@@ -1391,36 +1373,6 @@ defmodule Univec.Utility do
     end
   end
 
-  def prepare_auth_impl(ctx) do
-    spec = S.getprop(ctx, "spec")
-
-    if spec == nil do
-      {nil, Context.make_error(ctx, "auth_no_spec", "Expected context spec property to be defined.")}
-    else
-      headers = S.getprop(spec, "headers")
-      options = opts_map(S.getprop(ctx, "client"))
-
-      if S.getprop(options, "auth") == nil do
-        S.delprop(headers, "authorization")
-        {spec, nil}
-      else
-        apikey = S.getprop(options, "apikey", "__NOTFOUND__")
-
-        if (is_binary(apikey) and apikey == "__NOTFOUND__") or apikey == nil or apikey == "" do
-          S.delprop(headers, "authorization")
-        else
-          ap = S.getpath(options, "auth.prefix")
-          auth_prefix = if is_binary(ap), do: ap, else: ""
-          apikey_val = if is_binary(apikey), do: apikey, else: ""
-          hv = if auth_prefix != "", do: auth_prefix <> " " <> apikey_val, else: apikey_val
-          S.setprop(headers, "authorization", hv)
-        end
-
-        {spec, nil}
-      end
-    end
-  end
-
   # ---- result_* ------------------------------------------------------------
 
   def result_basic_impl(ctx) do
@@ -1495,6 +1447,23 @@ defmodule Univec.Utility do
 
   # ---- transform_* ---------------------------------------------------------
 
+  # `$action` selects the point (see make_point_impl); it is never an API
+  # field, so the body is a copy without it. The caller's map is left
+  # untouched.
+  defp strip_action(reqdata) do
+    if S.ismap(reqdata) and S.haskey(reqdata, "$action") do
+      body = S.jm([])
+
+      Enum.each(H.entries(reqdata), fn {key, val} ->
+        if key != "$action", do: S.setprop(body, key, val)
+      end)
+
+      body
+    else
+      reqdata
+    end
+  end
+
   def transform_request_impl(ctx) do
     spec = S.getprop(ctx, "spec")
     point = S.getprop(ctx, "point")
@@ -1502,17 +1471,20 @@ defmodule Univec.Utility do
 
     transform = H.to_map(S.getprop(point, "transform"))
 
-    if transform == nil do
-      S.getprop(ctx, "reqdata")
-    else
-      reqform = S.getprop(transform, "req")
-
-      if reqform == nil do
+    reqdata =
+      if transform == nil do
         S.getprop(ctx, "reqdata")
       else
-        S.transform(S.jm(["reqdata", S.getprop(ctx, "reqdata")]), reqform)
+        reqform = S.getprop(transform, "req")
+
+        if reqform == nil do
+          S.getprop(ctx, "reqdata")
+        else
+          S.transform(S.jm(["reqdata", S.getprop(ctx, "reqdata")]), reqform)
+        end
       end
-    end
+
+    strip_action(reqdata)
   end
 
   def transform_response_impl(ctx) do

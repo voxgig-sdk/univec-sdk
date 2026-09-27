@@ -1,6 +1,3 @@
-// Structured hook logging (mirrors go feature/log_feature.go, using stderr
-// lines instead of slog). Logs every pipeline hook with the operation and
-// spec summary when active; `level` filters (debug < info < warn < error).
 
 use std::rc::Rc;
 

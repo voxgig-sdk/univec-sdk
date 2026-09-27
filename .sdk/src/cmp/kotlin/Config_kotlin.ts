@@ -6,6 +6,9 @@ import {
   configDefinition,
   each,
   isAuthActive,
+  isHttpBasicAuth,
+  resolveAuthIn,
+  resolveAuthName,
   resolveAuthPrefix,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -37,23 +40,19 @@ const Config = cmp(async function Config(props: any) {
   const kotlinpackage = kotlinPackage(model)
 
   const entity = getModelPath(model, `main.${KIT}.entity`)
-  // Gated by the applicability tags, so this target never imports or
-  // registers a feature it has no source for. One rule, one place:
-  // helpers/applicability.
   const feature = targetFeatures(model, target)
 
   const headers = getModelPath(model, `main.${KIT}.config.headers`) || {}
 
   const authActive = isAuthActive(model)
   const authPrefix = resolveAuthPrefix(model)
+  const authBasic = isHttpBasicAuth(model)
+  const authIn = resolveAuthIn(model)
+  const authName = resolveAuthName(model)
 
   let baseUrl = ''
   try { baseUrl = getModelPath(model, `main.${KIT}.info.servers.0.url`) } catch (_e) { }
 
-  // Identity comes from configDefinition's def, not re-derived here, so
-  // this target cannot disagree with the shared emitter on main.slug /
-  // main.version / main.target (the three station descriptor fields,
-  // station design §4) — passing target.name is what opts this target in.
   const { def: configDef } = configDefinition(model, target.name)
 
   // The feature block comes from configDefinition's def, not from
@@ -74,53 +73,30 @@ const Config = cmp(async function Config(props: any) {
     base: baseUrl,
   }
   if (authActive) {
-    options.auth = { prefix: authPrefix }
+    const auth: Record<string, any> = { prefix: authPrefix }
+    // `basic` joins them for the same reason: the generated prepareAuth
+    // emits the base64(user:pass) branch only for a spec-declared HTTP
+    // Basic scheme, and that branch reads this option at runtime - without
+    // it the branch could never fire.
+    if (authBasic) { auth.basic = true }
+    if ('header' !== authIn) { auth.in = authIn }
+    if ('Authorization' !== authName) { auth.name = authName }
+    options.auth = auth
   }
   options.headers = headers
   options.entity = optionsEntity
 
-  // configDefinition's `def.entity` verbatim, NOT rebuilt here. This reduce
-  // was one of fourteen copies of that function's entityDefs loop, and when
-  // configDefinition started reconstructing a point's `parts` from apidef's
-  // segment vector (its ADR-003), only the copies that read `configDef` got
-  // it — this target's literal config emitted paths with no parts at all
-  // while its data config had them. One rule, one place.
   const entityConfig = configDef.entity
 
-  // THE PLUGIN DEFINITIONS the model selected, per feature.
-  //
-  // sekreto's contract since the registry was retired: a kind not passed
-  // in `plugins` is unknown to that Sekreto, so the model's choice of
-  // plugin groups IS the SDK's provider vocabulary. This walks the
-  // catalogue's active `plugin.def.kotlin` entries and hands the list to
-  // the feature through `Config.featurePlugins`.
-  //
-  // Kotlin's Definition symbols are PLAIN TOP-LEVEL VALS
-  // (`val hashicorp: Definition = providerplugin("hashicorp") {...}`), so
-  // the def key is the val name and the import is that name qualified by
-  // the file's package - DERIVED from the def path (`feature/secrets/
-  // sekreto/plugins/Hashicorp.kt` -> `feature.secrets.sekreto.plugins`)
-  // rather than hardcoding `secrets`, exactly as the go emitter does.
-  //
-  // Emitted in core, which already names KOTLINPACKAGE.feature classes in
-  // makeFeature - Kotlin has no package-cycle rule, so nothing here can
-  // introduce one. The feature reads it back as List<Any?> and filters by
-  // type, so a tree with the feature present but no group selected still
-  // compiles with no import at all.
   const pluginImports = new Set<string>()
   const featurePlugins: Record<string, string[]> = {}
 
   each(feature, (f: any) => {
     const syms: string[] = []
     each(f.plugin, (plugin: any) => {
-      // Filter on `active` HERE rather than trusting the feature object to
-      // arrive filtered: getting this wrong emits an import for a file the
-      // plugin trim just deleted, and the SDK does not compile.
       if (false === plugin.active || null == plugin.active) return
       for (const [sym, one] of Object.entries(plugin.def?.kotlin || {})) {
         const dir = String(one).replace(/\/[^/]+$/, '').replace(/\//g, '.')
-        // A dotted symbol (another language's class-qualified spelling)
-        // imports its HEAD; kotlin's own keys are bare val names.
         pluginImports.add(
           kotlinpackage + '.' + dir + '.' + String(sym).split('.')[0])
         syms.push(sym)

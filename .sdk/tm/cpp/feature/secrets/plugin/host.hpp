@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (cpp/src/host.hpp)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (cpp/src/host.hpp)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* The host: the lifecycle state machine (§5), extension points (§6),
  * and resource capture (§8).
@@ -99,6 +99,7 @@ class Inst {
   void bindchain(const std::string& point, ChainFn chain, const V& band);
   void exportvalue(const std::string& key, const V& value);
   void provides(const V& p);
+  V capability(const std::string& name) const;
   /* Returns a handle a plugin can hand back early. The scope still
    * holds the entry and unwinding it twice is a no-op — releasing early
    * must not make teardown wrong. */

@@ -1,4 +1,4 @@
-package = "voxgig-sdk-univec"
+package = "voxgig-sdk-univec-sdk"
 version = "0.1.2-1"
 source = {
   -- git+https (GitHub dropped git:// in 2022); pin the install to the release
@@ -25,6 +25,7 @@ build = {
     ["config"] = "config.lua",
     ["config_shared"] = "config_shared.lua",
     ["config_plugins"] = "config_plugins.lua",
+    ["schema"] = "schema.lua",
     ["features"] = "features.lua",
     ["feature.base_feature"] = "feature/base_feature.lua",
     ["feature.audit_feature"] = "feature/audit_feature.lua",

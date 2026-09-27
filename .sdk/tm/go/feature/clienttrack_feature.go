@@ -7,13 +7,6 @@ import (
 	"GOMODULE/core"
 )
 
-// Client tracking. Establishes a stable per-client session id at
-// construction and stamps identifying headers on every request: a
-// `User-Agent` (`<clientName>/<clientVersion>`), an `X-Client-Id` (session),
-// and a fresh per-request `X-Request-Id`. This lets a server correlate all
-// traffic from one SDK instance and each individual call. Header names,
-// client name/version and the id generator (`idgen`) are configurable;
-// caller-provided User-Agent / X-Client-Id values are never clobbered.
 type ClienttrackFeature struct {
 	BaseFeature
 	client  *core.UnivecSDK

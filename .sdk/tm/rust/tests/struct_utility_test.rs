@@ -1,10 +1,3 @@
-// Struct utility tests — run the shared `struct` corpus subtree from
-// ../.sdk/test/test.json against the vendored voxgig struct port.
-//
-// The corpus is driven by the VENDORED omni runner through the adapter in
-// tests/omni_resolver/mod.rs (which superseded the hand-written
-// tests/struct_runner/mod.rs). Group labels, null flags and subjects are
-// unchanged; the engine underneath them is now the shared one.
 
 mod omni_resolver;
 
@@ -18,18 +11,6 @@ use RUSTCRATE::utility::voxgigstruct::value::Value;
 use RUSTCRATE::utility::voxgigstruct::*;
 
 
-/// Groups this SDK's corpus subset does not carry, so a run over it reports
-/// zero checks for them BY DESIGN.
-///
-/// `Run::report` holds this list to the corpus in both directions: a group
-/// that goes absent without being named here fails the suite, and a name
-/// here that is no longer absent fails it too. Nothing else stops a renamed
-/// or deleted group from taking its whole check count away while `cargo
-/// test` still prints `ok`.
-///
-/// `sentinels` is the Group A null-unification block (UNDEF_SPEC.md): the
-/// subjects below are wired and ready, and the entries arrive with the
-/// corpus refresh that adds `struct.sentinels`.
 const EXPECTED_SKIPS: &[&str] = &[
     "sentinels-getprop_unify",
     "sentinels-getelem_absent",
@@ -271,7 +252,6 @@ fn struct_utility() {
         };
         walk(vin, Some(&mut walkpath), None, None)
     });
-    // walk.log — three runs (after-only / before-only / both) of a logging callback.
     {
         let log_spec = tostruct(&jpath(&s, &["walk", "log"]));
         let input = clone(&vget(&log_spec, "in"));
@@ -650,9 +630,6 @@ fn struct_utility() {
         );
     }
 
-    // -------- primary / SDK ------------------------------------------
-    // A tiny mock SDK (mirrors ts/test/sdk.ts): check(ctx) ->
-    //   { zed: 'ZED' + (opts.foo ?? '') + '_' + (ctx.meta?.bar ?? '0') }
     fn sdk_check(opts: &Value, ctx: &Value) -> Value {
         let foo = get_prop(opts, &Value::str("foo"), Value::Noval);
         let foo_s = if foo.is_nullish() {
@@ -711,8 +688,6 @@ fn struct_utility() {
     run.report("corpus", EXPECTED_SKIPS);
 }
 
-// Function values embedded in data: `get_elem` with a callable `alt`, and
-// `$APPLY` / a user `$FORMAT` formatter — see rs/README.md "Function values".
 #[test]
 fn function_values() {
     // get_elem: absent element + callable alt -> alt is invoked

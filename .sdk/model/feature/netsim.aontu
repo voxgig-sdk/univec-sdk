@@ -1,0 +1,44 @@
+
+main: kit: feature: netsim: {
+
+  name: key()
+  title: "Network simulation"
+  description: "Network behaviour simulation for offline testing (latency, failures, outages)"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'wrap'
+
+  config: {
+    options: {
+      active: false
+      latency: 0
+      failTimes: 0
+      failStatus: 503
+      failEvery: 0
+      errorTimes: 0
+      rateLimitTimes: 0
+      retryAfter: 0
+      failRate: 0
+      seed: 1
+      offline: false
+    }
+
+    # TYPES for the options whose kind the default cannot state.
+    # `config.optspec` wins over `config.options` when a name is in both, so
+    # the default above still documents the value and this states what the
+    # feature actually accepts.
+    optspec: {
+      # `latency: 0` reads as "a number", but the feature also takes
+      # `{ min, max }` for a uniform sample — the comment above said so and
+      # the spec would have rejected it.
+      latency: ['`$ONE`', '`$NUMBER`', '`$MAP`']
+
+      # Injected clock, for tests that must not really wait.
+      sleep: '`$FUNCTION`'
+    }
+  }
+
+  hook: {}
+}

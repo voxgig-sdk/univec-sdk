@@ -3,11 +3,43 @@ package voxgig.univecsdk.utility
 import java.net.{InetSocketAddress, ProxySelector, URI}
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.util.{LinkedHashMap, List => JList, Map => JMap}
-import java.util.function.{BiFunction, Supplier}
+import java.util.concurrent.ConcurrentHashMap
+import java.util.function.{BiFunction, Function => JFunction, Supplier}
 import voxgig.univecsdk.core._
 import voxgig.univecsdk.utility.struct.Struct
 
 object Fetcher {
+
+  // Clients keyed by redirect policy and proxy. Each HttpClient owns a
+  // connection pool and a selector thread, so one per request reused
+  // nothing; one per key pools across calls.
+  private val clients = new ConcurrentHashMap[String, HttpClient]()
+
+  private def clientFor(fetchdef: JMap[String, Object]): HttpClient = {
+    // "manual" (set by the station feature's middleware under a hosts
+    // policy) returns a 3xx like any other response: an automatic follow
+    // would carry injected credentials to a host no policy approved.
+    val redirectPolicy =
+      if ("manual" == fetchdef.get("redirect")) HttpClient.Redirect.NEVER
+      else HttpClient.Redirect.NORMAL
+
+    val proxy = fetchdef.get("proxy") match { case p: String => p; case _ => "" }
+
+    clients.computeIfAbsent(redirectPolicy.toString + "|" + proxy,
+      new JFunction[String, HttpClient] {
+        def apply(key: String): HttpClient = {
+          val clientb = HttpClient.newBuilder().followRedirects(redirectPolicy)
+          if (proxy != "") {
+            try {
+              val proxyUri = URI.create(proxy)
+              val port = if (proxyUri.getPort < 0) 80 else proxyUri.getPort
+              clientb.proxy(ProxySelector.of(new InetSocketAddress(proxyUri.getHost, port)))
+            } catch { case _: RuntimeException => }
+          }
+          clientb.build()
+        }
+      })
+  }
 
   def defaultHttpFetch(fullurl: String, fetchdef: JMap[String, Object]): JMap[String, Object] = {
     var method = fetchdef.get("method") match { case s: String => s; case _ => "" }
@@ -40,19 +72,8 @@ object Fetcher {
     }
     if (!hasUA) reqb.setHeader("User-Agent", "Mozilla/5.0 (compatible; UnivecSDK/1.0)")
 
-    val clientb = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL)
-    fetchdef.get("proxy") match {
-      case proxy: String if proxy != "" =>
-        try {
-          val proxyUri = URI.create(proxy)
-          val port = if (proxyUri.getPort < 0) 80 else proxyUri.getPort
-          clientb.proxy(ProxySelector.of(new InetSocketAddress(proxyUri.getHost, port)))
-        } catch { case _: RuntimeException => }
-      case _ =>
-    }
-
     val resp =
-      try clientb.build().send(reqb.build(), HttpResponse.BodyHandlers.ofString())
+      try clientFor(fetchdef).send(reqb.build(), HttpResponse.BodyHandlers.ofString())
       catch { case e: Exception => throw new RuntimeException("fetch: " + e.getMessage, e) }
 
     val headers = new LinkedHashMap[String, Object]()

@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (c/src/util.c)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (c/src/util.c)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* The arena, the buffer, and the two ordered containers everything else
  * is built from.
@@ -312,6 +312,20 @@ void sek_list_add(sek_list *list, const char *text) {
 
   list->items[list->len] = sek_strdup(list->pool, text);
   list->len++;
+}
+
+static int bytext(const void *left, const void *right) {
+  return strcmp(*(const char *const *)left, *(const char *const *)right);
+}
+
+/* By BYTE VALUE, which is what `strcmp` is and what every other port
+ * sorts a name list by. A locale-aware comparison would put the same
+ * three secret names in a different order on a machine with a different
+ * LC_COLLATE, and the shared spec compares whole lists. */
+void sek_list_sort(sek_list *list) {
+  if (1 < list->len) {
+    qsort(list->items, list->len, sizeof(char *), bytext);
+  }
 }
 
 /* ---- small string helpers ------------------------------------------ */

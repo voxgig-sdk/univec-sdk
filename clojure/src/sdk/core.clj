@@ -14,6 +14,7 @@
 
 (ns sdk.core
   (:require [voxgig.struct :as vs]
+            [sdk.schema :as schema]
             [clojure.string :as str]))
 
 (def SDK-NAME "Univec")
@@ -91,6 +92,21 @@
                          (catch NumberFormatException _
                            (bigint (java.math.BigInteger. tok))))))))]
       (parse-val))))
+
+;; The option spec, parsed ONCE. sdk.schema holds the raw JSON and nothing
+;; else — it cannot parse its own data without requiring this namespace,
+;; which would close a cycle — so the parse lives here, behind a delay so it
+;; happens on first use rather than at load.
+;;
+;; sdk.schema also carries `entityspec-data`, the per-entity field specs the
+;; `validate` feature checks payloads against. Parsed here for the same
+;; reason and behind the same delay; `entityspec` is public because the
+;; feature module reads it, and it is READ-ONLY — validate rebuilds the tree
+;; for `strict` rather than mutating this one.
+(def ^:private optspec-parsed (delay (json-parse schema/optspec-data)))
+(def ^:private entityspec-parsed (delay (json-parse schema/entityspec-data)))
+
+(defn entityspec [] @entityspec-parsed)
 
 ;; ---------------------------------------------------------------------------
 ;; Atom-object helpers. Every mutable "object" is an atom wrapping a map.
@@ -289,7 +305,9 @@
         cprop (fn [k] (mget ctxmap k))
         client (or (cprop "client") (bget :client))
         utility (or (cprop "utility") (bget :utility))
-        ;; ctrl: explicit ctrl map -> fresh control; else share base ctrl.
+        ;; ctrl: explicit ctrl map -> fresh control; an OPERATION (one named by
+        ;; opname) also gets its own, so a paging cursor cannot leak into the
+        ;; next call; anything else shares the base ctrl.
         ctrl-raw (cprop "ctrl")
         ctrl (cond
                (vs/ismap ctrl-raw)
@@ -299,7 +317,7 @@
                  (when (contains? (into #{} (vs/keysof ctrl-raw)) "actor") (oset! c :actor (mget ctrl-raw "actor")))
                  (when (vs/ismap (mget ctrl-raw "paging")) (oset! c :paging (mget ctrl-raw "paging")))
                  c)
-               (bget :ctrl) (bget :ctrl)
+               (and (nil? (cprop "opname")) (bget :ctrl)) (bget :ctrl)
                :else (make-control))
         meta (let [m (cprop "meta")] (if (vs/ismap m) m (or (bget :meta) (vs/jm))))
         config (let [c (cprop "config")] (if (vs/ismap c) c (bget :config)))
@@ -486,18 +504,30 @@
         out (vs/jm)]
     (doseq [item (or (vs/items reqmatch) [])]
       (let [k (vs/getprop item 0) v (vs/getprop item 1)]
-        (when (and (some? v) (string? k) (not (contains? pset k)))
+        (when (and (some? v) (string? k) (not= "$action" k) (not (contains? pset k)))
           (.put ^java.util.Map out k v))))
     out))
+
+;; `$action` selects the point (see u-make-point); it is never an API field,
+;; so the body is a copy without it. The caller's map is left untouched.
+(defn- strip-action [reqdata]
+  (if (and (vs/ismap reqdata) (.containsKey ^java.util.Map reqdata "$action"))
+    (let [body (vs/jm)]
+      (doseq [item (or (vs/items reqdata) [])]
+        (let [k (vs/getprop item 0) v (vs/getprop item 1)]
+          (when (not= "$action" k) (.put ^java.util.Map body k v))))
+      body)
+    reqdata))
 
 (defn u-transform-request [ctx]
   (let [spec (oget ctx :spec) point (oget ctx :point)]
     (when spec (oset! spec :step "reqform"))
     (let [transform (to-map (vs/getprop point "transform"))]
-      (if (nil? transform) (oget ctx :reqdata)
-          (let [reqform (vs/getprop transform "req")]
-            (if (nil? reqform) (oget ctx :reqdata)
-                (vs/transform (vs/jm "reqdata" (oget ctx :reqdata)) reqform)))))))
+      (strip-action
+       (if (nil? transform) (oget ctx :reqdata)
+           (let [reqform (vs/getprop transform "req")]
+             (if (nil? reqform) (oget ctx :reqdata)
+                 (vs/transform (vs/jm "reqdata" (oget ctx :reqdata)) reqform))))))))
 
 (defn u-prepare-body [ctx]
   (if (= "data" (op-input (oget ctx :op))) (ucall ctx :transform-request) nil))
@@ -604,25 +634,27 @@
         (oset! result :ok false)
         true))))
 
-(def HEADER-AUTH "authorization")
-(def OPTION-APIKEY "apikey")
-(def NOT-FOUND "__NOTFOUND__")
-
-(defn u-prepare-auth [ctx]
-  (let [spec (oget ctx :spec)]
-    (if (nil? spec) [nil (ctx-error ctx "auth_no_spec" "Expected context spec property to be defined.")]
-        (let [headers (oget spec :headers)
-              options (client-options-map (oget ctx :client))]
-          (if (nil? (vs/getprop options "auth"))
-            (do (vs/delprop headers HEADER-AUTH) [spec nil])
-            (let [apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
-              (if (or (nil? apikey) (and (string? apikey) (or (= apikey NOT-FOUND) (= apikey ""))))
-                (vs/delprop headers HEADER-AUTH)
-                (let [auth-prefix (or (vs/getpath options "auth.prefix") "")
-                      apikey-val (if (string? apikey) apikey "")]
-                  (.put ^java.util.Map headers HEADER-AUTH
-                        (if (= auth-prefix "") apikey-val (str auth-prefix " " apikey-val)))))
-              [spec nil]))))))
+;; WHERE THE CREDENTIAL GOES IS A FACT ABOUT THE API, so HEADER-AUTH,
+;; OPTION-APIKEY, NOT-FOUND and u-prepare-auth are GENERATED into
+;; src/sdk/prepare_auth.clj rather than written here.
+;;
+;; apidef resolves the security scheme's `in` and `name` into
+;; main.kit.info.security - joplin's says `in: "query", name: "token"` - and
+;; this file used to hardcode an `authorization` HEADER, so an
+;; apiKey-in-query API got a header it does not read and never got the query
+;; parameter it does. Header, query and cookie need three different bodies
+;; and a hand-written file has to pick one, so cmp/clojure/PrepareAuth_
+;; clojure.ts emits the branch the API actually uses and nothing else.
+;;
+;; `load`, NOT `require`: the generated file opens with `(in-ns 'sdk.core)`
+;; and is read INTO THIS NAMESPACE, right here, where the defn used to be.
+;; A namespace of its own would need sdk.core's oget / ctx-error /
+;; client-options-map while base-utility-map below needs its u-prepare-auth -
+;; a load cycle, which Clojure refuses. This is the idiom clojure.core itself
+;; uses to split across files, every helper above is already in scope, and
+;; both `:prepare-auth u-prepare-auth` below and `core/HEADER-AUTH` (read by
+;; feature/secrets) go on resolving exactly as before.
+(load "prepare_auth")
 
 (defn u-make-point [ctx]
   (let [preset (out-get ctx "point")]
@@ -716,7 +748,12 @@
 
 (defn u-make-spec [ctx]
   (if (some? (out-get ctx "spec"))
-    (do (oset! ctx :spec (out-get ctx "spec")) [(oget ctx :spec) nil])
+    ;; A PreSpec feature hook (e.g. validate) may short-circuit the operation
+    ;; by storing an error here; surface it before the request is built, the
+    ;; same way u-make-point surfaces out["point"].
+    (if (sdk-error? (out-get ctx "spec"))
+      [nil (out-get ctx "spec")]
+      (do (oset! ctx :spec (out-get ctx "spec")) [(oget ctx :spec) nil]))
     (let [point (oget ctx :point)
           options (oget ctx :options)
           base (or (vs/getprop options "base") "")
@@ -1026,37 +1063,15 @@
                 order)))
           config (or (oget ctx :config) (vs/jm))
           cfgopts (let [c (vs/getprop config "options")] (if (vs/ismap c) c (vs/jm)))
-          optspec (vs/jm
-                   "apikey" "" "secret" "" "base" "http://localhost:8000" "prefix" "" "suffix" ""
-                   ;; `basic` and `secret`: HTTP Basic Auth needs a second
-                   ;; credential and a flag to say the pair is Basic rather
-                   ;; than a single bearer token. Absent from the shape, a
-                   ;; client passing them is refused with "Unexpected keys".
-                   "auth" (vs/jm "prefix" "" "basic" false)
-                   "headers" (vs/jm "`$CHILD`" "`$STRING`")
-                   "allow" (vs/jm "method" "GET,PUT,POST,PATCH,DELETE,OPTIONS"
-                                  "op" "create,update,load,list,remove,command,direct,graphql")
-                   "entity" (vs/jm "`$CHILD`" (vs/jm "`$OPEN`" true "active" false "alias" (vs/jm)))
-                   "feature" (vs/jm "`$CHILD`" (vs/jm "`$OPEN`" true "active" false))
-                   "utility" (vs/jm)
-                   ;; Feature INSTANCES supplied at construction (the station
-                   ;; adopt path): consumed by make-sdk's feature-add loop, so
-                   ;; they are live feature atoms, not data - `$ANY` accepts
-                   ;; them verbatim. Without this entry the seam is DEAD:
-                   ;; client.clj reads options.extend, but validate rejected
-                   ;; the key ("Unexpected keys at field <root>: extend"), so
-                   ;; every construction that used it failed outright.
-                   ;; Mirrors go's make_options.go and MakeOptionsUtility.ts.
-                   "extend" "`$ANY`"
-                   "system" (vs/jm)
-                   "test" (vs/jm "active" false "entity" (vs/jm "`$OPEN`" true))
-                   "clean" (vs/jm "keys" "key,token,id")
-                   ;; Server-variable values for a templated base URL (OpenAPI
-                   ;; server variables): {name} placeholders in "base" are
-                   ;; substituted from this map at construction. Spec defaults
-                   ;; arrive via the generated config; user values override
-                   ;; them. Mirrors go's make_options optspec.
-                   "server" (vs/jm "`$CHILD`" ""))
+          ;; THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
+          ;;
+          ;; Built from the model: main.kit.optspec for the standard
+          ;; options, plus one entry per feature this target carries, from
+          ;; that feature's own config.options / config.optspec. Editing
+          ;; this file to add an option would put it back where it was —
+          ;; one of twenty hand-maintained copies of a schema nothing
+          ;; cross-checked — so add it to the model instead.
+          optspec @optspec-parsed
           sys-fetch (vs/getpath opts0 "system.fetch")
           merged (vs/merge (vs/jt (vs/jm) cfgopts opts0))
           validated (vs/validate merged optspec)

@@ -405,6 +405,9 @@ public class FeatureCorpusTest {
       UnivecSDK probe = buildClient(Map.of("feature",
           List.of(Map.of("name", name, "active", true))));
       if (null == record(probe, name)) {
+        // The one line every runner prints for an inert section.
+        System.err.println(String.format(
+            "feature.%s: inert (this SDK does not generate the feature)", name));
         continue;
       }
 

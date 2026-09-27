@@ -9,6 +9,8 @@ import {
   each,
   isAuthActive,
   isConfigData,
+  resolveAuthIn,
+  resolveAuthName,
   resolveAuthPrefix,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -35,15 +37,14 @@ const Config = cmp(async function Config(props: any) {
   const Name = model.const.Name
 
   const entity = getModelPath(model, `main.${KIT}.entity`)
-  // Gated by the applicability tags, so this target never imports or
-  // registers a feature it has no source for. One rule, one place:
-  // helpers/applicability.
   const feature = targetFeatures(model, target)
 
   const headers = getModelPath(model, `main.${KIT}.config.headers`) || {}
 
   const authActive = isAuthActive(model)
   const authPrefix = resolveAuthPrefix(model)
+  const authIn = resolveAuthIn(model)
+  const authName = resolveAuthName(model)
 
   let baseUrl = ''
   try { baseUrl = getModelPath(model, `main.${KIT}.info.servers.0.url`) } catch (_e) { }
@@ -52,34 +53,8 @@ const Config = cmp(async function Config(props: any) {
     ? `        "auth" => %{"prefix" => ${elixirString(authPrefix)}},\n`
     : ''
 
-  // THE PLUGIN DEFINITIONS PER FEATURE (the elixir peer of Config_go's
-  // FeaturePlugins and Config_ts's pluginDefs).
-  //
-  // Upstream sekreto replaced its self-registration registry with
-  // voxgig/plugin definitions: a provider kind the caller did not pass in
-  // via `plugins: [...]` is unknown to that Sekreto, so the model's choice
-  // of plugin groups IS the SDK's provider vocabulary. Each active plugin's
-  // `def` key is a fully-qualified elixir CALL (`Sekreto.Plugins.Hashicorp
-  // .hashicorp`), emitted here as `...()` and handed to the feature.
-  //
-  // The smallest of the four emitters: Elixir resolves modules globally, by
-  // their `defmodule`, so there is no import block to keep in step with the
-  // trim - naming the call is the whole of it.
-  //
-  // Filter on `active` HERE rather than trusting the feature object to
-  // arrive filtered (the trap Config_ts and Config_go both carry a warning
-  // about): emitting a call into a module the plugin trim just deleted is
-  // an `UndefinedFunctionError` at the first client construction.
   const featurePlugins: Record<string, string[]> = {}
 
-  // DECLARED at all, active or not - the emit gate. An SDK that selects no
-  // plugin-bearing feature gets no function, so config.ex is byte-identical
-  // to what it was before this feature existed: inactive costs nothing.
-  // (`only_active: false` for the same reason pluginExcludes needs it - the
-  // feature object a component is handed has ALREADY been filtered, so its
-  // `plugin` map holds only the ACTIVE groups and a project with the feature
-  // on but every group off would read as "no plugins declared" and lose the
-  // function the feature calls.)
   let declared = false
 
   each(feature, (f: any) => {
@@ -119,38 +94,20 @@ const Config = cmp(async function Config(props: any) {
 `
 
   Folder({ name: 'lib' }, () => {
-    // The same config as an OBJECT, built by the shared helper so this
-    // target's literal and the data that replaces it above the threshold are
-    // the same config by construction. The JSON is what the threshold is
-    // measured on - emitted source size varies by language, the model does not.
-    // Passing target.name opts in to the main slug/version/target identity
-    // fields (station descriptor input, mirrors Config_ts) - both reps below
-    // render from this same def, so the data and literal branches pick the
-    // fields up together.
-    const { def: configDef, json: configJson } = configDefinition(model, target.name)
+    const { def: configDef } = configDefinition(model, target.name)
+
+    if (authActive && null != configDef.options && null != configDef.options.auth) {
+      if ('header' !== authIn) configDef.options.auth.in = authIn
+      if ('Authorization' !== authName) configDef.options.auth.name = authName
+    }
+
+    const configJson = JSON.stringify(configDef)
     const asData = isConfigData(configJson, configReprSetting(model))
 
-    // configDefinition's `def.entity` verbatim, NOT rebuilt here. The reduce
-    // this replaces was one of fourteen copies of that function's entityDefs
-    // loop, and when configDefinition started reconstructing a point's
-    // `parts` from apidef's segment vector (its ADR-003), only the copies
-    // that read `configDef` got it — this target's literal config emitted
-    // paths with no parts at all while its data config had them. One rule,
-    // one place.
     const entityClean = configDef.entity
 
     File({ name: 'config.ex' }, () => {
 
-      // ABOVE THE THRESHOLD: emit the model as DATA.
-      //
-      // The literal is one nested `%{}` the Elixir compiler expands and holds
-      // in the module's constant pool; a binary is one token. `Json.parse`
-      // builds the vendored struct's heap nodes DIRECTLY - the same nodes
-      // `Helpers.deep/1` produces from a plain map - so make_config returns
-      // exactly what it returned before.
-      //
-      // `ProjectName.Json` is already the SDK's response decoder (see
-      // `safe_json` in utility.ex), so this adds no dependency.
       if (asData) {
         Content(`# ${Name} SDK configuration
 #

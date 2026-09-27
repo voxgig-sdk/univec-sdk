@@ -1,6 +1,6 @@
 # SecretsFeature — Agent Guide
 
-Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens (v0.1.0).
+Secrets (v0.1.0).
 
 A **feature** is a pipeline extension: an object of hooks that fire at named
 stages of every entity operation (load, list, create, update, remove) and of
@@ -23,8 +23,8 @@ later feature can override an earlier one.
 
 | Part | Path |
 | --- | --- |
-| Model definition | `.sdk/model/feature/secrets.aon` (name, title, version, `config.options.active`, the `hook` map, per-language `deps`) |
-| Registered in | `.sdk/model/feature/feature-index.aon` (`@"secrets.aon"`) |
+| Model definition | `.sdk/model/feature/secrets.aontu` (name, title, version, `config.options.active`, the `hook` map, per-language `deps`) |
+| Registered in | `.sdk/model/feature/feature-index.aontu` (`@"secrets.aontu"`) |
 | Runtime template | `.sdk/tm/ts/src/feature/secrets/` (copied here on `generate`; `FEATURE_Name`/`FEATURE_VERSION` substituted) |
 
 (Paths are relative to the **project root** — four levels up from here.)
@@ -32,7 +32,7 @@ later feature can override an earlier one.
 ## Customising this feature
 
 - **Turn hooks on/off**: edit the `hook` map in
-  `.sdk/model/feature/secrets.aon` (`<Stage>: active: true|false`).
+  `.sdk/model/feature/secrets.aontu` (`<Stage>: active: true|false`).
 - **Change default activation**: set `config.options.active` in the same file.
 - **Dependencies**: edit `deps.<lang>` in the same file.
 - **Behaviour**: edit the runtime template under

@@ -9,9 +9,6 @@ const EntityOperation = cmp(function Operation(props: any) {
   const { model } = props.ctx$
   const { ff, opname, entity, entrep, cls } = props
 
-  // The op markers sit inside the class body; the captured indent (2-space
-  // class-member indent) is applied to the whole spliced EJECT region, which
-  // is written at column 0.
   const { indent } = props
 
   Fragment({

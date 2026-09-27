@@ -1,5 +1,5 @@
-# VENDORED: @voxgig/plugin sdk-20260908-1556-0 (perl/lib/Voxgig/Plugin/Host.pm)
-# Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+# VENDORED: @voxgig/plugin sdk-20260925-1316-0 (perl/lib/Voxgig/Plugin/Host.pm)
+# Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 package Voxgig::Plugin::Host;
 
@@ -157,6 +157,23 @@ our @EXPORT_OK = qw(make_host);
         my ($self, $key, $value) = @_;
         $self->{entry}{exports}{$key} = $value;
         return;
+    }
+
+    # WHICH provider this instance is bound to for $name (11.1), as a
+    # ref, or undef when nothing provides it.
+    #
+    # The host's own `capability` answers with the live providers
+    # RANKED, not with the one THIS instance took; 11.4's reluctant
+    # rebinding makes those differ. A REF, not the instance: every port
+    # can return a string and a corpus entry can assert on one. The
+    # selection is REMEMBERED, because this is the instance asking.
+    sub capability {
+        my ($self, $name) = @_;
+        for my $req (@{ Voxgig::Plugin::Depend::requirements($self->{entry}{options}) }) {
+            return $self->{host}->chosen($self->{entry}, $req, 1)
+                if ($req->{name} // '') eq $name;
+        }
+        return undef;
     }
 
     # What this instance can do for others (section 11.1).

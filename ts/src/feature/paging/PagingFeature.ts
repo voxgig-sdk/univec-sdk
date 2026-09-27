@@ -5,14 +5,6 @@ import type { UnivecSDK } from '../../UnivecSDK'
 import { BaseFeature } from '../base/BaseFeature'
 
 
-// Pagination support for list operations. On the way out (PreRequest) it
-// stamps page/limit (or a cursor) into the request query; on the way back
-// (PreResult) it reads the server's pagination signals — a `Link:
-// rel="next"` header, `X-Next-Page`/`X-Total-Count` headers, or `next`/
-// `cursor`/`hasMore` fields in the body — and records them on
-// `ctx.result.paging`. Generated SDKs build auto-iteration on top of this
-// (advance the cursor/page and re-issue the list call until `hasMore` is
-// false). Parameter names and page size are configurable.
 class PagingFeature extends BaseFeature {
   version = '0.0.1'
   name = 'paging'
@@ -30,7 +22,7 @@ class PagingFeature extends BaseFeature {
 
 
   PreRequest(this: any, ctx: any) {
-    if (!this._isList(ctx)) {
+    if (!this.active || !this._isList(ctx)) {
       return
     }
     const spec = ctx.spec
@@ -45,7 +37,6 @@ class PagingFeature extends BaseFeature {
     const limitParam = this._options.limitParam || 'limit'
     const cursorParam = this._options.cursorParam || 'cursor'
 
-    // A per-call cursor/page from ctrl takes priority (used by auto-iteration).
     const paging = (ctx.ctrl && ctx.ctrl.paging) || {}
 
     // GraphQL paginates through operation VARIABLES, not the query string.
@@ -60,7 +51,10 @@ class PagingFeature extends BaseFeature {
       spec.query[cursorParam] = paging.cursor
     }
     else if (null == spec.query[pageParam]) {
-      spec.query[pageParam] = null != paging.page ? paging.page : (this._options.startPage || 1)
+      // A record written back by PreResult holds the page just fetched as
+      // `page` and the one to fetch as `nextPage`, so nextPage wins.
+      spec.query[pageParam] = null != paging.nextPage ? paging.nextPage :
+        null != paging.page ? paging.page : (this._options.startPage || 1)
     }
 
     if (null != this._options.limit && null == spec.query[limitParam]) {
@@ -70,7 +64,7 @@ class PagingFeature extends BaseFeature {
 
 
   PreResult(this: any, ctx: any) {
-    if (!this._isList(ctx)) {
+    if (!this.active || !this._isList(ctx)) {
       return
     }
     const result = ctx.result
@@ -94,7 +88,6 @@ class PagingFeature extends BaseFeature {
       hasMore: false,
     }
 
-    // Link: <...>; rel="next"
     const link = this._header(headers, 'link')
     if (null != link) {
       const m = /<([^>]+)>\s*;\s*rel="?next"?/i.exec(link)
@@ -126,11 +119,19 @@ class PagingFeature extends BaseFeature {
       }
     }
 
-    // Body-level cursors.
     if (body && 'object' === typeof body) {
       if (null != body.next) { paging.next = paging.next || body.next }
+      if (null != body.next_cursor) { paging.cursor = body.next_cursor }
       if (null != body.cursor) { paging.cursor = body.cursor }
       if (null != body.nextCursor) { paging.cursor = body.nextCursor }
+      if (null == paging.nextPage) {
+        const np = null != body.nextPage ? body.nextPage : body.next_page
+        if ('number' === typeof np || 'string' === typeof np) { paging.nextPage = np }
+      }
+      if ('boolean' === typeof body.has_more) {
+        paging.hasMore = body.has_more
+        explicitMore = true
+      }
       if ('boolean' === typeof body.hasMore) {
         paging.hasMore = body.hasMore
         explicitMore = true
@@ -148,6 +149,10 @@ class PagingFeature extends BaseFeature {
     }
 
     result.paging = paging
+
+    if (null != ctx.ctrl) {
+      ctx.ctrl.paging = paging
+    }
 
     const client: any = this._client
     client._paging = { last: paging }
@@ -171,8 +176,6 @@ class PagingFeature extends BaseFeature {
     const afterVar = this._options.afterVar || 'after'
     const firstVar = this._options.firstVar || 'first'
 
-    // Only bind variables the operation actually declares, or the server
-    // rejects the document.
     const declared: Record<string, boolean> = {}
     for (const v of ((point.graphql && point.graphql.vars) || [])) {
       declared[v.name] = true

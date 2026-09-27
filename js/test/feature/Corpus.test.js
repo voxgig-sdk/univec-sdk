@@ -254,6 +254,10 @@ describe('FeatureCorpus', () => {
 
       const probe = makeClient({})
       if (!probe._rootctx.config.hasFeature(name)) {
+        // The one line every runner prints for a section that names a
+        // feature this SDK does not generate, so an inert section is
+        // visible in the output rather than inferred from a green tick.
+        t.diagnostic(`feature.${name}: inert (this SDK does not generate the feature)`)
         return t.skip(`this SDK was generated without the ${name} feature`)
       }
 

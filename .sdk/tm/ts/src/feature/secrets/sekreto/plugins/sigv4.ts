@@ -1,29 +1,7 @@
 // VENDORED: @voxgig/sekreto 0.2.0 (typescript/plugins/sigv4.ts)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-// AWS Signature Version 4, hand-rolled.
-//
-// The AWS providers need exactly one thing from the AWS SDK - request
-// signing - and taking the SDK for it would break the no-dependency rule
-// that keeps ten ports honest. SigV4 is a stable, published algorithm
-// built from HMAC-SHA256, which every port's standard library (or, for
-// Rust, a small in-tree implementation) already has.
-//
-// `sigv4` is pure: the caller passes the timestamp, so the same input
-// yields the same signature everywhere. That is what lets the shared spec
-// carry known-answer cases that all ten ports must reproduce bit-for-bit,
-// and lets the integration mock recompute the signature server-side.
 
-// node:crypto is loaded ON FIRST USE, not at import time.
-//
-// This module lives under plugins/ and is reached only through the aws
-// plugin, so the core never sees it at all; deferring the builtin on top
-// of that keeps importing the plugin free of side effects too, and lets
-// the sigv4 conformance group run on a runtime that has crypto without
-// anything else in the module graph having asked for it.
-//
-// require(), not `await import()`: these helpers are synchronous and are
-// called from synchronous signing code. The package is CommonJS.
 function crypto(): typeof import('node:crypto') {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -51,8 +29,6 @@ export type Sigv4Input = {
   secret: string
   /** STS session token; signed as x-amz-security-token when present. */
   session?: string
-  /** The signing moment, `YYYYMMDDTHHMMSSZ`. Passed in, never sampled,
-   * so the function stays pure. */
   datetime: string
 }
 
@@ -108,12 +84,6 @@ export function sigv4(input: Sigv4Input): Sigv4Output {
   const date = input.datetime.slice(0, 8)
   const body = input.body || ''
 
-  // Every header that will be signed: the caller's extras, plus host and
-  // x-amz-date (and the session token when present), lower-cased and
-  // trimmed the way the canonical form requires.
-  // Canonical header values are trimmed AND internally collapsed -
-  // AWS folds sequential whitespace to one space before signing, so a
-  // header like "a  b" must sign as "a b" or the service refuses it.
   const headers: Record<string, string> = {}
   for (const [key, value] of Object.entries(input.headers || {})) {
     headers[key.toLowerCase()] = String(value).trim().replace(/\s+/g, ' ')

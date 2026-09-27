@@ -1,0 +1,39 @@
+main: kit: target: dart: {
+
+  title: Dart
+  ext: dart
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen-langpack/.sdk'
+  package: '@voxgig/sdkgen-langpack'
+  srcfeature: false
+
+  provides: { sekreto: true }
+
+  superseded: [
+    'test/runner.dart'
+    'test/struct_corpus.dart'
+  ]
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  # struct utility is vendored under tm/dart/lib/utility/voxgig_struct.dart -
+  # the runtime is dependency-free (dart:io HttpClient + dart:convert only).
+  deps: {}
+}
+
+
+main: kit: feature: &: target: dart: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: dart: publish: {
+  registry: {
+    name: 'pub.dev'
+    url: 'https://pub.dev'
+    vault: { alias: 'pubdev', env: 'PUB_CREDENTIALS' }
+  }
+}

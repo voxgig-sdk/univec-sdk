@@ -4,6 +4,8 @@ import {
   walk,
 } from '@voxgig/struct'
 
+import { sdkName } from '@voxgig/sdkgen'
+
 
 // Rust keywords (strict + reserved) that are illegal as an identifier.
 // sdkgen's shared safeVarName has no rust entry, so the guard lives here.
@@ -18,17 +20,6 @@ const RUST_RESERVED = new Set<string>([
 ])
 
 
-// Method names on a generated struct that must never be an entity accessor.
-//
-// An entity called `clone` generated `pub fn clone(&self, Value)` on the SDK
-// struct, which SHADOWS Clone::clone — so every `sdk.clone()` the generated
-// code makes elsewhere resolved to the entity accessor and the crate failed
-// with "this method takes 1 argument but 0 arguments were supplied", 16 times
-// over, pointing at the call sites and never at the entity that caused it.
-// `new` would collide with the struct's own constructor the same way.
-//
-// These are not Rust keywords, so RUST_RESERVED does not catch them; they are
-// inherent or std-trait methods the generated code actually calls.
 const RUST_METHOD_RESERVED = new Set<string>([
   'clone', 'new', 'default', 'drop', 'from', 'into', 'to_string',
   'as_ref', 'as_mut', 'borrow', 'borrow_mut', 'deref', 'deref_mut',
@@ -44,13 +35,8 @@ function rustMethodName(name: string): string {
 }
 
 
-// A collision-free snake_case rust identifier for a model name.
 function rustVarName(name: string): string {
   let snake = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()
-  // No Rust identifier may begin with a digit. A `3d_id` field became
-  // `pub 3_d_id: String`, which does not compile ("expected identifier, found
-  // `3_d_id`") and took the whole crate with it. Prefixed with an underscore,
-  // the convention cmp/c/utility_c.ts already applies.
   if (/^[0-9]/.test(snake)) {
     snake = '_' + snake
   }
@@ -58,11 +44,9 @@ function rustVarName(name: string): string {
 }
 
 
-// The Cargo package name, e.g. voxgig-solar-sdk (mirrors the go module
-// naming: org prefix from model.origin).
 function crateName(model: any): string {
   const org = (model.origin || 'voxgig-sdk').replace(/-sdk$/, '')
-  return `${org}-${model.name}-sdk`.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  return `${org}-${sdkName(model.name)}`.toLowerCase().replace(/[^a-z0-9-]/g, '-')
 }
 
 
@@ -117,29 +101,6 @@ function formatRustValue(val: any, indent: number = 0): string {
 }
 
 
-// Deep-remove meta keys (`foo$`) from a model subtree (twin of go's clean).
-// Emission-time normalisation of a model subtree (L0).
-//
-// Always drops jostraca's iteration metadata (`$`-suffixed keys: index$,
-// key$, val$). With `dropDefaults`, also drops keys whose value IS the
-// default the runtime already assumes when the key is absent, which is pure
-// payload — see CONFIG_DEFAULT.
-//
-// Rebuilds the tree rather than mutating during a walk. The previous
-// implementation walked a clone calling `delete p[k]`, but walk() assigns its
-// callback's result back over the child (`setprop(out, ckey, walk(...))`), so
-// the delete was undone on the way out and the helper silently did nothing.
-// Returning `undefined` from the callback does not fix it either: setprop
-// stores undefined rather than removing the key, which then emits as a null.
-//
-// `dropDefaults` is opt-in and must be passed ONLY for the entity subtree.
-// `active` means something different in feature config, where absent reads as
-// INACTIVE (see feature_init) — dropping `active: true` there would silently
-// disable the feature.
-// jostraca's iteration metadata, injected by each()/names() while it walks the
-// model. Listed explicitly rather than matched by trailing-dollar suffix: a
-// trailing dollar is not exclusive to jostraca -- Seneca uses entity$ as real
-// data -- so a blanket suffix match can silently drop a legitimate API field.
 const MODEL_META = ['index$', 'key$', 'val$']
 
 // Keys whose value IS the default the runtime already assumes when the key is
@@ -180,12 +141,6 @@ function clean(o: any, dropDefaults?: boolean): any {
 
 
 
-// The JSON as a Rust RAW string literal.
-//
-// A raw string processes no escapes, so the JSON's own `\n` and `\uXXXX`
-// survive byte for byte and reach the JSON parser as written - which a normal
-// Rust string would not, having consumed them itself. The hash level is raised
-// until its terminator does not occur in the text.
 function rustRawString(s: string): string {
   let level = 0
   while (s.includes('"' + '#'.repeat(level))) {

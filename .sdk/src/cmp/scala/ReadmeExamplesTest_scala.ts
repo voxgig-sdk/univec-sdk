@@ -2,29 +2,6 @@
 import { cmp, File, Content } from '@voxgig/sdkgen'
 
 
-// Emits sdktest/ReadmeExamplesTest.scala — a PRESENCE + STRUCTURE gate over
-// every scala fenced block in the repository ROOT README.md, the per-language
-// scala/README.md, AND the per-language scala/REFERENCE.md. It is a
-// default-package scala-cli object exposing run(rep) and is driven by the
-// generated SdkEntityTestMain aggregator (mirrors the generated per-entity
-// test objects).
-//
-// SCOPE NOTE (deliberate, documented): the Python/TS/Go equivalents EXECUTE and
-// type-check every documented block. That is infeasible here — the generated
-// Scala SDK compiles with scala-cli only (no in-process Scala compiler wired
-// into the test runtime), so a test cannot compile-and-run arbitrary doc
-// snippets at test time. This gate therefore guarantees the weaker-but-real
-// invariant that keeps the docs honest as the generator evolves:
-//   1. every doc exists and contains at least one scala block (nothing was
-//      dropped);
-//   2. every scala block is structurally well-formed — its braces, parentheses
-//      and brackets balance (catches a truncated or malformed generated
-//      snippet).
-// A per-doc summary line makes the coverage visible in the test output.
-//
-// The emitted Scala is written WITHOUT literal backticks (the fence marker is
-// built at runtime as 96.toChar.toString.repeat(3)) so this TS template literal
-// stays clean.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { target, ctx$: { model } } = props
 

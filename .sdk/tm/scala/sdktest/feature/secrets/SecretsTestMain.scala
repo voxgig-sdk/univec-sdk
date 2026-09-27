@@ -775,7 +775,7 @@ object SecretsTestMain {
     check("vocabulary.table", untabled.isEmpty,
       "sekreto ships provider kinds this test does not know about: " +
         untabled.mkString(", ") + " - add them to PLUGINMODULES, and to a " +
-        "`plugin` group in model/feature/secrets.aon")
+        "`plugin` group in model/feature/secrets.aontu")
 
     val w = new Wire()
     val client = secretsClient(w, "feature" -> secretsOpts(memchain("APIKEY" -> "VOCAB01")))

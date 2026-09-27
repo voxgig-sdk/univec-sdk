@@ -15,6 +15,24 @@
 
 #include "../core/types.hpp"
 
+// The GENERATED option spec makeOptions validates against. A leaf header
+// (it includes only core/struct.hpp), so this cannot close a cycle with
+// core/config.hpp, which pulls in the feature headers.
+#include "../core/schema.hpp"
+
+// prepareAuth is GENERATED, not templated: WHERE the credential goes -
+// header, query or cookie, and under what name - is a fact about THIS API
+// (apidef resolves it into main.kit.info.security), and this file can only
+// hold one answer. It used to hold `authorization`, so an apiKey-in-query
+// API got a header it does not read. The component is
+// src/cmp/cpp/PrepareAuth_cpp.ts; the emitted header defines
+// `sdk::util::prepareAuth` exactly as this file used to, and register_all
+// below still binds it.
+//
+// Included HERE, outside the namespace: the generated header opens its own
+// `namespace sdk { namespace util {`.
+#include "prepare_auth.hpp"
+
 namespace sdk {
 namespace util {
 
@@ -559,6 +577,12 @@ inline bool graphqlErrors(CtxPtr ctx) {
 // ---- makeSpec ---------------------------------------------------------
 
 inline SpecPtr makeSpec(CtxPtr ctx) {
+  // A PreSpec feature hook (e.g. validate) may short-circuit by storing an
+  // error; surface it before the request is built, the same way makePoint
+  // surfaces out.pointError.
+  if (ctx->out.specError) {
+    throw ctx->out.specError;
+  }
   if (ctx->out.spec) {
     ctx->spec = ctx->out.spec;
     return ctx->spec;
@@ -1002,7 +1026,7 @@ inline Value prepareQuery(CtxPtr ctx) {
   for (const auto& item : Struct::items(reqmatch)) {
     std::string key = as_str(pair_key(item));
     Value val = pair_val(item);
-    if (!is_nullish(val) && !contains_str(params, key)) {
+    if (!is_nullish(val) && "$action" != key && !contains_str(params, key)) {
       map_put(out, key, val);
     }
   }
@@ -1018,86 +1042,41 @@ inline std::string preparePath(CtxPtr ctx) {
 }
 
 // ---- prepareAuth ------------------------------------------------------
-
-inline SpecPtr prepareAuth(CtxPtr ctx) {
-  SpecPtr spec = ctx->spec;
-  if (!spec) throw ctx->makeError("auth_no_spec", "Expected context spec property to be defined.");
-
-  static const std::string HEADER_AUTH = "authorization";
-  static const std::string NOT_FOUND = "__NOTFOUND__";
-
-  Value headers = spec->headers;
-  Value options = ctx->client->optionsMap();
-
-  if (is_nullish(getp(options, "auth"))) {
-    map_remove(headers, HEADER_AUTH);
-    return spec;
-  }
-
-  Value apikey = getp(options, "apikey", Value(NOT_FOUND));
-
-  bool skip = false;
-  if (is_nullish(apikey)) {
-    skip = true;
-  } else if (apikey.is_string() && (apikey.as_string() == NOT_FOUND || apikey.as_string().empty())) {
-    skip = true;
-  }
-
-  if (skip) {
-    map_remove(headers, HEADER_AUTH);
-  } else {
-    std::string authPrefix = as_str(Struct::getpath(options, {"auth", "prefix"}));
-    std::string apikeyVal = apikey.is_string() ? apikey.as_string() : "";
-    if (authPrefix.empty()) {
-      map_put(headers, HEADER_AUTH, Value(apikeyVal));
-    } else {
-      map_put(headers, HEADER_AUTH, Value(authPrefix + " " + apikeyVal));
-    }
-  }
-
-  return spec;
-}
+//
+// GENERATED into utility/prepare_auth.hpp, included at the top of this file
+// (see the note there). `util::prepareAuth` keeps its name, its signature
+// and its binding in register_all below; only the three-way choice of WHERE
+// the credential goes moved out, because a template cannot make it.
 
 // ---- transformRequest -------------------------------------------------
+
+// `$action` selects the point (see makePoint); it is never an API field, so
+// the body is a copy without it. The caller's map is left untouched.
+inline Value stripAction(const Value& reqdata) {
+  if (!map_contains(reqdata, "$action")) return reqdata;
+  Value body = vmap();
+  for (const auto& item : Struct::items(reqdata)) {
+    std::string key = as_str(pair_key(item));
+    if ("$action" != key) map_put(body, key, pair_val(item));
+  }
+  return body;
+}
 
 inline Value transformRequest(CtxPtr ctx) {
   if (ctx->spec) ctx->spec->step = "reqform";
 
   Value transform = Helpers::toMapAny(getp(ctx->point, "transform"));
-  if (!transform.is_map()) return ctx->reqdata;
+  if (!transform.is_map()) return stripAction(ctx->reqdata);
 
   Value reqform = getp(transform, "req");
-  if (is_nullish(reqform)) return ctx->reqdata;
+  if (is_nullish(reqform)) return stripAction(ctx->reqdata);
 
   Value data = vmap();
   map_put(data, "reqdata", ctx->reqdata);
-  return Struct::transform(data, reqform);
+  return stripAction(Struct::transform(data, reqform));
 }
 
 // ---- makeOptions ------------------------------------------------------
-
-inline const char* OPTSPEC_JSON() {
-  return "{"
-    "\"apikey\": \"\","
-    "\"base\": \"http://localhost:8000\","
-    "\"prefix\": \"\","
-    "\"suffix\": \"\","
-    "\"auth\": { \"prefix\": \"\" },"
-    "\"headers\": { \"`$CHILD`\": \"`$STRING`\" },"
-    "\"allow\": {"
-    "  \"method\": \"GET,PUT,POST,PATCH,DELETE,OPTIONS\","
-    "  \"op\": \"create,update,load,list,remove,command,direct,graphql\""
-    "},"
-    "\"entity\": { \"`$CHILD`\": {"
-    "  \"`$OPEN`\": true, \"active\": false, \"alias\": {} } },"
-    "\"feature\": { \"`$CHILD`\": {"
-    "  \"`$OPEN`\": true, \"active\": false } },"
-    "\"utility\": {},"
-    "\"system\": {},"
-    "\"test\": { \"active\": false, \"entity\": { \"`$OPEN`\": true } },"
-    "\"clean\": { \"keys\": \"key,token,id\" }"
-    "}";
-}
 
 inline Value makeOptions(CtxPtr ctx) {
   Value options = ctx->options;
@@ -1165,7 +1144,19 @@ inline Value makeOptions(CtxPtr ctx) {
   Value cfgopts = Helpers::toMapAny(getp(config, "options"));
   if (!cfgopts.is_map()) cfgopts = vmap();
 
-  Value optspec = vs::parse_json(OPTSPEC_JSON());
+  // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
+  //
+  // Built from the model: `main.kit.optspec` for the standard options, plus
+  // one entry per feature this target carries, from that feature's own
+  // `config.options` / `config.optspec`. This file used to carry its own
+  // OPTSPEC_JSON() - one of twenty hand-maintained copies of a schema nothing
+  // cross-checked, and it had already drifted (no `extend`, no `server`, no
+  // `auth.basic`). Add an option to the model instead and every ported target
+  // validates it.
+  //
+  // Parsed once and shared: makeOptions validates AGAINST the spec and writes
+  // into the options, never into the spec.
+  const Value& optspec = sharedOptspec();
 
   // Preserve system.fetch before merge/validate (a function Value may be
   // dropped by validate).

@@ -1,10 +1,3 @@
-// Smoke tests for the vendored omni runner itself: a runner that cannot FAIL
-// a bad entry would turn every corpus suite vacuously green, so pin the
-// failure paths, not just the happy one. (The Rust peer of
-// tm/ts/test/omni.test.ts and tm/go/test/omnismoke_test.go.)
-//
-// The resolver accumulates group failures rather than panicking, so these
-// tests can assert that a failure HAPPENED without failing themselves.
 
 mod omni_resolver;
 
@@ -193,14 +186,6 @@ fn omni_absent_group_is_named_not_silent() {
     assert_eq!(vec!["smoke-missing".to_string()], run.skipped);
 }
 
-// Decision 5's tripwire: omni's BTreeMap sorts map keys, so an out-of-order
-// map in the corpus would be silently reordered on the way into a subject.
-//
-// It reads the corpus FILE. Going through `corpus()` would hand the check a
-// `Json::Map`, which is a `BTreeMap` — already sorted by the parse — so the
-// comparison would be a sorted list against itself and the tripwire could
-// never fire. `key_order_scan_fires_on_an_out_of_order_map` below is the
-// proof that this one can.
 #[test]
 fn corpus_maps_are_in_sorted_key_order() {
     let path = spec_path();

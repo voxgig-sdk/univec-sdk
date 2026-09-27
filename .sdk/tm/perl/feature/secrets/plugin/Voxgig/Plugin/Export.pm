@@ -1,5 +1,5 @@
-# VENDORED: @voxgig/plugin sdk-20260908-1556-0 (perl/lib/Voxgig/Plugin/Export.pm)
-# Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+# VENDORED: @voxgig/plugin sdk-20260925-1316-0 (perl/lib/Voxgig/Plugin/Export.pm)
+# Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 package Voxgig::Plugin::Export;
 
@@ -25,7 +25,7 @@ our @EXPORT_OK = qw(resolve_export);
 
 sub resolve_export {
     my ($spec, $exported) = @_;
-    my $cut = index($spec, '/');
+    my $cut = rindex($spec, '/');
     fail_with('plugin_export_ambiguous', "export spec needs a key: $spec",
               { spec => $spec })
         if $cut < 0;

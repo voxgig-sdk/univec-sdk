@@ -1,5 +1,5 @@
-;; VENDORED: @voxgig/plugin sdk-20260908-1556-0 (clojure/src/voxgig/plugin/resolve.clj)
-;; Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+;; VENDORED: @voxgig/plugin sdk-20260925-1316-0 (clojure/src/voxgig/plugin/resolve.clj)
+;; Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 ;; License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 (ns voxgig.plugin.resolve
   "Dynamic resolution (section 10.2) - name to candidate module ids.

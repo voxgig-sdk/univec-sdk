@@ -1,0 +1,38 @@
+
+main: kit: feature: clienttrack: {
+
+  name: key()
+  title: "Client tracking"
+  description: "Client identity and per-request correlation headers"
+  version: '0.0.1'
+  active: true
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  transport: 'none'
+
+  config: {
+    options: {
+      active: false
+      clientVersion: '0.0.1'
+    }
+  }
+
+  hook: {
+    PostConstruct: active: true
+    PreRequest: active: true
+  }
+}
+
+
+main: kit: feature: clienttrack: config: optspec: {
+  # overrides the SDK name sent in the client header
+  clientName: '`$STRING`'
+  # overrides the SDK version sent with it
+  clientVersion: '`$STRING`'
+  # extra headers merged into every tracked request
+  headers: '`$MAP`'
+  # supplies session and request ids
+  idgen: '`$FUNCTION`'
+  # pins the session id instead of generating one
+  sessionId: '`$STRING`'
+}

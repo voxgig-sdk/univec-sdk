@@ -17,15 +17,6 @@ export type HostOptions = {
     points?: {
         [point: string]: PointSpec;
     };
-    /** §11.3. `restart` (the default) treats provider replacement as an
-     * ordinary runtime operation: deactivate the old store, activate the
-     * new one, and everything that depended on it rides through, having
-     * released the old one's resources in between.
-     *
-     * `hold` is the strict reading — deactivating a required instance is
-     * `plugin_dependency_held`, naming the holders. NOT the default,
-     * because a station that cannot swap a provider without a restart
-     * has lost the argument for having a plugin system. */
     dependency?: 'restart' | 'hold';
 };
 type Live = {
@@ -37,25 +28,10 @@ type Live = {
     options: any;
     state: any;
     order?: OrderBlock;
-    /** §11.4's ALWAYS-RELUCTANT rebinding, made concrete: the provider
-     * ref this instance's activation actually selected, per requirement
-     * name. "A satisfied requirement is not re-bound while it stays
-     * satisfied" is a statement about a REMEMBERED choice — recomputing
-     * `providersof(r)[0]` on every question silently re-points a live
-     * consumer at any better-ranked newcomer, and then losing the
-     * provider it was really using does not restart it. Captured at
-     * activate, cleared on the way out. */
     selected: {
         [name: string]: string;
     };
-    /** §9.6's `active: false` — "declares it and bars it: it appears in
-     * `host.list()`, and `activate` and `ready` on it fail rather than
-     * quietly doing nothing". THE BAR OUTLIVES THE APPLY THAT SET IT: a
-     * flag consulted only while `apply` ran let a later direct `ready`
-     * bring the instance live, which is the config-switch it exists to
-     * be silently ignored. */
     barred?: boolean;
-    /** Requirements this instance declared but has not been given. */
     unmet: string[];
     /** Resources the instance scope holds, newest last — unwound in
      * REVERSE, because that is the only order in which teardown mirrors
@@ -65,7 +41,6 @@ type Live = {
      * (§8.1). Holding them until then is what makes a failed activate
      * leave nothing behind. */
     bindings: Bound[];
-    /** Set when this instance is itself a host (§6.5). */
     inner?: any;
     /** Declared in `define`, and VISIBLE while merely `loaded` (§11):
      * they are data, and hiding them would make the loaded state useless

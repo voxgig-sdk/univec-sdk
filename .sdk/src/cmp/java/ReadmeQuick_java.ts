@@ -91,8 +91,6 @@ ${'' === javaServerLines
     const eVar = javaVarName(exampleEntity.name)
     const accessor = javaVarName(exampleEntity.name)
     const opnames = entityOps(exampleEntity)
-    // Model-driven id key: `idF` is the entity's id-like MATCH field name, or
-    // null when it has none.
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
@@ -152,7 +150,6 @@ catch (RuntimeException err) {
 `)
     }
     else if (opnames.includes('load')) {
-      // Every REQUIRED load-match key (id first, then parent path params).
       const loadRequired = opRequestShape(exampleEntity, 'load').items
         .filter((it: any) => !it.optional || it.name === idF)
         .sort((a: any, b: any) =>
@@ -219,7 +216,6 @@ client.${accessor}(null).update(Map.of(${updatePairs.join(', ')}), null);
 `)
       }
       if (opnames.includes('remove')) {
-        // Every REQUIRED remove-match key: the id plus parent keys like page_id.
         const removePairs = opRequestShape(exampleEntity, 'remove').items
           .filter((it: any) => !it.optional || it.name === idF)
           .sort((a: any, b: any) =>

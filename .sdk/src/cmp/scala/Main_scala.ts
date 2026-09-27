@@ -23,10 +23,12 @@ import {
 
 import { Package } from './Package_scala'
 import { Config } from './Config_scala'
+import { Schema } from './Schema_scala'
 import { Gitignore } from './Gitignore_scala'
 import { MainEntity } from './MainEntity_scala'
 import { EntityBase } from './EntityBase_scala'
 import { EntityTypes } from './EntityTypes_scala'
+import { PrepareAuth } from './PrepareAuth_scala'
 import { scalaPackage } from './utility_scala'
 
 
@@ -44,31 +46,6 @@ const Main = cmp(async function Main(props: any) {
   // The Scala package root for every runtime piece (like GOMODULE for go).
   const scalapackage = scalaPackage(model)
 
-  // THE PLUGIN TRIM, over the WHOLE model rather than its active half.
-  //
-  // pluginExcludes(model) walks only the model's ACTIVE features
-  // (helpers/featureSource), which is right for a target whose feature trim
-  // is on: an inactive feature's whole tree is already gone at `target add`,
-  // so it has no plugin files left to exclude. Scala's feature trim is OFF
-  // (see the Copy below), so the opposite holds - an inactive feature's tree
-  // is all still here, and its plugins are the part of it that costs the
-  // most. Before this, a scala SDK whose model never mentioned `secrets`
-  // shipped and compiled all nine vendored provider clients: the one trim
-  // the target has walked straight past the feature that owns them.
-  //
-  // EVERY declared group of an inactive feature goes, not just the groups
-  // marked inactive. A feature that is off has no active plugins whatever
-  // its `plugin` map says - `main: kit: feature: secrets: { active: false
-  // plugin: vault: active: true }` selects nothing, because targetFeatures
-  // drops the feature before Config ever reads a group - so shipping vault's
-  // files for it would leave a provider client in the tree that nothing in
-  // the SDK can reach. That is why this reads the declared paths directly
-  // rather than reusing pluginExcludesFor, whose rule (exclude the groups
-  // marked `active: false`) is the right one only for a LIVE feature.
-  //
-  // Rooting matches pluginExcludes': scala's declared paths are
-  // target-root-relative, which is this Copy's root, and the other targets'
-  // paths in the same list cannot match anything in a scala tree.
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const allfeature = getModelPath(model, `main.${KIT}.feature`,
     { required: false, only_active: false }) || {}
@@ -86,27 +63,6 @@ const Main = cmp(async function Main(props: any) {
     }
   }
 
-  // THE FEATURE THE MODEL NEVER MENTIONS AT ALL.
-  //
-  // inactivePluginExcludes above walks the model's DECLARED features and skips
-  // the active ones, which covers `secrets: { active: false }`. It cannot cover
-  // the case that actually shipped: a model that does not mention secrets
-  // anywhere. Then `main.kit.feature` has no `secrets` key, the loop never sees
-  // it, nothing is excluded, and all nine provider clients are copied and
-  // compiled — which is what `vocabulary.off.notrimmed` reports, and it failed
-  // on 12 of the 68 cedar SDKs.
-  //
-  // PRECISE, NOT THE WHOLE TREE. The first cut of this excluded
-  // `feature/<inactive>/` wholesale and broke the build: SecretsFeature.scala
-  // ships to every scala SDK regardless (this target's feature trim is off) and
-  // imports `com.voxgig.sekreto` and `voxgig.plugin`, so removing the vendored
-  // cores left it uncompilable — "value voxgig is not a member of com".
-  //
-  // What may go is exactly the nine provider clients under sekreto/plugins.
-  // Httpjson.scala and Sigv4.scala live there too and must STAY: both belong to
-  // no group and are shared, which model/feature/secrets.aon documents at
-  // length after a cloud-only trim once deleted Sigv4 and scalac failed with
-  // four "Not found: uriescape".
   const SHARED_SEKRETO_PLUGINS = ['Httpjson.scala', 'Sigv4.scala']
   const pluginDirExcludes: RegExp[] = []
   if (null == (feature as any).secrets) {
@@ -124,25 +80,6 @@ const Main = cmp(async function Main(props: any) {
   // ProjectName carries the SDK name into vendored template strings.
   Copy({
     from: 'tm/' + target.name,
-    // The generate-time plugin trim, in both halves: pluginExcludes for an
-    // ACTIVE feature's inactive groups, inactivePluginExcludes (above) for
-    // the groups of a feature that is itself off. An inactive group's
-    // declared files stay out of the tree - the model's `path` entries are
-    // target-root-relative, which is this Copy's root.
-    //
-    // Scala's FEATURE-level trim is off (model/target/scala.aon `feature: {
-    // trim: false }`, because the cross-feature tests are fused into one
-    // sdktest/SdkTestMain.scala, which constructs fifteen feature classes by
-    // name), so this is the ONLY trim the target has, and what it does NOT
-    // reach is worth stating rather than leaving to be discovered: every
-    // feature's own source ships to every scala SDK whatever the model says,
-    // secrets included, so a secrets-off SDK still carries SecretsFeature,
-    // the vendored sekreto and voxgig/plugin cores, and the two UNGROUPED
-    // plugin files (plugins/Sigv4.scala's HMAC-SHA256 signer and
-    // plugins/Httpjson.scala's fetch + ProcessBuilder helpers, which belong
-    // to no group because four and eight kinds respectively compile against
-    // them). What it DOES reach is the nine provider clients, and they are
-    // the bulk: measured on a feature-off SDK, 26 files rather than 35.
     exclude: [
       /src\//,
       TEST_CONTROL_EXCLUDE,
@@ -160,7 +97,8 @@ const Main = cmp(async function Main(props: any) {
   // Shared entity runtime (entity/EntityBase.scala).
   EntityBase({ target })
 
-  // Generate the client class and config in core/.
+  PrepareAuth({ target })
+
   Folder({ name: 'core' }, () => {
 
     File({ name: model.const.Name + 'SDK.' + target.ext }, () => {
@@ -175,7 +113,6 @@ const Main = cmp(async function Main(props: any) {
           }
         },
 
-        // Entities - injected at SLOT
         () => {
           each(entity, (entity: ModelEntity) => {
             const entitySDK = getModelPath(model, `main.${KIT}.entity.${entity.name}`)
@@ -186,6 +123,8 @@ const Main = cmp(async function Main(props: any) {
     })
 
     Config({ target })
+
+    Schema({ target })
 
     // Generate the typed reference-model file (<Name>Types.scala) beside the
     // other generated core files. Documentation/DX shapes only — not wired

@@ -78,6 +78,21 @@ let cu (ctx : ctx) : utility =
 let cc (ctx : ctx) : sdk_client =
   match ctx.c_client with Some c -> c | None -> failwith "context client not set"
 
+(* ----- client options -----
+ * A CLONE of the client's options, so a utility that writes into the map it
+ * is handed cannot mutate the client's own (the secrets feature relies on
+ * that: it rewrites the credential in the fetchdef, never in the shared
+ * options).
+ *
+ * Lives HERE, beside the other client accessors, rather than in Sdk_runtime
+ * where it began: the generated sdk_prepare_auth.ml reads it and is compiled
+ * BEFORE Sdk_runtime (ocamlc compiles a module before anything that uses it
+ * and has no link-time reordering), so a definition in Sdk_runtime is out of
+ * reach. Sdk_runtime opens this module, so its own call sites are unchanged.
+ *)
+let client_options_map (client : sdk_client) : value =
+  match clone client.cl_options with Map _ as m -> m | _ -> empty_map ()
+
 (* ----- per-op feature scratch ----- *)
 
 let scratch_get (ctx : ctx) (key : string) : value option =

@@ -53,21 +53,6 @@ function hsString(s: string): string {
 }
 
 
-// Render a JSON-shaped value as a Haskell `CV` literal (the generated
-// SdkConfig realises it with buildCV). Empty map/list render as
-// (CVMap []) / (CVList []) — valid for 0, 1 or N entries (N-feature-safe).
-//
-// KEY ORDER IS INSERTION ORDER, not sorted. struct's Haskell `Value` holds a
-// map as an ORDERED assoc list, so key order is observable — it survives into
-// keysof, iteration and stringify. This used to sort, which was fine while
-// this was the only representation, but above the size threshold the same
-// config arrives via jsonRead in the JSON text's order. Sorting here would
-// have made the two representations describe the same config in a different
-// order, which is exactly what rung L1 promises cannot happen.
-//
-// Insertion order is still byte-stable: every nested level of the config comes
-// from `each`, which iterates sorted, and the two levels built by hand
-// (the root, and `options`) have a fixed order every target's literal follows.
 function formatHsValue(val: any): string {
   if (val === null || val === undefined) {
     return 'CVNull'
@@ -95,29 +80,6 @@ function formatHsValue(val: any): string {
 }
 
 
-// Remove `$`-suffixed model annotation keys.
-// Emission-time normalisation of a model subtree (L0).
-//
-// Always drops jostraca's iteration metadata (`$`-suffixed keys: index$,
-// key$, val$). With `dropDefaults`, also drops keys whose value IS the
-// default the runtime already assumes when the key is absent, which is pure
-// payload — see CONFIG_DEFAULT.
-//
-// Rebuilds the tree rather than mutating during a walk. The previous
-// implementation walked a clone calling `delete p[k]`, but walk() assigns its
-// callback's result back over the child (`setprop(out, ckey, walk(...))`), so
-// the delete was undone on the way out and the helper silently did nothing.
-// Returning `undefined` from the callback does not fix it either: setprop
-// stores undefined rather than removing the key, which then emits as a null.
-//
-// `dropDefaults` is opt-in and must be passed ONLY for the entity subtree.
-// `active` means something different in feature config, where absent reads as
-// INACTIVE (see feature_init) — dropping `active: true` there would silently
-// disable the feature.
-// jostraca's iteration metadata, injected by each()/names() while it walks the
-// model. Listed explicitly rather than matched by trailing-dollar suffix: a
-// trailing dollar is not exclusive to jostraca -- Seneca uses entity$ as real
-// data -- so a blanket suffix match can silently drop a legitimate API field.
 const MODEL_META = ['index$', 'key$', 'val$']
 
 // Keys whose value IS the default the runtime already assumes when the key is

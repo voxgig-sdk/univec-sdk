@@ -1,5 +1,5 @@
 # VENDORED: @voxgig/plugin 0.1.6 (python/voxgig_plugin/export.py)
-# Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+# Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 """Exports (section 11).
 
@@ -19,7 +19,7 @@ from .ref import canon_ref, parse_ref
 
 
 def resolve_export(spec, exported):
-    cut = spec.find('/')
+    cut = spec.rfind('/')
     if -1 == cut:
         fail('plugin_export_ambiguous', 'export spec needs a key: ' + spec,
              {'spec': spec})

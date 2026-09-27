@@ -5,14 +5,6 @@ import type { UnivecSDK } from '../../UnivecSDK'
 import { BaseFeature } from '../base/BaseFeature'
 
 
-// Response caching for safe (read) requests. Wraps the active transport and
-// serves a fresh cached snapshot instead of hitting the network when the
-// same method+URL was fetched within `ttl` ms. Only successful responses to
-// cacheable methods (default: GET) are stored, keyed by method+URL. The
-// cache is bounded (`max` entries, oldest evicted) and every hit/miss is
-// recorded on `client._cache` for inspection. One-shot response bodies are
-// normalised on capture so both the current caller and later hits can read
-// the JSON body repeatedly.
 class CacheFeature extends BaseFeature {
   version = '0.0.1'
   name = 'cache'

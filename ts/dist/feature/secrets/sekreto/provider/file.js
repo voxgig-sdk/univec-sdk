@@ -1,19 +1,11 @@
 "use strict";
 // VENDORED: @voxgig/sekreto 0.2.0 (typescript/src/provider/file.ts)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* Copyright (c) 2025 Voxgig Ltd, MIT License */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fileprovider = fileprovider;
 const support_1 = require("./support");
-/** A directory of one-secret-per-file entries, keyed like the
- * environment: `api.token` reads `<dir>/API_TOKEN`.
- *
- * This is the shape of a mounted Kubernetes Secret, a Docker or Swarm
- * secret, and a systemd credentials directory, so those all work with no
- * further configuration. One trailing newline is stripped - tools that
- * write these files disagree about it, and a newline is never part of a
- * secret on purpose. */
 function fileprovider(dir, prefix) {
     return {
         lookup: (name) => {

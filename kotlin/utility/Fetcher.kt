@@ -6,11 +6,43 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.util.concurrent.ConcurrentHashMap
 import java.util.function.BiFunction
 import java.util.function.Supplier
 
 import voxgig.univecsdk.core.Context
 import voxgig.univecsdk.utility.struct.Struct
+
+// Clients keyed by redirect policy and proxy. Each HttpClient owns a
+// connection pool and a selector thread, so one per request reused
+// nothing; one per key pools across calls.
+private val clients = ConcurrentHashMap<String, HttpClient>()
+
+private fun clientFor(fetchdef: MutableMap<String, Any?>): HttpClient {
+  // "manual" (set by the station feature's middleware under a hosts
+  // policy) returns a 3xx like any other response: an automatic follow
+  // would carry injected credentials to a host no policy approved.
+  val redirectPolicy =
+    if ("manual" == fetchdef["redirect"]) HttpClient.Redirect.NEVER
+    else HttpClient.Redirect.NORMAL
+
+  val praw = fetchdef["proxy"]
+  val proxy = if (praw is String) praw else ""
+
+  return clients.computeIfAbsent("$redirectPolicy|$proxy") {
+    val clientb = HttpClient.newBuilder().followRedirects(redirectPolicy)
+    if ("" != proxy) {
+      try {
+        val proxyUri = URI.create(proxy)
+        val port = if (proxyUri.port < 0) 80 else proxyUri.port
+        clientb.proxy(ProxySelector.of(InetSocketAddress(proxyUri.host, port)))
+      } catch (e: RuntimeException) {
+        // Unparseable proxy target: direct connection, as the go transport.
+      }
+    }
+    clientb.build()
+  }
+}
 
 @Suppress("UNCHECKED_CAST")
 fun defaultHttpFetch(fullurl: String, fetchdef: MutableMap<String, Any?>): MutableMap<String, Any?> {
@@ -50,32 +82,9 @@ fun defaultHttpFetch(fullurl: String, fetchdef: MutableMap<String, Any?>): Mutab
     reqb.setHeader("User-Agent", "Mozilla/5.0 (compatible; UnivecSDK/1.0)")
   }
 
-  // Honour a redirect annotation on the fetch definition (set by the
-  // station feature's middleware under a hosts policy): "manual" returns
-  // a 3xx like any other response instead of following it — the ts
-  // donor's fetch honours the same key natively, and an automatic follow
-  // would carry injected credentials to a host no policy approved.
-  val redirectPolicy =
-    if ("manual" == fetchdef["redirect"]) HttpClient.Redirect.NEVER
-    else HttpClient.Redirect.NORMAL
-
-  // Honour a proxy annotation on the fetch definition (set by the proxy
-  // feature): route the request through a proxied HttpClient.
-  val clientb = HttpClient.newBuilder().followRedirects(redirectPolicy)
-  val proxy = fetchdef["proxy"]
-  if (proxy is String && "" != proxy) {
-    try {
-      val proxyUri = URI.create(proxy)
-      val port = if (proxyUri.port < 0) 80 else proxyUri.port
-      clientb.proxy(ProxySelector.of(InetSocketAddress(proxyUri.host, port)))
-    } catch (e: RuntimeException) {
-      // Unparseable proxy target: fall through to a direct connection.
-    }
-  }
-
   val resp: HttpResponse<String>
   try {
-    resp = clientb.build().send(reqb.build(), HttpResponse.BodyHandlers.ofString())
+    resp = clientFor(fetchdef).send(reqb.build(), HttpResponse.BodyHandlers.ofString())
   } catch (e: Exception) {
     throw RuntimeException("fetch: " + e.message, e)
   }

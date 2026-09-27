@@ -59,8 +59,23 @@ CORPUS = ../.sdk/test/test.json
 
 # A gated feature's modules come AFTER sdk_features.ml (a feature module
 # opens it) and BEFORE sdk_config.ml (the generated factory names them).
+#
+# TWO GENERATED MODULES sit in this list rather than beside sdk_config.ml,
+# because ocaml links a FIXED order and compiles a module before anything
+# that calls it — there is no link-time reordering.
+#
+# sdk_schema.ml is the model's option spec and entity specs; sdk_runtime.ml's
+# make_options reads it, and the validate feature reads its entity specs.
+#
+# sdk_prepare_auth.ml is GENERATED (src/cmp/ocaml/PrepareAuth_ocaml.ts), not
+# copied from the template tree: WHERE the credential goes - a header, a query
+# parameter or a cookie, and under what name - is a fact about the API, and a
+# template can hold only one answer. It goes after sdk_helpers.ml, whose
+# client/value accessors it uses, and before sdk_runtime.ml, which binds
+# `prepare_auth_util` to it and registers that in the utility record.
 RUNTIME = utility/vregex.ml utility/voxgig_struct.ml sdk_json.ml \
-  sdk_types.ml sdk_helpers.ml sdk_runtime.ml sdk_features.ml $(FEATURE_SRC)
+  sdk_types.ml sdk_helpers.ml sdk_schema.ml sdk_prepare_auth.ml \
+  sdk_runtime.ml sdk_features.ml $(FEATURE_SRC)
 
 # The vendored corpus engine plus the adapter that drives it. Order matters:
 # the adapter references the vendored module.

@@ -68,32 +68,8 @@ function projectPath(suffix?: string): string {
 }
 
 
-// Emission-time normalisation of a model subtree (L0).
-//
-// Always drops jostraca's iteration metadata (`$`-suffixed keys: index$,
-// key$, val$). With `dropDefaults`, also drops keys whose value IS the
-// default the runtime already assumes when the key is absent, which is pure
-// payload — see CONFIG_DEFAULT.
-//
-// Rebuilds the tree rather than mutating during a walk. The previous
-// implementation walked a clone calling `delete p[k]`, but walk() assigns its
-// callback's result back over the child (`setprop(out, ckey, walk(...))`), so
-// the delete was undone on the way out and the helper silently did nothing.
-// Returning `undefined` from the callback does not fix it either: setprop
-// stores undefined rather than removing the key, which then emits as a null.
-//
-// `dropDefaults` is opt-in and must be passed ONLY for the entity subtree.
-// `active` means something different in feature config, where absent reads as
-// INACTIVE (see feature_init) — dropping `active: true` there would silently
-// disable the feature.
-// jostraca's iteration metadata, injected by each()/names() while it walks the
-// model. Listed explicitly rather than matched by trailing-dollar suffix: a
-// trailing dollar is not exclusive to jostraca -- Seneca uses entity$ as real
-// data -- so a blanket suffix match can silently drop a legitimate API field.
 const MODEL_META = ['index$', 'key$', 'val$']
 
-// Keys whose value IS the default the runtime already assumes when the key is
-// absent, so emitting them is pure payload.
 const CONFIG_DEFAULT: Record<string, any> = {
   active: true,
   req: false,
@@ -130,18 +106,6 @@ function clean(o: any, dropDefaults?: boolean): any {
 
 
 
-// The JSON as a Dart string literal.
-//
-// Dart's ordinary string literals INTERPOLATE: `$name` and `${...}` are
-// substitution, and the model is full of `$` - `$STRING`, `$NUMBER`,
-// `$action`. A raw string (`r'...'`) would avoid that but cannot contain its
-// own quote character and has no escape for it, and the JSON contains both
-// quote characters in quantity.
-//
-// So: JSON.stringify's escaping, which already handles `"` and `\` and emits
-// no raw control characters, plus `$` -> `\$`. That last step is unambiguous
-// precisely because JSON.stringify has already escaped every backslash, so a
-// `\$` here can only have come from this rule.
 function dartStringLiteral(json: string): string {
   return JSON.stringify(json).replace(/\$/g, '\\$')
 }

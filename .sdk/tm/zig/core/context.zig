@@ -100,7 +100,7 @@ pub const Context = struct {
             ctrl = c;
         } else if (ctxspec.ctrl_obj) |co| {
             ctrl = co;
-        } else if (basectx) |b| {
+        } else if (if (ctxspec.opname == null) basectx else null) |b| {
             ctrl = b.ctrl;
         } else {
             ctrl = Control.make();

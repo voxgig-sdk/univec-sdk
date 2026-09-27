@@ -4,8 +4,8 @@
 # stamps page/limit (or a cursor) into the request query; on the way back
 # (PreResult) it reads the server's pagination signals - a Link rel="next"
 # header, X-Page/X-Next-Page/X-Total-Count headers, or next/cursor/
-# nextCursor/hasMore fields in the body - and records them on
-# result.paging. A per-call ctrl paging value (page or cursor) takes
+# nextCursor/hasMore fields in the body (snake_case forms too) - and records
+# them on result.paging and the caller's ctrl paging. A per-call ctrl paging value (page or cursor) takes
 # priority. Parameter names ("pageParam", "limitParam", "cursorParam"),
 # "startPage" (default 1) and page size ("limit") are configurable.
 
@@ -56,8 +56,10 @@ class UnivecPagingFeature < UnivecBaseFeature
     if !paging["cursor"].nil?
       spec.query[cursor_param] = paging["cursor"]
     elsif spec.query[page_param].nil?
-      spec.query[page_param] =
-        paging["page"].nil? ? (@options["startPage"] || 1) : paging["page"]
+      # A record written back by PreResult holds the page just fetched as
+      # "page" and the one to fetch as "nextPage", so nextPage wins.
+      page = paging["nextPage"].nil? ? paging["page"] : paging["nextPage"]
+      spec.query[page_param] = page.nil? ? (@options["startPage"] || 1) : page
     end
 
     if !@options["limit"].nil? && spec.query[limit_param].nil?
@@ -158,11 +160,20 @@ class UnivecPagingFeature < UnivecBaseFeature
       paging["next"] = m[1] if m
     end
 
-    # Body-level cursors.
+    # Body-level signals; snake_case forms are read first so camelCase wins.
     if body.is_a?(Hash)
       paging["next"] = paging["next"] || body["next"] unless body["next"].nil?
+      paging["cursor"] = body["next_cursor"] unless body["next_cursor"].nil?
       paging["cursor"] = body["cursor"] unless body["cursor"].nil?
       paging["cursor"] = body["nextCursor"] unless body["nextCursor"].nil?
+      if paging["nextPage"].nil?
+        np = body["nextPage"].nil? ? body["next_page"] : body["nextPage"]
+        paging["nextPage"] = np if np.is_a?(Numeric) || np.is_a?(String)
+      end
+      if body["has_more"] == true || body["has_more"] == false
+        paging["hasMore"] = body["has_more"]
+        explicit_more = true
+      end
       if body["hasMore"] == true || body["hasMore"] == false
         paging["hasMore"] = body["hasMore"]
         explicit_more = true
@@ -180,6 +191,17 @@ class UnivecPagingFeature < UnivecBaseFeature
     end
 
     result.paging = paging
+
+    if ctx.ctrl && ctx.ctrl.respond_to?(:paging=)
+      # The Context shares the caller's paging hash by reference, so refill
+      # it in place; a fresh hash on ctrl never reaches the caller.
+      if ctx.ctrl.paging.is_a?(Hash)
+        ctx.ctrl.paging.clear
+        ctx.ctrl.paging.merge!(paging)
+      else
+        ctx.ctrl.paging = paging
+      end
+    end
 
     @client.instance_variable_set(:@_paging, { "last" => paging })
   end

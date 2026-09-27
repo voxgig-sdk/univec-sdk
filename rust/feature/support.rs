@@ -1,9 +1,3 @@
-// Shared option readers for the feature implementations (mirrors go
-// feature/feature_options.go). Feature options arrive as Value maps (from
-// SDK options or test harnesses); callables (clocks, sleepers, generators,
-// sinks) arrive as Value::Func entries. These helpers normalise access and
-// supply defaults, mirroring the `null == opts.x ? def : opts.x` pattern of
-// the ts features.
 
 use crate::core::helpers::{call_vfn, getp, now_ms, sleep_ms, to_int};
 use crate::utility::voxgigstruct::Value;

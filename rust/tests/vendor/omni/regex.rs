@@ -1,16 +1,6 @@
-// VENDORED: @voxgig/omni sdk-20260908-1556-0 (rust/src/regex.rs)
-// Source: https://github.com/voxgig/omni @ 274708cc2d12b21707d975543953f845f8444be0  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/omni sdk-20260925-1316-0 (rust/src/regex.rs)
+// Source: https://github.com/voxgig/omni @ b909ff51fc644e4955c850e30cc65e74be076df2  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! A small backtracking regex engine.
-//!
-//! Omni specs match error messages with `/pattern/` expectations, so every
-//! port needs a regex. Rust has no regex in its standard library, and omni
-//! adds no third-party dependencies, so it carries this one.
-//!
-//! Supported: literals, `.`, `^`, `$`, `|`, groups `(...)`, classes
-//! `[a-z0-9_]` and `[^...]`, quantifiers `* + ? {m} {m,} {m,n}` (greedy,
-//! and lazy with a trailing `?`), and the escapes `\d \D \w \W \s \S \n
-//! \r \t` plus any escaped punctuation.
 
 #[derive(Clone, Debug)]
 enum Node {

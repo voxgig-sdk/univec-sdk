@@ -1,5 +1,5 @@
-# VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (ruby/lib/voxgig_sekreto/providers.rb)
-# Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+# VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (ruby/lib/voxgig_sekreto/providers.rb)
+# Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 # frozen_string_literal: true
 
@@ -20,8 +20,9 @@
 #
 # THIS FILE REQUIRES NO net/http, NO openssl AND NO open3. What makes a
 # kind built in is that it needs nothing of the platform beyond reading a
-# local file; every kind that opens a socket, signs a request or spawns a
-# process is a plugin under plugins/, its own file, required only by a
+# local file; every kind that opens a socket, signs a request, spawns a
+# process or does cryptography is a plugin under plugins/, its own file,
+# required only by a
 # program that names it (docs/design/plugin-providers.md).
 #
 # A port of typescript/src/provider/support.ts and
@@ -204,7 +205,7 @@ module VoxgigSekreto
     'builtin' => %w[env memory dotenv file].freeze,
     'plugin' => %w[
       hashicorp boru awssecrets awsparams gcpsecrets azuresecrets
-      onepassword doppler infisical secretspec
+      onepassword doppler infisical secretspec minivault
     ].freeze
   }.freeze
 end

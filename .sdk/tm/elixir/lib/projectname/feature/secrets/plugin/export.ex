@@ -1,5 +1,5 @@
-# VENDORED: @voxgig/plugin sdk-20260908-1556-0 (elixir/lib/voxgig_plugin/export.ex)
-# Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+# VENDORED: @voxgig/plugin sdk-20260925-1316-0 (elixir/lib/voxgig_plugin/export.ex)
+# Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 defmodule Voxgig.Plugin.Export do
   @moduledoc """
@@ -23,8 +23,11 @@ defmodule Voxgig.Plugin.Export do
   never a corpus value, so it uses atom keys where the data does not.
   """
   def resolve_export(spec, exported) do
-    case :binary.match(spec, "/") do
-      :nomatch ->
+    # THE LAST `/`, not the first: a NAME may hold slashes (§4), a key may
+    # not. `:binary.matches` returns every hit, so the last one is the
+    # split; `:binary.match` returns only the first.
+    case List.last(:binary.matches(spec, "/")) do
+      nil ->
         Types.fail("plugin_export_ambiguous", "export spec needs a key: #{spec}",
                    %{"spec" => spec})
 

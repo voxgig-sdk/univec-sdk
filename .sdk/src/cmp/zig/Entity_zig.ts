@@ -29,7 +29,6 @@ const Entity = cmp(function Entity(props: any) {
 
   const ff = Path.normalize(__dirname + '/../../../src/cmp/zig/fragment/')
 
-  // Entity files go to entity/ as one file per entity.
   Folder({ name: 'entity' }, () => {
 
     File({ name: zigVarName(entity.name) + '.' + target.ext }, () => {
@@ -73,8 +72,6 @@ const Entity = cmp(function Entity(props: any) {
 
           EntyClass: cls,
 
-          // Matches every `// #<Stage>-Hook` marker in run_op (where `ctx` is
-          // the operation context). // comments -> default marker works.
           '#Entity-Hook': ({ name, indent }: any) =>
             Content({ indent }, `self.utility.feature_hook(ctx, "${name}");`),
 

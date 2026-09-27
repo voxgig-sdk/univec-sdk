@@ -24,6 +24,8 @@ import {
 
 import { Package } from './Package_rust'
 import { Config } from './Config_rust'
+import { Schema } from './Schema_rust'
+import { PrepareAuth } from './PrepareAuth_rust'
 import { Gitignore } from './Gitignore_rust'
 import { MainEntity } from './MainEntity_rust'
 import { EntityBase } from './EntityBase_rust'
@@ -43,8 +45,6 @@ const Main = cmp(async function Main(props: any) {
   // helpers/applicability.
   const feature = targetFeatures(model, target)
 
-  // The rust crate identifier (RUSTCRATE placeholder), e.g. solar_sdk —
-  // used in every `use <crate>::...` path in the test templates.
   const rustcrate = crateIdent(model)
 
   Package({ target })
@@ -67,8 +67,8 @@ const Main = cmp(async function Main(props: any) {
     }
   })
 
-  // Generated core files: the client (sdk.rs), the API config and the
-  // branded error type.
+  PrepareAuth({ target })
+
   Folder({ name: 'core' }, () => {
 
     File({ name: 'sdk.' + target.ext }, () => {
@@ -81,7 +81,6 @@ const Main = cmp(async function Main(props: any) {
           }
         },
 
-        // Entity accessors - injected at SLOT
         () => {
           each(entity, (entity: ModelEntity) => {
             const entitySDK = getModelPath(model, `main.${KIT}.entity.${entity.name}`)
@@ -93,15 +92,11 @@ const Main = cmp(async function Main(props: any) {
 
     Config({ target })
 
+    Schema({ target })
+
     SdkError({ target })
   })
 
-  // feature/mod.rs — the feature module index.
-  //
-  // GENERATED, not templated: rust needs every module declared, and
-  // `target add` only copies source for the features the model selects. A
-  // static index listing all eighteen shipped features stops the crate from
-  // compiling the moment the set is trimmed.
   Folder({ name: 'feature' }, () => {
     File({ name: 'mod.' + target.ext }, () => {
       Content(`// ${model.const.Name} SDK feature modules (mirrors tm/go/feature).
@@ -115,29 +110,7 @@ pub mod base;
       each(feature, (feat: any) => Content(`pub mod ${feat.name};\n`))
     })
 
-    // feature/<name>/plugins.rs - a feature's PLUGIN module index.
-    //
-    // GENERATED, and it has no go/py analogue: rust compiles only the
-    // modules a parent DECLARES, and the declared set varies with the
-    // plugin trim, so a static index would either name a file the trim
-    // just deleted or leave an active kind out of the build.
-    //
-    // It sits one level ABOVE the vendored `plugins/` directory on
-    // purpose: the vendoring guard fails any non-vendored file inside a
-    // vendor dir. Nothing is lost by that - an .rs file no module
-    // declares is not compiled at all, so an inactive group's vendored
-    // file left on disk is inert whether or not the trim reached it.
-    //
-    // This is rust's replacement for go's core-emitted FeaturePlugins map
-    // (Config_go), and it is better placed: core/config.rs never has to
-    // name a feature's types.
     each(feature, (feat: any) => {
-      // `only_active: false`, the same subtlety pluginExcludesFor
-      // documents: the feature object a component is handed has already
-      // been filtered, so a feature whose plugins are ALL inactive would
-      // arrive with nothing here and the index would not be emitted at
-      // all - leaving `pub mod plugins;` in the feature source pointing
-      // at a file that does not exist.
       const declared = getModelPath(model,
         `main.${KIT}.feature.${feat.name}.plugin`,
         { required: false, only_active: false }) || {}
@@ -156,18 +129,11 @@ pub mod base;
         if (true !== plugin.active) return
 
         for (const [sym, one] of Object.entries(plugin.def?.rust || {})) {
-          // 'feature/secrets/plugins/aws.rs' -> the module `aws`.
           mods.add(String(one).replace(/^.*\//, '').replace(/\.rs$/, ''))
           syms.add(sym)
         }
       })
 
-      // The shared HTTP client the vendored vault kinds import
-      // (`use super::httpjson::...`) belongs to NO plugin group - trimming
-      // it with any one group would delete a file the others compile
-      // against - so it ships with the feature core and is DECLARED here
-      // only when something reaches for it. That is what keeps rustls out
-      // of a chain that is [dotenv, env] or [secretspec].
       const NOHTTP = ['secretspec']
       const http = Array.from(mods).some((m: string) => !NOHTTP.includes(m))
 
@@ -209,15 +175,10 @@ pub fn definitions() -> Vec<Definition> {
     })
   })
 
-  // entity/mod.rs — the entity module index.
   EntityBase({ target })
 
-  // entity/types.rs — the documentary typed models (one struct per entity +
-  // per op). Declared as a module by EntityBase so it compiles with the crate.
   EntityTypes({ target })
 
-  // lib.rs — the crate root: module declarations plus the public API
-  // re-exports (twin of the go root package file).
   File({ name: 'lib.' + target.ext }, () => {
     Content(`// ${model.const.Name} SDK for Rust (generated by @voxgig/sdkgen).
 //

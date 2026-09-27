@@ -8,33 +8,6 @@ import {
 } from '@voxgig/apidef'
 
 
-// Emits t/readme_examples.t — a Test::More COMPLETENESS GATE that guarantees
-// every fenced `perl` code example across the package docs is unit-tested. It
-// reads ALL THREE docs — the root (multi-language) ../README.md, the
-// Perl-specific ../README.md, and ../REFERENCE.md — extracts every fenced perl
-// block (tagged by source doc + index) and enforces:
-//
-//   1. SYNTAX  — `perl -c` on every block (with the SDK lib on @INC, so a
-//      construction block's `use <Name>SDK` is actually compiled/loaded).
-//   2. RUN     — every RUNNABLE block (one that constructs the SDK, drives
-//      `$client`, or performs an entity op) is EXECUTED offline in seeded
-//      test mode against the real SDK. The captured stdout+stderr is scanned
-//      for FATAL perl-level programming-error markers REGARDLESS of exit code,
-//      so a bug an example's own eval swallows and prints is still caught.
-//      A domain not-found / 404 error never matches FATAL, so it is tolerated.
-//   3. COMPLETENESS — every block is partitioned into exactly one of
-//      {executed, syntaxchecked-nonrunnable, illustration}; the counts must
-//      sum to the total. A runnable-looking block that was not executed lands
-//      in neither bucket and FAILS the gate.
-//
-// A runnable block is rewritten so its client is a test-mode client
-// (<Name>SDK->test) seeded with an in-memory fixture for every entity it
-// references; any real ->new/->test constructor is rewritten. A block that
-// only uses `$client` (constructed in an earlier fenced block) gets a test
-// client prepended.
-//
-// The emitted Perl builds the ``` fence via chr(96) so this generator string
-// contains no backticks of its own.
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { target, ctx$: { model } } = props
 

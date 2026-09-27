@@ -1,21 +1,6 @@
 // VENDORED: @voxgig/plugin 0.1.6 (go/plugin/config.go)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-/* The declarative document (§9): normalization, and the ten-level
- * precedence ladder.
- *
- * TWO FUNCTIONS, AND THE SPLIT BETWEEN THEM IS FORCED.
- *
- * NormalizeConfig normalizes STRUCTURE and ENTRY KEYS. It does not
- * merge options, and cannot: §9.4 makes merge behaviour a property of
- * the definition's option SHAPE, which normalization has never seen. A
- * normalizer that flattened the option layers would make
- * `$MERGE: append` unimplementable at load time, because the layers it
- * must concatenate would already be collapsed.
- *
- * ResolveOptions applies the ladder, and it is the only place that
- * knows the shape. */
-
 package plugin
 
 import "sort"
@@ -30,12 +15,9 @@ type Keys struct {
 }
 
 type NormalizeInput struct {
-	Doc     any    `json:"doc"`
-	Profile string `json:"profile,omitempty"`
-	// Keys is §9.1: a host may rename `instance` and `default` into its
-	// own vocabulary.
-	Keys Keys `json:"keys,omitempty"`
-	// Reserved is §9.1: refs the host declares itself and always wins on.
+	Doc      any      `json:"doc"`
+	Profile  string   `json:"profile,omitempty"`
+	Keys     Keys     `json:"keys,omitempty"`
 	Reserved []string `json:"reserved,omitempty"`
 }
 
@@ -45,12 +27,6 @@ func NormalizeConfig(input NormalizeInput) (Normalized, error) {
 	dkey := or(input.Keys.Default, "default")
 	reserved := input.Reserved
 
-	// The rename is applied at TWO PLACES AND NO OTHERS: the document
-	// root, and every profile.<name> overlay root (§9.1). A rename
-	// applied only at the root would leave `profile.prod.sdk`
-	// untranslated and silently drop every environment override the host
-	// depends on. Recursing further would be worse: option data is the
-	// definition's.
 	baseinst := doc[ikey]
 	basedef := asmap(doc[dkey])
 
@@ -109,17 +85,10 @@ func NormalizeConfig(input NormalizeInput) (Normalized, error) {
 		b := base.emap[ref]
 		o := over.emap[ref]
 
-		// MERGE THE ENTRIES AS AUTHORED, THEN APPLY DEFAULTS TO THE
-		// RESULT (§9.3). A safety rule, not a tidiness one: if the
-		// overlay had its defaults filled in before merging it would
-		// carry a synthesized active:true and overwrite a base's false —
-		// silently re-enabling a deliberately disabled integration in
-		// production.
 		active := asbool(pick(o, "active", pick(b, "active", true)), true)
 		start := asstring(pick(o, "start", pick(b, "start", "eager")), "eager")
 		ord := pick(o, "order", pick(b, "order", nil))
 
-		// Option layers, levels 3-6, IN LADDER ORDER. Never merged here.
 		layers := []any{}
 		nm := refname(ref)
 		if v, ok := asmap(basedef[nm])["options"]; ok {
@@ -218,22 +187,16 @@ func checkreservedref(ref string, reserved []string) error {
 	return nil
 }
 
-// ---------------------------------------------------------------------
-// ResolveOptions — §9.3's ten levels, and §9.4's merge directives
-// ---------------------------------------------------------------------
-
 type ResolveInput struct {
-	Ref string `json:"ref"`
-	// Shape is level 1 — the definition's option shape. Also carries the
-	// $MERGE directives, which is why merging cannot happen without it.
+	Ref          string `json:"ref"`
 	Shape        any    `json:"shape,omitempty"`
-	HostDefaults any    `json:"hostdefaults,omitempty"` // 2
-	Doc          any    `json:"doc,omitempty"`          // 3-6
+	HostDefaults any    `json:"hostdefaults,omitempty"`
+	Doc          any    `json:"doc,omitempty"`
 	Profile      string `json:"profile,omitempty"`
-	Env          any    `json:"env,omitempty"`         // 7
-	HostOptions  any    `json:"hostoptions,omitempty"` // 8
-	LoadOptions  any    `json:"loadoptions,omitempty"` // 9
-	Patch        any    `json:"patch,omitempty"`       // 10
+	Env          any    `json:"env,omitempty"`
+	HostOptions  any    `json:"hostoptions,omitempty"`
+	LoadOptions  any    `json:"loadoptions,omitempty"`
+	Patch        any    `json:"patch,omitempty"`
 }
 
 func ResolveOptions(input ResolveInput) (map[string]any, error) {
@@ -254,11 +217,6 @@ func ResolveOptions(input ResolveInput) (map[string]any, error) {
 		overlay = asmap(asmap(doc["profile"])[input.Profile])
 	}
 
-	// ONE ordered merge, lowest to highest. Levels 3-6 are not two
-	// namespaces collapsed separately and composed afterwards: that
-	// inverts the rule that PROFILE SPECIFICITY OUTRANKS DEFINITION
-	// SPECIFICITY, so a prod per-definition default would lose to a base
-	// instance value.
 	lo3, err := optsof(doc["default"], name)
 	if nil != err {
 		return nil, err
@@ -277,13 +235,13 @@ func ResolveOptions(input ResolveInput) (map[string]any, error) {
 	}
 
 	layers := []any{
-		defaultsof(shape),  // 1
-		input.HostDefaults, // 2
-		lo3, lo4, lo5, lo6, // 3-6
-		input.Env,         // 7
-		input.HostOptions, // 8
-		input.LoadOptions, // 9
-		input.Patch,       // 10
+		defaultsof(shape),
+		input.HostDefaults,
+		lo3, lo4, lo5, lo6,
+		input.Env,
+		input.HostOptions,
+		input.LoadOptions,
+		input.Patch,
 	}
 
 	var out any = map[string]any{}
@@ -296,7 +254,6 @@ func ResolveOptions(input ResolveInput) (map[string]any, error) {
 	return asmap(out), nil
 }
 
-// defaultsof: the shape's non-directive values are the level-1 defaults.
 func defaultsof(shape map[string]any) map[string]any {
 	out := map[string]any{}
 	for _, k := range sortedkeys(shape) {
@@ -315,7 +272,6 @@ func optsof(src any, key string) (any, error) {
 	if nil == src {
 		return nil, nil
 	}
-	// The array form is equivalent to the map form (§9.1).
 	if list, ok := aslist(src); ok {
 		for _, item := range list {
 			raw, _ := asmap(item)["ref"]
@@ -351,10 +307,6 @@ func optsof(src any, key string) (any, error) {
 	return nil, nil
 }
 
-// mergeone merges ONE layer onto the accumulator, honouring the shape's
-// directives. The directive holds at EVERY precedence level, not only
-// between document levels — §9.4 makes it a property of the shape, which
-// does not know which layer a value arrived from.
 func mergeone(base any, over any, shape map[string]any) any {
 	if nil == over {
 		return base
@@ -411,7 +363,6 @@ func mergeone(base any, over any, shape map[string]any) any {
 	return out
 }
 
-// deepto merges N levels below this key, replacing below that.
 func deepto(base any, over any, n int) any {
 	if 0 >= n {
 		return clonevalue(over)
@@ -430,14 +381,6 @@ func deepto(base any, over any, n int) any {
 	return out
 }
 
-// §9.4: N is an integer of at least 1, and everything else is an error.
-//
-// `{"deep": 0}` is rejected DESPITE having an obvious reading, because
-// "replace at this key" already has a spelling and two spellings for one
-// behaviour is the defect class this repo exists to avoid. Without the
-// stated domain each port picks its own reading — reject, replace,
-// unlimited merge, or clamp to 1 — and the same document resolves
-// differently per language.
 var mergeWords = []string{"replace", "append"}
 
 func CheckShape(shape any) error {
@@ -570,25 +513,6 @@ func isposint(v any) bool {
 	return f == float64(int(f)) && 1 <= f
 }
 
-// asorderref reads ONE spelling or a LIST of them into an OrderRef, and
-// KEEPS THE AUTHORED VALUE so normalization can hand it back untouched.
-//
-// It used to be a bare asstring(), so a list decoded to "" and the
-// constraint was SILENTLY DROPPED - the sort ran as if nothing had been
-// declared.
-//
-// `stated` is separate from the value because an ABSENT key and a key
-// authored as `null` are different documents, and a map index alone
-// cannot tell them apart.
-//
-// The other four ports have no type like this at all: they carry the
-// authored block straight through (`ent.order = ord`), so every spelling
-// survives normalization by construction. Go is the only port that
-// decodes and rebuilds, and a rebuild loses whatever it does not model -
-// first the list form, then scalar-vs-one-element-list, then an authored
-// empty list, then an authored null. One cause, four parity breaks, none
-// of which the corpus could see until `config/normorder` was written.
-// Keeping the authored value ends the class rather than the instance.
 func asorderref(v any, stated bool) OrderRef {
 	if !stated {
 		return OrderRef{}

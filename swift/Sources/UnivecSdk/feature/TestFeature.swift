@@ -16,14 +16,18 @@ private func testEnvelope(_ ctx: Context, _ data: Value) -> Value {
   guard let point = ctx.point else { return data }
   guard case .map(let tm)? = point.entries["transform"] else { return data }
   guard case .string(let spec)? = tm.entries["res"] else { return data }
-  // Exactly `body.<key>`; a deeper path is not an envelope this mock can
-  // synthesise, so it is left alone rather than guessed at.
+  // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+  // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
   guard spec.hasPrefix("`body."), spec.hasSuffix("`"), spec.count >= 8 else { return data }
   let inner = String(spec.dropFirst(6).dropLast(1))
-  guard !inner.isEmpty, !inner.contains(".") else { return data }
-  let wrapped = VMap()
-  wrapped.entries[inner] = data
-  return .map(wrapped)
+  guard !inner.isEmpty else { return data }
+  var out = data
+  for seg in inner.split(separator: ".", omittingEmptySubsequences: false).reversed() {
+    let wrapped = VMap()
+    wrapped.entries[String(seg)] = out
+    out = .map(wrapped)
+  }
+  return out
 }
 
 private func testRespond(_ ctx: Context, _ status: Int, _ data: Value, _ extra: VMap?) -> Value {
@@ -89,9 +93,14 @@ private func testBuildArgs(_ ctx: Context, _ op: Operation, _ args: VMap?) -> Va
     }
   }
 
-  let paramsPath = getpath(point, jtp("args", "params"))
-  let reqdParams = select(paramsPath, .map(vm(("reqd", .bool(true)))))
-  let reqd = transform(reqdParams, jtp("`$EACH`", "", "`$KEY.name`"))
+  // Path AND query: a path-only read misses a query-addressed record
+  // (e.g. GET /result?trace_id=), which has no path param at all.
+  let reqdArgs = VList()
+  for kind in ["params", "query"] {
+    let argsPath = getpath(point, jtp("args", kind))
+    reqdArgs.items.append(contentsOf: select(argsPath, .map(vm(("reqd", .bool(true))))).asList?.items ?? [])
+  }
+  let reqd = transform(.list(reqdArgs), jtp("`$EACH`", "", "`$KEY.name`"))
 
   let qand = VList()
   let q = VMap()
@@ -202,17 +211,15 @@ public final class TestFeature: BaseFeature {
         }
         let args = testBuildArgs(ctx2, op, updateMatch)
         let found = select(.map(entmap), args)
-        var ent = getelem(found, .int(0))
+        let ent = getelem(found, .int(0))
         if isNil(ent) {
-          for (_, e) in entmap.entries where e.isMap { ent = e; break }
-        }
-        if isNil(ent) {
+          // update miss: 404, never another record
           let extra = VMap()
           extra.entries["statusText"] = .string("Not found")
           return testRespond(ctx2, 404, .noval, extra)
         }
-        if let entm = ent.asMap {
-          for (k, v) in ctx2.reqdata.entries { entm.entries[k] = v }
+        if ent.isMap {
+          _ = merge(.list(VList([ent, .map(ctx2.reqdata)])))
         }
         delprop(ent, .string("$KEY"))
         return testRespond(ctx2, 200, clone(ent), nil)

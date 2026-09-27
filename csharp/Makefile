@@ -11,7 +11,7 @@ clean:
 	rm -rf bin obj test/bin test/obj
 
 # --- Release: tag for NuGet ------------------------------------------------
-# NuGet publication is pending (see model/target/csharp.aon publish block);
+# NuGet publication is pending (see model/target/csharp.aontu publish block);
 # publishing a version currently means pushing the tag csharp/vX.Y.Z. When the
 # registry goes live, `dotnet pack` + `dotnet nuget push` slot in before the
 # tag (mirroring the voxgig/struct csharp Makefile). Run headless under the

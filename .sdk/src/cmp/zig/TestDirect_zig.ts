@@ -4,17 +4,6 @@ import { cmp, Content } from '@voxgig/sdkgen'
 import { zigVarName } from './utility_zig'
 
 
-// Per-entity direct-call smoke tests. Emits `test "..."` blocks INTO the
-// shared generated_test.zig file (opened by Test_zig) — see TestEntity_zig for
-// why zig keeps every generated test in one file.
-//
-// The go/rust TestDirect generators build a per-entity mock-fetch harness and
-// assert the exact URL/params the entity's op point resolves. Reproducing that
-// path-extraction + mock-transport harness in zig safely requires a build to
-// validate against, so this generator instead exercises the documented
-// `direct()` / `prepare()` escape hatches through the offline test transport
-// and asserts the result shape. `std`, `sdk`, `h`, `Value` and `vnull()` are
-// in scope from the Test_zig header.
 const TestDirect = cmp(function TestDirect(props: any) {
   const { entity } = props
 

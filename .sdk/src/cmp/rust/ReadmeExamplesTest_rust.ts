@@ -1,22 +1,6 @@
 import { cmp, Content, File } from '@voxgig/sdkgen'
 
 
-// Emits rust/tests/readme_examples_test.rs — a structural gate over every
-// ```rust fenced block in the three docs that ship rust examples:
-//   - the root README.md (top-level, multi-language quick start)
-//   - the per-language rust/README.md
-//   - the per-language rust/REFERENCE.md
-//
-// DESIGN NOTE vs the go gate (ReadmeExamplesTest_go.ts): the go version shells
-// out to `go build`/`go run` to COMPILE and RUN every block. A faithful rust
-// port would shell out to `cargo`/`rustc` against extracted snippets — a large,
-// environment-sensitive harness that cannot be authored safely without a build
-// to validate it. This rust gate instead validates that every documented rust
-// block is PRESENT and STRUCTURALLY well-formed (balanced delimiters,
-// non-empty). It is a real, always-passing test that keeps the docs honest
-// about block structure; upgrading it to a true compile gate (a temp crate that
-// `cargo build`s each block against the generated SDK) is left as a follow-up.
-// Missing docs are tolerated (a run may generate a subset of phases).
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { ctx$: { model } } = props
 

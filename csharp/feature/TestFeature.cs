@@ -59,15 +59,21 @@ public class TestFeature : BaseFeature
                 if (data == null || ctx2.Point == null) { return data; }
                 var tm = StructUtils.GetProp(ctx2.Point, "transform");
                 if (StructUtils.GetProp(tm, "res") is not string spec) { return data; }
-                // Exactly `body.<key>`; a deeper path is not an envelope this
-                // mock can synthesise, so it is left alone.
+                // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+                // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
                 if (!spec.StartsWith("`body.") || !spec.EndsWith("`") || spec.Length < 8)
                 {
                     return data;
                 }
                 var inner = spec.Substring(6, spec.Length - 7);
-                if (inner.Length == 0 || inner.Contains('.')) { return data; }
-                return new Dictionary<string, object?> { [inner] = data };
+                if (inner.Length == 0) { return data; }
+                var segs = inner.Split('.');
+                object? built = data;
+                for (var i = segs.Length - 1; 0 <= i; i--)
+                {
+                    built = new Dictionary<string, object?> { [segs[i]] = built };
+                }
+                return built;
             }
 
             Dictionary<string, object?> Respond(int status, object? data,
@@ -182,30 +188,17 @@ public class TestFeature : BaseFeature
                 var args = BuildArgs(ctx2, op, updateMatch);
                 var found = StructUtils.Select(entmap, args);
                 var ent = StructUtils.GetElem(found, 0);
-                if (ent == null && entmap != null)
-                {
-                    foreach (var e in entmap.Values)
-                    {
-                        if (e is Dictionary<string, object?>)
-                        {
-                            ent = e;
-                            break;
-                        }
-                    }
-                }
                 if (ent == null)
                 {
+                    // update miss: 404, never another record
                     return Respond(404, null, new Dictionary<string, object?>
                     {
                         ["statusText"] = "Not found",
                     });
                 }
-                if (ent is Dictionary<string, object?> entm && ctx2.Reqdata != null)
+                if (ent is Dictionary<string, object?> && ctx2.Reqdata != null)
                 {
-                    foreach (var kv in ctx2.Reqdata)
-                    {
-                        entm[kv.Key] = kv.Value;
-                    }
+                    StructUtils.Merge(new List<object?> { ent, ctx2.Reqdata });
                 }
                 StructUtils.DelProp(ent, "$KEY");
                 var outval = StructUtils.Clone(ent);
@@ -378,11 +371,16 @@ public class TestFeature : BaseFeature
             }
         }
 
-        // Get required params.
-        var paramsPath = StructUtils.GetPath(point, StructUtils.Jt("args", "params"));
-        var reqdParams = StructUtils.Select(paramsPath,
-            new Dictionary<string, object?> { ["reqd"] = true });
-        var reqd = StructUtils.Transform(reqdParams,
+        // Path AND query: a path-only read misses a query-addressed record
+        // (e.g. GET /result?trace_id=), which has no path param at all.
+        var reqdArgs = new List<object?>();
+        foreach (var kind in new[] { "params", "query" })
+        {
+            var argsPath = StructUtils.GetPath(point, StructUtils.Jt("args", kind));
+            reqdArgs.AddRange(StructUtils.Select(argsPath,
+                new Dictionary<string, object?> { ["reqd"] = true }));
+        }
+        var reqd = StructUtils.Transform(reqdArgs,
             StructUtils.Jt("`$EACH`", "", "`$KEY.name`"));
 
         var qand = new List<object?>();

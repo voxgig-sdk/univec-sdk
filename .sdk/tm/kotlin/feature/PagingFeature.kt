@@ -8,8 +8,9 @@ import KOTLINPACKAGE.utility.struct.Struct
 
 // Pagination support for list operations. On the way out (PreRequest) it
 // stamps page/limit (or a cursor) into the request query; on the way back
-// (PreResult) it reads the server's pagination signals and records them on
-// `ctx.result.paging`.
+// (PreResult) it reads the server's pagination signals (camelCase and
+// snake_case body forms) and records them on `ctx.result.paging` and the
+// caller's `ctrl.paging`.
 @Suppress("UNCHECKED_CAST")
 class PagingFeature : BaseFeature("paging", "0.0.1", true) {
 
@@ -53,7 +54,9 @@ class PagingFeature : BaseFeature("paging", "0.0.1", true) {
     if (cursor != null) {
       spec.query[cursorParam] = cursor
     } else if (spec.query[pageParam] == null) {
-      val page = paging["page"]
+      // A record written back by preResult holds the page just fetched as
+      // "page" and the one to fetch as "nextPage", so nextPage wins.
+      val page = paging["nextPage"] ?: paging["page"]
       if (page != null) {
         spec.query[pageParam] = page
       } else {
@@ -166,17 +169,32 @@ class PagingFeature : BaseFeature("paging", "0.0.1", true) {
       }
     }
 
-    // Body-level cursors.
+    // Body-level signals; snake_case forms are read first so camelCase wins.
     if (body is MutableMap<*, *>) {
       val bm = body as MutableMap<String, Any?>
       if (bm["next"] != null && paging["next"] == null) {
         paging["next"] = bm["next"]
+      }
+      if (bm["next_cursor"] != null) {
+        paging["cursor"] = bm["next_cursor"]
       }
       if (bm["cursor"] != null) {
         paging["cursor"] = bm["cursor"]
       }
       if (bm["nextCursor"] != null) {
         paging["cursor"] = bm["nextCursor"]
+      }
+      if (paging["nextPage"] == null) {
+        val np = bm["nextPage"] ?: bm["next_page"]
+        if (np is Number) {
+          paging["nextPage"] = np.toInt()
+        } else if (np is String) {
+          paging["nextPage"] = np
+        }
+      }
+      if (bm["has_more"] is Boolean) {
+        paging["hasMore"] = bm["has_more"]
+        explicitMore = true
       }
       if (bm["hasMore"] is Boolean) {
         paging["hasMore"] = bm["hasMore"]
@@ -197,6 +215,20 @@ class PagingFeature : BaseFeature("paging", "0.0.1", true) {
 
     result.paging = paging
     this.last = paging
+
+    // The Context shares the caller's paging map by reference, so refill it
+    // in place; an immutable map falls back to replacing the reference.
+    val shared = ctx.ctrl.paging
+    if (shared == null) {
+      ctx.ctrl.paging = paging
+    } else {
+      try {
+        shared.clear()
+        shared.putAll(paging)
+      } catch (e: UnsupportedOperationException) {
+        ctx.ctrl.paging = paging
+      }
+    }
   }
 
   private fun isList(ctx: Context): Boolean {

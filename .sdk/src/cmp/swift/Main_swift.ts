@@ -23,6 +23,8 @@ import {
 
 import { Package } from './Package_swift'
 import { Config } from './Config_swift'
+import { Schema } from './Schema_swift'
+import { PrepareAuth } from './PrepareAuth_swift'
 import { Gitignore } from './Gitignore_swift'
 import { MainEntity } from './MainEntity_swift'
 import { SdkError } from './SdkError_swift'
@@ -37,19 +39,6 @@ const Main = cmp(async function Main(props: any) {
 
   const entity: ModelEntity = getModelPath(model, `main.${KIT}.entity`)
 
-  // THE SECRETS TRIM, at generate time, and swift NEEDS it where go, py and
-  // dart leave the feature-level trim to `target add` (vendor-tag rollout,
-  // Decision 5). DELIBERATE DIVERGENCE, and the reason is the build: the
-  // feature's three vendored trees are separate SwiftPM MODULES that
-  // Package_swift declares only when the feature is active (see the note
-  // there). With the feature off, a tree still in Sources/<Name>Sdk/ would
-  // be folded into the SDK target and fail it on five redeclarations, and
-  // feature/SecretsFeature.swift would fail on `import Sekreto` naming a
-  // module the manifest never declared. Every other swift feature is a
-  // single file the SDK module compiles regardless, so it needs no such
-  // exclude. Keyed on the SAME predicate the manifest uses, so the two
-  // cannot disagree. The gated suite under Tests/.../feature/secrets/ goes
-  // with it: it imports Sekreto too.
   const secrets = swiftSecretsActive(model, target)
   const secretsSourceExcludes: RegExp[] = secrets ? [] : [
     /(^|\/)feature\/SecretsFeature\.swift$/,
@@ -63,19 +52,6 @@ const Main = cmp(async function Main(props: any) {
 
   Gitignore({})
 
-  // Copy tm/swift files with replacements. `src/` holds only the per-feature
-  // extension folders (not shipped into the SDK output).
-  // THE COPIED TREE HAS TO CARRY THE API NAME TOO.
-  //
-  // Copy substitutes file CONTENTS, never path components, so a blanket copy
-  // of tm/swift landed the runtime in a directory literally called
-  // ProjectNameSDK. Package.swift papered over it with an explicit `path:`,
-  // so it compiled and every swift suite passed — while every published SDK
-  // shipped `Sources/ProjectNameSDK/`, and SwiftPM's own convention
-  // (Sources/<target>) was broken in all of them.
-  //
-  // Copy's `to` prop names the destination, so the two placeholder subtrees
-  // are copied explicitly and the rest of tm/swift blanket-copied as before.
   Copy({
     from: 'tm/' + target.name,
     exclude: [/src\//, /Sources\//, /Tests\//],
@@ -89,15 +65,6 @@ const Main = cmp(async function Main(props: any) {
     Copy({
       from: 'tm/' + target.name + '/Sources/ProjectNameSDK',
       to: swiftTargetDir(model),
-      // pluginExcludes: the generate-time plugin trim (an ACTIVE feature's
-      // INACTIVE plugin group's declared files stay out of the tree). The
-      // model's swift `path` entries are relative to THIS Copy's root
-      // (`feature/secrets/plugins/Aws.swift`, not `Sources/ProjectNameSDK/
-      // ...`), as py's are to its pkg copy - helpers/featureSource documents
-      // that getting the root wrong makes the trim a silent no-op. No
-      // verbatim carve-out is needed for the vendored trees: none of the
-      // upstream swift files carries a ProjectName/PROJECTENV token, so the
-      // blanket replace is inert over them.
       exclude: [...secretsSourceExcludes, ...pluginExcludes(model)],
       replace: {
         ...props.ctx$.stdrep,
@@ -160,12 +127,16 @@ const Main = cmp(async function Main(props: any) {
 
         Config({ target })
 
+        Schema({ target })
+
         SdkError({ target })
 
         EntityBase({ target })
       })
     })
   })
+
+  PrepareAuth({ target })
 
   // entity/<Name>Types.swift — documentary typed models (one struct per entity
   // + per op). Compiles with the SwiftPM target; nothing consumes it yet.

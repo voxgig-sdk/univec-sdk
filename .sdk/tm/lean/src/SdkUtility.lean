@@ -67,6 +67,19 @@ def isErrV (v : Value) : SIO Bool := do
   | .map _ => pure (truthy (← gp v "__sdkerr__"))
   | _ => pure false
 
+/-- Remove configured sensitive keys (options.clean.keys) from a value. -/
+def clean (ctx : Value) (v : Value) : SIO Value := do
+  let options ← gp ctx "options"
+  let keysStr ← gpS (← gp options "clean") "keys"
+  let drop := if keysStr == "" then #[] else (keysStr.splitOn ",").toArray
+  let out ← clone v
+  match out with
+  | .map _ =>
+    for k in drop do
+      if k != "" then dp out k
+  | _ => pure ()
+  pure out
+
 -- ---------------------------------------------------------------------------
 -- Operation naming
 -- ---------------------------------------------------------------------------
@@ -109,8 +122,13 @@ def opnameOf (ctx : Value) : SIO String := do
 def defaultOptions : SIO Value := do
   let hdr ← newMap #[("content-type", .str "application/json")]
   let ent ← emptyMap
+  -- `allow.op` carries the ts optspec's own default, because makePoint
+  -- enforces it; the other optspec slots are not defaulted here, so nothing
+  -- below is a value a caller could mistake for an enforced one.
+  let allow ← newMap #[("op", .str "create,update,load,list,remove,command,direct,graphql")]
   newMap #[("base", .str "http://localhost:8000"), ("prefix", .str ""),
-           ("suffix", .str ""), ("headers", hdr), ("entity", ent)]
+           ("suffix", .str ""), ("headers", hdr), ("entity", ent),
+           ("allow", allow)]
 
 /-- Defaults <- config.options <- options, then every entity gets an alias map. -/
 def makeOptions (config options : Value) : SIO Value := do
@@ -169,8 +187,23 @@ def makeError (ctx : Value) (errv : Value) : SIO Value := do
   let msg := if m1 != "" then m1 else if m2 != "" then m2 else "unknown error"
   mkErr "sdk_error" (nm ++ "SDK: " ++ opname ++ ": " ++ msg)
 
+/-- The explain record the caller asked for, finished off: sensitive keys
+    removed, and the result's error dropped from it. The error is reported on
+    its own, so leaving a copy inside the explained result means a caller
+    reading the record cannot tell a failure it already handled from a fresh
+    one. Mirrors ts's DoneUtility. -/
+def doneExplain (ctx : Value) : SIO Unit := do
+  let ctrl ← gp ctx "ctrl"
+  let explain ← gp ctrl "explain"
+  if isMapV explain then do
+    let cleaned ← clean ctx explain
+    sp ctrl "explain" cleaned
+    let res ← gp cleaned "result"
+    if isMapV res then dp res "err"
+
 /-- Terminal step: the result payload, or the pipeline error. -/
 def done (ctx : Value) : SIO (Value × Option Value) := do
+  doneExplain ctx
   let res ← gp ctx "result"
   if truthy (← gp res "ok") then pure ((← gp res "resdata"), none)
   else do
@@ -266,6 +299,25 @@ def prepareHeaders (ctx : Value) : SIO Value := do
   | .map i => clone (.map i)
   | _ => newMap #[("content-type", .str "application/json")]
 
+/-- The credential prefix (`Bearer`): the caller's `options.auth.prefix` when
+    the caller passed an `auth` map, else the one the API model declares in
+    `config.options.auth.prefix`, else none.
+
+    runOp hands the pipeline the caller's RAW options - lean's client never
+    runs them through makeOptions, so the model's declared prefix was never
+    in `options` and a live SDK built `authorization: <key>` for a bearer
+    API. The corpus lane, which does merge, is unaffected: with `auth`
+    present in options the first branch answers exactly as before. Shared
+    with the secrets feature, whose transport wrapper rewrites the header
+    from the same rule. -/
+def authPrefix (ctx : Value) : SIO String := do
+  let options ← gp ctx "options"
+  match (← gp options "auth") with
+  | .map _ => gpS (← gp options "auth") "prefix"
+  | _ =>
+    let copts ← gp (← gp ctx "config") "options"
+    gpS (← gp copts "auth") "prefix"
+
 /-- apikey (with the configured auth prefix) becomes the authorization header. -/
 def prepareAuth (ctx : Value) : SIO (Value × Option Value) := do
   let specV ← gp ctx "spec"
@@ -289,7 +341,7 @@ def prepareAuth (ctx : Value) : SIO (Value × Option Value) := do
       dp headers "authorization"
       pure (specV, none)
     else do
-      let pfx ← gpS (← gp options "auth") "prefix"
+      let pfx ← authPrefix ctx
       let authval := if pfx != "" then pfx ++ " " ++ apikey else apikey
       sp headers "authorization" (.str authval)
       pure (specV, none)
@@ -343,7 +395,9 @@ def transformResponse (ctx : Value) : SIO Value := do
           let input ← newMap #[("ok", ok), ("status", status), ("statusText", stt),
                                ("headers", hdr), ("body", body),
                                ("resdata", resdata), ("resmatch", resmatch)]
-          transform input resform
+          let out ← transform input resform
+          sp resultV "resdata" out
+          pure out
       | _ => pure .noval
   | _ => pure .noval
 
@@ -493,7 +547,9 @@ def resultBasic (ctx : Value) : SIO Unit := do
       let full := if pm != "" then pm ++ ": " ++ msg else msg
       let e ← mkErr "request_status" full
       sp resultV "err" e
-    else pure ()
+    else do
+      let rerr ← gp responseV "err"
+      if (← isErrV rerr) then sp resultV "err" rerr
   | _, _ => pure ()
 
 /-- Response headers land on the result with lower-cased keys. -/
@@ -560,7 +616,12 @@ def makeSpec (ctx : Value) : SIO (Value × Option Value) := do
     -- them would send /graphql?id=i1.
     sp spec "query" (← emptyMap)
     sp headers "content-type" (.str graphqlContentType)
-  pure (spec, none)
+  else do
+    let body ← prepareBody ctx
+    if !(isNov body) then sp spec "body" body
+  let explain ← gp (← gp ctx "ctrl") "explain"
+  if isMapV explain then sp explain "spec" spec
+  prepareAuth ctx
 
 /-- base/prefix/path/suffix joined, `{param}` substituted, query appended. -/
 def makeUrl (ctx : Value) : SIO (Value × Option Value) := do
@@ -579,7 +640,7 @@ def makeUrl (ctx : Value) : SIO (Value × Option Value) := do
     for k in (← keysof params) do
       let v ← gp params k
       if !(isNov v) then do
-        let enc ← escurl (.str (vs v))
+        let enc ← escurl (.str (← jsString v))
         sp resmatch k v
         url := url.replace ("{" ++ k ++ "}") (vs enc)
     let query ← gp specV "query"
@@ -588,7 +649,7 @@ def makeUrl (ctx : Value) : SIO (Value × Option Value) := do
       let v ← gp query k
       if !(isNov v) then do
         let ek ← escurl (.str k)
-        let ev ← escurl (.str (vs v))
+        let ev ← escurl (.str (← jsString v))
         sp resmatch k v
         url := url ++ qsep ++ vs ek ++ "=" ++ vs ev
         qsep := "&"
@@ -634,11 +695,27 @@ def pointShape (pt : Value) : SIO (Nat × Bool) := do
   | _ => pure (0, false)
 
 /-- Select the endpoint for this operation: the single point, else the first
-    whose `select.exist` keys are all present and whose `$action` agrees. -/
+    whose `select.exist` keys are all present and whose `$action` agrees. An
+    op `options.allow.op` does not name is refused before any endpoint is
+    resolved, and an `$action` no point declares is refused rather than
+    answered with a different endpoint. -/
 def makePoint (ctx : Value) : SIO Value := do
   let op ← gp ctx "op"
-  let matchV ← gp ctx "reqmatch"
-  let dataV ← gp ctx "reqdata"
+  let opname ← gpS op "name"
+  -- Substring containment over the comma list, as the ts and go references
+  -- do. An empty or absent value allows everything: lean's makeOptions has no
+  -- optspec, so a hand-built context legitimately carries no `allow`.
+  let allowop ← gpS (← gp (← gp ctx "options") "allow") "op"
+  if allowop != "" && !(hasSub allowop opname) then
+    return (← mkErr "point_op_allow"
+      s!"Operation \"{opname}\" not allowed by SDK option allow.op value: \"{allowop}\"")
+  let input0 ← gpS op "input"
+  let input := if input0 == "" then "match" else input0
+  -- The call's own arguments, then the entity's current state. `$action` is
+  -- only ever an argument, so it is read from the first alone.
+  let reqsel ← gp ctx ("req" ++ input)
+  let statesel ← gp ctx input
+  let action ← gp reqsel "$action"
   let pts ← match (← gp op "points") with
     | .list i => listItems i
     | _ => pure #[]
@@ -656,15 +733,20 @@ def makePoint (ctx : Value) : SIO Value := do
         | .list i =>
           for ek in (← listItems i) do
             let k := vs ek
-            if isNov (← gp matchV k) && isNov (← gp dataV k) then ok := false
+            if isNov (← gp reqsel k) && isNov (← gp statesel k) then ok := false
         | _ => pure ()
-        if ok && ((← gp sel "$action") == (← gp matchV "$action")) then
+        if ok && ((← gp sel "$action") == action) then
           chosen := pt
-    -- select.exist can list more than the params needed to pick a point (for
-    -- /boards/{id} it is Trello's 17 optional query-includes), so a plain
-    -- {id} call matches NOTHING and this loop chose no point at all. Fall
-    -- back to the entity's own route rather than sending nowhere.
     if isNov chosen then
+      if !(isNov action) then
+        return (← mkErr "point_action_invalid"
+          s!"Operation \"{opname}\" action \"{← jsString action}\" is not valid.")
+      -- select.exist can list more than the params needed to pick a point (for
+      -- /boards/{id} it is Trello's 17 optional query-includes), so a plain
+      -- {id} call matches NOTHING and the loop above chose no point at all.
+      -- Fall back to the entity's own route rather than sending nowhere. Only
+      -- an actionless call gets that fallback: an action nothing declares is
+      -- the caller's error, and the entity's own route is a different request.
       let mut best := pts[0]!
       for cand in pts do
         let (candLen, candTerm) ← pointShape cand
@@ -685,19 +767,6 @@ def makeFetchDef (ctx : Value) : SIO Value := do
   let out ← newMap #[("method", .str method), ("headers", headers)]
   let body ← gp specV "body"
   if !(isNov body) then sp out "body" body
-  pure out
-
-/-- Remove configured sensitive keys (options.clean.keys) from a value. -/
-def clean (ctx : Value) (v : Value) : SIO Value := do
-  let options ← gp ctx "options"
-  let keysStr ← gpS (← gp options "clean") "keys"
-  let drop := if keysStr == "" then #[] else (keysStr.splitOn ",").toArray
-  let out ← clone v
-  match out with
-  | .map _ =>
-    for k in drop do
-      if k != "" then dp out k
-  | _ => pure ()
   pure out
 
 /-- The transport step. In test mode the client answers from its own store, so

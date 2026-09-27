@@ -5,8 +5,9 @@
 -- (PreResult) it reads the server's pagination signals — a
 -- `Link: <...>; rel="next"` header, `X-Page`/`X-Next-Page`/
 -- `X-Total-Count` headers, or `next`/`cursor`/`nextCursor`/`hasMore`
--- fields in the body — and records them on `ctx.result.paging`. A
--- per-call `ctrl.paging` (cursor or page) wins over the option defaults,
+-- fields in the body (snake_case forms too) — and records them on
+-- `ctx.result.paging` and the caller's `ctrl.paging`. A per-call
+-- `ctrl.paging` (cursor or page) wins over the option defaults,
 -- so auto-iteration can advance the cursor/page and re-issue the list
 -- call until `hasMore` is false. Parameter names (`pageParam`,
 -- `limitParam`, `cursorParam`), `startPage` (default 1) and `limit` are
@@ -95,8 +96,14 @@ function PagingFeature:PreRequest(ctx)
   if paging["cursor"] ~= nil then
     spec.query[cursor_param] = paging["cursor"]
   elseif spec.query[page_param] == nil then
-    if paging["page"] ~= nil then
-      spec.query[page_param] = paging["page"]
+    -- A record written back by PreResult holds the page just fetched as
+    -- "page" and the one to fetch as "nextPage", so nextPage wins.
+    local page = paging["nextPage"]
+    if page == nil then
+      page = paging["page"]
+    end
+    if page ~= nil then
+      spec.query[page_param] = page
     else
       spec.query[page_param] = self.options["startPage"] or 1
     end
@@ -218,16 +225,32 @@ function PagingFeature:PreResult(ctx)
     end
   end
 
-  -- Body-level cursors.
+  -- Body-level signals; snake_case forms are read first so camelCase wins.
   if type(body) == "table" then
     if body["next"] ~= nil and paging.next == nil then
       paging.next = body["next"]
+    end
+    if body["next_cursor"] ~= nil then
+      paging.cursor = body["next_cursor"]
     end
     if body["cursor"] ~= nil then
       paging.cursor = body["cursor"]
     end
     if body["nextCursor"] ~= nil then
       paging.cursor = body["nextCursor"]
+    end
+    if paging.nextPage == nil then
+      local np = body["nextPage"]
+      if np == nil then
+        np = body["next_page"]
+      end
+      if type(np) == "number" or type(np) == "string" then
+        paging.nextPage = np
+      end
+    end
+    if type(body["has_more"]) == "boolean" then
+      paging.hasMore = body["has_more"]
+      explicit_more = true
     end
     if type(body["hasMore"]) == "boolean" then
       paging.hasMore = body["hasMore"]
@@ -246,6 +269,22 @@ function PagingFeature:PreResult(ctx)
   end
 
   result.paging = paging
+
+  if ctx.ctrl ~= nil then
+    -- The Context shares the caller's paging table by reference, so refill
+    -- it in place; a fresh table on ctrl never reaches the caller.
+    if type(ctx.ctrl.paging) == "table" then
+      local shared = ctx.ctrl.paging
+      for k in pairs(shared) do
+        shared[k] = nil
+      end
+      for k, v in pairs(paging) do
+        shared[k] = v
+      end
+    else
+      ctx.ctrl.paging = paging
+    end
+  end
 
   local client = self.client
   client._paging = { last = paging }

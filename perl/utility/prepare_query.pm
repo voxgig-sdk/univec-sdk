@@ -30,6 +30,7 @@ $REGISTRY{prepare_query} = sub {
     for my $item (@$items) {
       my ($key, $val) = @$item;
       next unless UnivecHelpers::rb_truthy($val) && defined $key && !ref $key;
+      next if '$action' eq $key;
       next if grep { defined $_ && !ref $_ && $_ eq $key } @$params;
       $out->{$key} = $val;
     }

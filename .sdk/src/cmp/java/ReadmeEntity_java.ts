@@ -55,8 +55,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
-    const fields = entity.fields || []
-    // Model-driven id key: null when this entity has no id-like field.
+    const fields = Object.values(entity.fields || {})
     const idF = entityIdField(entity)
     // Sanitise the local variable name — a camelCased Java keyword gets a
     // trailing underscore (javaVarName) so the snippet compiles.
@@ -104,8 +103,8 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 `)
 
       each(fields, (field: any) => {
-        const desc = field.short || ''
-        Content(`| \`${field.name}\` | \`${canonToType(field.type, target.name)}\` | ${desc} |
+        const desc = field.sh || ''
+        Content(`| \`${field.n}\` | \`${canonToType(field.t, target.name)}\` | ${desc} |
 `)
       })
 

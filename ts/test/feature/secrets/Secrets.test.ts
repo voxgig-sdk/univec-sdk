@@ -1,16 +1,3 @@
-// Behavioural tests for the secrets feature (vendored @voxgig/sekreto).
-//
-// The contract under test: the `apikey` OPTION keeps its exact old meaning
-// and always wins, because SecretsFeature places it FIRST in the provider
-// chain (a `memory` store named `options`) — explicit-beats-lookup falls
-// out of sekreto's first-hit rule rather than from special-case logic.
-// With the feature inactive nothing changes at all. With it active and the
-// option unset, the chain (env, dotenv, a custom provider, a vault)
-// supplies the credential instead.
-//
-// This file lives in the `feature/` container on purpose: `target add`
-// trims it, along with the feature source and the vendored library, for a
-// project whose model does not select `secrets`.
 
 import { test, describe, beforeEach } from 'node:test'
 import assert from 'node:assert'
@@ -32,12 +19,6 @@ async function prepared(sdkopts: any): Promise<any> {
 }
 
 
-// The Authorization header carries the SPEC's credential prefix, which a
-// TEMPLATE cannot know: an OpenAPI `http`/`bearer` scheme gives
-// `Bearer <token>`, an apiKey scheme the raw token. So assert on the
-// CREDENTIAL and let the prefix be whatever this SDK's API declares —
-// pinning the whole header value passes only for a prefix-less API, and
-// this file ships to every project that selects the feature.
 function credentialIs(header: any, token: string) {
   const got = String(null == header ? '' : header)
   assert.ok(got === token || got.endsWith(' ' + token),
@@ -93,12 +74,6 @@ describe('secrets', () => {
   })
 
 
-  // The three ways an apikey can be "not given", pinned together because
-  // they are easy to conflate and only one of them is a suppression.
-  //
-  // makeOptions normalises an omitted apikey to '' before features
-  // initialise, so by init time omitted and explicit-empty are
-  // indistinguishable — both defer to the chain, deliberately.
 
   test('active: an OMITTED apikey defers to the chain', async () => {
     process.env[ENVPREFIX + 'APIKEY'] = 'ENVKEY01'
@@ -115,21 +90,6 @@ describe('secrets', () => {
   })
 
 
-  // `auth: null` — the documented way to disable auth outright, which
-  // prepareAuth honours before it ever reads the apikey.
-  //
-  // This needs an explicit guard because struct 0.3.2 nearly removed it in
-  // silence. Under 0.0.10, getprop returned a stored null as null, so
-  // validate saw `auth: null` as a non-map and REJECTED it for any SDK
-  // whose optspec supplies an `auth` default. Under 0.3.2 getprop treats a
-  // stored null as "no value", so the default fires instead and the
-  // suppression became "use default auth" — transmitting a credential the
-  // caller explicitly asked not to send. makeOptions now captures
-  // suppliedness BEFORE validate and restores the null after it.
-  //
-  // No corpus entry could catch this: corpus nulls travel as the
-  // '__NULL__' string, so real-JSON-null semantics are invisible to every
-  // port's shared fixtures.
   test('active: auth null suppresses the credential, chain or no chain',
     async () => {
       process.env[ENVPREFIX + 'APIKEY'] = 'ENVKEY01'
@@ -177,13 +137,6 @@ describe('secrets', () => {
   })
 
 
-  // sekreto's miss-vs-error invariant: a MISS falls through to the next
-  // provider, an ERROR does not. A broken vault must never degrade into an
-  // unauthenticated request.
-  //
-  // On the DIRECT path the error is RETURNED, not thrown: _rawRequest
-  // awaits prepare() outside its try, and direct()/graphql() are documented
-  // to return a value or an Error and never reject.
   test('active: a provider ERROR is returned by prepare, not thrown',
     async () => {
       const sdk = (SDK as any).test({}, {
@@ -260,15 +213,6 @@ describe('secrets', () => {
   })
 
 
-  // A MISS IS NOT A CACHEABLE ANSWER — sekreto's own rule, which this
-  // feature used to override from the layer above.
-  //
-  // Default caching here, deliberately: `cache: true` is about holding a
-  // HIT, and holding the settled promise after a miss meant the chain was
-  // never asked again for the life of the client. A secret provisioned
-  // after startup (a mounted file, a vault policy granted a minute late)
-  // was invisible forever, and the only workaround was giving up hit
-  // caching entirely.
   test('active: a MISS is re-asked, so a late secret is picked up',
     async () => {
       let calls = 0
@@ -355,14 +299,6 @@ describe('secrets', () => {
   })
 
 
-  // The bridge that makes the whole design work: resolution is async, the
-  // auth header is built synchronously, and entity ops await
-  // featureHook('PreSpec') before makeSpec — so that is where the lookup
-  // happens and still lands in time.
-  //
-  // The entity is discovered from the SDK's own config rather than named,
-  // because this file is a TEMPLATE: it ships to every project, and no
-  // project's entity names are known here.
   test('active: entity ops resolve via the PreSpec hook', async () => {
     process.env[ENVPREFIX + 'APIKEY'] = 'ENVKEY02'
 
@@ -377,18 +313,6 @@ describe('secrets', () => {
     // Before any op, nothing has been resolved.
     assert.equal(sdk.options().apikey, '')
 
-    // AN OP THAT EXISTS, not `list` on whichever entity comes first.
-    //
-    // A generated TS entity carries only the ops its model DECLARES, so
-    // `list` is absent from an entity declaring `create` alone — and
-    // calling it throws before the PreSpec hook can run, failing the
-    // assertion below for a reason that has nothing to do with secrets.
-    // univec-sdk hit exactly that: its first entity declares `create`
-    // only, so this test failed on every run while PreSpec worked
-    // perfectly. Any real op exercises the hook; `list` is not special.
-    //
-    // This file is a TEMPLATE, so no project's op names are known here
-    // either. Discover the first callable one rather than assuming.
     let ran = false
     for (const one of names) {
       const acc = one.charAt(0).toUpperCase() + one.slice(1)
@@ -424,17 +348,6 @@ describe('secrets', () => {
 })
 
 
-// ACCESS-TOKEN EXCHANGE.
-//
-// The shape these tests pin: what the chain resolves is a REFRESH token,
-// which is POSTed to a token endpoint for a short-lived ACCESS token; the
-// access token is what the Authorization header carries; and when the API
-// answers 401 the client buys another and tries the same request again,
-// once.
-//
-// A LIVE client throughout, with `system.fetch` stubbed. Test mode is
-// deliberately excluded here — it buys nothing (see SecretsFeature._buy),
-// which is the subject of its own test at the end.
 describe('secrets exchange', () => {
 
   const BASE = 'http://exchange.test/api'
@@ -587,7 +500,6 @@ describe('secrets exchange', () => {
     assert.equal(stub.api().length, 2, 'expected the request to be retried')
 
     authIs(stub.api()[0], 'ACCESS01')
-    // The retry must carry the NEW token, not the spent one.
     authIs(stub.api()[1], 'ACCESS02')
 
     assert.equal(res.ok, true, 'the caller sees the successful retry')
@@ -749,10 +661,6 @@ describe('secrets exchange', () => {
   test('auth: null suppresses the credential, refusal or not', async () => {
     process.env[ENVPREFIX + 'REFRESH_TOKEN'] = REFRESH
 
-    // `auth: null` is the documented way to send no credential at all.
-    // A refusal of a deliberately unauthenticated request is not an
-    // expired token: buying one and retrying would transmit exactly the
-    // credential the caller suppressed.
     const stub = stubfetch({ apiStatus: [401] })
     const sdk = new (SDK as any)({
       base: BASE,
@@ -774,10 +682,6 @@ describe('secrets exchange', () => {
     assert.equal(stub.api()[0].auth, undefined,
       'no credential may be sent when auth is suppressed')
 
-    // AND NO PURCHASE. This is the half the API-call assertions cannot see:
-    // resolve() runs before _withRefresh's suppression check, so the
-    // refresh token used to go to the token endpoint in a request body
-    // even here. Stopping the retry does not unsend it.
     assert.equal(stub.token().length, 0,
       'auth: null suppressed the credential but the refresh token was ' +
       'still POSTed to the exchange endpoint')
@@ -787,16 +691,6 @@ describe('secrets exchange', () => {
   test('a token another request already bought is spent, not re-bought', async () => {
     process.env[ENVPREFIX + 'REFRESH_TOKEN'] = REFRESH
 
-    // STAGGERED 401s: the case the shared in-flight purchase does NOT
-    // cover. Two requests go out on the same token; the first is refused,
-    // buys a new one and clears the shared promise; only then is the
-    // second refused. Buying again there is a wasted exchange, and on a
-    // provider that invalidates the previous credential on issuance it
-    // breaks the first request's own retry.
-    //
-    // Driven through the transport wrapper directly, because the race is
-    // in WHEN the refusal arrives relative to another request's refresh,
-    // and that is not something two ordinary calls can be made to stage.
     const stub = stubfetch()
     const sdk = exchangeSdk(stub)
 

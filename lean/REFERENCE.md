@@ -30,7 +30,7 @@ nesting here.
 
 #### Ordering
 
-`cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `timeout` wrap the transport. Each
+`cache`, `cost`, `netsim`, `proxy`, `ratelimit`, `retry`, `secrets`, `timeout` wrap the transport. Each
 wraps whatever is already installed. This SDK fixes that order in its own
 catalog rather than taking it from the caller.
 
@@ -44,7 +44,7 @@ rather than the transport, so their order does not affect what they observe.
 
 #### `audit`
 
-Structured audit trail of operations.
+Audit trail.
 
 **Configuration**
 
@@ -75,7 +75,7 @@ its default unless you name it.
 
 #### `cache`
 
-Response caching for safe read requests.
+Response cache.
 
 **Configuration**
 
@@ -106,7 +106,7 @@ its default unless you name it.
 
 #### `clienttrack`
 
-Client identity and per-request correlation headers.
+Client tracking.
 
 **Configuration**
 
@@ -138,7 +138,7 @@ its default unless you name it.
 
 #### `cost`
 
-Cost tracking and spend budget for API calls.
+Cost tracking.
 
 **Configuration**
 
@@ -175,7 +175,7 @@ its default unless you name it.
 
 #### `debug`
 
-Request/response capture ring buffer for debugging.
+Debug capture.
 
 **Configuration**
 
@@ -206,7 +206,7 @@ its default unless you name it.
 
 #### `idempotency`
 
-Idempotency keys for safe retries of mutating operations.
+Idempotency.
 
 **Configuration**
 
@@ -237,7 +237,7 @@ its default unless you name it.
 
 #### `log`
 
-Structured request and response logging.
+Logging.
 
 **Configuration**
 
@@ -266,7 +266,7 @@ its default unless you name it.
 
 #### `metrics`
 
-Statistics capture: per-operation counters and latency.
+Metrics.
 
 **Configuration**
 
@@ -294,7 +294,7 @@ its default unless you name it.
 
 #### `netsim`
 
-Network behaviour simulation for offline testing (latency, failures, outages).
+Network simulation.
 
 **Configuration**
 
@@ -332,7 +332,7 @@ its default unless you name it.
 
 #### `paging`
 
-Pagination signals for list operations.
+Paging.
 
 **Configuration**
 
@@ -367,7 +367,7 @@ its default unless you name it.
 
 #### `proxy`
 
-Outbound HTTP(S) proxy routing.
+Proxy.
 
 **Configuration**
 
@@ -398,7 +398,7 @@ its default unless you name it.
 
 #### `ratelimit`
 
-Client-side rate limiting via a token bucket.
+Rate limiting.
 
 **Configuration**
 
@@ -429,7 +429,7 @@ its default unless you name it.
 
 #### `rbac`
 
-Client-side role/permission enforcement.
+Access control.
 
 **Configuration**
 
@@ -453,7 +453,7 @@ its default unless you name it.
 
 #### `retry`
 
-Automatic retry of transient failures with exponential backoff.
+Retry.
 
 **Configuration**
 
@@ -485,9 +485,34 @@ its default unless you name it.
   sees. See [Ordering](#ordering) above.
 - Inactive by default: leaving it out costs nothing at runtime.
 
+#### `secrets`
+
+Secrets.
+
+**Configuration**
+
+| Option | Default |
+|---|---|
+| `active` | `false` |
+| `cache` | `true` |
+| `exchange` | `{active: false, method: 'POST', path: 'auth/token', refresh: '', request: 'refresh_token', response: 'access_token', retries: 1, statuses: [401]}` |
+| `name` | `'univec'` |
+| `providers` | `[{kind: 'boru', namespace: 'sdk'}]` |
+
+**Usage**
+
+Set `feature.secrets.active` to true in the client options, and override any option above in the same entry. Every option keeps
+its default unless you name it.
+
+**Considerations**
+
+- Wraps the transport: its place in the activation order decides what it
+  sees. See [Ordering](#ordering) above.
+- Inactive by default: leaving it out costs nothing at runtime.
+
 #### `streaming`
 
-Incremental streaming of list results via async iteration.
+Streaming.
 
 **Configuration**
 
@@ -518,7 +543,7 @@ its default unless you name it.
 
 #### `telemetry`
 
-Distributed tracing spans with W3C trace-context propagation.
+Telemetry.
 
 **Configuration**
 
@@ -549,7 +574,7 @@ its default unless you name it.
 
 #### `test`
 
-In-memory mock transport for testing without a live server.
+Test transport.
 
 **Configuration**
 
@@ -580,7 +605,7 @@ its default unless you name it.
 
 #### `timeout`
 
-Per-request timeout with transport abort.
+Timeout.
 
 **Configuration**
 

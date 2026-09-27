@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (c/src/sekreto.h)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (c/src/sekreto.h)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 /* sekreto: one interface for secrets, wherever they live.
  *
@@ -128,6 +128,10 @@ typedef struct {
 
 sek_list *sek_list_new(sek_pool *pool);
 void sek_list_add(sek_list *list, const char *text);
+
+/* Sorted by byte value, in place. Ordinary string work, so it is here
+ * with the list rather than wherever the first caller happened to be. */
+void sek_list_sort(sek_list *list);
 
 /* ---- json ---------------------------------------------------------- */
 
@@ -301,6 +305,17 @@ typedef struct {
   const char *config;
   const char *environment;
   const char *path;
+  /* minivault: the passphrase that unwraps `vaultkey`. */
+  const char *passphrase;
+  /* minivault: which key in the vault file to open with, defaulting to
+   * `master`. Named apart from `keyid` because that already means an AWS
+   * access key id. */
+  const char *vaultkey;
+  /* minivault: PBKDF2 rounds, used only when a key is created. Zero
+   * means unset, so the library's own default still applies. */
+  int iterations;
+  /* minivault: make the vault file if it is not there. */
+  int create;
 
   /* A provider already built, joining the chain as it is - `kind` unset.
    * This is how a custom provider that is not a plugin gets in. Never

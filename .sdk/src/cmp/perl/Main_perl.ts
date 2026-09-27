@@ -23,6 +23,8 @@ import {
 
 import { Package } from './Package_perl'
 import { Config } from './Config_perl'
+import { Schema } from './Schema_perl'
+import { PrepareAuth } from './PrepareAuth_perl'
 import { Gitignore } from './Gitignore_perl'
 import { MainEntity } from './MainEntity_perl'
 
@@ -55,13 +57,6 @@ const Main = cmp(async function Main(props: any) {
   // Copy tm/perl files with replacements
   Copy({
     from: 'tm/' + target.name,
-    // An ACTIVE feature's INACTIVE plugins do not ship. perl has no
-    // src/feature layout (srcfeature: false), so this blanket copy is the
-    // one place the generate-time plugin trim can act; the model's
-    // `plugin.<group>.path` entries name their files relative to THIS
-    // copy's root ('feature/secrets/plugins/Voxgig/Sekreto/Plugins/
-    // <Kind>.pm'). See helpers/featureSource.pluginExcludes, and
-    // Main_go.ts / Main_py.ts, which do the same.
     exclude: [/src\//, TEST_CONTROL_EXCLUDE, ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
@@ -85,19 +80,6 @@ const Main = cmp(async function Main(props: any) {
               ({ name, indent }: any) =>
                 `${indent}$utility->{feature_hook}->($ctx, "${name}");\n`,
 
-            // SECRETS. The accessor is emitted only when the secrets
-            // feature applies to this target AND the model activates it -
-            // with the feature off the marker line is REMOVED, so the
-            // inactive output is byte-identical to pre-migration.
-            //
-            // The LIVE Sekreto, not a clone: sekreto holds provider and
-            // cache state, so a clone would resolve into a copy nothing
-            // else can see.
-            //
-            // There is deliberately NO resolve seam here. Unlike ts and
-            // py, this port resolves at the TRANSPORT (see
-            // feature/secrets_feature.pm), which every wire path -
-            // entity ops, direct() and graphql() - already crosses.
             '/(?<indent>[ \\t]*)#[ \\t]*#SecretsAccessor[ \\t]*\\n?/':
               ({ indent }: any) => !secrets ? '' :
                 `${indent}# The LIVE Sekreto instance: for arbitrary secrets and redaction.\n` +
@@ -115,7 +97,6 @@ const Main = cmp(async function Main(props: any) {
           }
         },
 
-        // Entities - injected at SLOT
         () => {
           each(entity, (entity: ModelEntity) => {
             const entitySDK = getModelPath(model, `main.${KIT}.entity.${entity.name}`)
@@ -126,10 +107,12 @@ const Main = cmp(async function Main(props: any) {
     })
   })
 
-  // Generate config module
   Folder({ name: '.' }, () => {
     Config({ target })
+    Schema({ target })
   })
+
+  PrepareAuth({ target })
 
   // Generate feature factory module
   File({ name: 'features.pm' }, () => {

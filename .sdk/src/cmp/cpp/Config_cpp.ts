@@ -5,6 +5,9 @@ import {
   cmp,
   configDefinition,
   each,
+  isAuthActive,
+  resolveAuthIn,
+  resolveAuthName,
   targetFeatures,
 } from '@voxgig/sdkgen'
 
@@ -21,27 +24,6 @@ import {
 } from './utility_cpp'
 
 
-// PLUGIN DEFINITIONS PER FEATURE (the cpp peer of Config_c's
-// pluginDefinitions and Config_go's featurePlugins map).
-//
-// Upstream sekreto retired its self-registration registry for voxgig/plugin
-// definitions: a provider kind the caller did not pass in
-// `SekretoOptions::plugins` is unknown to that Sekreto. So the model's
-// choice of plugin groups IS the SDK's provider vocabulary, and the
-// generated code names each active group's factory (`def: cpp:` in
-// model/feature/secrets.aon - `hashicorp`, the `Definition hashicorp()`
-// each vendored kind header declares in namespace sekreto) and nothing
-// else. A symbol named here whose file the plugin trim removed is an
-// unresolved reference at link time - a loud failure, which is the right
-// kind. The owning file is kept per symbol because the generated
-// translation unit has to include that file's header.
-//
-// One entry per ACTIVE feature that declares a `plugin` map at all, read
-// with `only_active: false` (pluginExcludesFor's subtlety: the feature
-// object a component is handed has already been filtered, so a feature
-// whose groups are all off would otherwise look like one with no plugin
-// machinery, and its kinds.cpp - which the Makefile reads as the feature's
-// WIRING - would not be emitted).
 function pluginDefinitions(model: Model, target: any):
   Record<string, { syms: Record<string, string>, groups: number }> {
   const out: Record<string, { syms: Record<string, string>, groups: number }> = {}
@@ -72,50 +54,6 @@ function pluginDefinitions(model: Model, target: any):
 }
 
 
-// feature/<name>/kinds.cpp - GENERATED, one per plugin-bearing active
-// feature, and the ONE translation unit this otherwise header-only target
-// generates.
-//
-// It cannot live in core/config.hpp: that header is included by every test
-// translation unit, and it must not name the vendored voxgig/plugin's
-// `Definition` type - the same reason go hides its list behind []any and c
-// behind void**. So config.hpp's accessor is type-erased
-// (std::shared_ptr<void>), and this file, which may include the kind
-// headers, produces the erased list. It sits one level ABOVE the vendored
-// sekreto/, plugin/ and plugins/ directories on purpose: the vendoring
-// guard fails any non-vendored file inside a vendor dir, and this one is
-// generated.
-//
-// Beside it goes feature/<name>/kinds.mk, the feature's BUILD WIRING: a
-// generated make fragment that tm/cpp/Makefile reads through
-// `-include $(wildcard feature/*/kinds.mk)`. The Makefile itself names no
-// feature (the `nothing left behind names a dropped feature` guard holds a
-// trimmed template tree to that), so everything the payload needs from the
-// build is stated here, from the model: this translation unit and the
-// vendored cores to compile into libsdkfeature.a, the suite to build, and
-// - only when a plugin group is active - the plugin layer with the OpenSSL
-// it brings. A tree whose model never activated the feature has no
-// fragment, compiles none of the payload and links libstdc++ alone. Both
-// files are emitted for an active feature with NO active group as well -
-// an [env, memory] chain still needs the sekreto core - with an empty
-// definitions list and no plugin layer.
-//
-// For `secrets` it additionally carries `secrets_rawfetch`, the
-// token-exchange transport of last resort (go's rawExchangeFetch). The cpp
-// core ships no HTTP client (utility/pipeline.hpp fetcher: "provide
-// options.system.fetch"), and the decision for this target - as for c - is
-// to bundle one INSIDE the gated feature, compiled in only when a plugin
-// group is active, so an SDK without secrets, or with a chain of built-ins,
-// still ships zero external dependencies. DELIBERATE DIVERGENCE from c,
-// which bundles libcurl: the cpp sekreto port exports its own HTTPS client
-// (`sekreto::httprequest`, plugins/Httpjson.cpp over plugins/Tls.cpp), and
-// it is already compiled and linked - OpenSSL and all - on exactly the
-// condition this transport needs. Reusing it means one HTTP stack and one
-// -l pair (-lssl -lcrypto) instead of two; kinds.mk links OpenSSL on the
-// same condition (a plugin group active), so the two cannot disagree.
-// With no group active the exchange still works through a caller-supplied
-// options.system.fetch, which every live cpp request already lives under;
-// only the fallback is missing, and it says so.
 const FeaturePlugins = cmp(async function FeaturePlugins(props: any) {
   const ctx$ = props.ctx$
   const target = props.target
@@ -129,10 +67,6 @@ const FeaturePlugins = cmp(async function FeaturePlugins(props: any) {
       const { syms, groups } = defs[fname]
       const symnames = Object.keys(syms).sort()
 
-      // The header each selected kind file declares its factory in,
-      // relative to this file (feature/<fname>/): `feature/<fname>/
-      // plugins/Hashicorp.cpp` -> `plugins/Hashicorp.hpp`. Deduplicated,
-      // because aws declares two factories in one header.
       const headers = Array.from(new Set(symnames.map((sym) =>
         syms[sym]
           .replace(new RegExp('^feature/' + fname + '/'), '')
@@ -321,13 +255,20 @@ const Config = cmp(async function Config(props: any) {
   // helpers/applicability.
   const feature = targetFeatures(model, target)
 
-  // The embedded config, built by the shared helper so this target's shapes
-  // and identity fields stay in step with the ts reference by construction.
-  // Passing target.name opts cpp into main.slug/version/target (the station
-  // descriptor identity, ts/src/utility.ts configDefinition) - cpp has only
-  // the data rep (one chunked JSON literal), so this is the whole #MainMeta
-  // story for this target.
   const { def: configDef } = configDefinition(model, target.name)
+
+  const authIn = resolveAuthIn(model)
+  const authName = resolveAuthName(model)
+
+  if (isAuthActive(model) && null != configDef.options &&
+    null != configDef.options.auth) {
+    if ('header' !== authIn) {
+      configDef.options.auth.in = authIn
+    }
+    if ('Authorization' !== authName) {
+      configDef.options.auth.name = authName
+    }
+  }
 
   File({ name: 'config.' + target.ext }, () => {
 
@@ -395,16 +336,6 @@ inline FeaturePtr makeFeature(const std::string& name) {
 }
 `)
 
-    // The plugin-definitions accessor, EMITTED UNCONDITIONALLY so a caller
-    // can always ask, and EMPTY unless a plugin-bearing feature is active:
-    // each such feature's list lives in its generated
-    // feature/<name>/kinds.cpp (see FeaturePlugins above), which this
-    // dispatches to by name, so this header never names the vendored
-    // plugin's types - the list is type-erased (std::shared_ptr<void>; the
-    // feature casts back to plugin::DefinitionPtr), the way go returns
-    // []any and c void**. The per-feature function is an ordinary extern
-    // declaration here and in the feature header alike; kinds.cpp defines
-    // it, and the generated kinds.mk has the Makefile compile it.
     const plugged = Object.keys(pluginDefinitions(model, target)).sort()
 
     Content(`

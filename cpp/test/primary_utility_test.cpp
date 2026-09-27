@@ -786,7 +786,7 @@ static void transformResponseBasic() {
 
 // Sections under `primary` that are NOT this SDK's pipeline surface, with the
 // reason each is exempt. `check` is omni's OWN runner fixture (it comes from
-// .sdk/test/struct/test.aon, which the corpus build merges into primary); no
+// .sdk/test/struct/test.aontu, which the corpus build merges into primary); no
 // port drives it from a primary suite.
 static const std::vector<std::string>& notThisSuite() {
   static const std::vector<std::string> names = {"check"};

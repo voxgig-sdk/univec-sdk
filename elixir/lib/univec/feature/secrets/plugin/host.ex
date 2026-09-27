@@ -1,5 +1,5 @@
-# VENDORED: @voxgig/plugin sdk-20260908-1556-0 (elixir/lib/voxgig_plugin/host.ex)
-# Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+# VENDORED: @voxgig/plugin sdk-20260925-1316-0 (elixir/lib/voxgig_plugin/host.ex)
+# Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 # License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 defmodule Voxgig.Plugin.Host do
   @moduledoc """
@@ -641,6 +641,17 @@ defmodule Voxgig.Plugin.Host do
   #
   # `remember` is false for the questions asked ABOUT an instance rather
   # than BY it: introspection must not create a binding.
+  @doc false
+  # The instance api's way onto `chosen`, which is private.
+  def instcapability(host, ref, name) do
+    Depend.requirements(field(host, ref, "options"))
+    |> Enum.find(fn req -> Types.get(req, "name") == name end)
+    |> case do
+      nil -> nil
+      req -> chosen(host, ref, req, true)
+    end
+  end
+
   defp chosen(host, ref, req, remember) do
     cands = providersof(host, req)
     name = Types.get(req, "name")

@@ -27,7 +27,7 @@ make test
 
 | Source | Path | Edit when… |
 | --- | --- | --- |
-| Target definition | `.sdk/model/target/ts.aon` | deps, module, extension, phases change |
+| Target definition | `.sdk/model/target/ts.aontu` | deps, module, extension, phases change |
 | Templates | `.sdk/tm/ts/` | the file is the **same for every API** (runtime, transport, base classes) — copied verbatim with placeholder substitution |
 | Components | `.sdk/src/cmp/ts/` | the file's shape **depends on the API** (entities, constructor, README, tests) — TypeScript that walks the model |
 
@@ -37,25 +37,25 @@ component.* After editing a component run `npm run build` before
 
 ## Features in this target
 
-- [`audit`](./src/feature/audit/AGENTS.md) — Structured audit trail of operations
-- [`cache`](./src/feature/cache/AGENTS.md) — Response caching for safe read requests
-- [`clienttrack`](./src/feature/clienttrack/AGENTS.md) — Client identity and per-request correlation headers
-- [`cost`](./src/feature/cost/AGENTS.md) — Cost tracking and spend budget for API calls
-- [`debug`](./src/feature/debug/AGENTS.md) — Request/response capture ring buffer for debugging
-- [`idempotency`](./src/feature/idempotency/AGENTS.md) — Idempotency keys for safe retries of mutating operations
-- [`log`](./src/feature/log/AGENTS.md) — Structured request and response logging
-- [`metrics`](./src/feature/metrics/AGENTS.md) — Statistics capture: per-operation counters and latency
-- [`netsim`](./src/feature/netsim/AGENTS.md) — Network behaviour simulation for offline testing (latency, failures, outages)
-- [`paging`](./src/feature/paging/AGENTS.md) — Pagination signals for list operations
-- [`proxy`](./src/feature/proxy/AGENTS.md) — Outbound HTTP(S) proxy routing
-- [`ratelimit`](./src/feature/ratelimit/AGENTS.md) — Client-side rate limiting via a token bucket
-- [`rbac`](./src/feature/rbac/AGENTS.md) — Client-side role/permission enforcement
-- [`retry`](./src/feature/retry/AGENTS.md) — Automatic retry of transient failures with exponential backoff
-- [`secrets`](./src/feature/secrets/AGENTS.md) — Secret access: resolve the API credential through a provider chain, and exchange a refresh token for short-lived access tokens
-- [`streaming`](./src/feature/streaming/AGENTS.md) — Incremental streaming of list results via async iteration
-- [`telemetry`](./src/feature/telemetry/AGENTS.md) — Distributed tracing spans with W3C trace-context propagation
-- [`test`](./src/feature/test/AGENTS.md) — In-memory mock transport for testing without a live server
-- [`timeout`](./src/feature/timeout/AGENTS.md) — Per-request timeout with transport abort
+- [`audit`](./src/feature/audit/AGENTS.md) — Audit trail
+- [`cache`](./src/feature/cache/AGENTS.md) — Response cache
+- [`clienttrack`](./src/feature/clienttrack/AGENTS.md) — Client tracking
+- [`cost`](./src/feature/cost/AGENTS.md) — Cost tracking
+- [`debug`](./src/feature/debug/AGENTS.md) — Debug capture
+- [`idempotency`](./src/feature/idempotency/AGENTS.md) — Idempotency
+- [`log`](./src/feature/log/AGENTS.md) — Logging
+- [`metrics`](./src/feature/metrics/AGENTS.md) — Metrics
+- [`netsim`](./src/feature/netsim/AGENTS.md) — Network simulation
+- [`paging`](./src/feature/paging/AGENTS.md) — Paging
+- [`proxy`](./src/feature/proxy/AGENTS.md) — Proxy
+- [`ratelimit`](./src/feature/ratelimit/AGENTS.md) — Rate limiting
+- [`rbac`](./src/feature/rbac/AGENTS.md) — Access control
+- [`retry`](./src/feature/retry/AGENTS.md) — Retry
+- [`secrets`](./src/feature/secrets/AGENTS.md) — Secrets
+- [`streaming`](./src/feature/streaming/AGENTS.md) — Streaming
+- [`telemetry`](./src/feature/telemetry/AGENTS.md) — Telemetry
+- [`test`](./src/feature/test/AGENTS.md) — Test transport
+- [`timeout`](./src/feature/timeout/AGENTS.md) — Timeout
 
 Each feature's runtime and its own guide live in `src/feature/<name>/`.
 

@@ -9,8 +9,8 @@ require_once __DIR__ . '/BaseFeature.php';
 // stamps page/limit (or a cursor) into the request query; on the way back
 // (PreResult) it reads the server's pagination signals — a `Link:
 // rel="next"` header, `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body — and records
-// them on `$ctx->result->paging`. A per-call `ctrl->paging` (page or
+// `next`/`cursor`/`nextCursor`/`hasMore` fields in the body (snake_case
+// forms too) — and records them on `$ctx->result->paging` and `ctrl->paging`. A per-call `ctrl->paging` (page or
 // cursor) takes priority over the stamped defaults; parameter names and
 // page size are configurable; `startPage` defaults to 1. Mirrors
 // ts/src/feature/paging/PagingFeature.ts.
@@ -71,8 +71,10 @@ class UnivecPagingFeature extends UnivecBaseFeature
         } elseif (($spec->query[$page_param] ?? null) === null) {
             $start_page = is_numeric($this->options['startPage'] ?? null)
                 ? $this->options['startPage'] : 1;
-            $spec->query[$page_param] = ($paging['page'] ?? null) !== null
-                ? $paging['page'] : $start_page;
+            // A record written back by PreResult holds the page just fetched
+            // as "page" and the one to fetch as "nextPage", so nextPage wins.
+            $page = $paging['nextPage'] ?? $paging['page'] ?? null;
+            $spec->query[$page_param] = $page !== null ? $page : $start_page;
         }
 
         if (($this->options['limit'] ?? null) !== null
@@ -194,16 +196,29 @@ class UnivecPagingFeature extends UnivecBaseFeature
             }
         }
 
-        // Body-level cursors.
+        // Body-level signals; snake_case forms are read first so camelCase wins.
         if (is_array($body)) {
             if (($body['next'] ?? null) !== null) {
                 $paging['next'] = $paging['next'] ?? $body['next'];
+            }
+            if (($body['next_cursor'] ?? null) !== null) {
+                $paging['cursor'] = $body['next_cursor'];
             }
             if (($body['cursor'] ?? null) !== null) {
                 $paging['cursor'] = $body['cursor'];
             }
             if (($body['nextCursor'] ?? null) !== null) {
                 $paging['cursor'] = $body['nextCursor'];
+            }
+            if ($paging['nextPage'] === null) {
+                $np = $body['nextPage'] ?? $body['next_page'] ?? null;
+                if (is_int($np) || is_float($np) || is_string($np)) {
+                    $paging['nextPage'] = $np;
+                }
+            }
+            if (is_bool($body['has_more'] ?? null)) {
+                $paging['hasMore'] = $body['has_more'];
+                $explicit_more = true;
             }
             if (is_bool($body['hasMore'] ?? null)) {
                 $paging['hasMore'] = $body['hasMore'];
@@ -224,6 +239,12 @@ class UnivecPagingFeature extends UnivecBaseFeature
         }
 
         $result->paging = $paging;
+
+        // PHP arrays are values, so the record lands on this call's Control
+        // rather than on an array the caller passed.
+        if ($ctx->ctrl !== null) {
+            $ctx->ctrl->paging = $paging;
+        }
 
         $this->client->_paging = ['last' => $paging];
     }

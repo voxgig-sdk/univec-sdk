@@ -1,8 +1,3 @@
-// The Utility bundle (mirrors go core/utility_type.go). Go carries the
-// utilities as swappable function pointers; rust binds them statically and
-// keeps the two members that genuinely vary per client swappable: the
-// transport (`fetcher`, wrapped by features like retry/cache/netsim) and
-// the `custom` map of caller-supplied utility callables.
 
 use std::cell::RefCell;
 use std::rc::Rc;

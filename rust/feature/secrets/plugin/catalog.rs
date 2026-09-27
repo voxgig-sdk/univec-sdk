@@ -1,12 +1,6 @@
-// VENDORED: @voxgig/plugin sdk-20260908-1556-0 (rust/src/catalog.rs)
-// Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/plugin sdk-20260925-1316-0 (rust/src/catalog.rs)
+// Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
-//! The definition catalog (§10.1).
-//!
-//! A definition is registered once and may back many instances. Option
-//! shapes are validated AT REGISTRATION, not when a document happens to
-//! exercise a key - so a malformed shape fails once, and in the same place
-//! everywhere (§9.4).
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -22,8 +16,6 @@ use super::value::Value;
 /// corpus compares by code, which survives the change intact.
 pub type Callback = Rc<dyn Fn(&Inst) -> Result<(), PluginError>>;
 
-/// §9.4's cheap path: the host hands the new options and the old ones, and
-/// the instance stays live.
 pub type Reconfigure = Rc<dyn Fn(&Inst, &Value, &Value) -> Result<(), PluginError>>;
 
 #[derive(Clone)]

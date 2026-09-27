@@ -1,5 +1,5 @@
 
-import { cmp, Content, isPublished, repoInfo, packageVersion } from '@voxgig/sdkgen'
+import { cmp, Content, isPublished, repoInfo, packageVersion, sdkName } from '@voxgig/sdkgen'
 
 
 const ReadmeInstall = cmp(function ReadmeInstall(props: any) {
@@ -51,7 +51,7 @@ Or from a local source checkout:
 \`\`\`elixir
 def deps do
   [
-    {:${app}, path: "../${model.const.name.toLowerCase()}-sdk/${target.name}"}
+    {:${app}, path: "../${sdkName(model.const.name.toLowerCase())}/${target.name}"}
   ]
 end
 \`\`\`

@@ -23,6 +23,8 @@ import {
 
 import { Package } from './Package_rb'
 import { Config } from './Config_rb'
+import { Schema } from './Schema_rb'
+import { PrepareAuth } from './PrepareAuth_rb'
 import { Gitignore } from './Gitignore_rb'
 import { MainEntity } from './MainEntity_rb'
 import { EntityTypes } from './EntityTypes_rb'
@@ -57,7 +59,6 @@ const Main = cmp(async function Main(props: any) {
     }
   })
 
-  // Generate main SDK file
   File({ name: model.const.Name + '_sdk.' + target.ext }, () => {
 
     Fragment(
@@ -81,7 +82,6 @@ utility.feature_hook.call(@_rootctx, "${name}")
         }
       },
 
-      // Entities - injected at SLOT
       () => {
         each(entity, (entity: ModelEntity) => {
           const entitySDK = getModelPath(model, `main.${KIT}.entity.${entity.name}`)
@@ -91,10 +91,12 @@ utility.feature_hook.call(@_rootctx, "${name}")
       })
   })
 
-  // Generate config module
   Folder({ name: '.' }, () => {
     Config({ target })
+    Schema({ target })
   })
+
+  PrepareAuth({ target })
 
   // Generate typed models (<Sdk>_types.rb) — required by the main SDK file.
   EntityTypes({ target })

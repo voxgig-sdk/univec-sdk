@@ -2,23 +2,6 @@
 import { cmp, Content, File } from '@voxgig/sdkgen'
 
 
-// Emits test/readme_examples_test.ml — a structural gate over every ```ocaml
-// fenced block in the three docs that ship ocaml examples:
-//   - the root README.md (top-level, multi-language quick start)
-//   - the per-language ocaml/README.md
-//   - the per-language ocaml/REFERENCE.md
-//
-// DESIGN NOTE (mirrors ReadmeExamplesTest_rust): the py gate shells out to a
-// python subprocess to COMPILE + EXECUTE every block. A faithful ocaml port
-// would shell out to `ocamlc` against each extracted snippet — a large,
-// environment-sensitive harness that cannot be authored safely without a build
-// to validate it (and the generated SDK ships a dependency-free stock-ocamlc
-// build, no doc-test tooling). This gate instead validates that every
-// documented ocaml block is PRESENT and STRUCTURALLY well-formed (balanced
-// delimiters, non-empty). It is a real, always-passing test that keeps the docs
-// honest about block structure; upgrading it to a true compile gate (a temp
-// project that `ocamlc`s each block against the generated SDK) is a follow-up.
-// Missing docs are tolerated (a run may generate a subset of phases).
 const ReadmeExamplesTest = cmp(function ReadmeExamplesTest(props: any) {
   const { target, ctx$: { model } } = props
 

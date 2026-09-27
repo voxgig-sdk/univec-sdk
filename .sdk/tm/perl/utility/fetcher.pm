@@ -16,6 +16,16 @@ package UnivecUtilities;
 
 our %REGISTRY;
 
+# One HTTP::Tiny per (proxy, redirect) setting: a client keeps its
+# connection alive between requests, so one per request reused nothing.
+my %HTTP_CLIENTS;
+
+sub _http_client {
+  my (%new_args) = @_;
+  my $key = join "\n", map { "$_=$new_args{$_}" } sort keys %new_args;
+  return $HTTP_CLIENTS{$key} //= HTTP::Tiny->new(%new_args);
+}
+
 our $DefaultHttpFetch = sub {
   my ($fullurl, $fetchdef) = @_;
   $fetchdef = {} unless defined $fetchdef;
@@ -47,8 +57,12 @@ our $DefaultHttpFetch = sub {
   $new_args{max_redirect} = 0
     if defined $fetchdef->{redirect} && !ref $fetchdef->{redirect}
       && 'manual' eq $fetchdef->{redirect};
+  # Both keys: HTTP::Tiny lets the environment override its generic proxy.
+  $new_args{http_proxy} = $new_args{https_proxy} = "$fetchdef->{proxy}"
+    if defined $fetchdef->{proxy} && !ref $fetchdef->{proxy}
+      && length $fetchdef->{proxy};
 
-  my $res = eval { HTTP::Tiny->new(%new_args)->request($method, $fullurl, $opts) };
+  my $res = eval { _http_client(%new_args)->request($method, $fullurl, $opts) };
   if (!$res) {
     my $e = defined $@ ? "$@" : 'request failed';
     $e =~ s/\s+\z//;

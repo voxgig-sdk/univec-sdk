@@ -1,26 +1,3 @@
-// Behavioural tests for the secrets feature (vendored @voxgig/sekreto) -
-// the go port of tm/ts/test/feature/secrets/Secrets.test.ts.
-//
-// The contract under test: the `apikey` OPTION keeps its exact old meaning
-// and always wins, because SecretsFeature places it FIRST in the provider
-// chain (a `memory` store named `options`) - explicit-beats-lookup falls
-// out of sekreto's first-hit rule rather than from special-case logic.
-// With the feature inactive nothing changes at all. With it active and the
-// option unset, the chain (env, a custom provider, a vault) supplies the
-// credential instead.
-//
-// This file lives in the test `feature/` container on purpose: `target
-// add` trims it, along with the feature source and the vendored library,
-// for a project whose model does not select `secrets`.
-//
-// The feature is CONSTRUCTED DIRECTLY and handed in through the
-// `extend` option, so these tests hold in any generated tree - whether or
-// not the project's model activated the feature (activation only changes
-// whether config.go registers a constructor for it). The credential is
-// asserted ON THE WIRE: a live-mode client with a recording system.fetch,
-// driven through a real entity operation, which is what exercises the
-// PreSpec resolution seam. (See the migration guide: an options-level
-// assertion passes for a port that never consults the value.)
 
 package secretstest
 
@@ -174,13 +151,6 @@ func secretsClient(w *wire, sdkopts map[string]any) *sdk.UnivecSDK {
 	})
 }
 
-// withSecrets constructs the client and ADOPTS the feature via `extend`
-// ONLY when the generated config did not already install it - when this
-// SDK was generated with `secrets` model-active, the ordinary factory
-// path builds the instance, and adding a second via extend would DOUBLE
-// the feature: two transport wraps, two resolutions, and a token
-// purchase the assertions cannot account for. (The py harness guards the
-// same way via _has_feature.)
 func withSecrets(build func(extend bool) *sdk.UnivecSDK) *sdk.UnivecSDK {
 	client := build(false)
 	if nil == secretsFeatureOf(client) {
@@ -213,13 +183,6 @@ func secretsFeatureOf(client *sdk.UnivecSDK) *feat.SecretsFeature {
 	return nil
 }
 
-// driveEntityOpUntil performs real entity operations - which is what runs
-// the PreSpec hook - until `stop` reports the observable state a test is
-// waiting for. Each op's own outcome is irrelevant (no seeded data, a
-// scripted response); an op the API does not define fails BEFORE the
-// PreSpec hook, which is why several may need driving. Entity names come
-// from the SDK's own config, because this file is a TEMPLATE and no
-// project's entity names are known here.
 func driveEntityOpUntil(t *testing.T, client *sdk.UnivecSDK, what string, stop func() bool) {
 	t.Helper()
 
@@ -266,17 +229,6 @@ func exported(name string) string {
 	return string(runes)
 }
 
-// routableOp names an entity operation that actually REACHES THE TRANSPORT.
-//
-// A generated entity exposes List, Load and Create whether or not the model
-// declares them, so "drive the first entity the map yields" drives a dead
-// end whenever the model does not declare that one. Go randomises map
-// iteration, so which entity that is changes per run, and a test asserting
-// on what reached the wire then passes or fails by lottery.
-//
-// Discover a real route ONCE, against a throwaway client whose provider
-// always succeeds so nothing gates it, and drive that everywhere a test
-// needs a request to come out.
 func routableOp(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -433,12 +385,6 @@ func TestSecretsChain(t *testing.T) {
 
 		driveEntityOp(t, client, w)
 
-		// Resolution happens AT THE TRANSPORT - the one seam every wire
-		// path crosses - so the credential is on the wire, not merely
-		// resolved. go holds it in FEATURE STATE and injects there; the
-		// options map is never mutated (it stays raced-read-safe for
-		// every concurrent operation), so the state assertion reads the
-		// feature.
 		credentialIs(t, w.api()[0].auth, "ENVKEY02")
 		if v := secretsFeatureOf(client).Credential(); "ENVKEY02" != v {
 			t.Fatalf("the entity op did not resolve the secret through PreSpec: %q", v)
@@ -576,15 +522,6 @@ func TestSecretsChain(t *testing.T) {
 	})
 }
 
-// A MISS IS NOT A CACHEABLE ANSWER - sekreto's own rule, which this
-// feature used to override from the layer above.
-//
-// DEFAULT caching here, which is the whole point: `cache: true` is about
-// holding a HIT, and holding the settled resolution after a miss meant the
-// chain was never asked again for the life of the client. A secret
-// provisioned after startup (a mounted file, a vault policy granted a
-// minute late) was invisible forever, and the only workaround was giving up
-// hit caching entirely.
 func TestSecretsCachedMissIsReasked(t *testing.T) {
 	var mu sync.Mutex
 	calls := 0
@@ -705,16 +642,9 @@ func TestSecretsExchange(t *testing.T) {
 			t.Fatalf("expected the request to be retried exactly once, got %d calls", len(api))
 		}
 		credentialIs(t, api[0].auth, "ACCESS01")
-		// The retry must carry the NEW token, not the spent one.
 		credentialIs(t, api[1].auth, "ACCESS02")
 	})
 
-	// `auth: nil` SUPPRESSES THE PURCHASE, not just the retry.
-	//
-	// resolve() runs before withrefresh's suppression check, so the refresh
-	// token used to go to the token endpoint in a request body even here.
-	// Stopping the retry does not unsend it - this asserts on the token
-	// endpoint, which is the half the API-call assertions cannot see.
 	t.Run("auth nil buys no token at all", func(t *testing.T) {
 		os.Setenv(envprefix+"REFRESH_TOKEN", "REFRESH01")
 		defer os.Unsetenv(envprefix + "REFRESH_TOKEN")
@@ -776,11 +706,6 @@ func TestSecretsExchange(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------
-// Review-hardening pins (vendor-tag rollout, PR review): the exchange
-// works with ORDINARY options (no custom transport), the token body is
-// real JSON, an uncached miss retracts the credential, and a failed
-// resolution recovers safely under concurrency.
 
 // The exchange with NO system.fetch: the raw fallback transport carries
 // the purchase, and the body is MARSHALLED - a refresh token full of
@@ -936,23 +861,6 @@ func TestSecretsDirectPath(t *testing.T) {
 	}
 }
 
-// FAIL CLOSED ON A CONSTRUCTION FAILURE. The chain a project configures
-// can be wrong before a single lookup happens, and Init cannot fail the
-// client construction the way ts's throwing init does - so it HOLDS the
-// error (initerr) and the transport gate refuses to send.
-//
-// The entry pinned here is a bare kind name where a spec belongs. Init's
-// type switch over the providers list had cases for a *ProviderSpec, a
-// Provider and a map, and no default - so the entry was silently DROPPED,
-// the chain got SHORTER rather than broken, and every request went out
-// unauthenticated while the gate had nothing to refuse. That is fail-open
-// by omission, and it survived every other case in this file because each
-// of them configures the chain correctly.
-//
-// Both wire paths - the entity pipeline and Direct - each with a CONTROL
-// leg through the SAME live transport, so a zero means REFUSED and not
-// UNWIRED. The refusal is matched on sekreto's OWN message, so an
-// unrelated failure cannot stand in for it.
 func TestSecretsMalformedProviderEntry(t *testing.T) {
 	// A kind NAME where a provider or spec belongs.
 	malformed := []any{"hashicorp"}
@@ -1093,19 +1001,11 @@ func TestSecretsGateRecovery(t *testing.T) {
 		}},
 	})
 
-	// 1. The failure closes the gate: nothing reaches the wire.
-	//
-	// The operation is known to be routable, so an empty wire PROVES the gate
-	// refused it. Driving an arbitrary entity would pass here for the wrong
-	// reason: an operation the model never declared reaches no transport
-	// whether the gate is open or shut.
 	driveNamedOp(t, client, entity, opname)
 	if 0 != len(w.api()) {
 		t.Fatalf("a failed resolution must keep the wire silent, saw %d calls", len(w.api()))
 	}
 
-	// 2. Recovery under concurrency: two operations race the slow retry;
-	// both must come out carrying the fresh credential.
 	mu.Lock()
 	mode = "slow"
 	mu.Unlock()

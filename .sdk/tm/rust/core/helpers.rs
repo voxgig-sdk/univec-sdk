@@ -26,28 +26,23 @@ pub fn unsupported_op(opname: &str, entityname: &str) -> UnivecError {
     )
 }
 
-/// Property read: `getp(map, "key")` — Noval when absent (mirrors GetProp).
 pub fn getp(val: &Value, key: &str) -> Value {
     vs::get_prop(val, &Value::str(key), Value::Noval)
 }
 
-/// Path read on a Value store.
 pub fn getpath(path: &[&str], store: &Value) -> Value {
     let p = Value::list(path.iter().map(|s| Value::str(*s)).collect());
     vs::get_path(store, &p, None)
 }
 
-/// Property write (no-op when val is not a node).
 pub fn setp(val: &Value, key: &str, newval: Value) {
     vs::set_prop(val.clone(), &Value::str(key), newval);
 }
 
-/// Map literal builder: `jo(vec![("a", v)])`.
 pub fn jo(pairs: Vec<(&str, Value)>) -> Value {
     Value::map_of(pairs.into_iter().map(|(k, v)| (k.to_string(), v)))
 }
 
-/// List literal builder.
 pub fn ja(items: Vec<Value>) -> Value {
     Value::list(items)
 }
@@ -60,7 +55,6 @@ pub fn to_map(v: &Value) -> Value {
     }
 }
 
-/// Go `ToInt`: numeric coercion with -1 default.
 pub fn to_int(v: &Value) -> i64 {
     match v {
         Value::Num(n) => *n as i64,
@@ -96,7 +90,6 @@ pub fn get_f64(m: &Value, key: &str) -> Option<f64> {
     }
 }
 
-/// Wall clock in milliseconds.
 pub fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -104,15 +97,12 @@ pub fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// Real sleep in milliseconds.
 pub fn sleep_ms(ms: i64) {
     if ms > 0 {
         std::thread::sleep(std::time::Duration::from_millis(ms as u64));
     }
 }
 
-// Small thread-local LCG for ids and jitter (std has no rand; determinism
-// is not required here — injectable generators cover the tests).
 thread_local! {
     static RAND_SEED: RefCell<i64> = RefCell::new(
         SystemTime::now()
@@ -122,7 +112,6 @@ thread_local! {
     );
 }
 
-/// Pseudo-random integer in [0, n).
 pub fn rand_int(n: i64) -> i64 {
     if n <= 0 {
         return 0;
@@ -148,7 +137,6 @@ pub fn call_vfn(f: &Value, arg: &Value) -> Value {
     }
 }
 
-/// Wrap a plain single-argument closure as a `Value::Func`.
 pub fn vfn<F>(f: F) -> Value
 where
     F: Fn(&Value) -> Value + 'static,
@@ -156,13 +144,10 @@ where
     Value::func(move |_inj, val, _r, _s| f(val))
 }
 
-/// Call the transport-shaped response `json` entry (a `Value::Func`)
-/// yielding the parsed body.
 pub fn call_json(json: &Value) -> Value {
     call_vfn(json, &Value::Noval)
 }
 
-/// Build a `json` thunk that returns a fixed value.
 pub fn json_thunk(data: Value) -> Value {
     Value::func(move |_i, _v, _r, _s| data.clone())
 }

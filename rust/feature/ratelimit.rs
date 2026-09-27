@@ -1,9 +1,3 @@
-// Client-side rate limiting via a token bucket (mirrors go
-// feature/ratelimit_feature.go). Each request consumes a token; when the
-// bucket is empty the request waits until the bucket refills at `rate`
-// tokens per second (with capacity `burst`, default: rate). The clock
-// (`now`) and the wait (`sleep`) are injectable so the accounting can be
-// tested deterministically.
 
 use std::cell::RefCell;
 use std::rc::Rc;

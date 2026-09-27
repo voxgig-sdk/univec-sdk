@@ -1,5 +1,5 @@
--- VENDORED: @voxgig/plugin sdk-20260908-1556-0 (lua/src/plugin/export.lua)
--- Source: https://github.com/voxgig/plugin @ 91c4936555a4ce198669ca2c578b91e27e92e5ec  [tag: sdk-20260911-2013-0]
+-- VENDORED: @voxgig/plugin sdk-20260925-1316-0 (lua/src/plugin/export.lua)
+-- Source: https://github.com/voxgig/plugin @ 43acbf266b0dbcf52e5ab5463d85c822da9cd234  [tag: sdk-20260925-1316-0]
 -- License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 -- Exports (section 11).
 --
@@ -21,7 +21,16 @@ local M = {}
 -- `exported` is a plain lua array of {ref=, key=, value=} records: an
 -- internal shape, never a corpus value, so it is not tagged.
 function M.resolve_export(spec, exported)
-  local cut = spec:find('/', 1, true)
+  -- THE LAST `/`, not the first: a NAME may hold slashes (§4), a key
+  -- may not. Lua's `find` has no reverse, so walk forward keeping the
+  -- last hit rather than reaching for a pattern, which would have to
+  -- escape the separator anyway.
+  local cut = nil
+  local at = spec:find('/', 1, true)
+  while nil ~= at do
+    cut = at
+    at = spec:find('/', at + 1, true)
+  end
   if nil == cut then
     T.fail('plugin_export_ambiguous', 'export spec needs a key: ' .. spec,
            T.map { spec = spec })

@@ -50,15 +50,16 @@ FEATURE_SRC = $(SECRETS_PLUGIN) $(SECRETS_CORE) $(SECRETS_HELPERS) $(SECRETS_KIN
 
 FEATURE_TESTS = test/feature/secrets/t_secrets.ml
 
-# THE ONE EXTERNAL DEPENDENCY, behind the plugin groups that need a
-# transport (vault): plugins/tls.ml's externals live in
-# plugins/tls_stubs.c against OpenSSL, so the stub is compiled here and the
-# bytecode executables are linked `-custom` with libssl and libcrypto.
-# The stub is fed from line four (past the provenance header, see above).
+# THE C OBJECTS THIS CHAIN NEEDS, and the one external
+# dependency behind the plugin groups that need a transport
+# (vault): plugins/tls.ml's externals live in
+# plugins/tls_stubs.c against OpenSSL. Each stub is compiled
+# here and the bytecode executables are linked `-custom`, and each is fed
+# to the compiler from line four (past the provenance header, see above).
 OCAMLLIB = $(shell $(OCAMLC) -where)
 FEATURE_OBJ = feature/secrets/plugins/tls_stubs.o
 FEATURE_LINK = -custom -cclib -lssl -cclib -lcrypto
 
 feature/secrets/plugins/tls_stubs.o: feature/secrets/plugins/tls_stubs.c
-	@command -v $(CC) >/dev/null 2>&1 || { echo "secrets: a C compiler ($(CC)) is needed to build the OpenSSL binding that this SDK's secrets plugin kinds (vault) run - install one, or use only the built-in provider kinds" >&2; exit 1; }
+	@command -v $(CC) >/dev/null 2>&1 || { echo "secrets: a C compiler ($(CC)) is needed to build the C stub that this SDK's secrets plugin kinds (vault) run - install one, or use only the built-in provider kinds" >&2; exit 1; }
 	tail -n +4 $< | $(CC) -std=c11 -O2 -Wall -Wextra -I$(OCAMLLIB) -x c - -c -o $@

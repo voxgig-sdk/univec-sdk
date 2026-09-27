@@ -12,7 +12,7 @@ clean:
 
 # --- Release: tag for the SwiftPM registry ---------------------------------
 # SwiftPM has no upload step - publishing IS the git tag. Publication is
-# pending (see model/target/swift.aon publish block); publishing a version
+# pending (see model/target/swift.aontu publish block); publishing a version
 # currently means pushing the tag swift/vX.Y.Z. Run headless under the boru key
 # vault, which injects the GitHub token so nothing lands on disk or argv:
 #   boru vault exec --for=github=<alias> -- make publish

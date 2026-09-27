@@ -10,11 +10,6 @@ import {
 import { dartPackageName } from './Package_dart'
 
 
-// A `list()` on a NESTED entity needs its parent path params. The
-// quickstart used to emit `client.Moon().list()` for an entity at
-// `/planet/{planet_id}/moon`, which 404s against a live server from a
-// half-built URL — indistinguishable from "no such record". The model
-// already marks those params `reqd: true`; matchArg renders exactly them.
 function listMatchArg(ent: any): string {
   const idF = entityIdField(ent)
   return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))

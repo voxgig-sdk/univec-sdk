@@ -1,13 +1,3 @@
-// Primary utility tests — run the shared `primary` subtree of
-// ../.sdk/test/test.json against the SDK pipeline utilities (mirrors
-// tm/go/test/primary_utility_test.go).
-//
-// The corpus is driven by the VENDORED omni runner through the adapter in
-// tests/omni_resolver/mod.rs. Subjects receive omni's native argument list:
-// a `ctx` entry arrives as args[0], a MAP — `make_ctx_from_map` builds the
-// typed context a generated utility takes, and the subject writes the
-// observable ctx state back into that same map, which is what a
-// `match: {ctx: ...}` assertion reads (see the resolver's decision 3).
 
 mod common;
 mod omni_resolver;
@@ -25,9 +15,6 @@ use univec_sdk::{
     UnivecError, UnivecSDK, SdkResult, Spec, Utility, Value,
 };
 
-// Sections deliberately left empty in the shared corpus
-// (.sdk/test/primary/<name>.aon carries a PENDING header). Everything else
-// MUST contribute cases.
 const PENDING_SECTIONS: &[&str] = &[
     "fetcher", "makeFetchDef", "makeResult", "featureAdd",
     "featureHook", "featureInit",
@@ -42,13 +29,6 @@ fn primary_run() -> Run {
     run
 }
 
-/// Run one corpus section, failing loudly when it would run ZERO cases.
-///
-/// A renamed section, a fixture that failed to compile, or an empty set used
-/// to report PASS while running zero assertions — the whole point of a shared
-/// oracle lost without a single red test. The guard lives here rather than in
-/// the runner, which is vendored verbatim; the shared corpus is a v0 spec,
-/// and v0 tolerates an empty set.
 fn runsection<F>(run: &mut Run, name: &str, subject: F)
 where
     F: FnMut(&mut Vec<Value>) -> Result<Value, UnivecError> + 'static,
@@ -749,7 +729,6 @@ fn primary_param_basic() {
 
         // Write the resolved spec alias back into args[0] — the map a
         // `match: {ctx: {spec: {alias: ...}}}` assertion reads (resolver
-        // decision 3 retargets it onto `args.0`).
         if let Some(spec) = ctx.spec.borrow().clone() {
             setp(
                 &ctxmap,
@@ -837,7 +816,6 @@ fn primary_prepare_params_basic() {
     });
 }
 
-// Was two hand-written cases that had drifted out of the shared corpus (the
 // preparePath fixture shipped as an empty `set: []`). Now driven by the
 // corpus like every other section, so all ports assert the same separator /
 // blank-segment behaviour.

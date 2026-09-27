@@ -1,88 +1,3 @@
-// The corpus test runner: vendored @voxgig/omni driven through its NATIVE
-// API (`omni::runner::make_runner` / `RunPack::runsetflags_args`), presented
-// to the corpus suites in the struct-runner shape they already use
-// (`run.spec`, `run.set`, `run.run_set`, `run.run_set_fallible`,
-// `run.passed`, `run.failures`). No compat shim is vendored: the adapter
-// below IS the whole bridge, per language, per the vendor-tag rollout
-// (docs/design/vendor-tag-rollout.md, Decision 4). It supersedes the whole
-// of the retired `tests/struct_runner/mod.rs` and the corpus ENGINE half of
-// `tests/common/mod.rs` (`runset`/`runset_named`/`match_deep`/`match_string`
-// went with it; that file's SUPPORT half — env, sdk-test-control, ctx
-// construction, the fh harness — is retained under its own name, so the
-// emitted call sites did not move).
-//
-// It is the Rust peer of tm/csharp/test/OmniResolver.cs,
-// tm/java/test/OmniResolver.java and
-// tm/swift/Tests/UnivecSDKTests/OmniResolver.swift, and it follows the
-// bridge voxgig/struct's own rust corpus harness already uses
-// (struct/rust/corpus/tests/omni.rs) — the portable answer for a statically
-// typed port with no reflection: omni's `Provider` is closure-based, so
-// nothing in omni ever has to name this SDK's types.
-//
-// Rust-specific decisions, each load-bearing:
-//
-// 1. TWO VALUE MODELS, ONE CONVERSION PAIR. omni's `Json` and the SDK's
-//    `voxgigstruct::Value` are different enums, so every crossing is an
-//    explicit `tostruct` / `toomni`. `Json::Absent` <-> `Value::Noval` and
-//    `Json::Null` <-> `Value::Null` keep the two no-value states the corpus
-//    distinguishes apart — which is also why Rust needs neither go's
-//    `novalargs` spec rewrite nor lua/php's compat shim for the corpus's
-//    zero-argument entries (an entry with no `in`/`args`/`ctx` arrives as
-//    one `Json::Absent`, and becomes exactly this port's own NOVAL).
-//
-// 2. ARGUMENTS ARE WRITTEN BACK. `SubjectArgs` (`Fn(&mut [Json])`) is the
-//    channel omni provides for a subject that MUTATES its arguments, which
-//    `match: {args: ...}` then asserts on — `struct/minor/setpath` and
-//    `struct/merge/integrity` turn on it. Decision 1 handed the subject a
-//    CONVERTED COPY, so every subject here runs through `runsetflags_args`
-//    and the wrapper converts the (possibly mutated) `Value` arguments back
-//    into omni's own slice after the call. A dynamic port's shim gets this
-//    for free from shared object identity; Rust cannot.
-//
-// 3. `match: {ctx: ...}` IS RETARGETED ONTO `match: {args: {"0": ...}}`.
-//    The one place this port cannot follow canonical omni as written, and a
-//    VALUE-SEMANTICS consequence, not a choice. omni's `Json` is a plain
-//    enum: `resolveargs` stores `entry.ctx` and `args[0]` as two COPIES of
-//    the contextified map, and `checkresult` reads `entry.get("ctx")` for
-//    the ctx base — so a subject's post-call writes (decision 2) can never
-//    reach the copy `entry.ctx` holds, and nine `primary` entries assert
-//    exactly that post-call state. args[0] IS the ctx of a ctx entry (omni
-//    itself sets `args = [entry.get("ctx")]`), so moving the assertion from
-//    `ctx` to `args.0` reads the SAME map, post-call, and preserves every
-//    leaf: nothing is dropped, weakened or skipped. `retargetctx` below does
-//    that rewrite on the spec handed to the engine. Swift faces the identical
-//    problem and answers it identically; the upstream fix is for the Rust
-//    port's `drive` to re-point `entry.ctx` at the returned `args[0]`, the
-//    way JS object identity does implicitly — filed as a follow-up, not
-//    worked around by editing a vendored file.
-//
-// 4. NUMBERS NEED NOTHING. omni's parser reads every JSON number as `f64`
-//    and this port's `Value::Num` is also `f64` — unlike go/csharp/java,
-//    where an integral double had to be narrowed before a subject saw it.
-//
-// 5. KEY ORDER. omni models a map as a `BTreeMap`, which sorts; this port's
-//    `OrderedMap` preserves insertion order. Every map in the shared corpus
-//    is already in sorted key order, so the round-trip is lossless over it —
-//    but an out-of-order map authored later WOULD be reordered on the way
-//    in, and `raw_unsorted_keys` below is the tripwire that says so instead
-//    of failing an order-sensitive subject (`keysof`, `items`, `stringify`)
-//    with a mystery diff. It reads the corpus FILE with its own
-//    order-preserving scanner and never touches `Json`: a check fed by
-//    omni's parser would be comparing an already-sorted map against itself
-//    and could not fail. See `corpus_maps_are_in_sorted_key_order`.
-//
-// 7. WHAT RAN IS COUNTED, NOT WHAT WAS DECLARED. `drive` counts SUBJECT
-//    INVOCATIONS, not `entrycount(set)`: a number derived from the spec
-//    cannot tell a working engine from a disconnected one, and would read as
-//    evidence while proving nothing. It also compares the two and fails the
-//    group when they differ. `report` then refuses to pass on a group that
-//    is absent from the corpus, or present in the corpus but driven by
-//    nothing — the two ways a suite quietly stops checking.
-//
-// 6. FAILURES ARE ACCUMULATED, NOT RAISED. omni stops a group at its first
-//    bad entry and returns an `OmniError`; the struct suite reports the whole
-//    corpus in one panic at the end. `drive` records the message and carries
-//    on, so one run still names every broken GROUP.
 
 #![allow(dead_code)]
 // The vendored port re-exports its whole surface; a test crate uses part of
@@ -106,11 +21,7 @@ use univec_sdk::utility::voxgigstruct::value::Value;
 use univec_sdk::utility::voxgigstruct::InjectDef;
 use univec_sdk::UnivecError;
 
-// ---------------------------------------------------------------------------
-// The two value models (decision 1)
-// ---------------------------------------------------------------------------
 
-/// omni's model -> this SDK's.
 pub fn tostruct(val: &Json) -> Value {
     match val {
         Json::Absent => Value::Noval,
@@ -129,15 +40,6 @@ pub fn tostruct(val: &Json) -> Value {
     }
 }
 
-/// This SDK's model -> omni's.
-///
-/// `Value::Func` has no JSON shape at all. It reaches here only when a corpus
-/// entry puts a callable in data (`get_elem` with a callable `alt`, `$APPLY`,
-/// a user `$FORMAT`), and in every such case the corpus asserts on what the
-/// call RETURNED, not on the callable. `Json::Absent` is the honest answer:
-/// it is what omni's own model says about a value that is not JSON, and
-/// omni's `fixjson` then renders it as NULLMARK under the null flag — the
-/// same place the retired hand-written `fix_json` put it.
 pub fn toomni(val: &Value) -> Json {
     match val {
         Value::Noval => Json::Absent,
@@ -168,19 +70,6 @@ pub struct KeyOrderScan {
     pub unsorted: Option<String>,
 }
 
-/// Scan RAW JSON TEXT for a map whose keys are not in sorted order.
-///
-/// This deliberately does NOT go through `omni::runner::loadspec`: omni's
-/// `Json::Map` is a `BTreeMap`, so a parse has already sorted every map and
-/// the disorder this exists to catch is gone before the check can see it. A
-/// tripwire fed by the thing it is watching cannot fire, so the scanner
-/// below walks the file itself and keeps keys in the order they were
-/// authored. `String`'s ordering is byte-lexicographic on UTF-8, which is
-/// exactly the ordering a `BTreeMap<String, _>` imposes, so a sorted scan
-/// means a lossless crossing.
-///
-/// Panics on malformed JSON: a corpus this cannot parse must be loud, not a
-/// silent zero-map pass.
 pub fn raw_unsorted_keys(text: &str) -> KeyOrderScan {
     let mut scan = RawScan {
         src: text.as_bytes(),
@@ -464,18 +353,15 @@ pub fn spec_path() -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The whole corpus, as omni loaded it.
 pub fn corpus() -> Json {
     omni::runner::loadspec(SpecRef::Path(spec_path()))
         .unwrap_or_else(|err| panic!("omni: {}", err.message))
 }
 
-/// A child node by key (absent when missing).
 pub fn jget(val: &Json, key: &str) -> Json {
     val.get(key)
 }
 
-/// A child node by path.
 pub fn jpath(val: &Json, keys: &[&str]) -> Json {
     let mut current = val.clone();
     for key in keys {
@@ -484,7 +370,6 @@ pub fn jpath(val: &Json, keys: &[&str]) -> Json {
     current
 }
 
-/// How many entries a group declares.
 pub fn entrycount(set: &Json) -> usize {
     set.get("set").aslist().map(|list| list.len()).unwrap_or(0)
 }
@@ -500,7 +385,6 @@ pub struct Run {
     /// The whole corpus (sections outside this one: `DEF` blocks, the
     /// `primary/check` client group the struct suite drives by hand).
     pub all: Json,
-    /// The resolved section.
     pub spec: Json,
     pub failures: Vec<String>,
     pub passed: usize,
@@ -515,7 +399,6 @@ pub struct Run {
 }
 
 impl Run {
-    /// A runner over one named section of the shared corpus.
     pub fn section(name: &str) -> Run {
         Run::over(corpus(), name)
     }
@@ -540,7 +423,6 @@ impl Run {
         }
     }
 
-    /// A named group of the resolved section.
     pub fn set(&self, keys: &[&str]) -> Json {
         jpath(&self.spec, keys)
     }
@@ -594,7 +476,6 @@ impl Run {
         });
     }
 
-    /// Hand one group to omni and record the outcome.
     fn drive<F>(&mut self, set: &Json, nullflag: bool, label: &str, subject: F)
     where
         F: Fn(&mut [Json]) -> Result<Json, String> + 'static,
@@ -642,14 +523,10 @@ impl Run {
     }
 
     /// Every `<category>-<group>` in this section that carries a non-empty
-    /// `set` — the groups a suite over this section is expected to drive.
-    ///
-    /// Shape-specific: it assumes the `struct` section's two levels
     /// (`<category>.<group>.set`) and the `"<category>-<group>"` labels the
     /// struct suite passes to `run_set`. The `primary` section nests
     /// differently (`primary.<name>.basic`) and labels its groups `<name>`,
     /// so it guards zero-case runs in `runsection` instead — see
-    /// tests/primary_utility_test.rs.
     pub fn corpus_groups(&self) -> Vec<(String, usize)> {
         let mut found: Vec<(String, usize)> = Vec::new();
         let categories = match self.spec.asmap() {
@@ -660,7 +537,6 @@ impl Run {
             let groups = match node.asmap() {
                 Some(map) => map,
                 // `<category>.name` is a string and `<category>.set` an empty
-                // list; neither is a group.
                 None => continue,
             };
             for (name, group) in groups.iter() {
@@ -673,14 +549,6 @@ impl Run {
         found
     }
 
-    /// Fail the test with every accumulated failure, or report the count.
-    ///
-    /// `expectedskips` names the groups THIS SDK's corpus subset does not
-    /// carry. It is exhaustive in both directions: a group that goes absent
-    /// without being listed fails, and a listed group that is no longer
-    /// absent fails too. Without that a renamed or deleted group would take
-    /// its whole check count with it and the suite would still say `ok` —
-    /// the exact silence the shared oracle exists to prevent.
     pub fn report(&self, what: &str, expectedskips: &[&str]) {
         let mut problems: Vec<String> = self.failures.clone();
 
@@ -749,7 +617,6 @@ fn writeback(args: &mut [Json], index: usize, val: &Value) {
 
 /// Retarget `match: {ctx: ...}` onto `match: {args: {"0": ...}}` — decision 3.
 /// Only when the entry HAS a ctx or args (so args[0] is that map) and the
-/// check does not already assert on `args`.
 fn retargetctx(testspec: &Json) -> Json {
     let set = match testspec.get("set") {
         Json::List(list) => list,
@@ -768,8 +635,6 @@ fn retargetctx(testspec: &Json) -> Json {
             let mut newcheck = BTreeMap::new();
             if let Json::Map(fields) = &check {
                 for (key, val) in fields.iter() {
-                    // Drop the original leaf: it would read the stale
-                    // pre-call copy omni keeps in `entry.ctx`.
                     if "ctx" != key {
                         newcheck.insert(key.clone(), val.clone());
                     }

@@ -23,8 +23,6 @@ function cLit(type: any, placeholder: string = 'example'): string {
 }
 
 
-// cmap(...) for a set of `"key", <lit>` pairs, or NULL when empty (ops accept
-// a NULL match/data argument).
 function cmapExpr(pairs: string[]): string {
   return pairs.length ? `cmap(${pairs.length}, ${pairs.join(', ')})` : 'NULL'
 }

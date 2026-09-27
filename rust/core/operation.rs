@@ -1,4 +1,3 @@
-// Operation description (mirrors go core/operation.go).
 
 use crate::core::helpers::{get_str, getp, to_map};
 use crate::utility::voxgigstruct::Value;

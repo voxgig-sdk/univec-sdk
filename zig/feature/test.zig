@@ -109,15 +109,22 @@ fn envelope(ctx: *Context, data: Value) Value {
     const restf = h.getpath(&.{ "transform", "res" }, ctx.point);
     if (restf != .string) return data;
     const spec = restf.string;
-    // Exactly `body.<key>`; a deeper path is not an envelope this mock can
-    // synthesise, so it is left alone rather than guessed at.
+    // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+    // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
     if (spec.len < 8) return data;
     if (!std.mem.startsWith(u8, spec, "`body.")) return data;
     if (!std.mem.endsWith(u8, spec, "`")) return data;
     const inner = spec[6 .. spec.len - 1];
     if (inner.len == 0) return data;
-    if (std.mem.indexOfScalar(u8, inner, '.') != null) return data;
-    return h.jo(&.{.{ inner, data }});
+    var out = data;
+    var end: usize = inner.len;
+    while (true) {
+        const cut = std.mem.lastIndexOfScalar(u8, inner[0..end], '.');
+        const start = if (cut) |c| c + 1 else 0;
+        out = h.jo(&.{.{ inner[start..end], out }});
+        if (cut) |c| end = c else break;
+    }
+    return out;
 }
 
 fn respond(ctx: *Context, status: i64, data: Value, extra: []const h.Pair) Value {
@@ -143,26 +150,62 @@ fn resolve_match(ctx: *Context, explicit: Value) Value {
     return h.omap();
 }
 
+fn point_terminal(p: Value) bool {
+    const parts = h.getp(p, "parts");
+    if (parts != .array) return false;
+    const items = parts.array.data.items;
+    if (items.len == 0) return false;
+    const last = items[items.len - 1];
+    return last == .string and std.mem.startsWith(u8, last.string, "{");
+}
+
+fn point_depth(p: Value) usize {
+    const parts = h.getp(p, "parts");
+    return if (parts == .array) parts.array.data.items.len else 0;
+}
+
+// The entity's own endpoint: a terminal `{param}` marks a record route, and
+// among equals the shallower path wins (the same rule as make_point).
+fn pick_point(points: Value) Value {
+    if (points != .array) return h.vnull();
+    const items = points.array.data.items;
+    if (items.len == 0) return h.vnull();
+    var point = items[0];
+    for (items[1..]) |cand| {
+        if (point_terminal(cand) != point_terminal(point)) {
+            if (point_terminal(cand)) point = cand;
+        } else if (point_depth(cand) < point_depth(point)) {
+            point = cand;
+        }
+    }
+    return point;
+}
+
+fn reqd_names(point: Value, kind: []const u8) Value {
+    const args_path = h.getpath(&.{ "args", kind }, point);
+    const reqd_args = vs.select(h.A(), args_path, h.jo(&.{.{ "reqd", h.vbool(true) }})) catch return h.olist();
+    // transform reports collected injection errors beside the value; .out is
+    // the value itself, errors or not.
+    const tres = vs.transform(h.A(), reqd_args, h.ja(&.{
+        h.vstr("`$EACH`"),
+        h.vstr(""),
+        h.vstr("`$KEY.name`"),
+    })) catch return h.olist();
+    return tres.out;
+}
+
 fn build_args(ctx: *Context, args: Value) Value {
     const op = ctx.op;
     const opname = op.name;
     const entname: []const u8 = if (ctx.entity) |e| e.get_name() else op.entity;
 
     const points = h.getpath(&.{ "entity", entname, "op", opname, "points" }, ctx.config);
-    const point = h.get_elem(points, h.vnum(-1), h.vnull());
+    const point = pick_point(points);
 
-    const params_path = h.getpath(&.{ "args", "params" }, point);
-    const reqd_params = vs.select(h.A(), params_path, h.jo(&.{.{ "reqd", h.vbool(true) }})) catch h.olist();
-    const reqd = blk: {
-        // transform now reports collected injection errors beside the value;
-        // .out is what it used to return on its own, errors or not.
-        const tres = vs.transform(h.A(), reqd_params, h.ja(&.{
-            h.vstr("`$EACH`"),
-            h.vstr(""),
-            h.vstr("`$KEY.name`"),
-        })) catch break :blk h.olist();
-        break :blk tres.out;
-    };
+    // Path AND query: a path-only read misses a query-addressed record
+    // (e.g. GET /result?trace_id=), which has no path param at all.
+    const reqd_params = reqd_names(point, "params");
+    const reqd_query = reqd_names(point, "query");
 
     const qand = h.olist();
     const q = h.jo(&.{.{ "`$AND`", qand }});
@@ -171,8 +214,8 @@ fn build_args(ctx: *Context, args: Value) Value {
         const keys = h.keysof_vec(args);
         for (keys) |key| {
             const is_id = std.mem.eql(u8, key, "id");
-            const selected = vs.select(h.A(), reqd, h.vstr(key)) catch h.olist();
-            const is_reqd = !h.is_empty(selected);
+            const is_reqd = !h.is_empty(vs.select(h.A(), reqd_params, h.vstr(key)) catch h.olist()) or
+                !h.is_empty(vs.select(h.A(), reqd_query, h.vstr(key)) catch h.olist());
 
             if (is_id or is_reqd) {
                 const v = ctx.util().param(ctx, h.vstr(key));
@@ -244,20 +287,12 @@ fn test_fetch(entity: Value, ctx: *Context, _: []const u8, _: Value) err.E!Value
         const args = build_args(ctx, update_match);
         const found = vs.select(h.A(), entmap, args) catch h.olist();
         var ent = h.get_elem(found, h.vnum(0), h.vnull());
-        if (h.is_noval(ent) and h.sizeOf(entmap) > 0) {
-            for (h.items_vec(entmap)) |kv| {
-                if (kv.v == .object) {
-                    ent = kv.v;
-                    break;
-                }
-            }
-        }
         if (h.is_noval(ent)) {
+            // update miss: 404, never another record
             return respond(ctx, 404, h.vnull(), &.{.{ "statusText", h.vstr("Not found") }});
         }
         if (ent == .object and reqdata == .object) {
-            var it = reqdata.object.iterator();
-            while (it.next()) |kv| h.setp(ent, kv.key_ptr.*, kv.value_ptr.*);
+            ent = h.merge(h.ja(&.{ ent, reqdata }));
         }
         h.del_prop(ent, h.vstr("$KEY"));
         return respond(ctx, 200, h.clone(ent), &.{});

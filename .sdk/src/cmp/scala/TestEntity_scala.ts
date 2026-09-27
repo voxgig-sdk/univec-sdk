@@ -1,3 +1,4 @@
+import { flowSteps } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -24,11 +25,6 @@ import {
 import { scalaVarName } from './utility_scala'
 
 
-// Scala GenCtx mirrors the java donor's shape (see TestEntity_java.ts). The
-// scala per-entity test is a dependency-free scala-cli object (default
-// package) exposing run(rep) — driven by the generated SdkEntityTestMain
-// aggregator. Only the offline unit path is emitted: the in-memory test
-// transport serves the fixtures, so there is no live/env/synthetic machinery.
 type GenCtx = {
   model: Model
   entity: ModelEntity
@@ -68,10 +64,10 @@ const TestEntity = cmp(function TestEntity(props: any) {
   for (const n of idnames) {
     idmapObj[n] = String(n).toUpperCase()
   }
-  const allSteps = Object.values(basicflow.step) as any[]
-  const updateStep = allSteps.find((s: any) => s.op === 'update')
-  const updateData = updateStep?.data
-    ? Object.entries(updateStep.data).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+  const allSteps = Object.values(flowSteps(basicflow)) as any[]
+  const updateStep = allSteps.find((s: any) => s.o === 'update')
+  const updateData = updateStep?.d
+    ? Object.entries(updateStep.d).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
     : []
   for (const [k, v] of updateData as any[]) {
     if (null == idmapObj[k] && null != idmapObj[v as string]) {
@@ -125,10 +121,10 @@ object ${EntityName}EntityTest {
     // that a later load/update/remove reads its id from. Seed it from the
     // shipped "existing" fixtures here, mirroring the ts generator. Guarded on a
     // DATA id field — an entity that carries no id has no `.get("id")` to read.
-    const flowHasCreate = allSteps.some((s: any) => s.op === 'create')
+    const flowHasCreate = allSteps.some((s: any) => s.o === 'create')
     const needsPreambleData = !flowHasCreate &&
       null != entityDataIdField(entity) &&
-      allSteps.some((s: any) => ['load', 'update', 'remove'].includes(s.op))
+      allSteps.some((s: any) => ['load', 'update', 'remove'].includes(s.o))
     if (needsPreambleData) {
       const preambleData = scalaVarName(entity.name + '_ref01_data')
       Content(`      val ${preambleData}Raw = Struct.items(Helpers.toMapAny(
@@ -138,8 +134,8 @@ object ${EntityName}EntityTest {
     }
 
     // Model-driven step iteration (sorted-key order for byte-stable output).
-    each(basicflow.step, (step: any, index: any) => {
-      const opgen: OpGen = GENERATE_OP[step.op]
+    each(flowSteps(basicflow), (step: any, index: any) => {
+      const opgen: OpGen = GENERATE_OP[step.o]
       if (opgen) {
         Content('\n')
         opgen(genCtx, step, index)
@@ -156,13 +152,13 @@ object ${EntityName}EntityTest {
 
 const generateCreate: OpGen = (ctx, step, index) => {
   const { entity, flow, accessor, ENTLOWER } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = scalaVarName(step.input.entvar ?? ref + '_ent')
-  const datavar = scalaVarName(step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? '')))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = scalaVarName(step.i.entvar ?? ref + '_ent')
+  const datavar = scalaVarName(step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? '')))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const needsEnt = !priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   Content(`      // CREATE
 `)
@@ -193,14 +189,14 @@ const generateCreate: OpGen = (ctx, step, index) => {
 
 const generateList: OpGen = (ctx, step, index) => {
   const { entity, flow, accessor, ENTLOWER } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = scalaVarName(step.input.entvar ?? ref + '_ent')
-  const matchvar = scalaVarName(step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? '')))
-  const listvar = scalaVarName(step.input.listvar ?? (ref + '_list' + (step.input.suffix ?? '')))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = scalaVarName(step.i.entvar ?? ref + '_ent')
+  const matchvar = scalaVarName(step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? '')))
+  const listvar = scalaVarName(step.i.listvar ?? (ref + '_list' + (step.i.suffix ?? '')))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const needsEnt = !priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   Content(`      // LIST
 `)
@@ -217,16 +213,13 @@ const generateList: OpGen = (ctx, step, index) => {
 `)
   }
 
-  // Select-by-id assertions require the DATA type to carry an id field
-  // (entityDataIdField); an entity keyed only on a load-MATCH id it does not
-  // return as data has no `.get("id")` to compare, so skip them.
   const hasDataId = null != entityDataIdField(entity)
-  const allSteps = Object.values(flow.step) as any[]
-  const listvarUsed = hasDataId && !!step.valid?.some((v: any) => {
+  const allSteps = Object.values(flowSteps(flow)) as any[]
+  const listvarUsed = hasDataId && !!step.v?.some((v: any) => {
     if ('ItemExists' !== v.apply && 'ItemNotExists' !== v.apply) return false
     const validRef = v.def?.ref
-    return validRef && allSteps.some((s: any) => 'create' === s.op &&
-      ((s.input.ref ?? entity.name + '_ref01') === validRef))
+    return validRef && allSteps.some((s: any) => 'create' === s.o &&
+      ((s.i.ref ?? entity.name + '_ref01') === validRef))
   })
 
   Content(`      val ${listvar}Result = ${entvar}.list(${matchvar}, null)
@@ -237,11 +230,11 @@ const generateList: OpGen = (ctx, step, index) => {
 `)
   }
 
-  if (step.valid) {
-    for (const validator of step.valid) {
+  if (step.v) {
+    for (const validator of step.v) {
       const validRef = validator.def?.ref
-      const hasRefData = validRef && allSteps.some((s: any) => 'create' === s.op &&
-        ((s.input.ref ?? entity.name + '_ref01') === validRef))
+      const hasRefData = validRef && allSteps.some((s: any) => 'create' === s.o &&
+        ((s.i.ref ?? entity.name + '_ref01') === validRef))
       const refDataVar = scalaVarName(validRef + '_data')
 
       if ('ItemExists' === validator.apply && hasRefData && hasDataId) {
@@ -262,16 +255,16 @@ const generateList: OpGen = (ctx, step, index) => {
 
 const generateUpdate: OpGen = (ctx, step, index) => {
   const { entity, flow, accessor, ENTLOWER } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = scalaVarName(step.input.entvar ?? ref + '_ent')
-  const datavar = scalaVarName(step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? '')))
-  const resdatavar = scalaVarName(step.input.resdatavar ?? (ref + '_resdata' + (step.input.suffix ?? '')))
-  const markdefvar = scalaVarName(step.input.markdefvar ?? (ref + '_markdef' + (step.input.suffix ?? '')))
-  const srcdatavar = scalaVarName(step.input.srcdatavar ?? (ref + '_data' + (step.input.suffix ?? '')))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = scalaVarName(step.i.entvar ?? ref + '_ent')
+  const datavar = scalaVarName(step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? '')))
+  const resdatavar = scalaVarName(step.i.resdatavar ?? (ref + '_resdata' + (step.i.suffix ?? '')))
+  const markdefvar = scalaVarName(step.i.markdefvar ?? (ref + '_markdef' + (step.i.suffix ?? '')))
+  const srcdatavar = scalaVarName(step.i.srcdatavar ?? (ref + '_data' + (step.i.suffix ?? '')))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const needsEnt = !priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   const hasDataId = null != entityDataIdField(entity)
 
@@ -288,8 +281,8 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 `)
   }
 
-  if (step.data) {
-    const dataEntries = Object.entries(step.data).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+  if (step.d) {
+    const dataEntries = Object.entries(step.d).filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
     for (const [key] of dataEntries) {
       Content(`      ${datavar}Up.put("${key}", idmap.get("${key}"))
 `)
@@ -297,10 +290,10 @@ const generateUpdate: OpGen = (ctx, step, index) => {
   }
 
   let hasMark = false
-  if (step.spec) {
-    for (const spec of step.spec) {
-      if ('TextFieldMark' === spec.apply && null != step.input.textfield) {
-        const fieldname = step.input.textfield
+  if (step.s) {
+    for (const spec of step.s) {
+      if ('TextFieldMark' === spec.apply && null != step.i.textfield) {
+        const fieldname = step.i.textfield
         const fieldvalue = spec.def?.mark ?? `Mark01-${ref}`
         hasMark = true
         Content(`      val ${markdefvar}Name = "${fieldname}"
@@ -328,23 +321,23 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 
 const generateLoad: OpGen = (ctx, step, index) => {
   const { entity, flow, accessor, ENTLOWER } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = scalaVarName(step.input.entvar ?? ref + '_ent')
-  const matchvar = scalaVarName(step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? '')))
-  const datavar = scalaVarName(step.input.datavar ?? (ref + '_data' + (step.input.suffix ?? '')))
-  const srcdatavar = scalaVarName(step.input.srcdatavar ?? (ref + '_data' + (step.input.suffix ?? '')))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = scalaVarName(step.i.entvar ?? ref + '_ent')
+  const matchvar = scalaVarName(step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? '')))
+  const datavar = scalaVarName(step.i.datavar ?? (ref + '_data' + (step.i.suffix ?? '')))
+  const srcdatavar = scalaVarName(step.i.srcdatavar ?? (ref + '_data' + (step.i.suffix ?? '')))
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const hasEntVar = priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
-  const flowHasCreate = Object.values(flow.step).some((s: any) => (s as any).op === 'create')
+  const flowHasCreate = Object.values(flowSteps(flow)).some((s: any) => (s as any).o === 'create')
   const preambleRef = entity.name + '_ref01'
   const hasSrcData = (!flowHasCreate && srcdatavar === scalaVarName(preambleRef + '_data')) ||
     priorSteps.some((s: any) => {
-      if ('create' === s.op) {
-        const priorRef = s.input.ref ?? entity.name + '_ref01'
-        const priorDatvar = scalaVarName(s.input.datavar ?? (priorRef + '_data' + (s.input.suffix ?? '')))
+      if ('create' === s.o) {
+        const priorRef = s.i.ref ?? entity.name + '_ref01'
+        const priorDatvar = scalaVarName(s.i.datavar ?? (priorRef + '_data' + (s.i.suffix ?? '')))
         return priorDatvar === srcdatavar
       }
       return false
@@ -383,10 +376,10 @@ const generateLoad: OpGen = (ctx, step, index) => {
 
 const generateRemove: OpGen = (ctx, step, index) => {
   const { entity, flow, accessor, ENTLOWER } = ctx
-  const ref = step.input.ref ?? entity.name + '_ref01'
-  const entvar = scalaVarName(step.input.entvar ?? ref + '_ent')
-  const matchvar = scalaVarName(step.input.matchvar ?? (ref + '_match' + (step.input.suffix ?? '')))
-  const srcdatavar = scalaVarName(step.input.srcdatavar ?? (ref + '_data'))
+  const ref = step.i.ref ?? entity.name + '_ref01'
+  const entvar = scalaVarName(step.i.entvar ?? ref + '_ent')
+  const matchvar = scalaVarName(step.i.matchvar ?? (ref + '_match' + (step.i.suffix ?? '')))
+  const srcdatavar = scalaVarName(step.i.srcdatavar ?? (ref + '_data'))
 
   // The remove-by-id match reads ${srcdatavar}.get("id"); skip the whole step
   // when the DATA type has no id field (there is no created id to remove by).
@@ -394,9 +387,9 @@ const generateRemove: OpGen = (ctx, step, index) => {
     return
   }
 
-  const priorSteps = Object.values(flow.step).slice(0, Number(index)) as any[]
+  const priorSteps = Object.values(flowSteps(flow)).slice(0, Number(index)) as any[]
   const needsEnt = !priorSteps.some((s: any) =>
-    ['create', 'list', 'load', 'update', 'remove'].includes(s.op))
+    ['create', 'list', 'load', 'update', 'remove'].includes(s.o))
 
   Content(`      // REMOVE
 `)

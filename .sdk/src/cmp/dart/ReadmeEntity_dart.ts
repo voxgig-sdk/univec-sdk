@@ -21,12 +21,6 @@ function dartLit(type: any, placeholder: string = 'example'): string {
 }
 
 
-// Op method spellings + descriptions (language-agnostic wording).
-// A `list()` on a NESTED entity needs its parent path params. The
-// quickstart used to emit `client.Moon().list()` for an entity at
-// `/planet/{planet_id}/moon`, which 404s against a live server from a
-// half-built URL — indistinguishable from "no such record". The model
-// already marks those params `reqd: true`; matchArg renders exactly them.
 function listMatchArg(ent: any): string {
   const idF = entityIdField(ent)
   return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))
@@ -63,7 +57,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
-    const fields = entity.fields || []
+    const fields = Object.values(entity.fields || {})
     // Model-driven id key: null when this entity has no id-like field.
     const idF = entityIdField(entity)
     const eVar = exampleVarName(entity.name, 'dart')
@@ -109,8 +103,8 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 `)
 
       each(fields, (field: any) => {
-        const desc = field.short || ''
-        Content(`| \`${field.name}\` | \`${canonToType(field.type, target.name)}\` | ${desc} |
+        const desc = field.sh || ''
+        Content(`| \`${field.n}\` | \`${canonToType(field.t, target.name)}\` | ${desc} |
 `)
       })
 

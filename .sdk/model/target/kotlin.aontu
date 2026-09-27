@@ -1,0 +1,47 @@
+main: kit: target: kotlin: {
+
+  title: Kotlin
+  ext: kt
+  comment: line: "//"
+  module: name: 'univec'
+  base: 'node_modules/@voxgig/sdkgen/project/.sdk'
+  package: '@voxgig/sdkgen'
+  srcfeature: false
+
+  # Applicability (docs/design/feature-tags.md): this target's feature
+  # container carries a vendored sekreto port, so the `secrets` feature —
+  # whose `needs` is exactly this tag — applies here. Without it
+  # featureApplies() refuses the feature and Config emits neither the
+  # import nor the registry entry.
+  provides: { sekreto: true, schema: true }
+
+  superseded: [
+    'test/StructRunner.kt'
+  ]
+
+  deps: &: {
+    kind: *'prod' | string
+  }
+
+  deps: {}
+}
+
+
+main: kit: feature: &: target: kotlin: deps: &: {
+  kind: *'prod' | string
+}
+
+
+main: kit: target: kotlin: publish: {
+  registry: {
+    name: 'maven-central'
+    url: 'https://central.sonatype.com'
+    vault: { recipe: 'maven', alias: 'central' }
+  }
+}
+
+
+main: kit: target: kotlin: feature: {
+  trim: true
+  fullset: ['test/FeatureTest.kt']
+}

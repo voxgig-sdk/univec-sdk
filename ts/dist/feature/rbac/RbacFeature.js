@@ -2,14 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RbacFeature = void 0;
 const BaseFeature_1 = require("../base/BaseFeature");
-// Client-side role/permission enforcement. Before an operation resolves its
-// endpoint, the required permission for that entity+operation is checked
-// against the permissions the client holds; a disallowed call is
-// short-circuited with an `rbac_denied` error and never touches the
-// network. Required permissions come from `rules` (keyed by
-// `<entity>.<op>`, `<op>`, or `*`); the default when no rule matches is
-// controlled by `deny` (default: allow when unspecified). Held permissions
-// are the `permissions` list (a `*` grants everything).
 class RbacFeature extends BaseFeature_1.BaseFeature {
     version = '0.0.1';
     name = 'rbac';
@@ -33,7 +25,6 @@ class RbacFeature extends BaseFeature_1.BaseFeature {
         }
         const required = this._required(ctx);
         if (null == required) {
-            // No rule: honour the default policy.
             if (true === this._options.deny) {
                 return this._reject(ctx, '<default-deny>');
             }

@@ -57,7 +57,7 @@ ok(Voxgig::Struct::ismap($spec), 'primary section found in test.json');
 
 
 # Sections deliberately left empty in the shared corpus
-# (.sdk/test/primary/<name>.aon carries a PENDING header). Everything else
+# (.sdk/test/primary/<name>.aontu carries a PENDING header). Everything else
 # MUST contribute cases.
 my %PENDING = map { $_ => 1 } qw(
   fetcher makeFetchDef makeResult featureAdd featureHook featureInit
@@ -197,6 +197,64 @@ sub _def_setup {
     && ref($section->{DEF}{setup}) eq 'HASH') ? $section->{DEF}{setup}{a} : undef;
   return undef unless ref($setup) eq 'HASH';
   return UnivecOmni::tostruct(Voxgig::Omni::Util::clone($setup));
+}
+
+
+# Where this SDK's prepare_auth actually puts the credential: the name is the
+# API's OWN scheme name, not always `authorization`, so it is discovered by
+# running prepare_auth once.
+sub _auth_credential {
+  my ($auth_client) = @_;
+  my $auth_utility = $auth_client->get_utility;
+  my $ctx = UnivecContext->new({
+    'client' => $auth_client,
+    'utility' => $auth_utility,
+    'opname' => 'load',
+  }, undef);
+  # The DEF setup this client is built from carries `auth.basic: false`, so
+  # the single-token branch runs and there is a credential to find.
+  $ctx->{spec} = UnivecSpec->new({
+    'headers' => {}, 'query' => {}, 'step' => 's' });
+  my (undef, $err) = $auth_utility->{prepare_auth}->($ctx);
+  return undef if defined $err;
+  for my $where ('headers', 'query') {
+    # A cookie credential rides the header bag, because a cookie IS a header.
+    my $bag = 'query' eq $where ? $ctx->{spec}{query} : $ctx->{spec}{headers};
+    for my $name (keys %{ $bag || {} }) {
+      return { 'where' => $where, 'name' => $name };
+    }
+  }
+  return undef;
+}
+
+
+# Rename the corpus's `headers` bag to the real container, and the
+# `authorization` key inside it to the real credential name. Applied only to
+# the prepareAuth section, so real header assertions elsewhere are untouched.
+sub _retarget_auth {
+  my ($node, $cred) = @_;
+
+  if (ref($node) eq 'ARRAY') {
+    return [ map { _retarget_auth($_, $cred) } @$node ];
+  }
+  return $node unless ref($node) eq 'HASH';
+
+  my $out = {};
+  for my $key (keys %$node) {
+    if ('headers' eq $key) {
+      my $bag = {};
+      my $inner = ref($node->{$key}) eq 'HASH' ? $node->{$key} : {};
+      for my $bagkey (keys %$inner) {
+        my $name = 'authorization' eq $bagkey ? $cred->{name} : $bagkey;
+        $bag->{$name} = _retarget_auth($inner->{$bagkey}, $cred);
+      }
+      $out->{ $cred->{where} } = $bag;
+    }
+    else {
+      $out->{$key} = _retarget_auth($node->{$key}, $cred);
+    }
+  }
+  return $out;
 }
 
 
@@ -606,12 +664,27 @@ runsection('param', sub {
 {
   my $auth_client = UnivecSDK->test(undef, _def_setup('prepareAuth'));
 
+  # The corpus writes the credential as `headers.authorization`: a
+  # PLACEHOLDER each runner points at the container and name this API
+  # actually uses.
+  my $cred = _auth_credential($auth_client);
+  ok(defined $cred, 'prepare_auth placed a credential in headers or query');
+
+  # An absent section is runsection's report to make.
+  my $section = ref($spec) eq 'HASH' ? $spec->{prepareAuth} : undef;
+  my $swap = ref($section) eq 'HASH' && defined $cred
+    && !('headers' eq $cred->{where} && 'authorization' eq $cred->{name});
+  my $original = $swap ? $section->{basic} : undef;
+  $section->{basic} = _retarget_auth($original, $cred) if $swap;
+
   runsection('prepareAuth', sub {
     my ($view) = @_;
     my $ctx = UnivecOmni::livectx($view);
     $ctx->{client} = $auth_client;
     return _unwrap($utility->{prepare_auth}->($ctx));
   });
+
+  $section->{basic} = $original if $swap;
 }
 
 

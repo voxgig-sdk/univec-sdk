@@ -71,30 +71,18 @@ voxgig_value* make_options_util(Context* ctx) {
   voxgig_value* cfgopts = to_map(getp(config, "options"));
   if (!voxgig_is_map(cfgopts)) cfgopts = voxgig_new_map();
 
-  // Build the option spec (validation shape). Marker keys use backticks.
-  voxgig_value* optspec = cmap(13,
-    "apikey", v_str(""),
-    "base", v_str("http://localhost:8000"),
-    "prefix", v_str(""),
-    "suffix", v_str(""),
-    "auth", cmap(1, "prefix", v_str("")),
-    "headers", cmap(1, "`$CHILD`", v_str("`$STRING`")),
-    "allow", cmap(2,
-      "method", v_str("GET,PUT,POST,PATCH,DELETE,OPTIONS"),
-      "op", v_str("create,update,load,list,remove,command,direct,graphql")),
-    "entity", cmap(1, "`$CHILD`", cmap(3,
-      "`$OPEN`", v_bool(true),
-      "active", v_bool(false),
-      "alias", v_map())),
-    "feature", cmap(1, "`$CHILD`", cmap(2,
-      "`$OPEN`", v_bool(true),
-      "active", v_bool(false))),
-    "utility", v_map(),
-    "system", v_map(),
-    "test", cmap(2,
-      "active", v_bool(false),
-      "entity", cmap(1, "`$OPEN`", v_bool(true))),
-    "clean", cmap(1, "keys", v_str("key,token,id")));
+  /* THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
+   *
+   * Built from the model: `main.kit.optspec` for the standard options, plus
+   * one entry per feature this target carries, from that feature's own
+   * `config.options` / `config.optspec`. Editing this file to add an option
+   * would put it back where it was - one of twenty hand-maintained copies of
+   * a schema nothing cross-checked - so add it to the model instead and every
+   * ported target validates it.
+   *
+   * Parsed once and shared: make_options validates AGAINST the spec and
+   * writes into the options, never into the spec. */
+  voxgig_value* optspec = shared_optspec();
 
   // Preserve system.fetch before merge/validate (validation strips it).
   voxgig_value* sys_fetch = getpath2(opts, "system", "fetch");

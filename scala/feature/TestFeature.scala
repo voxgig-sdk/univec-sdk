@@ -50,14 +50,18 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
     val tm = Struct.getprop(ctx.point, "transform")
     Struct.getprop(tm, "res") match {
       case spec: String =>
-        // Exactly `body.<key>`; a deeper path is not an envelope this mock
-        // can synthesise, so it is left alone rather than guessed at.
+        // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+        // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
         if (!spec.startsWith("`body.") || !spec.endsWith("`") || spec.length < 8) return data
         val inner = spec.substring(6, spec.length - 1)
-        if (inner.isEmpty || inner.contains(".")) return data
-        val wrapped = new java.util.LinkedHashMap[String, Object]()
-        wrapped.put(inner, data)
-        wrapped
+        if (inner.isEmpty) return data
+        var out: Object = data
+        for (seg <- inner.split("\\.", -1).reverse) {
+          val wrapped = new java.util.LinkedHashMap[String, Object]()
+          wrapped.put(seg, out)
+          out = wrapped
+        }
+        out
       case _ => data
     }
   }
@@ -134,16 +138,10 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
       if (updateMatch.isEmpty) updateMatch = resolveMatch(ctx, new LinkedHashMap[String, Object]()).asInstanceOf[LinkedHashMap[String, Object]]
       val args = buildArgs(ctx, op, updateMatch)
       val found = Struct.select(entmap, args)
-      var ent = Struct.getelem(found, java.lang.Integer.valueOf(0))
-      if (ent == null && entmap != null) {
-        val vit = entmap.values().iterator()
-        var brk = false
-        while (vit.hasNext && !brk) {
-          vit.next() match { case e: JMap[_, _] => ent = e; brk = true; case _ => }
-        }
-      }
+      val ent = Struct.getelem(found, java.lang.Integer.valueOf(0))
+      // update miss: 404, never another record
       if (ent == null) return respond(ctx, 404, null, extra("statusText", "Not found"))
-      ent match { case m: JMap[_, _] if ctx.reqdata != null => m.asInstanceOf[JMap[String, Object]].putAll(ctx.reqdata); case _ => }
+      ent match { case _: JMap[_, _] if ctx.reqdata != null => Struct.merge(Struct.jt(ent, ctx.reqdata)); case _ => }
       Struct.delprop(ent, "$KEY")
       val out = Struct.clone(ent)
       respond(ctx, 200, out, null)
@@ -277,9 +275,14 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
       case _ =>
     }
 
-    val paramsPath = Struct.getpath(point, java.util.List.of("args", "params"))
-    val reqdParams = Struct.select(paramsPath, Struct.jm("reqd", java.lang.Boolean.TRUE))
-    val reqd = Struct.transform(reqdParams, Struct.jt("`$EACH`", "", "`$KEY.name`"))
+    // Path AND query: a path-only read misses a query-addressed record
+    // (e.g. GET /result?trace_id=), which has no path param at all.
+    val reqdArgs = Struct.jt()
+    for (kind <- List("params", "query")) {
+      val argsPath = Struct.getpath(point, java.util.List.of("args", kind))
+      reqdArgs.addAll(Struct.select(argsPath, Struct.jm("reqd", java.lang.Boolean.TRUE)))
+    }
+    val reqd = Struct.transform(reqdArgs, Struct.jt("`$EACH`", "", "`$KEY.name`"))
 
     val qand = Struct.jt()
     val q = Struct.jm("`$AND`", qand)

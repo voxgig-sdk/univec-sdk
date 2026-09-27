@@ -23,17 +23,6 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         }
     }
 
-    // `auth: null` is the documented way to disable auth outright, and
-    // prepare_auth honours it before it ever reads the apikey. It cannot
-    // survive validate: depending on the struct port a stored null is either
-    // REPLACED by the optspec default - transmitting the credential the
-    // caller withheld - or REJECTED outright. Withhold the key for validate,
-    // then put the null back. Same fix as ts/js/go make_options.
-    //
-    // Read the map DIRECTLY rather than through get_prop: get_prop applies
-    // the Group A rule and returns the alt for a stored null, so it cannot
-    // tell an absent auth from a suppressed one - and only the latter is a
-    // suppression.
     let auth_suppressed = match &options {
         Value::Map(m) => matches!(m.borrow().get("auth"), Some(Value::Null)),
         _ => false,
@@ -45,12 +34,6 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         opts = vs::del_prop(opts, &Value::str("auth"));
     }
 
-    // Feature add-order. `options.feature` may be an ordered List of
-    // { name, active, ...opts } entries (the List position IS the order in
-    // which features are added), or a { name: {opts} } map. Normalize a List
-    // to a map (so merge/validate are unchanged) and remember the explicit
-    // order; a map defaults to test-first so the `test` mock transport is
-    // installed as the base of the transport wrapper chain.
     let mut feature_order: Vec<String> = Vec::new();
     if let Value::List(fl) = getp(&opts, "feature") {
         let fmap = Value::empty_map();
@@ -73,57 +56,7 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         _ => Value::empty_map(),
     };
 
-    let optspec = jo(vec![
-        ("apikey", Value::str("")),
-        ("base", Value::str("http://localhost:8000")),
-        ("prefix", Value::str("")),
-        ("suffix", Value::str("")),
-        ("auth", jo(vec![("prefix", Value::str("")), ("basic", Value::Bool(false))])),
-        ("headers", jo(vec![("`$CHILD`", Value::str("`$STRING`"))])),
-        (
-            "allow",
-            jo(vec![
-                ("method", Value::str("GET,PUT,POST,PATCH,DELETE,OPTIONS")),
-                ("op", Value::str("create,update,load,list,remove,command,direct,graphql")),
-            ]),
-        ),
-        (
-            "entity",
-            jo(vec![(
-                "`$CHILD`",
-                jo(vec![
-                    ("`$OPEN`", Value::Bool(true)),
-                    ("active", Value::Bool(false)),
-                    ("alias", Value::empty_map()),
-                ]),
-            )]),
-        ),
-        (
-            "feature",
-            jo(vec![(
-                "`$CHILD`",
-                jo(vec![
-                    ("`$OPEN`", Value::Bool(true)),
-                    ("active", Value::Bool(false)),
-                ]),
-            )]),
-        ),
-        ("utility", Value::empty_map()),
-        ("system", Value::empty_map()),
-        (
-            "test",
-            jo(vec![
-                ("active", Value::Bool(false)),
-                ("entity", jo(vec![("`$OPEN`", Value::Bool(true))])),
-            ]),
-        ),
-        ("clean", jo(vec![("keys", Value::str("key,token,id"))])),
-        // Server-variable values for a templated base URL (OpenAPI server
-        // variables): {name} placeholders in "base" are substituted from this
-        // map at construction. Spec defaults arrive via the generated config;
-        // user values override them. Mirrors go's make_options optspec.
-        ("server", jo(vec![("`$CHILD`", Value::str(""))])),
-    ]);
+    let optspec = crate::core::schema::optspec();
 
     // Preserve system.fetch before merge/validate (validation strips it).
     let sys_fetch = getpath(&["system", "fetch"], &opts);
@@ -145,16 +78,6 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         setp(&opts, "auth", Value::Null);
     }
 
-    // Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
-    // Every placeholder must resolve to a non-empty value: from options.server
-    // (user), else the Config default. A placeholder that resolves to "" is a
-    // construction ERROR in live mode - the URL cannot work - but in test mode
-    // substitutes the deterministic value "test-<name>" so offline tests need
-    // no configuration. The SDK constructor has no error return, so a missing
-    // required variable PANICS: construction-time misconfiguration.
-    //
-    // Scanned by hand rather than with vs::re_replace, whose replacement is a
-    // fixed string and cannot vary per placeholder.
     if let Value::Str(base) = getp(&opts, "base") {
         if base.contains('{') {
             let testmode = matches!(getpath(&["test", "active"], &opts), Value::Bool(true))
@@ -213,7 +136,6 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         }
     }
 
-    // Restore system.fetch.
     if !sys_fetch.is_noval() {
         let sys = getp(&opts, "system");
         if let Value::Map(_) = sys {
@@ -223,7 +145,6 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         }
     }
 
-    // Derived clean config.
     let clean_keys = match getpath(&["clean", "keys"], &opts) {
         Value::Str(s) => s,
         _ => "key,token,id".to_string(),
@@ -253,12 +174,6 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
             } else {
                 feature_order = names;
             }
-            // Station special case, mirroring test's: its transport wrap must
-            // sit immediately outside the base transport (inside retry/cache/
-            // netsim), so map-form activation hoists it to just after test -
-            // or first, when no test entry exists. Without this the sorted
-            // default would init station last and wrap OUTSIDE the recording
-            // features, turning its wire-truth events into fiction.
             if let Some(si) = feature_order.iter().position(|n| n == "station") {
                 feature_order.remove(si);
                 let at = feature_order

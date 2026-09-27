@@ -24,9 +24,11 @@ import {
 import { goFeatureName } from './utility_go'
 import { Package } from './Package_go'
 import { Config } from './Config_go'
+import { Schema } from './Schema_go'
 import { Gitignore } from './Gitignore_go'
 import { MainEntity } from './MainEntity_go'
 import { EntityTypes } from './EntityTypes_go'
+import { PrepareAuth } from './PrepareAuth_go'
 
 
 const Main = cmp(async function Main(props: any) {
@@ -51,13 +53,6 @@ const Main = cmp(async function Main(props: any) {
 
   Gitignore({})
 
-  // Copy tm/go files with replacements.
-  //
-  // Rewrite the placeholder `github.com/voxgig/struct` import (used in the
-  // template since it's a self-contained module there) to its in-SDK path.
-  // The struct package is inlined under `<gomodule>/utility/struct` so the
-  // module is fully self-contained — no external go.mod required by
-  // downstream consumers.
   Copy({
     from: 'tm/' + target.name,
     // pluginExcludes: the generate-time plugin trim (an INACTIVE plugin
@@ -74,11 +69,10 @@ const Main = cmp(async function Main(props: any) {
     }
   })
 
-  // Typed models: entity/types.go (package entity), emitted alongside the
-  // generated *_entity.go files so the typed accessors resolve without imports.
   EntityTypes({ target })
 
-  // Generate main SDK file in core/ folder
+  PrepareAuth({ target })
+
   Folder({ name: 'core' }, () => {
 
     File({ name: model.name + '_sdk.' + target.ext }, () => {
@@ -106,7 +100,6 @@ s.utility.FeatureHook(s.rootctx, "${name}")
           }
         },
 
-        // Entities - injected at SLOT
         () => {
           each(entity, (entity: ModelEntity) => {
             const entitySDK = getModelPath(model, `main.${KIT}.entity.${entity.name}`)
@@ -117,6 +110,7 @@ s.utility.FeatureHook(s.rootctx, "${name}")
     })
 
     Config({ target })
+    Schema({ target })
 
     // Generate registry.go with all constructor function vars
     File({ name: 'registry.' + target.ext }, () => {
@@ -127,7 +121,6 @@ var UtilityRegistrar func(u *Utility)
 var NewBaseFeatureFunc func() Feature
 
 `)
-      // Feature constructor function vars (non-base)
       each(feature, (feat: any) => {
         if (feat.name !== 'base') {
           const fname = goFeatureName(feat)
@@ -137,7 +130,6 @@ var NewBaseFeatureFunc func() Feature
         }
       })
 
-      // Entity constructor function vars
       each(entity, (ent: any) => {
         Content(`var New${ent.Name}EntityFunc func(client *${model.const.Name}SDK, entopts map[string]any) ${model.const.Name}Entity
 
@@ -146,7 +138,6 @@ var NewBaseFeatureFunc func() Feature
     })
   })
 
-  // Generate root package file
   const hasEntities = Object.keys(entity || {}).length > 0
   const entityImport = hasEntities ? `\n\t"${gomodule}/entity"` : ''
   File({ name: model.name + '.' + target.ext }, () => {
@@ -179,13 +170,11 @@ type BaseFeature = feature.BaseFeature
 func init() {
 `)
 
-    // Register feature constructors - base is always present
     Content(`	core.NewBaseFeatureFunc = func() core.Feature {
 		return feature.NewBaseFeature()
 	}
 `)
 
-    // Register non-base feature constructors
     each(feature, (feat: any) => {
       if (feat.name !== 'base') {
         const fname = goFeatureName(feat)
@@ -196,7 +185,6 @@ func init() {
       }
     })
 
-    // Register entity constructors
     each(entity, (ent: any) => {
       Content(`	core.New${ent.Name}EntityFunc = func(client *core.${model.const.Name}SDK, entopts map[string]any) core.${model.const.Name}Entity {
 		return entity.New${entityClassName(ent, entityCollection(model))}(client, entopts)

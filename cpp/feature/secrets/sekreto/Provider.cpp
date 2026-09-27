@@ -1,5 +1,5 @@
-// VENDORED: @voxgig/sekreto sdk-20260908-1556-0 (cpp/src/Provider.cpp)
-// Source: https://github.com/voxgig/sekreto @ 1267ee2e5f49566bc92695bc9eb3a60ef4924998  [tag: sdk-20260911-2013-0]
+// VENDORED: @voxgig/sekreto sdk-20260925-1316-0 (cpp/src/Provider.cpp)
+// Source: https://github.com/voxgig/sekreto @ 163f537960de6813cc393b89843949ca3afa8cfc  [tag: sdk-20260925-1316-0]
 // License: MIT (c) voxgig - see repository LICENSE. Do not edit: resync from upstream.
 #include "Provider.hpp"
 
@@ -112,6 +112,18 @@ plugin::V optionsof(const ProviderSpec& spec) {
   setstr(out, "config", spec.config);
   setstr(out, "environment", spec.environment);
   setstr(out, "path", spec.path);
+  setstr(out, "passphrase", spec.passphrase);
+  setstr(out, "vaultkey", spec.vaultkey);
+
+  // Written only when set, like every string above: zero and false are
+  // what "not configured" means for these two.
+  if (spec.iterations.has_value()) {
+    plugin::set(out, "iterations", plugin::vnum(spec.iterations.value()));
+  }
+
+  if (spec.create) {
+    plugin::set(out, "create", plugin::vbool(true));
+  }
 
   if (spec.kv.has_value()) {
     plugin::set(out, "kv", plugin::vnum(spec.kv.value()));
@@ -177,6 +189,14 @@ ProviderSpec specof(const plugin::V& options) {
   spec.config = strof(options, "config");
   spec.environment = strof(options, "environment");
   spec.path = strof(options, "path");
+  spec.passphrase = strof(options, "passphrase");
+  spec.vaultkey = strof(options, "vaultkey");
+
+  plugin::V iterations = plugin::get(options, "iterations");
+  if (plugin::isnum(iterations)) spec.iterations = static_cast<int>(plugin::asnum(iterations));
+
+  plugin::V create = plugin::get(options, "create");
+  spec.create = plugin::isbool(create) && plugin::asbool(create);
 
   plugin::V kv = plugin::get(options, "kv");
   if (plugin::isnum(kv)) spec.kv = static_cast<int>(plugin::asnum(kv));

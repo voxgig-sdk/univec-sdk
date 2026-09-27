@@ -79,7 +79,7 @@ object PrepareQuery {
       val item = it.next()
       val key = item.get(0) match { case s: String => s; case _ => "" }
       val v = item.get(1)
-      if (v != null && !containsStr(params, key)) out.put(key, v)
+      if (v != null && "$action" != key && !containsStr(params, key)) out.put(key, v)
     }
     out
   }
@@ -108,43 +108,19 @@ object PrepareBody {
     if ("data" == ctx.op.input) ctx.utility.transformRequest(ctx) else null
 }
 
-object PrepareAuth {
-  val HEADER_AUTH = "authorization"
-  val OPTION_APIKEY = "apikey"
-  val NOT_FOUND = "__NOTFOUND__"
-
-  def prepareAuth(ctx: Context): Spec = {
-    val spec = ctx.spec
-    if (spec == null) throw ctx.makeError("auth_no_spec", "Expected context spec property to be defined.")
-
-    val headers = spec.headers
-    val options = ctx.client.optionsMap()
-
-    // Public APIs that need no auth omit the options.auth block entirely.
-    if (options.get("auth") == null) {
-      headers.remove(HEADER_AUTH)
-      return spec
-    }
-
-    val apikey = Struct.getprop(options, OPTION_APIKEY, NOT_FOUND)
-
-    var skip = false
-    if (apikey == null) skip = true
-    else apikey match {
-      case s: String if NOT_FOUND == s || "" == s => skip = true
-      case _ =>
-    }
-
-    if (skip) {
-      headers.remove(HEADER_AUTH)
-    } else {
-      var authPrefix = ""
-      Struct.getpath(options, java.util.List.of("auth", "prefix")) match { case s: String => authPrefix = s; case _ => }
-      val apikeyVal = apikey match { case s: String => s; case _ => "" }
-      if ("" == authPrefix) headers.put(HEADER_AUTH, apikeyVal)
-      else headers.put(HEADER_AUTH, authPrefix + " " + apikeyVal)
-    }
-
-    spec
-  }
-}
+// NO `object PrepareAuth` HERE, and its absence is the point.
+//
+// WHERE the credential goes is a fact about the API - header, query or
+// cookie, under the name the spec gives - and apidef resolves all of it
+// into main.kit.info.security. This file can hold only ONE answer, so the
+// object that used to sit here hardcoded `val HEADER_AUTH = "authorization"`
+// and an apiKey-in-query API (joplin's `?token=`) got a header it ignores.
+//
+// So prepareAuth is GENERATED, into utility/PrepareAuth.scala beside this
+// file, by src/cmp/scala/PrepareAuth_scala.ts - which emits the one branch
+// this API actually uses. It stays `object PrepareAuth` in this same
+// package, so utility/Register.scala's `u.prepareAuth = (ctx) =>
+// PrepareAuth.prepareAuth(ctx)` binds it with no change: scala resolves the
+// object by package, not by file name.
+//
+// The six objects above are placement-independent and stay templated.

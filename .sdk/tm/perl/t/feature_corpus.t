@@ -267,6 +267,15 @@ sub subset {
 }
 
 
+# Whether the SDK built the feature at all. The activity record is the
+# wrong probe: most features create theirs on first use, so an idle client
+# has none and every section but the eager ones read as inert.
+sub present {
+  my ($client, $name) = @_;
+  return scalar grep { ref $_ && ($_->{name} // '') eq $name }
+    @{ $client->{features} || [] };
+}
+
 sub record {
   my ($client, $name) = @_;
   return $client->{"_$name"};
@@ -295,7 +304,11 @@ for my $name (sort keys %{ $CORPUS->{feature} || {} }) {
   # Probed by ACTIVATING it: the feature defaults to inactive, so an idle
   # client never builds it and its absence says nothing.
   my $probe = build_client({ feature => [ { name => $name, active => 1 } ] });
-  next unless defined record($probe, $name);
+  unless (present($probe, $name)) {
+    # The one line every runner prints for an inert section.
+    diag("feature.$name: inert (this SDK does not generate the feature)");
+    next;
+  }
 
   my %by_key = map { $_->{key} => $_ } @ops;
 

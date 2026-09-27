@@ -425,21 +425,24 @@ class Config {
       'fields': <dynamic>[
         <String, dynamic>{
           'name': 'embeddings',
+          'title': 'Embeddings',
+          'type': '`\$ARRAY`',
           'req': true,
           'short': 'Translated vectors, in the target model\'s dimension.',
-          'type': '`\$ARRAY`',
         },
         <String, dynamic>{
           'name': 'source_model',
+          'title': 'Source Model',
+          'type': '`\$STRING`',
           'req': true,
           'short': 'Model space the supplied vectors are currently in.',
-          'type': '`\$STRING`',
         },
         <String, dynamic>{
           'name': 'target_model',
+          'title': 'Target Model',
+          'type': '`\$STRING`',
           'req': true,
           'short': 'Model space to translate into.',
-          'type': '`\$STRING`',
         },
       ],
       'name': 'convert',
@@ -449,8 +452,28 @@ class Config {
           'name': 'create',
           'points': <dynamic>[
             <String, dynamic>{
-              'args': <String, dynamic>{},
               'kind': 'http',
+              'method': 'POST',
+              'orig': '/v1/convert',
+              'segments': <dynamic>[
+                <String, dynamic>{
+                  'lit': 'v1',
+                },
+                <String, dynamic>{
+                  'lit': 'convert',
+                },
+              ],
+              'parts': <dynamic>[
+                'v1',
+                'convert',
+              ],
+              'rename': <String, dynamic>{},
+              'transform': <String, dynamic>{
+                'req': '`reqdata`',
+                'res': '`body.data`',
+              },
+              'args': <String, dynamic>{},
+              'select': <String, dynamic>{},
               'live': <String, dynamic>{
                 'assert': <String, dynamic>{
                   'equal': <String, dynamic>{
@@ -544,29 +567,32 @@ class Config {
                   },
                 },
               },
+            },
+            <String, dynamic>{
+              'kind': 'http',
               'method': 'POST',
-              'orig': '/v1/convert',
+              'orig': '/v1/embed-bridge',
               'segments': <dynamic>[
                 <String, dynamic>{
                   'lit': 'v1',
                 },
                 <String, dynamic>{
-                  'lit': 'convert',
+                  'lit': 'embed-bridge',
                 },
               ],
-              'select': <String, dynamic>{},
+              'parts': <dynamic>[
+                'v1',
+                'embed-bridge',
+              ],
+              'rename': <String, dynamic>{},
               'transform': <String, dynamic>{
                 'req': '`reqdata`',
                 'res': '`body.data`',
               },
-              'parts': <dynamic>[
-                'v1',
-                'convert',
-              ],
-            },
-            <String, dynamic>{
               'args': <String, dynamic>{},
-              'kind': 'http',
+              'select': <String, dynamic>{
+                '\$action': 'bridge',
+              },
               'live': <String, dynamic>{
                 'assert': <String, dynamic>{
                   'equal': <String, dynamic>{
@@ -659,31 +685,36 @@ class Config {
                   ],
                 },
               },
+            },
+            <String, dynamic>{
+              'kind': 'http',
               'method': 'POST',
-              'orig': '/v1/embed-bridge',
+              'orig': '/v1/ephemeral/convert',
               'segments': <dynamic>[
                 <String, dynamic>{
                   'lit': 'v1',
                 },
                 <String, dynamic>{
-                  'lit': 'embed-bridge',
+                  'lit': 'ephemeral',
+                },
+                <String, dynamic>{
+                  'lit': 'convert',
                 },
               ],
-              'select': <String, dynamic>{
-                '\$action': 'bridge',
-              },
+              'parts': <dynamic>[
+                'v1',
+                'ephemeral',
+                'convert',
+              ],
+              'rename': <String, dynamic>{},
               'transform': <String, dynamic>{
                 'req': '`reqdata`',
                 'res': '`body.data`',
               },
-              'parts': <dynamic>[
-                'v1',
-                'embed-bridge',
-              ],
-            },
-            <String, dynamic>{
               'args': <String, dynamic>{},
-              'kind': 'http',
+              'select': <String, dynamic>{
+                '\$action': 'ephemeral',
+              },
               'live': <String, dynamic>{
                 'assert': <String, dynamic>{
                   'equal': <String, dynamic>{
@@ -781,8 +812,11 @@ class Config {
                   },
                 },
               },
+            },
+            <String, dynamic>{
+              'kind': 'http',
               'method': 'POST',
-              'orig': '/v1/ephemeral/convert',
+              'orig': '/v1/ephemeral/embed-bridge',
               'segments': <dynamic>[
                 <String, dynamic>{
                   'lit': 'v1',
@@ -791,25 +825,23 @@ class Config {
                   'lit': 'ephemeral',
                 },
                 <String, dynamic>{
-                  'lit': 'convert',
+                  'lit': 'embed-bridge',
                 },
               ],
-              'select': <String, dynamic>{
-                '\$action': 'ephemeral',
-              },
+              'parts': <dynamic>[
+                'v1',
+                'ephemeral',
+                'embed-bridge',
+              ],
+              'rename': <String, dynamic>{},
               'transform': <String, dynamic>{
                 'req': '`reqdata`',
                 'res': '`body.data`',
               },
-              'parts': <dynamic>[
-                'v1',
-                'ephemeral',
-                'convert',
-              ],
-            },
-            <String, dynamic>{
               'args': <String, dynamic>{},
-              'kind': 'http',
+              'select': <String, dynamic>{
+                '\$action': 'ephemeral_bridge',
+              },
               'live': <String, dynamic>{
                 'assert': <String, dynamic>{
                   'equal': <String, dynamic>{
@@ -906,31 +938,6 @@ class Config {
                   ],
                 },
               },
-              'method': 'POST',
-              'orig': '/v1/ephemeral/embed-bridge',
-              'segments': <dynamic>[
-                <String, dynamic>{
-                  'lit': 'v1',
-                },
-                <String, dynamic>{
-                  'lit': 'ephemeral',
-                },
-                <String, dynamic>{
-                  'lit': 'embed-bridge',
-                },
-              ],
-              'select': <String, dynamic>{
-                '\$action': 'ephemeral_bridge',
-              },
-              'transform': <String, dynamic>{
-                'req': '`reqdata`',
-                'res': '`body.data`',
-              },
-              'parts': <dynamic>[
-                'v1',
-                'ephemeral',
-                'embed-bridge',
-              ],
             },
           ],
         },
@@ -943,21 +950,24 @@ class Config {
       'fields': <dynamic>[
         <String, dynamic>{
           'name': 'embeddings',
+          'title': 'Embeddings',
+          'type': '`\$ARRAY`',
           'req': true,
           'short': 'One vector per input text, in input order.',
-          'type': '`\$ARRAY`',
         },
         <String, dynamic>{
           'name': 'model',
+          'title': 'Model',
+          'type': '`\$STRING`',
           'req': true,
           'short': 'Model that produced the vectors.',
-          'type': '`\$STRING`',
         },
         <String, dynamic>{
           'name': 'texts',
+          'title': 'Texts',
+          'type': '`\$ARRAY`',
           'req': true,
           'short': 'Texts to embed.',
-          'type': '`\$ARRAY`',
         },
       ],
       'name': 'embed',
@@ -967,8 +977,28 @@ class Config {
           'name': 'create',
           'points': <dynamic>[
             <String, dynamic>{
-              'args': <String, dynamic>{},
               'kind': 'http',
+              'method': 'POST',
+              'orig': '/v1/embed',
+              'segments': <dynamic>[
+                <String, dynamic>{
+                  'lit': 'v1',
+                },
+                <String, dynamic>{
+                  'lit': 'embed',
+                },
+              ],
+              'parts': <dynamic>[
+                'v1',
+                'embed',
+              ],
+              'rename': <String, dynamic>{},
+              'transform': <String, dynamic>{
+                'req': '`reqdata`',
+                'res': '`body.data`',
+              },
+              'args': <String, dynamic>{},
+              'select': <String, dynamic>{},
               'live': <String, dynamic>{
                 'assert': <String, dynamic>{
                   'equal': <String, dynamic>{
@@ -1031,29 +1061,36 @@ class Config {
                   ],
                 },
               },
+            },
+            <String, dynamic>{
+              'kind': 'http',
               'method': 'POST',
-              'orig': '/v1/embed',
+              'orig': '/v1/ephemeral/embed',
               'segments': <dynamic>[
                 <String, dynamic>{
                   'lit': 'v1',
                 },
                 <String, dynamic>{
+                  'lit': 'ephemeral',
+                },
+                <String, dynamic>{
                   'lit': 'embed',
                 },
               ],
-              'select': <String, dynamic>{},
+              'parts': <dynamic>[
+                'v1',
+                'ephemeral',
+                'embed',
+              ],
+              'rename': <String, dynamic>{},
               'transform': <String, dynamic>{
                 'req': '`reqdata`',
                 'res': '`body.data`',
               },
-              'parts': <dynamic>[
-                'v1',
-                'embed',
-              ],
-            },
-            <String, dynamic>{
               'args': <String, dynamic>{},
-              'kind': 'http',
+              'select': <String, dynamic>{
+                '\$action': 'ephemeral',
+              },
               'live': <String, dynamic>{
                 'assert': <String, dynamic>{
                   'equal': <String, dynamic>{
@@ -1120,31 +1157,6 @@ class Config {
                   ],
                 },
               },
-              'method': 'POST',
-              'orig': '/v1/ephemeral/embed',
-              'segments': <dynamic>[
-                <String, dynamic>{
-                  'lit': 'v1',
-                },
-                <String, dynamic>{
-                  'lit': 'ephemeral',
-                },
-                <String, dynamic>{
-                  'lit': 'embed',
-                },
-              ],
-              'select': <String, dynamic>{
-                '\$action': 'ephemeral',
-              },
-              'transform': <String, dynamic>{
-                'req': '`reqdata`',
-                'res': '`body.data`',
-              },
-              'parts': <dynamic>[
-                'v1',
-                'ephemeral',
-                'embed',
-              ],
             },
           ],
         },
@@ -1157,28 +1169,32 @@ class Config {
       'fields': <dynamic>[
         <String, dynamic>{
           'name': 'dailyLimit',
+          'title': 'Daily Limit',
+          'type': '`\$INTEGER`',
           'req': true,
           'short': 'Calls permitted per day.',
-          'type': '`\$INTEGER`',
         },
         <String, dynamic>{
           'name': 'dailyUsed',
+          'title': 'Daily Used',
+          'type': '`\$INTEGER`',
           'req': true,
           'short': 'Calls already used today.',
-          'type': '`\$INTEGER`',
         },
         <String, dynamic>{
           'name': 'key',
+          'title': 'Key',
+          'type': '`\$STRING`',
           'req': true,
           'short': 'The ephemeral API key, prefixed `eph_`.',
-          'type': '`\$STRING`',
         },
         <String, dynamic>{
-          'format': 'date-time',
           'name': 'resetsAt',
+          'title': 'Resets At',
+          'type': '`\$STRING`',
           'req': true,
           'short': 'When the daily allowance resets.',
-          'type': '`\$STRING`',
+          'format': 'date-time',
         },
       ],
       'name': 'ephemeral_key',
@@ -1188,18 +1204,7 @@ class Config {
           'name': 'create',
           'points': <dynamic>[
             <String, dynamic>{
-              'args': <String, dynamic>{},
               'kind': 'http',
-              'live': <String, dynamic>{
-                'assert': <String, dynamic>{
-                  'nonempty': <dynamic>[
-                    'key',
-                  ],
-                },
-                'auth': 'public',
-                'id': 'key',
-                'retention': 'No deletion endpoint; issued key is subject to the service daily allowance',
-              },
               'method': 'POST',
               'orig': '/v1/ephemeral/key',
               'segments': <dynamic>[
@@ -1213,16 +1218,28 @@ class Config {
                   'lit': 'key',
                 },
               ],
-              'select': <String, dynamic>{},
-              'transform': <String, dynamic>{
-                'req': '`reqdata`',
-                'res': '`body.data`',
-              },
               'parts': <dynamic>[
                 'v1',
                 'ephemeral',
                 'key',
               ],
+              'rename': <String, dynamic>{},
+              'transform': <String, dynamic>{
+                'req': '`reqdata`',
+                'res': '`body.data`',
+              },
+              'args': <String, dynamic>{},
+              'select': <String, dynamic>{},
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'nonempty': <dynamic>[
+                    'key',
+                  ],
+                },
+                'auth': 'public',
+                'id': 'key',
+                'retention': 'No deletion endpoint; issued key is subject to the service daily allowance',
+              },
             },
           ],
         },
@@ -1235,57 +1252,67 @@ class Config {
       'fields': <dynamic>[
         <String, dynamic>{
           'name': 'eval',
-          'short': 'Retrieval-fidelity metrics for a convert model.',
+          'title': 'Eval',
           'type': '`\$OBJECT`',
+          'short': 'Retrieval-fidelity metrics for a convert model.',
         },
         <String, dynamic>{
           'name': 'executionProvider',
-          'short': 'Hardware backend, e.g.',
+          'title': 'Execution Provider',
           'type': '`\$STRING`',
+          'short': 'Hardware backend, e.g.',
         },
         <String, dynamic>{
           'name': 'modelCard',
-          'short': 'Convert models only: training provenance and architecture detail.',
+          'title': 'Model Card',
           'type': '`\$OBJECT`',
+          'short': 'Convert models only: training provenance and architecture detail.',
         },
         <String, dynamic>{
           'name': 'modelType',
+          'title': 'Model Type',
+          'type': '`\$STRING`',
           'req': true,
           'short': '`embed` for text-to-vector models, `convert` for space-translation models.',
-          'type': '`\$STRING`',
         },
         <String, dynamic>{
           'name': 'name',
+          'title': 'Name',
+          'type': '`\$STRING`',
           'req': true,
           'short': 'Model identifier used in requests.',
-          'type': '`\$STRING`',
         },
         <String, dynamic>{
           'name': 'sequenceLen',
-          'short': 'Embed models only: maximum input sequence length.',
+          'title': 'Sequence Len',
           'type': '`\$INTEGER`',
+          'short': 'Embed models only: maximum input sequence length.',
         },
         <String, dynamic>{
           'name': 'sourceDim',
-          'short': 'Convert models only: source vector dimension.',
+          'title': 'Source Dim',
           'type': '`\$INTEGER`',
+          'short': 'Convert models only: source vector dimension.',
         },
         <String, dynamic>{
           'name': 'sourceModel',
-          'short': 'Convert models only: the source model space.',
+          'title': 'Source Model',
           'type': '`\$STRING`',
+          'short': 'Convert models only: the source model space.',
         },
         <String, dynamic>{
           'name': 'targetDim',
+          'title': 'Target Dim',
+          'type': '`\$INTEGER`',
           'req': true,
           'short': 'Dimension of the produced vectors.',
-          'type': '`\$INTEGER`',
         },
         <String, dynamic>{
           'name': 'targetModel',
+          'title': 'Target Model',
+          'type': '`\$STRING`',
           'req': true,
           'short': 'The model space produced.',
-          'type': '`\$STRING`',
         },
       ],
       'name': 'model',
@@ -1295,17 +1322,7 @@ class Config {
           'name': 'list',
           'points': <dynamic>[
             <String, dynamic>{
-              'args': <String, dynamic>{},
               'kind': 'http',
-              'live': <String, dynamic>{
-                'assert': <String, dynamic>{
-                  'nonempty': <dynamic>[
-                    '',
-                  ],
-                },
-                'auth': 'public',
-                'id': 'models',
-              },
               'method': 'GET',
               'orig': '/v1/models',
               'segments': <dynamic>[
@@ -1316,15 +1333,26 @@ class Config {
                   'lit': 'models',
                 },
               ],
-              'select': <String, dynamic>{},
-              'transform': <String, dynamic>{
-                'req': '`reqdata`',
-                'res': '`body.data`',
-              },
               'parts': <dynamic>[
                 'v1',
                 'models',
               ],
+              'rename': <String, dynamic>{},
+              'transform': <String, dynamic>{
+                'req': '`reqdata`',
+                'res': '`body.data`',
+              },
+              'args': <String, dynamic>{},
+              'select': <String, dynamic>{},
+              'live': <String, dynamic>{
+                'assert': <String, dynamic>{
+                  'nonempty': <dynamic>[
+                    '',
+                  ],
+                },
+                'auth': 'public',
+                'id': 'models',
+              },
             },
           ],
         },

@@ -12,8 +12,8 @@ from projectname_sdk.feature.base_feature import UnivecBaseFeature
 # stamps page/limit (or a cursor) into the request query; on the way back
 # (PreResult) it reads the server's pagination signals — a `Link:
 # rel="next"` header, `X-Page`/`X-Next-Page`/`X-Total-Count` headers, or
-# `next`/`cursor`/`nextCursor`/`hasMore` fields in the body — and records
-# them on `ctx.result.paging`. A per-call cursor/page supplied via ctrl
+# `next`/`cursor`/`nextCursor`/`hasMore` fields in the body (snake_case forms
+# too) — and records them on `ctx.result.paging` and the caller's ctrl paging. A per-call cursor/page supplied via ctrl
 # paging takes priority (used by auto-iteration). Parameter names
 # (`pageParam`/`limitParam`/`cursorParam`), `startPage` and page size
 # (`limit`) are configurable.
@@ -66,7 +66,11 @@ class UnivecPagingFeature(UnivecBaseFeature):
         if paging.get("cursor") is not None:
             spec.query[cursor_param] = paging["cursor"]
         elif spec.query.get(page_param) is None:
-            page = paging.get("page")
+            # A record written back by PreResult holds the page just fetched
+            # as "page" and the one to fetch as "nextPage", so nextPage wins.
+            page = paging.get("nextPage")
+            if page is None:
+                page = paging.get("page")
             if page is None:
                 page = self.options.get("startPage") or 1
             spec.query[page_param] = page
@@ -166,14 +170,25 @@ class UnivecPagingFeature(UnivecBaseFeature):
                     paging["hasMore"] = more
                     explicit_more = True
 
-        # Body-level cursors.
+        # Body-level signals; snake_case forms are read first so camelCase wins.
         if isinstance(body, dict):
             if body.get("next") is not None:
                 paging["next"] = paging["next"] or body["next"]
+            if body.get("next_cursor") is not None:
+                paging["cursor"] = body["next_cursor"]
             if body.get("cursor") is not None:
                 paging["cursor"] = body["cursor"]
             if body.get("nextCursor") is not None:
                 paging["cursor"] = body["nextCursor"]
+            if paging["nextPage"] is None:
+                np = body.get("nextPage")
+                if np is None:
+                    np = body.get("next_page")
+                if isinstance(np, (int, float, str)) and not isinstance(np, bool):
+                    paging["nextPage"] = np
+            if isinstance(body.get("has_more"), bool):
+                paging["hasMore"] = body["has_more"]
+                explicit_more = True
             if isinstance(body.get("hasMore"), bool):
                 paging["hasMore"] = body["hasMore"]
                 explicit_more = True
@@ -190,6 +205,16 @@ class UnivecPagingFeature(UnivecBaseFeature):
                                  or paging["nextPage"] is not None)
 
         result.paging = paging
+
+        ctrl = ctx.ctrl
+        if ctrl is not None:
+            # The Context shares the caller's paging dict by reference, so
+            # refill it in place; a fresh dict on ctrl never reaches the caller.
+            if isinstance(getattr(ctrl, "paging", None), dict):
+                ctrl.paging.clear()
+                ctrl.paging.update(paging)
+            else:
+                ctrl.paging = paging
 
         self.client._paging = {"last": paging}
 

@@ -45,7 +45,7 @@ public class PrimaryUtilityTest {
   static final String TEST_JSON_FILE = "../.sdk/test/test.json";
 
   // PENDING sections are the ones deliberately left empty in the shared
-  // corpus (.sdk/test/primary/<name>.aon). Everything else MUST contribute
+  // corpus (.sdk/test/primary/<name>.aontu). Everything else MUST contribute
   // cases.
   static final Set<String> PENDING = Set.of(
       "fetcher", "makeFetchDef", "makeResult",
@@ -98,6 +98,44 @@ public class PrimaryUtilityTest {
           + "would run; add cases, or mark the fixture PENDING in .sdk/test/primary/");
     }
     run.runset(basic, subject);
+  }
+
+  // Rename the corpus's `headers` bag to the real container, and the
+  // `authorization` key inside it to the real credential name. Applied only
+  // to the prepareAuth section, so real header assertions elsewhere are
+  // untouched.
+  @SuppressWarnings("unchecked")
+  static Object retargetAuth(Object node, PipelineTest.AuthCred cred) {
+    if (node instanceof List) {
+      List<Object> out = new ArrayList<>();
+      for (Object child : (List<Object>) node) {
+        out.add(retargetAuth(child, cred));
+      }
+      return out;
+    }
+    if (!(node instanceof Map)) {
+      return node;
+    }
+
+    Map<String, Object> out = new LinkedHashMap<>();
+    for (Map.Entry<String, Object> entry : ((Map<String, Object>) node).entrySet()) {
+      if ("headers".equals(entry.getKey())) {
+        Map<String, Object> bag = new LinkedHashMap<>();
+        Map<String, Object> inner = Helpers.toMapAny(entry.getValue());
+        if (inner != null) {
+          for (Map.Entry<String, Object> bagentry : inner.entrySet()) {
+            String name = "authorization".equals(bagentry.getKey())
+                ? cred.name() : bagentry.getKey();
+            bag.put(name, retargetAuth(bagentry.getValue(), cred));
+          }
+        }
+        out.put(cred.where(), bag);
+      }
+      else {
+        out.put(entry.getKey(), retargetAuth(entry.getValue(), cred));
+      }
+    }
+    return out;
   }
 
   // Helper: create basic test context.
@@ -684,15 +722,38 @@ public class PrimaryUtilityTest {
     UnivecSDK authClient = UnivecSDK.testSDK(null, setupOpts);
     Utility authUtility = authClient.getUtility();
 
-    runsection("prepareAuth", (args) -> {
-      Context ctx = OmniResolver.omniCtx(args[0], authClient, authUtility);
+    // The corpus writes the credential as `headers.authorization`: a
+    // PLACEHOLDER each runner points at the container and name this API
+    // actually uses. PipelineTest.authCredential (same package) discovers
+    // both by running prepareAuth once.
+    PipelineTest.AuthCred cred = PipelineTest.authCredential();
+    assertNotNull(cred, "prepareAuth placed no credential in headers or query");
 
-      authUtility.prepareAuth.apply(ctx);
+    // An absent section is runsection's report to make.
+    Map<String, Object> section = Helpers.toMapAny(run().spec.get("prepareAuth"));
+    boolean swap = section != null
+        && (!"headers".equals(cred.where()) || !"authorization".equals(cred.name()));
+    Object original = swap ? section.get("basic") : null;
+    if (swap) {
+      section.put("basic", retargetAuth(original, cred));
+    }
 
-      OmniResolver.omniSyncCtx(args[0], ctx);
+    try {
+      runsection("prepareAuth", (args) -> {
+        Context ctx = OmniResolver.omniCtx(args[0], authClient, authUtility);
 
-      return null;
-    });
+        authUtility.prepareAuth.apply(ctx);
+
+        OmniResolver.omniSyncCtx(args[0], ctx);
+
+        return null;
+      });
+    }
+    finally {
+      if (swap) {
+        section.put("basic", original);
+      }
+    }
   }
 
   @Test
