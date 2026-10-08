@@ -19,10 +19,6 @@ class DebugFeature extends BaseFeature("debug", "0.0.1", true) {
 
   private val DEBUG_ENTRY_KEY = "debug_entry"
 
-  private val DEFAULT_REDACT: JList[String] = java.util.List.of(
-    "authorization", "cookie", "set-cookie", "api-key", "apikey",
-    "x-api-key", "idempotency-key")
-
   override def init(ctx: Context, options: JMap[String, Object]): Unit = {
     this.client = ctx.client
     this.options = options
@@ -51,7 +47,7 @@ class DebugFeature extends BaseFeature("debug", "0.0.1", true) {
       } else {
         entry.put("url", ctx.spec.path)
       }
-      entry.put("headers", redact(ctx.spec.headers))
+      entry.put("headers", redact(ctx, ctx.spec.headers))
     }
     ctx.out.put(DEBUG_ENTRY_KEY, entry)
   }
@@ -88,7 +84,7 @@ class DebugFeature extends BaseFeature("debug", "0.0.1", true) {
 
   private def finish(ctx: Context, ok: Boolean): Unit = {
     // Finish once per operation: the marker in ctx.out is consumed here.
-    val entry = Helpers.toMapAny(ctx.out.get(DEBUG_ENTRY_KEY))
+    var entry = Helpers.toMapAny(ctx.out.get(DEBUG_ENTRY_KEY))
     if (entry == null) {
       return
     }
@@ -105,6 +101,11 @@ class DebugFeature extends BaseFeature("debug", "0.0.1", true) {
       entry.put("status", java.lang.Integer.valueOf(ctx.result.status))
     }
 
+    // The whole entry leaves through the buffer and the callback: the url
+    // and the error message can carry a query credential the header mask
+    // above never saw.
+    entry = cleaned(ctx, entry)
+
     this.entries.add(entry)
     val max = FeatureOptions.foptInt(this.options, "max", 100)
     while (this.entries.size() > max) {
@@ -118,32 +119,34 @@ class DebugFeature extends BaseFeature("debug", "0.0.1", true) {
     }
   }
 
-  private def redact(headers: JMap[String, Object]): JMap[String, Object] = {
+  private def cleaned(ctx: Context, m: JMap[String, Object]): JMap[String, Object] = {
+    if (ctx.utility == null || ctx.utility.clean == null) return m
+    val out = Helpers.toMapAny(ctx.utility.clean(ctx, m))
+    if (out == null) m else out
+  }
+
+  // The core clean rules apply (clean.keys, every registered value); the
+  // feature's own `redact` list ADDS header names on top of them.
+  private def redact(ctx: Context, headers: JMap[String, Object]): JMap[String, Object] = {
     val out = new LinkedHashMap[String, Object]()
     if (headers == null) {
       return out
     }
-    var patterns = FeatureOptions.foptStrList(this.options, "redact")
-    if (patterns == null) {
-      patterns = DEFAULT_REDACT
+    val patterns = new ArrayList[String]()
+    val listed = FeatureOptions.foptStrList(this.options, "redact")
+    if (listed != null) {
+      val pit = listed.iterator()
+      while (pit.hasNext) patterns.add(pit.next().toLowerCase())
     }
     val it = headers.entrySet().iterator()
     while (it.hasNext) {
       val h = it.next()
-      var masked = false
-      val pit = patterns.iterator()
-      while (!masked && pit.hasNext) {
-        val p = pit.next()
-        if (h.getKey.toLowerCase().equals(p)) {
-          masked = true
-        }
-      }
-      if (masked) {
-        out.put(h.getKey, "<redacted>")
+      if (patterns.contains(h.getKey.toLowerCase())) {
+        out.put(h.getKey, "[redacted]")
       } else {
         out.put(h.getKey, h.getValue)
       }
     }
-    out
+    cleaned(ctx, out)
   }
 }

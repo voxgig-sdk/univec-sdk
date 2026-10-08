@@ -6,7 +6,7 @@ use std::rc::Rc;
 use crate::core::config::{make_feature, shared_config};
 use crate::core::context::{Context, CtxSpec};
 use crate::core::error::ProjectNameError;
-use crate::core::helpers::{call_json, get_bool, get_str, getp, getpath, jo, setp, to_int, to_map};
+use crate::core::helpers::{allowed, call_json, get_bool, get_str, getp, getpath, jo, setp, to_int, to_map};
 use crate::core::spec::Spec;
 use crate::core::types::FeatureRef;
 use crate::core::utility_type::Utility;
@@ -134,7 +134,23 @@ impl ProjectNameSDK {
         let path = get_str(&fetchargs, "path").unwrap_or_default();
         let method = get_str(&fetchargs, "method")
             .filter(|m| !m.is_empty())
-            .unwrap_or_else(|| "GET".to_string());
+            .unwrap_or_else(|| "GET".to_string())
+            .to_uppercase();
+
+        let allow_method = getpath(&["allow", "method"], &options);
+        if !allowed(&allow_method, &method) {
+            return Err(ctx.make_error(
+                "spec_method_allow",
+                &format!(
+                    "Method \"{}\" not allowed by SDK option allow.method value: \"{}\"",
+                    method,
+                    match &allow_method {
+                        Value::Str(s) => s.as_str(),
+                        _ => "",
+                    }
+                ),
+            ));
+        }
 
         let params = match to_map(&getp(&fetchargs, "params")) {
             Value::Map(m) => Value::Map(m),
@@ -188,10 +204,7 @@ impl ProjectNameSDK {
 
     // Is this raw-access op permitted by the SDK's allow.op option?
     fn op_allowed(&self, op: &str) -> bool {
-        match getpath(&["allow", "op"], &self.options_map()) {
-            Value::Str(s) => s.contains(op),
-            _ => false,
-        }
+        allowed(&getpath(&["allow", "op"], &self.options_map()), op)
     }
 
     fn op_denied(&self, op: &str) -> Value {
@@ -245,7 +258,7 @@ impl ProjectNameSDK {
             Err(err) => {
                 return Ok(jo(vec![
                     ("ok", Value::Bool(false)),
-                    ("err", Value::str(err.msg.clone())),
+                    ("err", Value::str(utility.clean_str(&ctx, &err.msg))),
                 ]));
             }
             Ok(f) => f,
@@ -282,12 +295,29 @@ impl ProjectNameSDK {
                 }
             };
 
-            return Ok(jo(vec![
-                ("ok", Value::Bool((200..300).contains(&status))),
+            let body_err = if !no_body && getp(&fetched, "unreadable") == Value::Bool(true) {
+                let failed = if (200..300).contains(&status) {
+                    None
+                } else {
+                    Some(ctx.make_error("request_status", &format!("request: {}: {}", status,
+                        get_str(&fetched, "statusText").unwrap_or_default())))
+                };
+                Some(crate::core::response::unreadable_body(&ctx, status, &headers,
+                    &getp(&fetched, "body"), &getp(&fetchdef, "headers"), failed))
+            } else {
+                None
+            };
+
+            let mut out = vec![
+                ("ok", Value::Bool(body_err.is_none() && (200..300).contains(&status))),
                 ("status", Value::Num(status as f64)),
                 ("headers", headers),
                 ("data", json_data),
-            ]));
+            ];
+            if let Some(err) = body_err {
+                out.push(("err", Value::str(utility.clean_str(&ctx, &err.msg))));
+            }
+            return Ok(jo(out));
         }
 
         Ok(jo(vec![
@@ -343,6 +373,22 @@ impl ProjectNameSDK {
     }
 
     // <[SLOT]>
+}
+
+// The client holds the credential in its options; its default print is the
+// name and the mode, never the options.
+impl std::fmt::Debug for ProjectNameSDK {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProjectNameSDK")
+            .field("mode", &*self.mode.borrow())
+            .finish()
+    }
+}
+
+impl std::fmt::Display for ProjectNameSDK {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProjectNameSDK({})", self.mode.borrow())
+    }
 }
 
 pub fn test_sdk(testopts: Value, sdkopts: Value) -> Rc<ProjectNameSDK> {

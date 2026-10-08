@@ -22,6 +22,8 @@ const Package = cmp(async function Package(props: any) {
 
   const name = zigModuleName(model)
 
+  // A fetched package keeps only `.paths`: the module source, the license
+  // and the docs the README links.
   File({ name: 'build.zig.zon' }, () => {
     Content(`.{
     .name = .${name},
@@ -29,10 +31,17 @@ const Package = cmp(async function Package(props: any) {
     .fingerprint = ${zigPackageFingerprint(name)},
     .dependencies = .{},
     .paths = .{
-        "src",
-        "test",
         "build.zig",
         "build.zig.zon",
+        "root.zig",
+        "core",
+        "entity",
+        "feature",
+        "utility",
+        "test",
+        "LICENSE",
+        "README.md",
+        "REFERENCE.md",
     },
 }
 `)

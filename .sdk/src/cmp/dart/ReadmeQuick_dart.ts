@@ -75,8 +75,8 @@ final client = ${ctor};
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`list()\` returns a \`List\` of entity instances and throws on error — iterate
-it and read each record's data via \`.data()\`.
+\`list()\` returns a \`List\` of entities, one per record, and throws on error —
+iterate it and read each record with \`.data()\`.
 
 \`\`\`dart
 try {
@@ -114,12 +114,12 @@ try {
       Content(`### 3. Load ${neArticle} ${neName.toLowerCase()}
 
 ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
-\`load()\` returns the ENTITY — call data() for the record — and throws on error.
+\`load()\` returns the entity and throws on error; \`.data()\` reads its record.
 
 \`\`\`dart
 try {
   final ${neVar} = await client.${neName}().load({${neMatch.join(', ')}});
-  print(${neVar});
+  print(${neVar}.data());
 } catch (err) {
   print('load failed: $err');
 }
@@ -141,12 +141,12 @@ try {
 
       Content(`### 3. Load ${article} ${eName.toLowerCase()}
 
-\`load()\` returns the ENTITY — call data() for the record — and throws on error.
+\`load()\` returns the entity and throws on error; \`.data()\` reads its record.
 
 \`\`\`dart
 try {
   final ${eVar} = await client.${eName}().load(${loadArg});
-  print(${eVar});
+  print(${eVar}.data());
 } catch (err) {
   print('load failed: $err');
 }
@@ -176,13 +176,14 @@ try {
       ? `created.data()['${dataIdF}']`
       : dartLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`dart
 `)
       if (opnames.includes('create')) {
-        Content(`// Create — returns the ENTITY (call data() for the record)
+        Content(`// Create — returns the created entity; data() reads its record
 final created = await client.${eName}().create({${examplePairs('create').join(', ')}});
 
 `)
@@ -190,8 +191,15 @@ final created = await client.${eName}().create({${examplePairs('create').join(',
       if (opnames.includes('update')) {
         const updatePairs = (idF ? [`'${idF}': ${idValueFor('update')}`] : []).concat(examplePairs('update'))
         const fromCreated = null != dataIdF && opnames.includes('create')
-        Content(`// Update${fromCreated ? " — the created record's id is a plain map key" : ''}
+        Content(`// Update${fromCreated ? " — the id comes off the created entity's data()" : ''}
 await client.${eName}().update({${updatePairs.join(', ')}});
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`'${idF}': ${idValueFor('patch')}`] : []).concat(examplePairs('patch'))
+        Content(`// Patch — sends only the fields given
+await client.${eName}().patch({${patchPairs.join(', ')}});
 
 `)
       }
@@ -203,7 +211,7 @@ await client.${eName}().update({${updatePairs.join(', ')}});
           .map((it: any) => it.name === idF
             ? `'${it.name}': ${idValueFor('remove')}`
             : `'${it.name}': ${dartLit(it.type, 'example_' + it.name)}`)
-        Content(`// Remove
+        Content(`// Remove — returns the entity, marked as deleted
 await client.${eName}().remove(${removePairs.length ? `{${removePairs.join(', ')}}` : ''});
 `)
       }

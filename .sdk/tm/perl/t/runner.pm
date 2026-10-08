@@ -167,4 +167,90 @@ sub live_delay_ms {
   return 500;
 }
 
+# A live check that did not pass, as main.kit.test.live.strict decides:
+# strict fails the test, lenient skips it with the same reason. The caller
+# leaves its block after either.
+sub live_miss {
+  my ($strict, $name, $reason) = @_;
+  if ($strict) {
+    Test::More::fail("$name: $reason");
+  }
+  else {
+    Test::More->builder->skip("$name: $reason");
+  }
+  return;
+}
+
+# An account holding no record for the test to read skips either way.
+sub live_empty {
+  my ($name, $reason) = @_;
+  Test::More->builder->skip("$name: $reason");
+  return;
+}
+
+# A live list response's records: the body, or the first list an envelope
+# holds.
+sub live_list {
+  my ($data) = @_;
+  return $data if ref $data eq 'ARRAY';
+  if (ref $data eq 'HASH') {
+    for my $k (sort keys %$data) {
+      return $data->{$k} if ref $data->{$k} eq 'ARRAY';
+    }
+  }
+  return undef;
+}
+
+# A live response for a message: the SDK's error, or else its status and
+# content type, never its body.
+sub live_describe {
+  my ($result) = @_;
+  return 'no response' unless ref $result eq 'HASH';
+  return '' . $result->{err} if defined $result->{err};
+  my $ctype;
+  for my $k (keys %{ $result->{headers} || {} }) {
+    $ctype = $result->{headers}{$k} if lc($k) eq 'content-type';
+  }
+  my $out = 'HTTP ' . ($result->{status} // 'none');
+  if (defined $ctype) {
+    my ($media) = split /;/, $ctype;
+    $media =~ s/^\s+|\s+$//g;
+    $out .= " $media";
+  }
+  return $out;
+}
+
+# The record a create-less flow reads live: the first its list returns, put
+# where the flow reads the fixture's existing records. False once the test
+# is settled and its block ends.
+sub live_existing {
+  my ($setup, $strict, $label, $name, $list) = @_;
+  my $found = eval { $list->() };
+  if (my $err = $@) {
+    live_miss($strict, $label, "Live list discovery failed: $err");
+    return 0;
+  }
+  if (ref $found ne 'ARRAY') {
+    live_miss($strict, $label, 'Live list discovery returned no list');
+    return 0;
+  }
+  if (!@$found) {
+    live_empty($label, "The account has no $name record to load");
+    return 0;
+  }
+  my $first = $found->[0];
+  my $record = (Scalar::Util::blessed($first) && $first->can('data_get'))
+    ? $first->data_get : $first;
+  $setup->{data}{existing}{$name} = { 'live01' => $record };
+  return 1;
+}
+
+# In a lenient live run a step that dies skips, observing the live API.
+sub live_observe {
+  my ($err, $setup, $strict, $label) = @_;
+  die $err if $strict || !$setup->{live};
+  Test::More->builder->skip("$label: live run, main.kit.test.live.strict is false: $err");
+  return;
+}
+
 1;

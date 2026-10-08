@@ -716,6 +716,7 @@ object SecretsTestMain {
     "Gcpsecrets" -> List("gcpsecrets"),
     "Hashicorp" -> List("hashicorp"),
     "Infisical" -> List("infisical"),
+    "Minivault" -> List("minivault"),
     "Onepassword" -> List("onepassword"),
     "Secretspec" -> List("secretspec"),
   )

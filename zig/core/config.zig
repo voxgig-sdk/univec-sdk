@@ -316,6 +316,7 @@ pub fn make_config() Value {
                 }) },
                 .{ "optspec", h.jo(&.{
                     .{ "clearTimer", h.vstr("`$FUNCTION`") },
+                    .{ "now", h.vstr("`$FUNCTION`") },
                     .{ "setTimer", h.vstr("`$FUNCTION`") },
                 }) },
                 .{ "strict", h.vbool(false) },
@@ -484,6 +485,10 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                                .{ "response", h.jo(&.{
+                                    .{ "kind", h.vstr("json") },
+                                    .{ "media", h.vstr("application/json") },
+                                }) },
                             }),
                             h.jo(&.{
                                 .{ "kind", h.vstr("http") },
@@ -601,6 +606,10 @@ pub fn make_config() Value {
                                             h.vstr("SDK live coverage test."),
                                         }) },
                                     }) },
+                                }) },
+                                .{ "response", h.jo(&.{
+                                    .{ "kind", h.vstr("json") },
+                                    .{ "media", h.vstr("application/json") },
                                 }) },
                             }),
                             h.jo(&.{
@@ -729,6 +738,10 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                                .{ "response", h.jo(&.{
+                                    .{ "kind", h.vstr("json") },
+                                    .{ "media", h.vstr("application/json") },
+                                }) },
                             }),
                             h.jo(&.{
                                 .{ "kind", h.vstr("http") },
@@ -855,6 +868,10 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                                .{ "response", h.jo(&.{
+                                    .{ "kind", h.vstr("json") },
+                                    .{ "media", h.vstr("application/json") },
+                                }) },
                             }),
                         }) },
                     }) },
@@ -978,6 +995,10 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                                .{ "response", h.jo(&.{
+                                    .{ "kind", h.vstr("json") },
+                                    .{ "media", h.vstr("application/json") },
+                                }) },
                             }),
                             h.jo(&.{
                                 .{ "kind", h.vstr("http") },
@@ -1074,6 +1095,10 @@ pub fn make_config() Value {
                                         }) },
                                     }) },
                                 }) },
+                                .{ "response", h.jo(&.{
+                                    .{ "kind", h.vstr("json") },
+                                    .{ "media", h.vstr("application/json") },
+                                }) },
                             }),
                         }) },
                     }) },
@@ -1156,6 +1181,10 @@ pub fn make_config() Value {
                                     .{ "auth", h.vstr("public") },
                                     .{ "id", h.vstr("key") },
                                     .{ "retention", h.vstr("No deletion endpoint; issued key is subject to the service daily allowance") },
+                                }) },
+                                .{ "response", h.jo(&.{
+                                    .{ "kind", h.vstr("json") },
+                                    .{ "media", h.vstr("application/json") },
                                 }) },
                             }),
                         }) },
@@ -1269,6 +1298,10 @@ pub fn make_config() Value {
                                     }) },
                                     .{ "auth", h.vstr("public") },
                                     .{ "id", h.vstr("models") },
+                                }) },
+                                .{ "response", h.jo(&.{
+                                    .{ "kind", h.vstr("json") },
+                                    .{ "media", h.vstr("application/json") },
                                 }) },
                             }),
                         }) },

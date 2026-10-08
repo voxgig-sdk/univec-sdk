@@ -3106,8 +3106,9 @@ namespace Voxgig.Struct
 
             bool cKeyExists = TryGetDataValue(inj.DParent, key, out object? cval);
 
-            // TS: if (!exact && NONE === cval) return — only skip when key is absent, not when value is JSON null.
-            if (!exact && !cKeyExists)
+            // PATCH (scalar defaults, pending upstream fix): null scalar values
+            // keep the default, matching GetProp in the reference validator.
+            if (!exact && (!cKeyExists || (cval == null && !IsNode(pval))))
             {
                 return null;
             }

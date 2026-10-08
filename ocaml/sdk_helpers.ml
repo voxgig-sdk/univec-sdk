@@ -60,6 +60,33 @@ let json_thunk (data : value) : value = Func (fun _ _ _ _ -> data)
 let call_json (j : value) : value = call_vfn j Noval
 let is_callable (v : value) : bool = match v with Func _ -> true | _ -> false
 
+(* ----- base64 (no opam dependency) -----
+ * Shared by the generated prepare_auth (the Basic wire form) and the clean
+ * registry (the encoded forms a registered value travels in). *)
+
+let b64_alphabet =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+let base64_encode (text : string) : string =
+  let n = String.length text in
+  let buf = Buffer.create (((n + 2) / 3) * 4) in
+  let i = ref 0 in
+  while !i < n do
+    let rest = n - !i in
+    let a = Char.code text.[!i] in
+    let b = if 1 < rest then Char.code text.[!i + 1] else 0 in
+    let c = if 2 < rest then Char.code text.[!i + 2] else 0 in
+    let word = (a lsl 16) lor (b lsl 8) lor c in
+    Buffer.add_char buf b64_alphabet.[(word lsr 18) land 0x3f];
+    Buffer.add_char buf b64_alphabet.[(word lsr 12) land 0x3f];
+    (* One trailing source byte yields two characters and "==", two yield
+     * three and "=". *)
+    Buffer.add_char buf (if 1 < rest then b64_alphabet.[(word lsr 6) land 0x3f] else '=');
+    Buffer.add_char buf (if 2 < rest then b64_alphabet.[word land 0x3f] else '=');
+    i := !i + 3
+  done;
+  Buffer.contents buf
+
 (* ----- errors ----- *)
 
 let mk_error (code : string) (msg : string) : sdk_error =
@@ -123,3 +150,12 @@ let num_opt (v : value) : float option =
 
 let int_opt (v : value) : int option =
   match v with Num n -> Some (int_of_float n) | _ -> None
+
+(* The caller's cookie pieces with the named cookies removed: a cookie is one
+ * ;-delimited piece, whatever its value holds. *)
+let cookie_keep (header : string) (names : string list) : string list =
+  List.filter_map (fun piece ->
+      let cookie = String.trim piece in
+      let name = String.trim (List.hd (String.split_on_char '=' cookie)) in
+      if cookie = "" || List.mem name names then None else Some cookie)
+    (String.split_on_char ';' header)

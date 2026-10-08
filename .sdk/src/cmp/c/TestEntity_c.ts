@@ -8,6 +8,8 @@ import {
   Content,
   File,
   cmp,
+  opReachable,
+  invalidRequest,
 } from '@voxgig/sdkgen'
 
 
@@ -41,10 +43,9 @@ int main(void) {
   CHECK_STR_EQ(e->vt->get_name(e), "${entity.name}", "entity get_name");
 `)
 
-    // The stream test drives the list op; only emit it when the entity has a
-    // list op — a create/load-only entity has no list endpoint, so
-    // stream("list") would error.
-    const hasList = null != (entity.op && (entity.op as any)?.list)
+    // The stream test drives the list op with no match; only emit it when a
+    // bare call can reach a list route (see helpers/opShape opReachable).
+    const hasList = opReachable((entity.op as any)?.list, [])
     if (hasList) {
       Content(`
   // stream(): runs the list op through the full pipeline and returns a List
@@ -79,12 +80,84 @@ int main(void) {
 `)
     }
 
+    Content(failureTests(ident, evar, entity, hasList))
+
     Content(`
   TEST_SUMMARY("${evar}_entity");
 }
 `)
   })
 })
+
+
+// A failed operation fails a stream as it fails the operation: a transport
+// failure, and a hook that rejects the call. The caller's ctrl stays its own,
+// and an invalid request fails with validate's own error. A C hook cannot throw.
+function failureTests(ident: string, evar: string, entity: ModelEntity, hasList: boolean): string {
+  const feature = (name: string) =>
+    `!v_is_noval(getp(getp(shared_config(), "feature"), "${name}"))`
+  let out = ''
+
+  if (hasList) {
+    out += `
+  {
+    voxgig_value* offline = cmap(1, "net", cmap(1, "offline", v_bool(true)));
+    PNError* ferr = NULL;
+    Entity* fe = ${ident}_${evar}(test_sdk(offline, NULL), NULL);
+    voxgig_value* fitems = ${evar}_stream(fe, "list", NULL, NULL, &ferr);
+    CHECK(NULL == fitems && NULL != ferr && NULL != strstr(ferr->msg, "offline"),
+      "stream: a failed operation fails the stream");
+
+    PNError* qerr = NULL;
+    Entity* qe = ${ident}_${evar}(test_sdk(offline, NULL), NULL);
+    ${evar}_stream(qe, "list", NULL, cmap(1, "ctrl", cmap(1, "throw", v_bool(false))), &qerr);
+    CHECK(NULL == qerr, "stream: under throw false a failed stream ends");
+
+    if (${feature('rbac')}) {
+      PNError* derr = NULL;
+      Entity* de = ${ident}_${evar}(test_sdk(NULL, cmap(1, "feature",
+        cmap(1, "rbac", cmap(2, "active", v_bool(true), "deny", v_bool(true))))), NULL);
+      ${evar}_stream(de, "list", NULL, NULL, &derr);
+      CHECK(NULL != derr && 0 == strcmp(derr->code, "rbac_denied"),
+        "stream: a denied operation fails the stream");
+    }
+  }
+
+  {
+    voxgig_value* explain = voxgig_new_map();
+    voxgig_value* ctrl = cmap(1, "explain", v_share(explain));
+    PNError* cerr = NULL;
+    Entity* ce = ${ident}_${evar}(test_sdk(NULL, NULL), NULL);
+    ${evar}_stream(ce, "list", NULL, cmap(1, "ctrl", v_share(ctrl)), &cerr);
+    CHECK(NULL == cerr && v_is_noval(getp(ctrl, "stream")),
+      "stream: the caller's ctrl gains no key");
+    CHECK(0 < voxgig_as_map(explain)->len, "stream: the caller's explain record is filled");
+  }
+`
+  }
+
+  const bad = invalidRequest(entity)
+  if (null != bad) {
+    const pairs = Object.entries(bad.args)
+    const args = pairs
+      .map(([k, v]) => JSON.stringify(k) + ', ' +
+        ('number' === typeof v ? 'v_num(' + v + ')' :
+          'boolean' === typeof v ? 'v_bool(' + v + ')' : 'v_str(' + JSON.stringify(v) + ')'))
+      .join(', ')
+    out += `
+  if (${feature('validate')}) {
+    PNError* verr = NULL;
+    Entity* ve = ${ident}_${evar}(test_sdk(NULL, cmap(1, "feature",
+      cmap(1, "validate", cmap(1, "active", v_bool(true))))), NULL);
+    ve->vt->${bad.op}(ve, cmap(${pairs.length}, ${args}), NULL, &verr);
+    CHECK(NULL != verr && 0 == strcmp(verr->code, "validate_failed"),
+      "an invalid request fails with validate_failed");
+  }
+`
+  }
+
+  return out
+}
 
 
 export {

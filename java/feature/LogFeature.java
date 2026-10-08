@@ -125,18 +125,25 @@ public class LogFeature extends BaseFeature {
       msg.append(" spec=").append(ctx.spec.method).append(" ").append(ctx.spec.path);
     }
 
+    // A log line leaves the pipeline, so it is cleaned like every other
+    // emission, even though it carries no header or url today.
+    String line = msg.toString();
+    if (ctx.utility != null && ctx.utility.clean != null) {
+      line = String.valueOf(ctx.utility.clean.apply(ctx, line));
+    }
+
     switch (level) {
       case "debug":
-        this.logger.fine(msg.toString());
+        this.logger.fine(line);
         break;
       case "warn":
-        this.logger.warning(msg.toString());
+        this.logger.warning(line);
         break;
       case "error":
-        this.logger.severe(msg.toString());
+        this.logger.severe(line);
         break;
       default:
-        this.logger.info(msg.toString());
+        this.logger.info(line);
         break;
     }
   }

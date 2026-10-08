@@ -25,9 +25,9 @@ cd ${target.name} && make build
   // Publish pending: not yet on the opam registry. Build from the git release
   // tag or from a local source checkout. The generated library is
   // dependency-free — a plain `make build` (stock `ocamlc`) is all it needs.
-  const { releasesUrl } = repoInfo(model)
+  const { hostName, tagsUrl } = repoInfo(model)
   Content(`This package is not yet published to the opam registry. Install it from the
-GitHub release tag (\`${target.name}/vX.Y.Z\`, see [Releases](${releasesUrl}))
+${hostName} release tag (\`${target.name}/vX.Y.Z\`, see [Tags](${tagsUrl}))
 or from a source checkout. The SDK is dependency-free and compiles with the
 stock \`ocamlc\` — no opam packages, no dune:
 

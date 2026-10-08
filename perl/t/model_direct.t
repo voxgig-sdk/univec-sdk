@@ -11,6 +11,18 @@ use Cwd ();
 use UnivecSDK;
 require(Cwd::abs_path("$FindBin::Bin/runner.pm"));
 
+# main.kit.test.live.strict is true (the default is true): a live
+# request that fails, or a live test missing an input it needs,
+# fails the test.
+# An account with no record for a test to read skips it either way.
+use constant LIVE_STRICT => 1;
+
+sub live_ok {
+  my ($result) = @_;
+  my $status = UnivecHelpers::to_int($result->{status});
+  return !defined $result->{err} && $result->{ok} && $status >= 200 && $status < 300;
+}
+
 DIRECT_LIST: {
   my $setup = model_direct_setup([
     { 'id' => 'direct01' },
@@ -25,29 +37,20 @@ DIRECT_LIST: {
   }
   my $client = $setup->{client};
 
+  my $params = {};
+
   my $result = $client->direct({
     'path' => 'v1/models',
     'method' => 'GET',
-    'params' => {},
+    'params' => $params,
   });
   if ($setup->{live}) {
-    # Live mode is lenient: synthetic IDs frequently 4xx and the list-
-    # response shape varies wildly across public APIs. Skip rather than
-    # fail when the call doesn't return a usable list.
-    if (defined $result->{err}) {
-      note("list call failed (likely synthetic IDs against live API): $result->{err}");
-      pass('direct-list-model: skipped (live)');
+    if (!live_ok($result)) {
+      UnivecTestRunner::live_miss(LIVE_STRICT, 'direct-list-model', 'Live list failed: ' . UnivecTestRunner::live_describe($result));
       last DIRECT_LIST;
     }
-    unless ($result->{ok}) {
-      note('list call not ok (likely synthetic IDs against live API)');
-      pass('direct-list-model: skipped (live)');
-      last DIRECT_LIST;
-    }
-    my $status = UnivecHelpers::to_int($result->{status});
-    if ($status < 200 || $status >= 300) {
-      note("expected 2xx status, got $status");
-      pass('direct-list-model: skipped (live)');
+    if (!defined UnivecTestRunner::live_list($result->{data})) {
+      UnivecTestRunner::live_miss(LIVE_STRICT, 'direct-list-model', 'Live list returned no list: ' . UnivecTestRunner::live_describe($result));
       last DIRECT_LIST;
     }
     pass('direct-list-model: live ok');
@@ -85,11 +88,12 @@ sub model_direct_setup {
       %{ UnivecTestRunner::live_client_options() },
       'apikey' => $env->{'UNIVEC_APIKEY'},
     });
+    my $idmap = $env->{'UNIVEC_TEST_MODEL_ENTID'};
     return {
       'client' => $client,
       'calls' => $calls,
       'live' => 1,
-      'idmap' => {},
+      'idmap' => ref $idmap eq 'HASH' ? $idmap : {},
     };
   }
 

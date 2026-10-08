@@ -1,9 +1,10 @@
 // Request/response capture for debugging (mirrors go feature/debug_feature.go
 // / rust feature/debug.rs). Records a bounded ring buffer of per-operation
 // traces — method, URL, redacted headers, response status and timing — on the
-// feature's entries. Sensitive header values (matching `redact`, default
-// authorization/cookie/api-key style names) are masked. An optional `onEntry`
-// callback receives each finished entry. `max` caps the buffer (default 100).
+// feature's entries. Every entry passes through the SDK's clean rules
+// (clean.keys and every registered secret); the `redact` option ADDS header
+// names on top of them. An optional `onEntry` callback receives each finished
+// entry. `max` caps the buffer (default 100).
 
 const std = @import("std");
 const h = @import("../core/helpers.zig");
@@ -16,16 +17,6 @@ const Feature = types.Feature;
 const OutVal = types.OutVal;
 
 const DEBUG_ENTRY_KEY: []const u8 = "debug_entry";
-
-const DEBUG_DEFAULT_REDACT = [_][]const u8{
-    "authorization",
-    "cookie",
-    "set-cookie",
-    "api-key",
-    "apikey",
-    "x-api-key",
-    "idempotency-key",
-};
 
 pub const DebugFeature = struct {
     name: []const u8 = "debug",
@@ -46,13 +37,11 @@ pub const DebugFeature = struct {
         return @ptrCast(@alignCast(p));
     }
 
-    fn redact(self: *DebugFeature, headers: Value) Value {
+    // The core clean rules apply (clean.keys, every registered value); the
+    // feature's own `redact` list ADDS header names on top of them.
+    fn redact(self: *DebugFeature, ctx: *Context, headers: Value) Value {
         const out = h.omap();
-        const patterns: [][]const u8 = sup.fopt_str_list(self.options, "redact") orelse blk: {
-            var l: std.ArrayList([]const u8) = .empty;
-            for (DEBUG_DEFAULT_REDACT) |p| l.append(h.A(), p) catch {};
-            break :blk l.toOwnedSlice(h.A()) catch &.{};
-        };
+        const patterns: [][]const u8 = sup.fopt_str_list(self.options, "redact") orelse &.{};
         if (headers == .object) {
             var it = headers.object.iterator();
             while (it.next()) |kv| {
@@ -60,19 +49,20 @@ pub const DebugFeature = struct {
                 const lower = std.ascii.allocLowerString(h.A(), key) catch key;
                 var masked = false;
                 for (patterns) |p| {
-                    if (std.mem.eql(u8, lower, p)) {
+                    const plower = std.ascii.allocLowerString(h.A(), p) catch p;
+                    if (std.mem.eql(u8, lower, plower)) {
                         masked = true;
                         break;
                     }
                 }
                 if (masked) {
-                    h.setp(out, key, h.vstr("<redacted>"));
+                    h.setp(out, key, h.vstr("[redacted]"));
                 } else {
                     h.setp(out, key, kv.value_ptr.*);
                 }
             }
         }
-        return out;
+        return ctx.util().clean(ctx, out);
     }
 
     fn finish(self: *DebugFeature, ctx: *Context, ok: bool) void {
@@ -92,7 +82,12 @@ pub const DebugFeature = struct {
             if (ctx.result) |r| h.setp(entry, "status", h.vnum(r.status));
         }
 
-        self.entries.append(h.A(), entry) catch {};
+        // The whole entry leaves through the buffer and the callback: the url
+        // and the error message can carry a query credential the header mask
+        // above never saw.
+        const out = ctx.util().clean(ctx, entry);
+
+        self.entries.append(h.A(), out) catch {};
         const max: usize = @intCast(@max(sup.fopt_int(self.options, "max", 100), 0));
         while (self.entries.items.len > max) {
             _ = self.entries.orderedRemove(0);
@@ -100,7 +95,7 @@ pub const DebugFeature = struct {
 
         const on_entry = h.getp(self.options, "onEntry");
         if (on_entry == .function) {
-            _ = h.call_vfn(on_entry, entry);
+            _ = h.call_vfn(on_entry, out);
         }
     }
 
@@ -120,7 +115,7 @@ pub const DebugFeature = struct {
             } else {
                 h.setp(entry, "url", h.vstr(sp.path));
             }
-            h.setp(entry, "headers", self.redact(sp.headers));
+            h.setp(entry, "headers", self.redact(ctx, sp.headers));
         }
         ctx.out_set(DEBUG_ENTRY_KEY, OutVal{ .val = entry });
     }

@@ -5,16 +5,36 @@
 
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
 
-import voxgig.univecsdk.core.{Helpers, SdkEntity, UnivecSDK}
+import voxgig.univecsdk.core.{Config, Context, Helpers, SdkEntity, SdkError, UnivecSDK}
+import voxgig.univecsdk.feature.BaseFeature
 import voxgig.univecsdk.utility.struct.Struct
 
 object EphemeralKeyEntityTest {
+
+  import SdkTestSupport.{B, I, jl, om}
+
+  private def hasFeature(name: String): Boolean = {
+    val fm = Helpers.toMapAny(Config.sharedConfig().get("feature"))
+    fm != null && fm.get(name) != null
+  }
 
   def run(rep: SdkTestReport): Unit = {
     rep.scope("ephemeral_key.instance") {
       val testsdk = UnivecSDK.testSDK()
       val ent = testsdk.ephemeralKey(null)
       rep.check("ephemeral_key.instance", ent != null, "expected non-null ephemeral_key entity")
+    }
+
+    rep.scope("ephemeral_key.validate") {
+      if (hasFeature("validate")) {
+        val client = UnivecSDK.testSDK(null, om("feature" -> om("validate" -> om("active" -> B(true)))))
+        val err = try {
+          client.ephemeralKey(null).create(om("dailyLimit" -> "x", "dailyUsed" -> I(1), "key" -> "x", "resetsAt" -> "x"), null)
+          null
+        } catch { case e: SdkError => e }
+        rep.check("ephemeral_key.validate", err != null && "validate_failed" == err.code,
+          "expected validate_failed, got " + err)
+      }
     }
 
     rep.scope("ephemeral_key.basic") {

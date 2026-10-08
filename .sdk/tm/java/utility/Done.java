@@ -12,7 +12,7 @@ final class Done {
 
   static Object done(Context ctx) {
     if (ctx.ctrl.explain != null) {
-      ctx.ctrl.explain = (Map<String, Object>) Clean.clean(ctx, ctx.ctrl.explain);
+      Clean.cleanExplain(ctx);
       Object explainResult = ctx.ctrl.explain.get("result");
       Map<String, Object> rm = Helpers.toMapAny(explainResult);
       if (rm != null) {

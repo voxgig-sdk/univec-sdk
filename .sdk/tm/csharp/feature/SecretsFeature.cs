@@ -194,6 +194,8 @@ public class SecretsFeature : BaseFeature
 
         if ("" != seat)
         {
+            Register(seat);
+
             string key;
             try
             {
@@ -288,6 +290,17 @@ public class SecretsFeature : BaseFeature
     public Sekreto? GetSekreto()
     {
         return _sek;
+    }
+
+    // Every value this feature resolves or buys is a secret the SDK handles,
+    // and none arrives under an option key the intake registration saw.
+    private void Register(string? value)
+    {
+        var ctx = _client?.GetRootCtx();
+        if (null != value && null != ctx && null != ctx.Utility?.CleanAdd)
+        {
+            ctx.Utility.CleanAdd(ctx, value);
+        }
     }
 
     // Credential exposes the resolved credential (empty when none) - the
@@ -409,6 +422,7 @@ public class SecretsFeature : BaseFeature
         // sekreto's invariant, and the whole of this feature's fail-closed
         // behaviour rides on the difference.
         var found = _sek.TryGet(_secretname);
+        Register(found);
 
         if (null == _exchange)
         {
@@ -835,6 +849,8 @@ public class SecretsFeature : BaseFeature
                 "secrets: token exchange returned no '" + x.Response +
                 "' field from " + url);
         }
+
+        Register(token);
 
         return token;
     }

@@ -88,12 +88,14 @@ class TelemetryFeature : BaseFeature("telemetry", "0.0.1", true) {
     span["durationMs"] = dur
     span["ok"] = ok
 
+    val out = Helpers.toMapAny(ctx.utility?.clean?.invoke(ctx, span)) ?: span
+
     this.activeSpans--
-    this.spans.add(span)
+    this.spans.add(out)
 
     val exporter = this.options?.get("exporter")
     if (exporter is Consumer<*>) {
-      (exporter as Consumer<MutableMap<String, Any?>>).accept(span)
+      (exporter as Consumer<MutableMap<String, Any?>>).accept(out)
     }
   }
 

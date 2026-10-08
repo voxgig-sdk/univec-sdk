@@ -94,7 +94,7 @@ function AuditFeature:_emit(ctx, outcome)
     actor = "anonymous"
   end
 
-  local record = {
+  local record = ctx.utility.clean(ctx, {
     seq = self.seq,
     ts = self:_now(),
     actor = actor,
@@ -103,7 +103,7 @@ function AuditFeature:_emit(ctx, outcome)
     outcome = outcome,
     status = ctx.result ~= nil and ctx.result.status or nil,
     correlationId = ctx.id,
-  }
+  })
 
   local client = self.client
   local recs = client._audit.records

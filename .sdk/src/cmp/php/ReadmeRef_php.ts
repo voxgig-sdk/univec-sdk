@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape, phpEntityAccessor , targetFeatures } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape, phpEntityAccessor, targetFeatures, opNeedsAction, bodyNote, listMatchArg } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -14,6 +14,7 @@ import {
 // parse).
 function phpLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'null'
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return 'true'
   if ('ARRAY' === k || 'OBJECT' === k) return '[]'
@@ -24,28 +25,33 @@ function phpLit(type: any, placeholder: string = 'example'): string {
 const OP_SIGNATURES: Record<string, { sig: string, returns: string, desc: string }> = {
   load: {
     sig: 'load(array $reqmatch, ?array $ctrl = null): mixed',
-    returns: 'mixed — the result data; throws on error',
-    desc: 'Load a single entity matching the given criteria. Throws on error.',
+    returns: 'mixed — the entity; throws on error',
+    desc: 'Load a single entity matching the given criteria. Returns the entity, whose record `data_get()` reads, and throws on error.',
   },
   list: {
     sig: 'list(?array $reqmatch = null, ?array $ctrl = null): mixed',
-    returns: 'array — the list of results; throws on error',
-    desc: 'List entities matching the given criteria (call with no argument to list all). Returns an array. Throws on error.',
+    returns: 'array — the entities, one per record; throws on error',
+    desc: 'List entities matching the given criteria (call with no argument to list all). Returns an array of entities, one per record, and throws on error.',
   },
   create: {
     sig: 'create(array $reqdata, ?array $ctrl = null): mixed',
-    returns: 'mixed — the result data; throws on error',
-    desc: 'Create a new entity with the given data. Throws on error.',
+    returns: 'mixed — the created entity; throws on error',
+    desc: 'Create a new entity with the given data. Returns the created entity and throws on error.',
   },
   update: {
     sig: 'update(array $reqdata, ?array $ctrl = null): mixed',
-    returns: 'mixed — the result data; throws on error',
-    desc: 'Update an existing entity. The data must include the entity `id`. Throws on error.',
+    returns: 'mixed — the updated entity; throws on error',
+    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity and throws on error.',
+  },
+  patch: {
+    sig: 'patch(array $reqdata, ?array $ctrl = null): mixed',
+    returns: 'mixed — the patched entity; throws on error',
+    desc: 'Change part of an existing entity: only the fields given are sent. The data must include the entity `id`. Returns the patched entity and throws on error.',
   },
   remove: {
     sig: 'remove(array $reqmatch, ?array $ctrl = null): mixed',
-    returns: 'mixed — the result data; throws on error',
-    desc: 'Remove the entity matching the given criteria. Throws on error.',
+    returns: 'mixed — the entity, marked as deleted; throws on error',
+    desc: 'Remove the entity matching the given criteria. Returns the entity, marked as deleted, and throws on error.',
   },
 }
 
@@ -214,7 +220,7 @@ $${ent.name} = $client->${phpEntityAccessor(ent.Name)}();
         if (hasFieldOps) {
           // Only emit columns for operations this entity actually exposes —
           // never advertise a create/update/remove column the entity lacks.
-          const opcols = ['load', 'list', 'create', 'update', 'remove']
+          const opcols = ['load', 'list', 'create', 'update', 'patch', 'remove']
             .filter((op: string) => opnames.includes(op) && ent.op[op]?.active !== false)
           Content(`### Field Usage by Operation
 
@@ -255,6 +261,10 @@ ${info.desc}
 
 `)
 
+          if (opNeedsAction(ent.op[opname])) {
+            return
+          }
+
           if ('load' === opname || 'remove' === opname) {
             // The id key plus every REQUIRED match key (parent path params
             // like page_id) — the same shape the runtime resolves path
@@ -276,7 +286,7 @@ $result = $client->${phpEntityAccessor(ent.Name)}()->${opname}(${arg});
           }
           else if ('list' === opname) {
             Content(`\`\`\`php
-$results = $client->${phpEntityAccessor(ent.Name)}()->list();
+$results = $client->${phpEntityAccessor(ent.Name)}()->list(${listMatchArg('php', ent)});
 \`\`\`
 
 `)
@@ -299,10 +309,10 @@ $result = $client->${phpEntityAccessor(ent.Name)}()->create([
 
 `)
           }
-          else if ('update' === opname) {
+          else if ('update' === opname || 'patch' === opname) {
             // The id key plus every REQUIRED data member — the same shape the
             // runtime validates — then the patch-fields note.
-            const updateItems = opRequestShape(ent, 'update').items
+            const updateItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
               .sort((a: any, b: any) =>
                 (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
@@ -310,12 +320,20 @@ $result = $client->${phpEntityAccessor(ent.Name)}()->create([
               `  "${it.name}" => ${phpLit(it.type,
                 it.name === idF ? ent.name + '_id' : it.name)},\n`).join('')
             Content(`\`\`\`php
-$result = $client->${phpEntityAccessor(ent.Name)}()->update([
-${updateLines}  // Fields to update
+$result = $client->${phpEntityAccessor(ent.Name)}()->${opname}([
+${updateLines}  // ${'patch' === opname ? 'Only the fields to change' : 'Fields to update'}
 ]);
 \`\`\`
 
 `)
+          }
+
+          if ('create' === opname || 'update' === opname || 'patch' === opname) {
+            const note = bodyNote(ent.op[opname], {
+              values: 'a string or a stream resource',
+              once: 'a stream resource',
+            })
+            if ('' !== note) Content(note)
           }
         })
       }

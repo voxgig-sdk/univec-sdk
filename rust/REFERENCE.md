@@ -8,7 +8,7 @@ Complete API reference for the Univec Rust SDK.
 ### Constructor
 
 ```rust
-use univec_sdk::{UnivecSDK, Value};
+use univec_sdk::{jo, UnivecEntity, UnivecSDK, Entity, Value};
 
 let client = UnivecSDK::new(options);
 ```
@@ -114,9 +114,9 @@ let convert = client.convert(Value::Noval);
 
 ### Operations
 
-#### `create(reqdata: Value, ctrl: Value) -> Result<Value, UnivecError>`
+#### `create(reqdata: Value, ctrl: Value) -> Result<Rc<Self>, UnivecError>`
 
-Create a new entity with the given data. Returns the created entity data on `Ok` and `Err` on failure.
+Create a new entity with the given data. `Ok` is the created entity, and `Err` a failure.
 
 ```rust
 let result = client.convert(Value::Noval).create(jo(vec![
@@ -163,9 +163,9 @@ let embed = client.embed(Value::Noval);
 
 ### Operations
 
-#### `create(reqdata: Value, ctrl: Value) -> Result<Value, UnivecError>`
+#### `create(reqdata: Value, ctrl: Value) -> Result<Rc<Self>, UnivecError>`
 
-Create a new entity with the given data. Returns the created entity data on `Ok` and `Err` on failure.
+Create a new entity with the given data. `Ok` is the created entity, and `Err` a failure.
 
 ```rust
 let result = client.embed(Value::Noval).create(jo(vec![
@@ -213,9 +213,9 @@ let ephemeral_key = client.ephemeral_key(Value::Noval);
 
 ### Operations
 
-#### `create(reqdata: Value, ctrl: Value) -> Result<Value, UnivecError>`
+#### `create(reqdata: Value, ctrl: Value) -> Result<Rc<Self>, UnivecError>`
 
-Create a new entity with the given data. Returns the created entity data on `Ok` and `Err` on failure.
+Create a new entity with the given data. `Ok` is the created entity, and `Err` a failure.
 
 ```rust
 let result = client.ephemeral_key(Value::Noval).create(jo(vec![
@@ -270,16 +270,14 @@ let model = client.model(Value::Noval);
 
 ### Operations
 
-#### `list(reqmatch: Value, ctrl: Value) -> Result<Value, UnivecError>`
+#### `list(reqmatch: Value, ctrl: Value) -> Result<Vec<Rc<Self>>, UnivecError>`
 
-List entities matching the given criteria. The match is optional — pass `Value::Noval` to list all records. `Ok` is a `Value::List`.
+List entities matching the given criteria. The match is optional — pass `Value::Noval` to list all records. `Ok` is a `Vec` of entities, one per record.
 
 ```rust
 let results = client.model(Value::Noval).list(Value::Noval, Value::Noval).unwrap();
-if let Value::List(items) = &results {
-    for model in items.borrow().iter() {
-        println!("{:?}", model);
-    }
+for model in &results {
+    println!("{:?}", model.data(None));
 }
 ```
 
@@ -957,6 +955,7 @@ Timeout.
 | Option | Type |
 |---|---|
 | `clearTimer` | function |
+| `now` | function |
 | `setTimer` | function |
 
 These take no default: the feature behaves one way when you supply them and

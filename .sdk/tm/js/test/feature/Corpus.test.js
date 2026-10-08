@@ -185,6 +185,15 @@ function tokensUsed(kase) {
 }
 
 
+// The first feature a case composes that this SDK does not generate. Such a
+// case is skipped rather than failed, as a section naming one is.
+function missingFeature(probe, kase) {
+  const named = Array.isArray(kase.feature) ? kase.feature.map((f) => f?.name) :
+    Object.keys(kase.feature || {})
+  return named.find((n) => 'string' === typeof n && !probe._rootctx.config.hasFeature(n))
+}
+
+
 // Assert that `actual` contains `expect`, recursively. Cases assert only the
 // fields they are about, so a full deepStrictEqual would force every case to
 // restate the whole record.
@@ -267,6 +276,7 @@ describe('FeatureCorpus', () => {
         `or an emptied fixture must fail loudly, not pass silently`)
 
       let ran = 0
+      const failed = []
       for (const raw of cases) {
         const need = tokensUsed(raw)
         if (ops.length < need) {
@@ -274,33 +284,52 @@ describe('FeatureCorpus', () => {
           continue
         }
 
+        const missing = missingFeature(probe, raw)
+        if (null != missing) {
+          t.diagnostic(`skip "${raw.name}": needs the ${missing} feature, ` +
+            'which this SDK does not generate')
+          continue
+        }
+
         const tokens = {}
         for (let i = 0; i < need; i++) { tokens['#OP' + (i + 1)] = ops[i].key }
 
         const kase = resolve(raw, tokens)
-        const client = makeClient(kase)
+        ran++
 
-        for (const step of (kase.op || [])) {
-          const ref = byKey[step.op]
-          ok(null != ref, `${kase.name}: no operation ${step.op}`)
-          try {
-            await client[ref.accessor]()[ref.op]({}, step.ctrl || {})
-            ok(null == step.err,
-              `${kase.name}: ${step.op} was expected to fail, and did not`)
-          }
-          catch (err) {
-            if (null == step.err) { throw err }
+        // Every failing case is reported, not only the first.
+        try {
+          const client = makeClient(kase)
+
+          for (const step of (kase.op || [])) {
+            const ref = byKey[step.op]
+            ok(null != ref, `${kase.name}: no operation ${step.op}`)
+            let err = undefined
+            try {
+              await client[ref.accessor]()[ref.op]({}, step.ctrl || {})
+            }
+            catch (e) {
+              err = e
+            }
+            if (null == step.err) {
+              ok(undefined === err,
+                `${kase.name}: ${step.op} failed unexpectedly: ${err?.message}`)
+              continue
+            }
+            ok(undefined !== err, `${kase.name}: ${step.op} was expected to fail, and did not`)
             if ('string' === typeof step.err) {
               deepStrictEqual(err.code, step.err, `${kase.name}: wrong error code`)
             }
           }
-        }
 
-        subset(client[`_${name}`], kase.out, `${kase.name}: _${name}`)
-        ran++
+          subset(client[`_${name}`], kase.out, `${kase.name}: _${name}`)
+        }
+        catch (err) {
+          const msg = String(err?.message ?? err)
+          failed.push(msg.startsWith(kase.name) ? msg : kase.name + ': ' + msg)
+        }
       }
 
-      ok(0 < ran, `every feature.${name} case was skipped`)
       // Say how many ran. A partial run is legitimate (an SDK with one
       // operation skips the cases needing two) but it should be visible
       // rather than inferred from a green tick - and it is the one line
@@ -308,6 +337,8 @@ describe('FeatureCorpus', () => {
       // language's runner.
       t.diagnostic(`feature.${name}: ran ${ran} of ${cases.length} ` +
         `case(s) against ${ops.length} operation(s)`)
+      ok(0 < ran, `every feature.${name} case was skipped`)
+      deepStrictEqual(failed, [], `feature.${name}: ${failed.length} case(s) failed`)
     })
   }
 })

@@ -384,6 +384,7 @@ public static class SdkConfig
                     ["optspec"] = new Dictionary<string, object?>
                     {
                         ["clearTimer"] = "`$FUNCTION`",
+                        ["now"] = "`$FUNCTION`",
                         ["setTimer"] = "`$FUNCTION`",
                     },
                     ["strict"] = false,
@@ -597,6 +598,11 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                    ["response"] = new Dictionary<string, object?>
+                                    {
+                                        ["kind"] = "json",
+                                        ["media"] = "application/json",
+                                    },
                                 },
                                 new Dictionary<string, object?>
                                 {
@@ -747,6 +753,11 @@ public static class SdkConfig
                                                 "SDK live coverage test.",
                                             },
                                         },
+                                    },
+                                    ["response"] = new Dictionary<string, object?>
+                                    {
+                                        ["kind"] = "json",
+                                        ["media"] = "application/json",
                                     },
                                 },
                                 new Dictionary<string, object?>
@@ -910,6 +921,11 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                    ["response"] = new Dictionary<string, object?>
+                                    {
+                                        ["kind"] = "json",
+                                        ["media"] = "application/json",
+                                    },
                                 },
                                 new Dictionary<string, object?>
                                 {
@@ -1071,6 +1087,11 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                    ["response"] = new Dictionary<string, object?>
+                                    {
+                                        ["kind"] = "json",
+                                        ["media"] = "application/json",
+                                    },
                                 },
                             },
                         },
@@ -1227,6 +1248,11 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                    ["response"] = new Dictionary<string, object?>
+                                    {
+                                        ["kind"] = "json",
+                                        ["media"] = "application/json",
+                                    },
                                 },
                                 new Dictionary<string, object?>
                                 {
@@ -1350,6 +1376,11 @@ public static class SdkConfig
                                             },
                                         },
                                     },
+                                    ["response"] = new Dictionary<string, object?>
+                                    {
+                                        ["kind"] = "json",
+                                        ["media"] = "application/json",
+                                    },
                                 },
                             },
                         },
@@ -1452,6 +1483,11 @@ public static class SdkConfig
                                         ["auth"] = "public",
                                         ["id"] = "key",
                                         ["retention"] = "No deletion endpoint; issued key is subject to the service daily allowance",
+                                    },
+                                    ["response"] = new Dictionary<string, object?>
+                                    {
+                                        ["kind"] = "json",
+                                        ["media"] = "application/json",
                                     },
                                 },
                             },
@@ -1590,6 +1626,11 @@ public static class SdkConfig
                                         },
                                         ["auth"] = "public",
                                         ["id"] = "models",
+                                    },
+                                    ["response"] = new Dictionary<string, object?>
+                                    {
+                                        ["kind"] = "json",
+                                        ["media"] = "application/json",
                                     },
                                 },
                             },

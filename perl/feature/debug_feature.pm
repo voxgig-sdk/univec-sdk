@@ -2,8 +2,9 @@
 #
 # Request/response capture for debugging. Records a bounded ring buffer of
 # per-operation traces - method, URL, redacted headers, response status and
-# timing. Sensitive header values (matching "redact", default
-# authorization/cookie/api-key style names) are masked. An optional
+# timing. The SDK's own clean rules (clean.keys and every registered secret
+# value) apply to the whole entry, and the "redact" option ADDS header names
+# on top of them. An optional
 # "on_entry" callback receives each finished entry (e.g. to stream to a
 # console). "max" caps the buffer (default 100). The clock is injectable
 # ("now", ms) for deterministic tests.
@@ -24,11 +25,6 @@ require(Cwd::abs_path("$__dir/base_feature.pm"));
 package UnivecDebugFeature;
 
 our @ISA = ('UnivecBaseFeature');
-
-my @REDACT_DEFAULT = (
-  'authorization', 'cookie', 'set-cookie', 'api-key', 'apikey',
-  'x-api-key', 'idempotency-key',
-);
 
 sub new {
   my ($class) = @_;
@@ -73,7 +69,7 @@ sub PreRequest {
       . ($ctx->{op} ? $ctx->{op}{name} : '_'),
     'method' => $method,
     'url' => $url,
-    'headers' => $self->_redact($headers),
+    'headers' => $self->_redact($ctx, $headers),
     'start' => $self->_now,
     'status' => undef,
     'ok' => undef,
@@ -129,6 +125,11 @@ sub _finish {
     $entry->{status} = $ctx->{result}{status};
   }
 
+  # The whole entry leaves through the buffer and the callback: the url
+  # and the error message can carry a query credential the header mask
+  # above never saw.
+  $entry = $ctx->{utility}{clean}->($ctx, $entry);
+
   my $track = $self->{client}{_debug};
   if (!$track) {
     $track = { 'entries' => [] };
@@ -146,16 +147,19 @@ sub _finish {
   return;
 }
 
+# The core clean rules apply (clean.keys, every registered value); the
+# feature's own `redact` list ADDS header names on top of them.
 sub _redact {
-  my ($self, $headers) = @_;
+  my ($self, $ctx, $headers) = @_;
   return {} unless defined $headers;
-  my $patterns = $self->{options}{redact} || \@REDACT_DEFAULT;
+  my $patterns = Voxgig::Struct::islist($self->{options}{redact})
+    ? [ map { lc("$_") } @{ $self->{options}{redact} } ] : [];
   my $out = {};
   for my $k (keys %$headers) {
-    $out->{$k} = (grep { "$_" eq lc("$k") } @$patterns)
-      ? '<redacted>' : $headers->{$k};
+    $out->{$k} = (grep { $_ eq lc("$k") } @$patterns)
+      ? '[redacted]' : $headers->{$k};
   }
-  return $out;
+  return $ctx->{utility}{clean}->($ctx, $out);
 }
 
 sub _now {

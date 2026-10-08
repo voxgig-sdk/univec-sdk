@@ -84,6 +84,7 @@ defmodule Univec.FeatureHarness do
 
   def default_method("create"), do: "POST"
   def default_method("update"), do: "PATCH"
+  def default_method("patch"), do: "PATCH"
   def default_method("remove"), do: "DELETE"
   def default_method(_), do: "GET"
 

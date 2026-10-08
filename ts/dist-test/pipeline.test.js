@@ -59,9 +59,34 @@ function utilWith(fetcher) {
         const preset = { method: 'GET' };
         (0, node_assert_1.strictEqual)(__1.stdutil.makePoint(base({ out: { point: preset } })), preset);
     });
+    (0, node_test_1.test)('an allow list names whole operations, in any case', () => {
+        const point = { method: 'GET', parts: ['a'] };
+        const op = { name: 'load', points: [point] };
+        (0, node_assert_1.strictEqual)(__1.stdutil.makePoint(base({ op, options: { allow: { op: 'reload,unload' } } })).code, 'point_op_allow');
+        (0, node_assert_1.strictEqual)(__1.stdutil.makePoint(base({ op, options: { allow: { op: 'list, LOAD' } } })), point);
+    });
+    (0, node_test_1.test)('an allow list names whole methods', () => {
+        const ctx = base({
+            op: { name: 'update', points: [] },
+            point: { method: 'pu', parts: ['a'] },
+            options: { allow: { method: 'GET,PUT' }, base: 'http://x' },
+        });
+        (0, node_assert_1.strictEqual)(__1.stdutil.makeSpec(ctx).code, 'spec_method_allow');
+    });
     (0, node_test_1.test)('makeSpec short-circuits a feature-supplied spec', () => {
         const preset = { method: 'GET' };
         (0, node_assert_1.strictEqual)(__1.stdutil.makeSpec(base({ out: { spec: preset } })), preset);
+    });
+});
+(0, node_test_1.describe)('pipeline:direct', () => {
+    (0, node_test_1.test)('direct and graphql answer a method allow.method refuses with a result map', async () => {
+        const sdk = __1.UnivecSDK.test({}, { allow: { method: 'GET' } });
+        const direct = await sdk.direct({ path: '/a', method: 'POST' });
+        (0, node_assert_1.strictEqual)(direct.ok, false);
+        (0, node_assert_1.strictEqual)(direct.err.code, 'spec_method_allow');
+        const graphql = await sdk.graphql('{ a }');
+        (0, node_assert_1.strictEqual)(graphql.ok, false);
+        (0, node_assert_1.strictEqual)(graphql.err.code, 'spec_method_allow');
     });
 });
 (0, node_test_1.describe)('pipeline:makeResponse', () => {
@@ -269,9 +294,9 @@ const COOKIE_PAIR = /^[^=;]+=K$/;
         return { headers: {}, query: {} };
     }
     // `basic: false` is explicit: an HTTP Basic API's generated config carries
-    // `auth.basic: true`, and a client that merges it in takes a branch needing
-    // a secret as well. With none supplied that branch writes nothing, which
-    // the probe below would then read as a public API.
+    // `auth.basic: true`, and a client that merges it in takes the Basic
+    // branch, which base64-joins the key with a password rather than placing
+    // the key as it is.
     function auth(prefix) {
         return { prefix, basic: false };
     }
@@ -349,6 +374,42 @@ const COOKIE_PAIR = /^[^=;]+=K$/;
     (0, node_test_1.test)('a missing apikey option drops the credential', () => {
         (0, node_assert_1.strictEqual)(placed({ auth: auth('Bearer') }, 'stale'), undefined);
     });
+    // HTTP Basic joins the key with a password, which may be empty (RFC 7617):
+    // Lob documents its key as the user with a blank password. An SDK for an
+    // API that is not HTTP Basic has no such branch, and the first placement
+    // below tells the two apart.
+    (0, node_test_1.test)('HTTP Basic sends the key with a blank password', () => {
+        if (null == CRED || 'headers' !== CRED.where || '' !== CRED.pair)
+            return;
+        const basic = { prefix: 'Basic', basic: true };
+        const b64 = (s) => Buffer.from(s).toString('base64');
+        if (placed({ apikey: 'K', secret: 'S', auth: basic }) !== 'Basic ' + b64('K:S'))
+            return;
+        (0, node_assert_1.strictEqual)(placed({ apikey: 'K', auth: basic }), 'Basic ' + b64('K:'));
+        (0, node_assert_1.strictEqual)(placed({ apikey: 'K', secret: '', auth: basic }), 'Basic ' + b64('K:'));
+        (0, node_assert_1.strictEqual)(placed({ apikey: '', secret: 'S', auth: basic }, 'stale'), undefined);
+    });
+});
+(0, node_test_1.describe)('pipeline:prepareQuery', () => {
+    // The generated config lists path parameters as args.params. A match field
+    // that fills the path must not be sent again as a query parameter, which a
+    // strict server rejects.
+    (0, node_test_1.test)('a path parameter stays out of the query', () => {
+        const point = { args: { params: [{ name: 'id', kind: 'param' }] } };
+        const ctx = base({ point, reqmatch: { id: 'i1', q: 'x' } });
+        (0, node_assert_1.deepStrictEqual)(__1.stdutil.prepareQuery(ctx), { q: 'x' });
+    });
+    (0, node_test_1.test)('an action is never a query parameter', () => {
+        const ctx = base({ point: { args: { params: [] } }, reqmatch: { $action: 'go', q: 'x' } });
+        (0, node_assert_1.deepStrictEqual)(__1.stdutil.prepareQuery(ctx), { q: 'x' });
+    });
+    // A query argument's orig is the name the API definition gives it, which
+    // the model may have renamed for the caller.
+    (0, node_test_1.test)('a query argument goes out under its orig', () => {
+        const point = { args: { query: [{ name: 'item_id', orig: 'itemIds', kind: 'query' }] } };
+        const ctx = base({ point, reqmatch: { item_id: ['i1'], q: 'x' } });
+        (0, node_assert_1.deepStrictEqual)(__1.stdutil.prepareQuery(ctx), { itemIds: ['i1'], q: 'x' });
+    });
 });
 (0, node_test_1.describe)('pipeline:result helpers', () => {
     (0, node_test_1.test)('resultHeaders with no forEach yields an empty map', () => {
@@ -360,6 +421,25 @@ const COOKIE_PAIR = /^[^=;]+=K$/;
         const ctx = base({ response: { json: async () => ({ a: 1 }), body: null }, result: {} });
         await __1.stdutil.resultBody(ctx);
         (0, node_assert_1.strictEqual)(ctx.result.body, undefined);
+    });
+    // The agent and the body preview may carry a registered value; the body is
+    // cleaned before the bound so a split value cannot leave its prefix.
+    (0, node_test_1.test)('resultBody masks a registered value in the agent and across the preview bound', async () => {
+        const secret = 'PIPELINE-SECRET-a1b2c3d4e5f6';
+        const text = 'x'.repeat(150) + secret + 'y'.repeat(100);
+        const ctx = base({
+            options: { __derived__: { clean: { active: true, keys: [], values: [], mask: '[redacted]', hint: 0, min: 4 } } },
+            spec: { headers: { 'user-agent': 'Probe ' + secret } },
+            response: { body: 'body', json: async () => { throw Object.assign(new SyntaxError('bad json'), { text }); } },
+            result: { status: 200, headers: { 'content-type': 'text/html' } },
+        });
+        __1.stdutil.cleanAdd(ctx, secret);
+        await __1.stdutil.resultBody(ctx);
+        const message = String(ctx.result.err.message);
+        (0, node_assert_1.strictEqual)(ctx.result.err.code, 'response_content_type');
+        (0, node_assert_1.ok)(message.includes('user-agent Probe [redacted]'), message);
+        (0, node_assert_1.ok)(message.includes('body: ' + 'x'.repeat(150) + '[redacted]'), message);
+        (0, node_assert_1.ok)(!message.includes(secret.slice(0, 8)), message);
     });
 });
 //# sourceMappingURL=pipeline.test.js.map

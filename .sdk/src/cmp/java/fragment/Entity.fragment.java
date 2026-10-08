@@ -31,5 +31,7 @@ public class EntyClass extends EntityBase {
 
 // #UpdateOp
 
+// #PatchOp
+
 // #RemoveOp
 }

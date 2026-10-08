@@ -97,7 +97,7 @@ const CRED_NAME = ${zigstr(credLiteral(spec.where, spec.name))};
 const OPTION_APIKEY = "apikey";
 ` + (withBasic ? `const OPTION_SECRET = "secret";
 ` : '') + `const NOT_FOUND = "__NOTFOUND__";
-` + (withBasic ? basicHelpers() : '') + `
+` + authName(true) + (withBasic ? basicHelpers() : '') + `
 pub fn prepare_auth_util(ctx: *Context) E!*Spec {
     const spec = ctx.spec orelse return ctx.fail("auth_no_spec", "Expected context spec property to be defined.");
 
@@ -111,6 +111,13 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
         return spec;
     }
 
+    const name = auth_name(options);
+
+    // A credential left under the declared name would travel beside the renamed one.
+    if (!std.mem.eql(u8, name, CRED_NAME)) {
+        h.del_prop(headers, h.vstr(CRED_NAME));
+    }
+
     const apikey = vs.getprop(h.A(), options, h.vstr(OPTION_APIKEY), h.vstr(NOT_FOUND)) catch h.vstr(NOT_FOUND);
 
     const skip = switch (apikey) {
@@ -120,7 +127,7 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
     };
 ` + (withBasic ? basicBlock() : '') + `
     if (skip) {
-        h.del_prop(headers, h.vstr(CRED_NAME));
+        h.del_prop(headers, h.vstr(name));
     } else {
         const auth_prefix: []const u8 = switch (h.getpath(&.{ "auth", "prefix" }, options)) {
             .string => |s| s,
@@ -133,9 +140,9 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
         // A raw credential (empty prefix, e.g. an apiKey scheme) must go in
         // as-is; only a non-empty prefix (Bearer/Basic/OAuth) is space-joined.
         if (auth_prefix.len == 0) {
-            h.setp(headers, CRED_NAME, h.vstr(apikey_val));
+            h.setp(headers, name, h.vstr(apikey_val));
         } else {
-            h.setp(headers, CRED_NAME, h.vstr(fmt("{s} {s}", .{ auth_prefix, apikey_val })));
+            h.setp(headers, name, h.vstr(fmt("{s} {s}", .{ auth_prefix, apikey_val })));
         }
     }
 
@@ -151,7 +158,7 @@ function renderQuery(spec: AuthSpec): string {
 const CRED_NAME = ${zigstr(credLiteral(spec.where, spec.name))};
 const OPTION_APIKEY = "apikey";
 const NOT_FOUND = "__NOTFOUND__";
-
+` + authName(false) + `
 pub fn prepare_auth_util(ctx: *Context) E!*Spec {
     const spec = ctx.spec orelse return ctx.fail("auth_no_spec", "Expected context spec property to be defined.");
 
@@ -165,6 +172,13 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
         return spec;
     }
 
+    const name = auth_name(options);
+
+    // A credential left under the declared name would travel beside the renamed one.
+    if (!std.mem.eql(u8, name, CRED_NAME)) {
+        h.del_prop(query, h.vstr(CRED_NAME));
+    }
+
     const apikey = vs.getprop(h.A(), options, h.vstr(OPTION_APIKEY), h.vstr(NOT_FOUND)) catch h.vstr(NOT_FOUND);
 
     const skip = switch (apikey) {
@@ -174,7 +188,7 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
     };
 
     if (skip) {
-        h.del_prop(query, h.vstr(CRED_NAME));
+        h.del_prop(query, h.vstr(name));
     } else {
         const apikey_val: []const u8 = switch (apikey) {
             .string => |s| s,
@@ -185,7 +199,7 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
         // dropped here deliberately rather than silently concatenated. Nor is
         // there an HTTP Basic branch - \`Authorization: Basic base64(u:p)\`
         // cannot be a query parameter.
-        h.setp(query, CRED_NAME, h.vstr(apikey_val));
+        h.setp(query, name, h.vstr(apikey_val));
     }
 
     return spec;
@@ -205,36 +219,26 @@ const COOKIE_HEADER = "cookie";
 const CRED_NAME = ${zigstr(credLiteral(spec.where, spec.name))};
 const OPTION_APIKEY = "apikey";
 const NOT_FOUND = "__NOTFOUND__";
-
-// The cookie header minus our own pair, every other cookie left alone.
-fn cookies_without_cred(headers: Value) []const u8 {
+` + authName(false) + `
+// The cookie header minus the named pair, every other cookie left alone.
+fn cookies_without_cred(headers: Value, name: []const u8) []const u8 {
     const existing: []const u8 = switch (h.getp(headers, COOKIE_HEADER)) {
         .string => |s| s,
         else => "",
     };
     if (existing.len == 0) return "";
 
-    var kept: []const u8 = "";
-    var it = std.mem.splitScalar(u8, existing, ';');
-    while (it.next()) |part| {
-        const piece = std.mem.trim(u8, part, " \\t");
-        if (piece.len == 0) continue;
-        if (std.mem.eql(u8, piece, CRED_NAME)) continue;
-        if (std.mem.startsWith(u8, piece, CRED_NAME ++ "=")) continue;
-        kept = if (kept.len == 0) piece else fmt("{s}; {s}", .{ kept, piece });
-    }
-
-    return kept;
+    return std.mem.join(h.A(), "; ", h.cookie_keep(existing, &[_][]const u8{name})) catch "";
 }
 
-// Set (a value) or remove (null) our pair, leaving every other cookie in place.
-fn apply_cookie(headers: Value, value: ?[]const u8) void {
-    const rest = cookies_without_cred(headers);
+// Set (a value) or remove (null) the named pair, leaving every other cookie in place.
+fn apply_cookie(headers: Value, name: []const u8, value: ?[]const u8) void {
+    const rest = cookies_without_cred(headers, name);
 
     if (value) |v| {
         // NO PREFIX IN A COOKIE either - a cookie carries a bare \`name=value\`
         // pair, not a header's scheme-prefixed credential.
-        const pair = fmt("{s}={s}", .{ CRED_NAME, v });
+        const pair = fmt("{s}={s}", .{ name, v });
         h.setp(headers, COOKIE_HEADER, h.vstr(if (rest.len == 0) pair else fmt("{s}; {s}", .{ rest, pair })));
         return;
     }
@@ -255,8 +259,15 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
     // Public APIs that need no auth omit the options.auth block entirely.
     const auth = h.getp(options, "auth");
     if (h.is_noval(auth)) {
-        apply_cookie(headers, null);
+        apply_cookie(headers, CRED_NAME, null);
         return spec;
+    }
+
+    const name = auth_name(options);
+
+    // A credential left under the declared name would travel beside the renamed one.
+    if (!std.mem.eql(u8, name, CRED_NAME)) {
+        apply_cookie(headers, CRED_NAME, null);
     }
 
     const apikey = vs.getprop(h.A(), options, h.vstr(OPTION_APIKEY), h.vstr(NOT_FOUND)) catch h.vstr(NOT_FOUND);
@@ -268,16 +279,31 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
     };
 
     if (skip) {
-        apply_cookie(headers, null);
+        apply_cookie(headers, name, null);
     } else {
         const apikey_val: []const u8 = switch (apikey) {
             .string => |s| s,
             else => "",
         };
-        apply_cookie(headers, apikey_val);
+        apply_cookie(headers, name, apikey_val);
     }
 
     return spec;
+}
+`
+}
+
+
+// The client's `auth.name` option, when set, replaces the declared name; a
+// header name travels lower-cased.
+function authName(header: boolean): string {
+  return `
+// The client's auth.name option, when set, replaces the name the API declares.
+fn auth_name(options: Value) []const u8 {
+    return switch (h.getpath(&.{ "auth", "name" }, options)) {
+        .string => |s| if (s.len == 0) CRED_NAME else ${header ? 'std.ascii.allocLowerString(h.A(), s) catch CRED_NAME' : 's'},
+        else => CRED_NAME,
+    };
 }
 `
 }
@@ -330,9 +356,11 @@ fn base64_std(text: []const u8) []const u8 {
 // something — and only when the model says the scheme IS basic.
 function basicBlock(): string {
   return `
-    // True HTTP Basic Auth needs TWO credentials, base64-joined - a single
+    // True HTTP Basic Auth joins the two credentials, base64-encoded - a single
     // token in the header (the branch below) can never authenticate against
     // an API that actually checks \`Authorization: Basic base64(user:pass)\`.
+    // The password may be empty (RFC 7617): Lob, for one, documents the key as
+    // the user with a blank password (\`curl -u key:\`).
     if (is_true(h.getpath(&.{ "auth", "basic" }, options))) {
         const secret = vs.getprop(h.A(), options, h.vstr(OPTION_SECRET), h.vstr(NOT_FOUND)) catch h.vstr(NOT_FOUND);
 
@@ -342,8 +370,8 @@ function basicBlock(): string {
             else => false,
         };
 
-        if (skip or no_secret) {
-            h.del_prop(headers, h.vstr(CRED_NAME));
+        if (skip) {
+            h.del_prop(headers, h.vstr(name));
         } else {
             const basic_prefix: []const u8 = switch (h.getpath(&.{ "auth", "prefix" }, options)) {
                 .string => |s| s,
@@ -353,15 +381,18 @@ function basicBlock(): string {
                 .string => |s| s,
                 else => "",
             };
-            const secret_val: []const u8 = switch (secret) {
+            const secret_val: []const u8 = if (no_secret) "" else switch (secret) {
                 .string => |s| s,
                 else => "",
             };
             const b64 = base64_std(fmt("{s}:{s}", .{ apikey_val, secret_val }));
+            // The joined, encoded pair is a wire form neither credential's own
+            // registration covers.
+            ctx.util().clean_add(ctx, b64);
             if (basic_prefix.len == 0) {
-                h.setp(headers, CRED_NAME, h.vstr(b64));
+                h.setp(headers, name, h.vstr(b64));
             } else {
-                h.setp(headers, CRED_NAME, h.vstr(fmt("{s} {s}", .{ basic_prefix, b64 })));
+                h.setp(headers, name, h.vstr(fmt("{s} {s}", .{ basic_prefix, b64 })));
             }
         }
 

@@ -6,7 +6,6 @@ import java.util.Map;
 import voxgig.univecsdk.core.Context;
 import voxgig.univecsdk.core.Result;
 import voxgig.univecsdk.core.Spec;
-import voxgig.univecsdk.utility.struct.Struct;
 
 final class MakeFetchDef {
 
@@ -35,12 +34,7 @@ final class MakeFetchDef {
     fetchdef.put("headers", spec.headers);
 
     if (spec.body != null) {
-      if (spec.body instanceof Map) {
-        fetchdef.put("body", Struct.jsonify(spec.body));
-      }
-      else {
-        fetchdef.put("body", spec.body);
-      }
+      fetchdef.put("body", Media.requestBody(ctx.point, spec.body));
     }
 
     return fetchdef;

@@ -105,12 +105,12 @@ convert = Univec.convert(sdk)
 
 ### Operations
 
-#### `create(entity, reqdata, ctrl \\ nil) :: map()`
+#### `create(entity, reqdata, ctrl \\ nil) :: entity`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```elixir
-record = Univec.Entity.Convert.create(convert, Univec.Helpers.deep(%{
+convert = Univec.Entity.Convert.create(convert, Univec.Helpers.deep(%{
   "embeddings" => [],  # list()
   "source_model" => "example_source_model",  # String.t()
   "target_model" => "example_target_model",  # String.t()
@@ -162,12 +162,12 @@ embed = Univec.embed(sdk)
 
 ### Operations
 
-#### `create(entity, reqdata, ctrl \\ nil) :: map()`
+#### `create(entity, reqdata, ctrl \\ nil) :: entity`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```elixir
-record = Univec.Entity.Embed.create(embed, Univec.Helpers.deep(%{
+embed = Univec.Entity.Embed.create(embed, Univec.Helpers.deep(%{
   "embeddings" => [],  # list()
   "model" => "example_model",  # String.t()
   "texts" => [],  # list()
@@ -220,12 +220,12 @@ ephemeral_key = Univec.ephemeral_key(sdk)
 
 ### Operations
 
-#### `create(entity, reqdata, ctrl \\ nil) :: map()`
+#### `create(entity, reqdata, ctrl \\ nil) :: entity`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```elixir
-record = Univec.Entity.EphemeralKey.create(ephemeral_key, Univec.Helpers.deep(%{
+ephemeral_key = Univec.Entity.EphemeralKey.create(ephemeral_key, Univec.Helpers.deep(%{
   "dailyLimit" => 1,  # integer()
   "dailyUsed" => 1,  # integer()
   "key" => "example_key",  # String.t()
@@ -287,10 +287,10 @@ model = Univec.model(sdk)
 
 #### `list(entity, reqmatch \\ nil, ctrl \\ nil) :: list()`
 
-List entities matching the given criteria. The match is optional — call `list(entity)` to list all records. Returns a list and raises on error.
+List entities matching the given criteria. The match is optional — call `list(entity)` to list all records. Returns a list of entities, one per record, and raises on error.
 
 ```elixir
-records = Univec.Entity.Model.list(model)
+models = Univec.Entity.Model.list(model)
 ```
 
 ### Common Functions
@@ -975,6 +975,7 @@ Timeout.
 | Option | Type |
 |---|---|
 | `clearTimer` | function |
+| `now` | function |
 | `setTimer` | function |
 
 These take no default: the feature behaves one way when you supply them and

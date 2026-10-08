@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures, opNeedsAction, bodyNote } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -7,7 +7,7 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { zigVarName } from './utility_zig'
+import { zigVarName, zigListMatch } from './utility_zig'
 
 
 // Canonical type sentinel -> a zig type name for the field/param tables.
@@ -26,6 +26,7 @@ function zigType(type: any): string {
 // A type-correct zig expression constructing a voxgig struct Value.
 function zigLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'h.vnull()'
   if ('INTEGER' === k || 'NUMBER' === k) return 'h.vnum(1)'
   if ('BOOLEAN' === k) return 'h.vbool(true)'
   if ('ARRAY' === k) return 'h.olist()'
@@ -45,24 +46,28 @@ const ReadmeRef = cmp(function ReadmeRef(props: any) {
 
   const OP_SIGNATURES: Record<string, { sig: string, desc: string }> = {
     load: {
-      sig: 'load(reqmatch: Value, ctrl: Value) OpResult',
-      desc: 'Load a single entity matching the given criteria. `.ok` carries the entity data, `.err` the branded error.',
+      sig: 'load(reqmatch: Value, ctrl: Value) EntResult',
+      desc: 'Load a single entity matching the given criteria. `.ok` carries the entity, whose record `asEntity().data(null)` reads, and `.err` the branded error.',
     },
     list: {
-      sig: 'list(reqmatch: Value, ctrl: Value) OpResult',
-      desc: 'List entities matching the given criteria. The match is optional — pass `h.vnull()` to list all records. `.ok` is a `Value` array.',
+      sig: 'list(reqmatch: Value, ctrl: Value) EntListResult',
+      desc: 'List entities matching the given criteria. The match is optional — pass `h.vnull()` to list all records. `.ok` is a slice of entities, one per record.',
     },
     create: {
-      sig: 'create(reqdata: Value, ctrl: Value) OpResult',
-      desc: 'Create a new entity with the given data. `.ok` carries the created entity data.',
+      sig: 'create(reqdata: Value, ctrl: Value) EntResult',
+      desc: 'Create a new entity with the given data. `.ok` carries the created entity.',
     },
     update: {
-      sig: 'update(reqdata: Value, ctrl: Value) OpResult',
-      desc: 'Update an existing entity. The data must include the entity id. `.ok` carries the updated entity data.',
+      sig: 'update(reqdata: Value, ctrl: Value) EntResult',
+      desc: 'Update an existing entity. The data must include the entity id. `.ok` carries the updated entity.',
+    },
+    patch: {
+      sig: 'patch(reqdata: Value, ctrl: Value) EntResult',
+      desc: 'Change part of an existing entity: only the fields given are sent. The data must include the entity id. `.ok` carries the patched entity.',
     },
     remove: {
-      sig: 'remove(reqmatch: Value, ctrl: Value) OpResult',
-      desc: 'Remove the entity matching the given criteria. `.err` on failure.',
+      sig: 'remove(reqmatch: Value, ctrl: Value) EntResult',
+      desc: 'Remove the entity matching the given criteria. `.ok` carries the entity, marked as deleted, and `.err` the branded error.',
     },
   }
 
@@ -220,7 +225,7 @@ const ${eVar} = client.${method}(h.vnull());
         // Field operations breakdown
         const hasFieldOps = fields.some((f: any) => f.op && Object.keys(f.op).length > 0)
         if (hasFieldOps) {
-          const opcols = ['load', 'list', 'create', 'update', 'remove']
+          const opcols = ['load', 'list', 'create', 'update', 'patch', 'remove']
             .filter((op: string) => opnames.includes(op) && ent.op[op]?.active !== false)
           Content(`### Field Usage by Operation
 
@@ -261,6 +266,10 @@ ${info.desc}
 
 `)
 
+          if (opNeedsAction(ent.op[opname])) {
+            return
+          }
+
           if ('load' === opname || 'remove' === opname) {
             const matchItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
@@ -273,7 +282,7 @@ ${info.desc}
               : 'h.vnull()'
             Content(`\`\`\`zig
 switch (client.${method}(h.vnull()).${opname}(${arg}, h.vnull())) {
-    .ok => |result| std.debug.print("{s}\\n", .{h.stringify(result)}),
+    .ok => |result| std.debug.print("{s}\\n", .{h.stringify(result.asEntity().data(null))}),
     .err => |e| std.debug.print("${opname} failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
@@ -282,8 +291,12 @@ switch (client.${method}(h.vnull()).${opname}(${arg}, h.vnull())) {
           }
           else if ('list' === opname) {
             Content(`\`\`\`zig
-switch (client.${method}(h.vnull()).list(h.vnull(), h.vnull())) {
-    .ok => |results| std.debug.print("{s}\\n", .{h.stringify(results)}),
+switch (client.${method}(h.vnull()).list(${zigListMatch(ent)}, h.vnull())) {
+    .ok => |results| {
+        for (results) |result| {
+            std.debug.print("{s}\\n", .{h.stringify(result.asEntity().data(null))});
+        }
+    },
     .err => |e| std.debug.print("list failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
@@ -301,15 +314,15 @@ switch (client.${method}(h.vnull()).create(h.jo(&.{
 `)
             })
             Content(`}), h.vnull())) {
-    .ok => |result| std.debug.print("{s}\\n", .{h.stringify(result)}),
+    .ok => |result| std.debug.print("{s}\\n", .{h.stringify(result.asEntity().data(null))}),
     .err => |e| std.debug.print("create failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
 
 `)
           }
-          else if ('update' === opname) {
-            const updateItems = opRequestShape(ent, 'update').items
+          else if ('update' === opname || 'patch' === opname) {
+            const updateItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
               .sort((a: any, b: any) =>
                 (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
@@ -317,15 +330,22 @@ switch (client.${method}(h.vnull()).create(h.jo(&.{
               `    .{ "${it.name}", ${zigLit(it.type,
                 it.name === idF ? ent.name + '_id' : it.name)} },\n`).join('')
             Content(`\`\`\`zig
-switch (client.${method}(h.vnull()).update(h.jo(&.{
-${updateLines}    // Fields to update
+switch (client.${method}(h.vnull()).${opname}(h.jo(&.{
+${updateLines}    // ${'patch' === opname ? 'Only the fields to change' : 'Fields to update'}
 }), h.vnull())) {
-    .ok => |result| std.debug.print("{s}\\n", .{h.stringify(result)}),
-    .err => |e| std.debug.print("update failed: {s}\\n", .{e.msg}),
+    .ok => |result| std.debug.print("{s}\\n", .{h.stringify(result.asEntity().data(null))}),
+    .err => |e| std.debug.print("${opname} failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
 
 `)
+          }
+
+          if ('create' === opname || 'update' === opname || 'patch' === opname) {
+            const note = bodyNote(ent.op[opname], {
+              values: 'a string value holding the bytes',
+            })
+            if ('' !== note) Content(note)
           }
         })
       }
@@ -342,9 +362,13 @@ Get the entity data. Pass a map to set it.
 
 Get the entity match criteria. Pass a map to set it.
 
-#### \`stream(action: []const u8, args: Value, callopts: Value) []Value\`
+#### \`stream(action: []const u8, args: Value, callopts: Value) StreamResult\`
 
 Run an operation through the pipeline and materialise its result items.
+\`StreamResult\` is \`.ok\` with the items, or \`.err\` with the error that
+failed the operation, as an operation call reports it. Under \`throw: false\`
+in \`callopts.ctrl\`, a failed stream is \`.ok\` with whatever data the
+failure left.
 
 #### \`get_name() []const u8\`
 

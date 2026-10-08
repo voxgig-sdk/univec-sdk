@@ -27,6 +27,11 @@ sourceSets["test"].resources.setSrcDirs(emptyList<String>())
 
 tasks.test {
     useJUnitPlatform()
+    // The canary sweep (test/CleanTest.kt) reports what it swept on stdout,
+    // and the generator's compile lane reads that line from gradle's output.
+    testLogging {
+        showStandardStreams = true
+    }
 }
 
 // Keep the Java and Kotlin compile tasks on the same bytecode target (the

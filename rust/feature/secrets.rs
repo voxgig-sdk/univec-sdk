@@ -253,6 +253,7 @@ impl Feature for SecretsFeature {
         let mut specs: Vec<ProviderSpec> = Vec::new();
 
         if !explicit.is_empty() {
+            register(&state.options, &explicit);
             match envkey(&state.secretname, "") {
                 Ok(key) => {
                     let mut values: BTreeMap<String, String> = BTreeMap::new();
@@ -443,6 +444,10 @@ fn resolve_once(state: &Rc<RefCell<SecretsState>>) -> Result<bool, UnivecError> 
     // A provider ERROR fails the op (via the transport gate); only a MISS
     // falls through.
     let found = found.map_err(|err| fail(&format!("{}", err)))?;
+
+    if let Some(value) = &found {
+        register(&state.borrow().options, value);
+    }
 
     {
         let mut s = state.borrow_mut();
@@ -649,8 +654,15 @@ fn buy(state: &Rc<RefCell<SecretsState>>) -> Result<String, UnivecError> {
 
     let token = buy_once(state)?;
     state.borrow_mut().cred = token.clone();
+    register(&state.borrow().options, &token);
 
     Ok(token)
+}
+
+// A resolved or bought value arrives under no option key the intake
+// registration saw; the options map is the client's own, Rc-shared.
+fn register(options: &Value, value: &str) {
+    crate::utility::clean::clean_add_opts(options, value);
 }
 
 fn buy_once(state: &Rc<RefCell<SecretsState>>) -> Result<String, UnivecError> {

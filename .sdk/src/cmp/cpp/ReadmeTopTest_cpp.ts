@@ -1,17 +1,18 @@
 
-import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape, requiredItems } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { cppVarName } from './utility_cpp'
+import { cppVarName, cppEscape } from './utility_cpp'
 
 
 // A type-correct C++ literal for a field's canonical type.
 function cppLit(type: any): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Value(nullptr)'
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value(1)'
   if ('BOOLEAN' === k) return 'Value(true)'
   if ('ARRAY' === k) return 'vlist()'
@@ -37,26 +38,33 @@ auto client = ${model.const.Name}SDK::testSDK();
     const idF = entityIdField(exampleEntity)
     const isMatchOp = 'load' === primaryOp || 'remove' === primaryOp
     let arg = 'Value::undef()'
-    if (isMatchOp) {
-      const items = opRequestShape(exampleEntity, primaryOp).items
-        .filter((it: any) => !it.optional || it.name === idF)
+    if (isMatchOp || ('list' === primaryOp && 0 < requiredItems(exampleEntity, 'list').length)) {
+      const items = (isMatchOp ? opRequestShape(exampleEntity, primaryOp).items
+        .filter((it: any) => !it.optional || it.name === idF) : requiredItems(exampleEntity, 'list'))
         .sort((a: any, b: any) =>
           (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
       arg = 0 < items.length
         ? `vmap({${items.map((it: any) =>
-          `{"${it.name}", ${it.name === idF ? 'Value("test01")' : cppLit(it.type)}}`).join(', ')}})`
+          `{"${cppEscape(it.name)}", ${isMatchOp && it.name === idF ? 'Value("test01")' : cppLit(it.type)}}`).join(', ')}})`
         : 'Value::undef()'
-    } else if ('create' === primaryOp || 'update' === primaryOp) {
+    } else if ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp) {
       const items = opRequestShape(exampleEntity, primaryOp).items
         .filter((it: any) => it.name !== idF && it.name !== 'id')
       const required = items.filter((it: any) => !it.optional)
       const chosen = required.length ? required : items.slice(0, 3)
-      arg = `vmap({${chosen.map((it: any) => `{"${it.name}", ${cppLit(it.type)}}`).join(', ')}})`
+      arg = `vmap({${chosen.map((it: any) => `{"${cppEscape(it.name)}", ${cppLit(it.type)}}`).join(', ')}})`
     }
-    const eVar = acc + ('list' === primaryOp ? 's' : '')
-    Content(`Value ${eVar} = client->${acc}()->${primaryOp}(${arg}, Value::undef());
-std::cout << Struct::jsonify(${eVar}) << std::endl;
+    if ('list' === primaryOp) {
+      Content(`for (const auto& ${acc} : client->${acc}()->list(${arg}, Value::undef())) {
+  std::cout << Struct::jsonify(${acc}->data()) << std::endl;
+}
 `)
+    }
+    else {
+      Content(`SdkEntityPtr ${acc} = client->${acc}()->${primaryOp}(${arg}, Value::undef());
+std::cout << Struct::jsonify(${acc}->data()) << std::endl;
+`)
+    }
   }
 
   Content(`\`\`\`

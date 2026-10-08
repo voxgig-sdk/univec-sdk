@@ -125,7 +125,7 @@ namespace ${model.const.Name}Sdk.Types;
       })), log)
 
       const ops = ent.op || {}
-      ;['load', 'list', 'create', 'update', 'remove'].forEach((opname: string) => {
+      ;['load', 'list', 'create', 'update', 'patch', 'remove'].forEach((opname: string) => {
         if (null == ops[opname]) {
           return
         }

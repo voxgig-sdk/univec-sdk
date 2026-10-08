@@ -463,7 +463,7 @@ function envchain(extra) {
         const stub = stubfetch();
         const sdk = exchangeSdk(stub);
         const res = await sdk.direct({ path: '/thing' });
-        node_assert_1.default.ok(res instanceof Error || (res && false === res.ok), 'expected a failure, got: ' + JSON.stringify(res));
+        node_assert_1.default.ok(res && false === res.ok && null != res.err, 'expected a failure, got: ' + JSON.stringify(res));
         node_assert_1.default.equal(stub.api().length, 0, 'a request must not go out unauthenticated because the chain was empty');
     });
     (0, node_test_1.test)('a failing token endpoint surfaces the API refusal, not a spin', async () => {

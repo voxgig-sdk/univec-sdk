@@ -60,8 +60,14 @@ local function default_http_fetch(fullurl, fetchdef)
   end
 
   local json_body = nil
-  if #body > 0 then
-    json_body = json.decode(body)
+  local unreadable = false
+  if string.find(body, "%S") then
+    local decoded, pos, err = json.decode(body)
+    if err ~= nil or string.find(body, "%S", pos) then
+      unreadable = true
+    else
+      json_body = decoded
+    end
   end
 
   local status_text = "OK"
@@ -75,6 +81,7 @@ local function default_http_fetch(fullurl, fetchdef)
     headers = resp_headers,
     json = function() return json_body end,
     body = body,
+    unreadable = unreadable,
   }, nil
 end
 

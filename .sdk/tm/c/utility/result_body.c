@@ -12,6 +12,10 @@ SdkResult* result_body_util(Context* ctx) {
     if (voxgig_is_func(json) && !v_is_noval(body) && !v_is_null(body)) {
       result->body = call_json(json);
     }
+    if (response->unreadable) {
+      voxgig_value* sent = ctx->spec ? ctx->spec->headers : NULL;
+      result->err = unreadable_body(ctx, result->status, result->headers, body, sent, result->err);
+    }
   }
   return result;
 }

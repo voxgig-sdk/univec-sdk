@@ -83,6 +83,7 @@ pub trait UnivecEntity: Entity + Sized {
     fn list(self: &Rc<Self>, reqmatch: Value, ctrl: Value) -> Result<Vec<Rc<Self>>, UnivecError>;
     fn create(self: &Rc<Self>, reqdata: Value, ctrl: Value) -> Result<Rc<Self>, UnivecError>;
     fn update(self: &Rc<Self>, reqdata: Value, ctrl: Value) -> Result<Rc<Self>, UnivecError>;
+    fn patch(self: &Rc<Self>, reqdata: Value, ctrl: Value) -> Result<Rc<Self>, UnivecError>;
     fn remove(self: &Rc<Self>, reqmatch: Value, ctrl: Value) -> Result<Rc<Self>, UnivecError>;
 }
 

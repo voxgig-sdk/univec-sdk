@@ -3,8 +3,8 @@
 # Create a new EntityName.
 #
 # reqdata: body data hashref (EntityNameCreateData shape). ctrl: optional
-# per-call control. Returns the created EntityName data (hashref); dies
-# with ProjectNameError on failure.
+# per-call control. Returns the created EntityName entity (data_get reads
+# its record); dies with ProjectNameError on failure.
 sub create {
   my ($self, $reqdata, $ctrl) = @_;
   my $utility = $self->{_utility};

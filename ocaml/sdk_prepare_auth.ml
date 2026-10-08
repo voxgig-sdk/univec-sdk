@@ -34,6 +34,12 @@ let cred_name = "authorization"
 let option_apikey = "apikey"
 let not_found = "__NOTFOUND__"
 
+(* The client's auth.name option, when set, replaces the name the API declares. *)
+let auth_name (options : value) : string =
+  match getpath_s options "auth.name" with
+  | Str s when s <> "" -> String.lowercase_ascii s
+  | _ -> cred_name
+
 let prepare_auth_util (ctx : ctx) : (spec option * sdk_error option) =
   match ctx.c_spec with
   | None -> (None, Some (ctx_make_error ctx "auth_no_spec" "Expected context spec property to be defined."))
@@ -45,16 +51,19 @@ let prepare_auth_util (ctx : ctx) : (spec option * sdk_error option) =
       * needs no auth omits the block entirely. Both land here. *)
      | Noval | Null -> ignore (delprop headers (Str cred_name)); (Some spec, None)
      | _ ->
+       let name = auth_name options in
+       (* A credential left under the declared name would travel beside the renamed one. *)
+       if name <> cred_name then ignore (delprop headers (Str cred_name));
        let apikey = getprop ~alt:(Str not_found) options (Str option_apikey) in
        let is_notfound = (match apikey with Str s -> s = not_found | _ -> false) in
        let no_apikey = is_notfound || is_noval apikey || apikey = Str "" in
        if no_apikey then
-         ignore (delprop headers (Str cred_name))
+         ignore (delprop headers (Str name))
        else begin
          let auth_prefix = match getpath_s options "auth.prefix" with Str s -> s | _ -> "" in
          let apikey_val = match apikey with Str s -> s | _ -> "" in
          (* Empty prefix (a raw apiKey credential) must not add a leading space. *)
          let authval = if auth_prefix <> "" then auth_prefix ^ " " ^ apikey_val else apikey_val in
-         setp headers cred_name (Str authval)
+         setp headers name (Str authval)
        end;
        (Some spec, None))

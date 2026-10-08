@@ -3,6 +3,7 @@ package KOTLINPACKAGE.feature
 import java.util.function.Consumer
 
 import KOTLINPACKAGE.core.Context
+import KOTLINPACKAGE.core.Helpers
 import KOTLINPACKAGE.core.SdkClient
 
 // Audit trail. Emits a structured record for every operation — who (actor),
@@ -65,18 +66,19 @@ class AuditFeature : BaseFeature("audit", "0.0.1", true) {
     val entity = ctx.op.entity
     val opname = ctx.op.name
 
-    val record = linkedMapOf<String, Any?>()
-    record["seq"] = this.seq
-    record["ts"] = FeatureOptions.foptNow(this.options).getAsLong()
-    record["actor"] = actor
-    record["entity"] = entity
-    record["op"] = opname
-    record["outcome"] = outcome
-    record["correlationId"] = ctx.id
+    val raw = linkedMapOf<String, Any?>()
+    raw["seq"] = this.seq
+    raw["ts"] = FeatureOptions.foptNow(this.options).getAsLong()
+    raw["actor"] = actor
+    raw["entity"] = entity
+    raw["op"] = opname
+    raw["outcome"] = outcome
+    raw["correlationId"] = ctx.id
     val result = ctx.result
     if (result != null) {
-      record["status"] = result.status
+      raw["status"] = result.status
     }
+    val record = Helpers.toMapAny(ctx.utility?.clean?.invoke(ctx, raw)) ?: raw
 
     this.records.add(record)
     val max = FeatureOptions.foptInt(this.options, "max", 1000)

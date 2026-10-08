@@ -12,6 +12,7 @@
 #ifndef SDK_UTILITY_PREPARE_AUTH_HPP
 #define SDK_UTILITY_PREPARE_AUTH_HPP
 
+#include <algorithm>
 #include <string>
 
 #include "../core/types.hpp"
@@ -36,6 +37,21 @@ inline SpecPtr prepareAuth(CtxPtr ctx) {
     return spec;
   }
 
+  // The client's auth.name option, when set, replaces the name the API declares.
+  std::string name = as_str(Struct::getpath(options, {"auth", "name"}));
+  if (name.empty()) {
+    name = CRED_NAME;
+  } else {
+    // ASCII rules, as a field name is ASCII: std::tolower follows the C locale.
+    std::transform(name.begin(), name.end(), name.begin(),
+      [](char c) { return ('A' <= c && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; });
+  }
+
+  // A credential left under the declared name would travel beside the renamed one.
+  if (name != CRED_NAME) {
+    map_remove(headers, CRED_NAME);
+  }
+
   Value apikey = getp(options, "apikey", Value(NOT_FOUND));
 
   bool skip = false;
@@ -46,16 +62,16 @@ inline SpecPtr prepareAuth(CtxPtr ctx) {
   }
 
   if (skip) {
-    map_remove(headers, CRED_NAME);
+    map_remove(headers, name);
   } else {
     std::string authPrefix = as_str(Struct::getpath(options, {"auth", "prefix"}));
     std::string apikeyVal = apikey.is_string() ? apikey.as_string() : "";
     // A raw credential (empty prefix, e.g. an apiKey scheme) must go in
     // as-is; only a non-empty prefix (Bearer/Basic/OAuth) is space-joined.
     if (authPrefix.empty()) {
-      map_put(headers, CRED_NAME, Value(apikeyVal));
+      map_put(headers, name, Value(apikeyVal));
     } else {
-      map_put(headers, CRED_NAME, Value(authPrefix + " " + apikeyVal));
+      map_put(headers, name, Value(authPrefix + " " + apikeyVal));
     }
   }
 

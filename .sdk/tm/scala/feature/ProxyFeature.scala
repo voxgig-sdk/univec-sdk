@@ -1,6 +1,7 @@
 package SCALAPACKAGE.feature
 
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
+import java.net.URI
 import java.util.regex.{Matcher, Pattern}
 import SCALAPACKAGE.core.{Context, FetcherFn, SdkClient}
 
@@ -20,6 +21,8 @@ class ProxyFeature extends BaseFeature("proxy", "0.0.1", true) {
   // Activity tracking (mirrors the ts client._proxy record).
   var routed: Int = 0
   var url: String = ""
+
+  private var target: String = ""
 
   private val HOST_RE: Pattern =
     Pattern.compile("^[a-z]+://([^/:]+)", Pattern.CASE_INSENSITIVE)
@@ -59,18 +62,36 @@ class ProxyFeature extends BaseFeature("proxy", "0.0.1", true) {
       }
     }
 
+    // A proxy URL may carry credentials as userinfo, from the option or the
+    // environment, and neither is under a sensitive key name. The transport
+    // is handed the raw target; the activity record shows the cleaned one.
+    this.target = this.url
+    if (!"".equals(this.url) && ctx.utility != null) {
+      try {
+        val parsed = new URI(this.url)
+        for (info <- List(parsed.getRawUserInfo, parsed.getUserInfo)) {
+          if (info != null && !"".equals(info)) {
+            for (part <- info.split(":", 2)) {
+              if (!"".equals(part)) ctx.utility.cleanAdd(ctx, part)
+            }
+          }
+        }
+      } catch { case _: RuntimeException => }
+      this.url = String.valueOf(ctx.utility.clean(ctx, this.url))
+    }
+
     val inner: FetcherFn = ctx.utility.fetcher
 
     ctx.utility.fetcher = (ctx2, u, fetchdef) => inner(ctx2, u, route(u, fetchdef))
   }
 
   private def route(u: String, fetchdef: JMap[String, Object]): JMap[String, Object] = {
-    if ("".equals(this.url) || bypass(u)) {
+    if ("".equals(this.target) || bypass(u)) {
       return fetchdef
     }
 
     val out = new LinkedHashMap[String, Object](fetchdef)
-    out.put("proxy", this.url)
+    out.put("proxy", this.target)
 
     this.routed += 1
     out

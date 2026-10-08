@@ -9,10 +9,19 @@ public static partial class SdkUtility
 {
     internal static Spec MakeSpecUtil(Context ctx)
     {
-        if (ctx.Out.TryGetValue("spec", out var outSpec) && outSpec is Spec cached)
+        if (ctx.Out.TryGetValue("spec", out var outSpec))
         {
-            ctx.Spec = cached;
-            return cached;
+            // A PreSpec hook (validate) rejects the operation by placing its
+            // error here; the pipeline raises it, and ctx.Spec stays a spec.
+            if (outSpec is Exception rejected)
+            {
+                throw rejected;
+            }
+            if (outSpec is Spec cached)
+            {
+                ctx.Spec = cached;
+                return cached;
+            }
         }
 
         var point = ctx.Point;
@@ -36,11 +45,11 @@ public static partial class SdkUtility
 
         ctx.Spec.Method = utility.PrepareMethod(ctx);
 
-        var allowMethod = StructUtils.GetPath(options, StructUtils.Jt("allow", "method"))
-            as string ?? "";
+        var allowMethodVal = StructUtils.GetPath(options, StructUtils.Jt("allow", "method"));
+        var allowMethod = allowMethodVal as string ?? "";
         // null-safe: an op outside the convention resolves NO method (see
         // PrepareMethod), which the allow list can never contain.
-        if (ctx.Spec.Method == null || !allowMethod.Contains(ctx.Spec.Method))
+        if (!global::UnivecSdk.Helpers.Allowed(allowMethodVal, ctx.Spec.Method))
         {
             throw ctx.MakeError("spec_method_allow",
                 "Method \"" + ctx.Spec.Method +
@@ -77,7 +86,16 @@ public static partial class SdkUtility
             ctx.Ctrl.Explain["spec"] = ctx.Spec;
         }
 
+        // Whatever PrepareAuth sets in the query, under whichever name, is the
+        // credential; a key it leaves as it was is the caller's.
+        var query = new Dictionary<string, object?>(ctx.Spec.Query);
+
         var spec = utility.PrepareAuth(ctx);
+
+        spec.AuthQuery = spec.Query
+            .Where(e => !query.TryGetValue(e.Key, out var was) || !Equals(was, e.Value))
+            .Select(e => e.Key)
+            .ToList();
 
         ctx.Spec = spec;
         return spec;

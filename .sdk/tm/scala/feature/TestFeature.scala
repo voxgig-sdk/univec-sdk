@@ -45,9 +45,42 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
   // and the response transform unwraps that key on the way back. Returning the
   // bare payload means the transform unwraps a property that is not there and
   // the caller gets nothing. Mirrors the go/ts/lua/php mocks.
+  // The record the mock keeps: the request data without `$body`, which only the
+  // wire carries.
+  private def record(reqdata: JMap[String, Object]): JMap[String, Object] = {
+    if (reqdata == null) return null
+    val out = new LinkedHashMap[String, Object](reqdata)
+    out.remove("$body")
+    out
+  }
+
+  // The key a list's response transform
+  // ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record under.
+  private def itemEnvelopeKey(restf: Object): String = restf match {
+    case spec: JList[_] if 3 == spec.size && "`$EACH`" == spec.get(0) && "body" == spec.get(1) =>
+      spec.get(2) match {
+        case m: JMap[_, _] => m.get("`$MERGE`") match {
+          case merge: String => "^`\\.([^.`$]+)`$".r.findFirstMatchIn(merge).map(_.group(1)).orNull
+          case _ => null
+        }
+        case _ => null
+      }
+    case _ => null
+  }
+
   private def envelope(ctx: Context, data: Object): Object = {
     if (data == null || ctx == null || ctx.point == null) return data
     val tm = Struct.getprop(ctx.point, "transform")
+    val key = itemEnvelopeKey(Struct.getprop(tm, "res"))
+    if (null != key && data.isInstanceOf[JList[_]]) {
+      val items = new java.util.ArrayList[Object]()
+      data.asInstanceOf[JList[Object]].forEach { item =>
+        val wrapped = new LinkedHashMap[String, Object]()
+        wrapped.put(key, item)
+        items.add(wrapped)
+      }
+      return items
+    }
     Struct.getprop(tm, "res") match {
       case spec: String =>
         // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
@@ -124,7 +157,7 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
       while (it.hasNext) Struct.delprop(it.next(), "$KEY")
       val out = Struct.clone(found)
       respond(ctx, 200, out, null)
-    } else if ("update" == op.name) {
+    } else if ("update" == op.name || "patch" == op.name) {
       var updateMatch = new LinkedHashMap[String, Object]()
       if (ctx.reqdata != null) {
         if (ctx.reqdata.containsKey("id")) updateMatch.put("id", ctx.reqdata.get("id"))
@@ -141,7 +174,7 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
       val ent = Struct.getelem(found, java.lang.Integer.valueOf(0))
       // update miss: 404, never another record
       if (ent == null) return respond(ctx, 404, null, extra("statusText", "Not found"))
-      ent match { case _: JMap[_, _] if ctx.reqdata != null => Struct.merge(Struct.jt(ent, ctx.reqdata)); case _ => }
+      ent match { case _: JMap[_, _] if ctx.reqdata != null => Struct.merge(Struct.jt(ent, record(ctx.reqdata))); case _ => }
       Struct.delprop(ent, "$KEY")
       val out = Struct.clone(ent)
       respond(ctx, 200, out, null)
@@ -166,7 +199,7 @@ class TestFeature extends BaseFeature("test", "0.0.1", true) {
           java.lang.Integer.valueOf(r.nextInt(0x10000)), java.lang.Integer.valueOf(r.nextInt(0x10000)))
       }
 
-      val ent = Struct.clone(ctx.reqdata)
+      val ent = Struct.clone(record(ctx.reqdata))
       ent match {
         case entm0: JMap[_, _] =>
           val entm = entm0.asInstanceOf[JMap[String, Object]]

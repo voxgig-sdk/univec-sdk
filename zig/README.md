@@ -15,7 +15,7 @@ keeps the cognitive load low.
 
 ## Install
 Zig has no central package registry, so this package is distributed as a
-git tag (`zig/vX.Y.Z`, see [Releases](https://github.com/voxgig-sdk/univec-sdk/releases)). Add it to
+git tag (`zig/vX.Y.Z`, see [Tags](https://github.com/voxgig-sdk/univec-sdk/tags)). Add it to
 your `build.zig.zon` dependencies, or build from a source checkout:
 
 ```bash
@@ -55,9 +55,9 @@ const client = sdk.UnivecSDK.new(h.jo(&.{
 ### 4. Create, update, and remove
 
 ```zig
-// Create — .ok carries the created record
+// Create — .ok carries the created entity
 switch (client.convert(h.vnull()).create(h.jo(&.{.{ "embeddings", h.olist() }, .{ "source_model", h.vstr("example_source_model") }, .{ "target_model", h.vstr("example_target_model") }}), h.vnull())) {
-    .ok => |created| std.debug.print("{s}\n", .{h.stringify(created)}),
+    .ok => |created| std.debug.print("{s}\n", .{h.stringify(created.asEntity().data(null))}),
     .err => |e| std.debug.print("create failed: {s}\n", .{e.msg}),
 }
 
@@ -71,14 +71,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -87,8 +88,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -138,9 +139,13 @@ Create a mock client for unit testing — no server required:
 ```zig
 const client = sdk.test_sdk(h.vnull(), h.vnull());
 
-// Entity ops return an OpResult — .ok carries the record, .err the error.
+// list's .ok is one entity per mock record, .err the error.
 switch (client.model(h.vnull()).list(h.vnull(), h.vnull())) {
-    .ok => |model| std.debug.print("{s}\n", .{h.stringify(model)}), // the mock record
+    .ok => |models| {
+        for (models) |model| {
+            std.debug.print("{s}\n", .{h.stringify(model.asEntity().data(null))});
+        }
+    },
     .err => |e| std.debug.print("list failed: {s}\n", .{e.msg}),
 }
 ```
@@ -222,18 +227,19 @@ All entities share the same interface.
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `list` | `(reqmatch: Value, ctrl: Value) OpResult` | List entities matching the criteria (`.ok` is a `Value` array). |
-| `create` | `(reqdata: Value, ctrl: Value) OpResult` | Create a new entity. |
-| `stream` | `(action: []const u8, args: Value, callopts: Value) []Value` | Run an op through the pipeline and materialise its result items. |
+| `list` | `(reqmatch: Value, ctrl: Value) EntListResult` | List entities matching the criteria (`.ok` is a slice of entities, one per record). |
+| `create` | `(reqdata: Value, ctrl: Value) EntResult` | Create a new entity. |
+| `stream` | `(action: []const u8, args: Value, callopts: Value) StreamResult` | Run an op through the pipeline: `.ok` with its result items, or `.err` with the error that failed it. |
 | `data` | `(args: ?Value) Value` | Get entity data (pass a map to set). |
 | `matchv` | `(args: ?Value) Value` | Get entity match criteria (pass a map to set). |
 | `get_name` | `() []const u8` | Return the entity name. |
 
 ### Result shape
 
-Entity operations return an `OpResult` union — `switch` on it: `.ok`
-carries the bare result data (a `Value` object for single-entity ops, a
-`Value` array for `list`), `.err` carries the branded error pointer.
+Entity operations return a result union — `switch` on it: `.ok` carries
+the entity (`EntResult`), or for `list` a slice of entities, one per record
+(`EntListResult`), and `asEntity().data(null)` reads an entity's record;
+`.err` carries the branded error pointer.
 
 The `direct()` escape hatch returns a result `Value` map directly (no
 error union) — even on a non-2xx response — that you branch on via
@@ -321,8 +327,9 @@ Create an instance: `const convert = client.convert(h.vnull());`
 | --- | --- |
 | `create(reqdata, ctrl)` | Create a new entity with the given data. |
 
-Each operation returns an `OpResult` — `switch` on it: `.ok => |data|`
-carries the result `Value`, `.err => |e|` carries the branded error.
+Each operation returns a result union — `switch` on it: `.ok` carries the
+entity (for `list`, a slice of entities, one per record), whose record
+`asEntity().data(null)` reads, and `.err => |e|` the branded error.
 
 #### Fields
 
@@ -340,7 +347,7 @@ switch (client.convert(h.vnull()).create(h.jo(&.{
     .{ "source_model", h.vstr("example_source_model") }, // []const u8
     .{ "target_model", h.vstr("example_target_model") }, // []const u8
 }), h.vnull())) {
-    .ok => |convert| std.debug.print("{s}\n", .{h.stringify(convert)}),
+    .ok => |convert| std.debug.print("{s}\n", .{h.stringify(convert.asEntity().data(null))}),
     .err => |e| std.debug.print("create failed: {s}\n", .{e.msg}),
 }
 ```
@@ -356,8 +363,9 @@ Create an instance: `const embed = client.embed(h.vnull());`
 | --- | --- |
 | `create(reqdata, ctrl)` | Create a new entity with the given data. |
 
-Each operation returns an `OpResult` — `switch` on it: `.ok => |data|`
-carries the result `Value`, `.err => |e|` carries the branded error.
+Each operation returns a result union — `switch` on it: `.ok` carries the
+entity (for `list`, a slice of entities, one per record), whose record
+`asEntity().data(null)` reads, and `.err => |e|` the branded error.
 
 #### Fields
 
@@ -375,7 +383,7 @@ switch (client.embed(h.vnull()).create(h.jo(&.{
     .{ "model", h.vstr("example_model") }, // []const u8
     .{ "texts", h.olist() }, // Value (array)
 }), h.vnull())) {
-    .ok => |embed| std.debug.print("{s}\n", .{h.stringify(embed)}),
+    .ok => |embed| std.debug.print("{s}\n", .{h.stringify(embed.asEntity().data(null))}),
     .err => |e| std.debug.print("create failed: {s}\n", .{e.msg}),
 }
 ```
@@ -391,8 +399,9 @@ Create an instance: `const ephemeral_key = client.ephemeral_key(h.vnull());`
 | --- | --- |
 | `create(reqdata, ctrl)` | Create a new entity with the given data. |
 
-Each operation returns an `OpResult` — `switch` on it: `.ok => |data|`
-carries the result `Value`, `.err => |e|` carries the branded error.
+Each operation returns a result union — `switch` on it: `.ok` carries the
+entity (for `list`, a slice of entities, one per record), whose record
+`asEntity().data(null)` reads, and `.err => |e|` the branded error.
 
 #### Fields
 
@@ -412,7 +421,7 @@ switch (client.ephemeral_key(h.vnull()).create(h.jo(&.{
     .{ "key", h.vstr("example_key") }, // []const u8
     .{ "resetsAt", h.vstr("example_resetsAt") }, // []const u8
 }), h.vnull())) {
-    .ok => |ephemeral_key| std.debug.print("{s}\n", .{h.stringify(ephemeral_key)}),
+    .ok => |ephemeral_key| std.debug.print("{s}\n", .{h.stringify(ephemeral_key.asEntity().data(null))}),
     .err => |e| std.debug.print("create failed: {s}\n", .{e.msg}),
 }
 ```
@@ -428,8 +437,9 @@ Create an instance: `const model = client.model(h.vnull());`
 | --- | --- |
 | `list(reqmatch, ctrl)` | List entities, optionally matching the given criteria. |
 
-Each operation returns an `OpResult` — `switch` on it: `.ok => |data|`
-carries the result `Value`, `.err => |e|` carries the branded error.
+Each operation returns a result union — `switch` on it: `.ok` carries the
+entity (for `list`, a slice of entities, one per record), whose record
+`asEntity().data(null)` reads, and `.err => |e|` the branded error.
 
 #### Fields
 
@@ -450,7 +460,11 @@ carries the result `Value`, `.err => |e|` carries the branded error.
 
 ```zig
 switch (client.model(h.vnull()).list(h.vnull(), h.vnull())) {
-    .ok => |models| std.debug.print("{s}\n", .{h.stringify(models)}),
+    .ok => |models| {
+        for (models) |model| {
+            std.debug.print("{s}\n", .{h.stringify(model.asEntity().data(null))});
+        }
+    },
     .err => |e| std.debug.print("list failed: {s}\n", .{e.msg}),
 }
 ```

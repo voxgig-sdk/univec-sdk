@@ -2,6 +2,7 @@ import 'GraphqlUtility.dart';
 import '../Spec.dart';
 
 import 'ErrUtility.dart';
+import 'PrepareMethodUtility.dart' show allowed;
 
 // Create request specification.
 dynamic makeSpec(dynamic ctx) {
@@ -32,7 +33,7 @@ dynamic makeSpec(dynamic ctx) {
   ctx.spec.method = prepareMethod(ctx);
 
   final allowmethod = (options['allow']?['method'] ?? '').toString();
-  if (!allowmethod.contains(ctx.spec.method.toString())) {
+  if (!allowed(options['allow']?['method'], ctx.spec.method)) {
     return ctx.error(
         'spec_method_allow',
         'Method "' +

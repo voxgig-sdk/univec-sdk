@@ -415,6 +415,7 @@ static void cost_commit(CostTrack* t, voxgig_value* options, Context* ctx,
       cmap(8, "seq", v_num((double)t->seq), "entity", v_str(entity), "op", v_str(opname),
            "actor", v_str(actor), "amount", v_num(amount), "currency", v_str(t->currency),
            "source", v_str(source), "attempts", v_num((double)attempts));
+  record = clean_util(ctx, record);
   t->last = record;
 
   voxgig_value* sink = getp(options, "sink");

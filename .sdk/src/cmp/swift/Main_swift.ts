@@ -6,6 +6,7 @@ import { swiftSecretsActive, swiftTargetDir, swiftTestDir } from './utility_swif
 import {
   cmp, each,
   File, Content, Copy, Folder, Fragment,
+  inactiveFeatureExcludes,
   pluginExcludes,
 } from '@voxgig/sdkgen'
 
@@ -65,7 +66,9 @@ const Main = cmp(async function Main(props: any) {
     Copy({
       from: 'tm/' + target.name + '/Sources/ProjectNameSDK',
       to: swiftTargetDir(model),
-      exclude: [...secretsSourceExcludes, ...pluginExcludes(model)],
+      exclude: [...secretsSourceExcludes,
+        ...inactiveFeatureExcludes(props.ctx$, target, 'tm/' + target.name + '/Sources/ProjectNameSDK'),
+        ...pluginExcludes(model)],
       replace: {
         ...props.ctx$.stdrep,
         ProjectName: model.const.Name,
@@ -77,7 +80,8 @@ const Main = cmp(async function Main(props: any) {
     Copy({
       from: 'tm/' + target.name + '/Tests/ProjectNameSDKTests',
       to: swiftTestDir(model),
-      exclude: secretsTestExcludes,
+      exclude: [...secretsTestExcludes,
+        ...inactiveFeatureExcludes(props.ctx$, target, 'tm/' + target.name + '/Tests/ProjectNameSDKTests')],
       replace: {
         ...props.ctx$.stdrep,
         ProjectName: model.const.Name,

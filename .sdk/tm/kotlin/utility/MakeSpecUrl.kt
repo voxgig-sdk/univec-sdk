@@ -1,6 +1,7 @@
 package KOTLINPACKAGE.utility
 
 import KOTLINPACKAGE.core.Context
+import KOTLINPACKAGE.core.Helpers
 import KOTLINPACKAGE.core.Result
 import KOTLINPACKAGE.core.Spec
 import KOTLINPACKAGE.utility.struct.Struct
@@ -46,7 +47,7 @@ fun makeSpec(ctx: Context): Spec {
 
   val allowMethodRaw = Struct.getpath(options, listOf("allow", "method"))
   val allowMethod = if (allowMethodRaw is String) allowMethodRaw else ""
-  if (method == null || "" == method || !allowMethod.contains(method)) {
+  if (method == null || !Helpers.allowed(allowMethodRaw, method)) {
     throw ctx.makeError(
       "spec_method_allow",
       "Method \"" + (method ?: "") +
@@ -80,7 +81,16 @@ fun makeSpec(ctx: Context): Spec {
     ctx.ctrl.explain!!["spec"] = spec
   }
 
+  // Whatever prepareAuth sets in the query, under whichever name, is the
+  // credential; a key it leaves as it was is the caller's.
+  val query = LinkedHashMap(spec.query)
+
   val authed = utility.prepareAuth(ctx)
+
+  authed.authquery = authed.query.entries
+    .filter { !query.containsKey(it.key) || query[it.key] != it.value }
+    .map { it.key }
+    .toMutableList()
 
   ctx.spec = authed
   return authed
@@ -104,7 +114,18 @@ fun makeUrl(ctx: Context): String {
   joinParts.add(spec.suffix)
   var url = Struct.join(joinParts, "/", true)
 
+  // A route the definition ends with a slash keeps it: a server such as a
+  // Django REST one redirects or refuses the route without it.
+  val point = ctx.point
+  val orig = if (point == null) null else Struct.getprop(point, "orig", null)
+  if (orig is String && orig.endsWith("/") && spec.suffix.isEmpty() && !url.endsWith("/")) {
+    url += "/"
+  }
+
   val resmatch = linkedMapOf<String, Any?>()
+
+  // Sent with the request, never recorded as the entity's match.
+  val authquery = spec.authquery
 
   val params = spec.params
   for (item in Struct.items(params)) {
@@ -117,6 +138,14 @@ fun makeUrl(ctx: Context): String {
     }
   }
 
+  // A placeholder left in the route would send the request to the wrong route.
+  // The base's own placeholders are server variables, resolved with the options.
+  val route = url.removePrefix(spec.base.trimEnd('/'))
+  val unfilled = Regex("\\{[^{}/]+\\}").findAll(route).map { it.value }.toList()
+  if (unfilled.isNotEmpty()) {
+    throw ctx.makeError("url_param_missing", "URL path has no value for " + unfilled.joinToString(", ") + ".")
+  }
+
   // Append query string from spec.query.
   var qsep = "?"
   for (item in Struct.items(spec.query)) {
@@ -125,7 +154,9 @@ fun makeUrl(ctx: Context): String {
     if (v != null) {
       url += qsep + Struct.escurl(key) + "=" + Struct.escurl(Struct.stringify(v))
       qsep = "&"
-      resmatch[key] = v
+      if (!authquery.contains(key)) {
+        resmatch[key] = v
+      }
     }
   }
 
@@ -155,11 +186,7 @@ fun makeFetchDef(ctx: Context): MutableMap<String, Any?> {
 
   val body = spec.body
   if (body != null) {
-    if (body is MutableMap<*, *>) {
-      fetchdef["body"] = Struct.jsonify(body)
-    } else {
-      fetchdef["body"] = body
-    }
+    fetchdef["body"] = Media.requestBody(ctx.point, body)
   }
 
   return fetchdef

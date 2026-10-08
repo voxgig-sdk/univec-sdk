@@ -12,7 +12,7 @@ ${tagline}
 
 The ${target.title} SDK for the ${model.Name} API — an entity-oriented client
 for Lean 4. The API is surfaced as capitalised Entities with a small, uniform
-verb set (\`list\`, \`load\`, \`create\`, \`update\`, \`remove\`); every operation is
+verb set (\`list\`, \`load\`, \`create\`, \`update\`, \`patch\`, \`remove\`); every operation is
 driven by the embedded config through the dependency-free vendored voxgig
 \`Value\` struct model, and runs in struct's \`SIO\` monad.
 

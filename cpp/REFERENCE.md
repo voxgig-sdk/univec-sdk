@@ -109,12 +109,12 @@ auto convert = client->convert();
 
 ### Operations
 
-#### `create(reqdata, ctrl) -> Value`
+#### `create(reqdata, ctrl) -> SdkEntityPtr`
 
-Create a new entity with the given data. Returns the created entity data and throws on error.
+Create a new entity with the given data. Returns the created entity and throws on error.
 
 ```cpp
-Value result = client->convert()->create(vmap({
+SdkEntityPtr result = client->convert()->create(vmap({
     {"embeddings", vlist()},  // std::vector<Value>
     {"source_model", Value("example_source_model")},  // std::string
     {"target_model", Value("example_target_model")},  // std::string
@@ -158,12 +158,12 @@ auto embed = client->embed();
 
 ### Operations
 
-#### `create(reqdata, ctrl) -> Value`
+#### `create(reqdata, ctrl) -> SdkEntityPtr`
 
-Create a new entity with the given data. Returns the created entity data and throws on error.
+Create a new entity with the given data. Returns the created entity and throws on error.
 
 ```cpp
-Value result = client->embed()->create(vmap({
+SdkEntityPtr result = client->embed()->create(vmap({
     {"embeddings", vlist()},  // std::vector<Value>
     {"model", Value("example_model")},  // std::string
     {"texts", vlist()},  // std::vector<Value>
@@ -208,12 +208,12 @@ auto ephemeral_key = client->ephemeral_key();
 
 ### Operations
 
-#### `create(reqdata, ctrl) -> Value`
+#### `create(reqdata, ctrl) -> SdkEntityPtr`
 
-Create a new entity with the given data. Returns the created entity data and throws on error.
+Create a new entity with the given data. Returns the created entity and throws on error.
 
 ```cpp
-Value result = client->ephemeral_key()->create(vmap({
+SdkEntityPtr result = client->ephemeral_key()->create(vmap({
     {"dailyLimit", Value(1)},  // int64_t
     {"dailyUsed", Value(1)},  // int64_t
     {"key", Value("example_key")},  // std::string
@@ -265,14 +265,14 @@ auto model = client->model();
 
 ### Operations
 
-#### `list(reqmatch, ctrl) -> Value`
+#### `list(reqmatch, ctrl) -> std::vector<SdkEntityPtr>`
 
-List entities matching the given criteria. The match is optional — pass `Value::undef()` to list all records. Returns a Value list and throws on error.
+List entities matching the given criteria. The match is optional — pass `Value::undef()` to list all records. Returns one entity per record and throws on error.
 
 ```cpp
-Value results = client->model()->list(Value::undef(), Value::undef());
-for (const auto& model : *results.as_list()) {
-  std::cout << Struct::jsonify(model) << std::endl;
+std::vector<SdkEntityPtr> results = client->model()->list(Value::undef(), Value::undef());
+for (const auto& model : results) {
+  std::cout << Struct::jsonify(model->data()) << std::endl;
 }
 ```
 
@@ -950,6 +950,7 @@ Timeout.
 | Option | Type |
 |---|---|
 | `clearTimer` | function |
+| `now` | function |
 | `setTimer` | function |
 
 These take no default: the feature behaves one way when you supply them and

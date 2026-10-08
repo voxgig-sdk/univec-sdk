@@ -10,13 +10,13 @@ const ReadmeInstall = cmp(function ReadmeInstall(props: any) {
   // Consumers vendor the source tree (or add it as a submodule) and put the
   // SDK directory on the compiler include path. The git release tag
   // (`cpp/vX.Y.Z`) is the unit of distribution.
-  const { releasesUrl } = repoInfo(model)
+  const { tagsUrl } = repoInfo(model)
 
   Content(`The ${target.title} SDK is **header-only** — there is no package to install
 from a registry. Vendor the \`cpp/\` directory into your project (or add the
 repository as a git submodule) and put it on your compiler's include path.
 Releases are cut as the git tag \`${target.name}/vX.Y.Z\` (see
-[Releases](${releasesUrl})).
+[Tags](${tagsUrl})).
 
 \`\`\`bash
 # Add the SDK as a submodule (or copy the cpp/ directory into your tree).

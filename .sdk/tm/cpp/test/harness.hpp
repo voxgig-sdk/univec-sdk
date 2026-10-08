@@ -142,7 +142,7 @@ struct FhOpResult {
 
 inline std::string fhDefaultMethod(const std::string& op) {
   if (op == "create") return "POST";
-  if (op == "update") return "PATCH";
+  if (op == "update" || op == "patch") return "PATCH";
   if (op == "remove") return "DELETE";
   return "GET";
 }

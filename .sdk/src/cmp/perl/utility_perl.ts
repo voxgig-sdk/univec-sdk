@@ -6,6 +6,8 @@ import {
   walk,
 } from '@voxgig/struct'
 
+import { targetFeatures, canonScalarKey, requiredItems } from '@voxgig/sdkgen'
+
 
 function projectPath(suffix?: string): string {
   return Path.normalize(Path.join(__dirname, '../../..', suffix ?? ''))
@@ -58,8 +60,32 @@ function perlStringLiteral(val: string): string {
 }
 
 
+// The secrets plugin needs builtin::is_bool, from perl 5.36.
+function minPerl(model: any, target: any): string {
+  return null != (targetFeatures(model, target) as any).secrets ? '5.036' : '5.018'
+}
+
+
+function perlVersionLabel(version: string): string {
+  const [major, minor] = version.split('.')
+  return major + '.' + Number(minor.slice(0, 3))
+}
+
+function perlListArgs(entity: any): string {
+  const lit = (type: any): string =>
+    (({ NULL: 'undef', INTEGER: '1', NUMBER: '1', BOOLEAN: '1', ARRAY: '[]', OBJECT: '{}' }) as any)[canonScalarKey(type)] ?? "'example'"
+  const items = requiredItems(entity, 'list')
+  return 0 < items.length
+    ? `({ ${items.map((it: any) => `${perlStringLiteral(it.name)} => ${lit(it.type)}`).join(', ')} })`
+    : ''
+}
+
+
 export {
+  perlListArgs,
   perlStringLiteral,
   clean,
   projectPath,
+  minPerl,
+  perlVersionLabel,
 }

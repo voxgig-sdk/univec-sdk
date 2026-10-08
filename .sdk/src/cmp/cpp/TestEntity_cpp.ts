@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, invalidRequest, opReachable } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -134,7 +134,7 @@ static ${entity.Name}Setup ${evar}_basic_setup(const Value& extra) {
 
   ${entity.Name}Setup s;
   s.client = client;
-  s.d = entity_data;
+  s.data = entity_data;
   s.idmap = idmap_resolved;
   s.env = env;
   s.live = live;
@@ -151,10 +151,10 @@ static void ${evar}_entity_instance() {
 
 `)
 
-    // The stream test drives the list op; only emit it when the entity has a
-    // list op (a create/load-only entity has no list endpoint, so
-    // stream("list") throws "Operation \"list\" has no endpoint definitions").
-    const flowHasList = allSteps.some((s: any) => 'list' === s.o)
+    // The stream test drives the list op with no match; only emit it when a
+    // bare call can reach a list route (see helpers/opShape opReachable).
+    const flowHasList = allSteps.some((s: any) => 'list' === s.o) &&
+      opReachable((entity.op as any)?.list, [])
     if (flowHasList) {
       Content(`
 static void ${evar}_entity_stream() {
@@ -180,6 +180,10 @@ static void ${evar}_entity_stream() {
 }
 `)
     }
+
+    const hasList = opReachable((entity.op as any)?.list, [])
+    const failure = failureTests(ProjectName, entity, evar, method, hasList)
+    Content(failure.code)
 
     Content(`
 static void ${evar}_entity_basic() {
@@ -224,12 +228,137 @@ static void ${evar}_entity_basic() {
 
 int main() {
   T_RUN(${evar}_entity_instance);
-${flowHasList ? `  T_RUN(${evar}_entity_stream);\n` : ''}  T_RUN(${evar}_entity_basic);
+${flowHasList ? `  T_RUN(${evar}_entity_stream);\n` : ''}${failure.tests.map((t) => `  T_RUN(${t});\n`).join('')}  T_RUN(${evar}_entity_basic);
   return sdktest::summary("${entity.name}_entity_test");
 }
 `)
   })
 })
+
+
+// Failure paths through the real entity code: a failed or denied operation
+// fails its stream, stream() leaves the caller's ctrl alone, a throwing hook
+// fires PreUnexpected (throw false too), and validate refuses a bad request.
+function failureTests(ProjectName: string, entity: ModelEntity, evar: string,
+  method: string, hasList: boolean): { code: string, tests: string[] } {
+  const tests: string[] = []
+  const bad = invalidRequest(entity)
+  if (!hasList && null == bad) {
+    return { code: '', tests }
+  }
+
+  let code = `
+static bool ${evar}_has_feature(const std::string& name) {
+  Value fm = Helpers::toMapAny(getp(sharedConfig(), "feature"));
+  return fm.is_map() && !getp(fm, name).is_undef();
+}
+`
+
+  if (hasList) {
+    tests.push(`${evar}_entity_stream_error`, `${evar}_entity_stream_ctrl`,
+      `${evar}_entity_unexpected`)
+    code += `
+class ${entity.Name}FailHook : public BaseFeature {
+public:
+  int unexpected = 0;
+  ${entity.Name}FailHook() : BaseFeature("failhook", "0.0.1", true) {}
+  void preSpec(CtxPtr ctx) override {
+    throw std::runtime_error("${entity.name} hook failed");
+  }
+  void preUnexpected(CtxPtr ctx) override {
+    unexpected++;
+  }
+};
+
+static void ${evar}_entity_stream_error() {
+  Value offline = vmap({{"net", vmap({{"offline", Value(true)}})}});
+  std::string msg;
+  try {
+    ${ProjectName}SDK::testSDK(offline, Value::undef())->${method}()
+        ->stream("list", Value::undef(), Value::undef());
+  } catch (const SdkErrorPtr& err) {
+    msg = err->getMessage();
+  }
+  ASSERT_TRUE(msg.find("offline") != std::string::npos,
+      "stream: a failed operation fails the stream");
+
+  bool raised = false;
+  try {
+    ${ProjectName}SDK::testSDK(offline, Value::undef())->${method}()
+        ->stream("list", Value::undef(), vmap({{"ctrl", vmap({{"throw", Value(false)}})}}));
+  } catch (const SdkErrorPtr&) {
+    raised = true;
+  }
+  ASSERT_FALSE(raised, "stream: under throw false a failed stream ends");
+
+  if (${evar}_has_feature("rbac")) {
+    std::string code;
+    try {
+      ${ProjectName}SDK::testSDK(Value::undef(), vmap({{"feature", vmap({{"rbac",
+          vmap({{"active", Value(true)}, {"deny", Value(true)}})}})}}))->${method}()
+          ->stream("list", Value::undef(), Value::undef());
+    } catch (const SdkErrorPtr& err) {
+      code = err->code;
+    }
+    ASSERT_EQ(code, std::string("rbac_denied"), "stream: a denied operation fails the stream");
+  }
+}
+
+static void ${evar}_entity_stream_ctrl() {
+  Value explain = vmap();
+  Value ctrl = vmap({{"explain", explain}});
+  ${ProjectName}SDK::testSDK()->${method}()->stream("list", Value::undef(), vmap({{"ctrl", ctrl}}));
+  ASSERT_TRUE(getp(ctrl, "stream").is_undef(), "stream: the caller's ctrl gains no key");
+  ASSERT_TRUE(!explain.as_map()->empty(), "stream: the caller's explain record is filled");
+}
+
+static void ${evar}_entity_unexpected() {
+  auto hook = std::make_shared<${entity.Name}FailHook>();
+  auto client = ${ProjectName}SDK::testSDK();
+  client->getRootCtx()->utility->featureAdd(client->getRootCtx(), hook);
+
+  std::string msg;
+  try {
+    client->${method}()->list(Value::undef(), Value::undef());
+  } catch (const SdkErrorPtr& err) {
+    msg = err->getMessage();
+  }
+  ASSERT_TRUE(msg.find("hook failed") != std::string::npos, "a throwing hook fails the operation");
+  ASSERT_TRUE(0 < hook->unexpected, "a throwing hook fires PreUnexpected");
+
+  int fired = hook->unexpected;
+  client->${method}()->list(Value::undef(), vmap({{"throw", Value(false)}}));
+  ASSERT_TRUE(fired < hook->unexpected, "under throw false PreUnexpected fires too");
+}
+`
+  }
+
+  if (null != bad) {
+    tests.push(`${evar}_entity_validate`)
+    const args = Object.entries(bad.args)
+      .map(([k, v]) => `{${JSON.stringify(k)}, Value(${JSON.stringify(v)})}`)
+      .join(', ')
+    code += `
+static void ${evar}_entity_validate() {
+  if (!${evar}_has_feature("validate")) {
+    std::cerr << "skip: feature not present in this SDK: validate\\n";
+    return;
+  }
+  auto vsdk = ${ProjectName}SDK::testSDK(Value::undef(), vmap({{"feature",
+      vmap({{"validate", vmap({{"active", Value(true)}})}})}}));
+  std::string code;
+  try {
+    vsdk->${method}()->${bad.op}(vmap({${args}}), Value::undef());
+  } catch (const SdkErrorPtr& err) {
+    code = err->code;
+  }
+  ASSERT_EQ(code, std::string("validate_failed"), "an invalid request fails with validate_failed");
+}
+`
+  }
+
+  return { code, tests }
+}
 
 
 function decl(varname: string, declared: Set<string>): string {

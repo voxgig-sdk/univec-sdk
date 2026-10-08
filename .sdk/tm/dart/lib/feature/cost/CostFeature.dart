@@ -284,7 +284,7 @@ class CostFeature extends BaseFeature {
     _bump(cost['actors'], actor.toString(), amount);
 
     _seq = _seq + 1;
-    final record = <String, dynamic>{
+    final record = ctx.utility.clean(ctx, <String, dynamic>{
       'seq': _seq,
       'entity': entity,
       'op': opname,
@@ -293,7 +293,7 @@ class CostFeature extends BaseFeature {
       'currency': cost['currency'],
       'source': source,
       'attempts': pending['attempts'],
-    };
+    });
     cost['last'] = record;
 
     final sink = options['sink'];

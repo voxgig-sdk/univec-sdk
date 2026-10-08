@@ -34,7 +34,7 @@ const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
   if (authActive) {
     Content(`import System.Environment (lookupEnv)
 import qualified SdkClient as Sdk
-import VoxgigStruct (Value (..), emptyMap)
+import VoxgigStruct (Value (..), emptyMap, stringify)
 import SdkHelpers (jo)
 
 main :: IO ()
@@ -46,7 +46,7 @@ main = do
   }
   else {
     Content(`import qualified SdkClient as Sdk
-import VoxgigStruct (Value (..), emptyMap)
+import VoxgigStruct (Value (..), emptyMap, stringify)
 import SdkHelpers (jo)
 
 main :: IO ()
@@ -63,12 +63,12 @@ main = do
 
     if (opnames.includes('list')) {
       Content(`
-  -- List all ${eName.toLowerCase()}s (one ENTITY per record, raises on error)
+  -- List all ${eName.toLowerCase()}s (one entity per record, raises on error)
   ent <- Sdk.${eFn} sdk VNoval
   match <- emptyMap
   ctrl <- emptyMap
   ${eFn}s <- Sdk.eList ent match ctrl
-  mapM_ (\\en -> print =<< Sdk.eDataGet en) ${eFn}s
+  mapM_ (\\en -> putStrLn =<< stringify =<< Sdk.eDataGet en) ${eFn}s
 `)
     }
 
@@ -83,12 +83,12 @@ main = do
             it.name === idF ? 'example_id' : 'example_' + it.name)})`).join(', ')}]`
         : '[]'
       Content(`
-  -- Load a specific ${eName.toLowerCase()} (returns the ENTITY, raises on error)
+  -- Load a specific ${eName.toLowerCase()} (returns the entity, raises on error)
   ent2 <- Sdk.${eFn} sdk VNoval
   m <- jo ${loadArg}
   ctrl2 <- emptyMap
   ${eFn} <- Sdk.eLoad ent2 m ctrl2
-  print =<< Sdk.eDataGet ${eFn}
+  putStrLn =<< stringify =<< Sdk.eDataGet ${eFn}
 `)
     }
   }

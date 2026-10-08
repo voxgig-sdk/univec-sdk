@@ -208,7 +208,7 @@ class CostFeature extends BaseFeature {
     this._bump(cost.actors, actor, amount)
 
     this._seq++
-    const record = {
+    const record = ctx.utility.clean(ctx, {
       seq: this._seq,
       entity,
       op: opname,
@@ -217,7 +217,7 @@ class CostFeature extends BaseFeature {
       currency: cost.currency,
       source,
       attempts: pending.attempts,
-    }
+    })
     cost.last = record
 
     const sink = this._options.sink

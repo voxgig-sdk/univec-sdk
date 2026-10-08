@@ -11,6 +11,11 @@ public static partial class SdkUtility
     private const string OptionApikey = "apikey";
     private const string NotFound = "__NOTFOUND__";
 
+    // The client's auth.name option, when set, replaces the name the API declares.
+    private static string PrepareAuthName(object? options) =>
+        StructUtils.GetPath(options, StructUtils.Jt("auth", "name")) is string name && name != ""
+            ? name.ToLowerInvariant() : HeaderAuth;
+
     internal static Spec PrepareAuthUtil(Context ctx)
     {
         var spec = ctx.Spec ?? throw ctx.MakeError("auth_no_spec",
@@ -26,6 +31,14 @@ public static partial class SdkUtility
             return spec;
         }
 
+        var name = PrepareAuthName(options);
+
+        // A credential left under the declared name would travel beside the renamed one.
+        if (name != HeaderAuth)
+        {
+            headers.Remove(HeaderAuth);
+        }
+
         var apikey = StructUtils.GetProp(options, OptionApikey, NotFound);
 
         var skip = apikey == null ||
@@ -33,7 +46,7 @@ public static partial class SdkUtility
 
         if (skip)
         {
-            headers.Remove(HeaderAuth);
+            headers.Remove(name);
         }
         else
         {
@@ -44,7 +57,7 @@ public static partial class SdkUtility
             }
             var apikeyVal = apikey as string ?? "";
             // Empty prefix (raw apiKey credential) must not add a leading space.
-            headers[HeaderAuth] = authPrefix == ""
+            headers[name] = authPrefix == ""
                 ? apikeyVal
                 : authPrefix + " " + apikeyVal;
         }

@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable } from '@voxgig/sdkgen'
 
 import {
   flatten,
@@ -27,8 +27,39 @@ import {
   isAuthActive,
   serverVarEnv,
   serverVariables,
-  entityDataIdField, envName, envToken
+  entityDataIdField, envName, envToken,
+  invalidRequest,
+  liveFlowNeeds, liveStrict, liveStrictNote,
 } from '@voxgig/sdkgen'
+
+
+// The live prologue of a flow built from offline fixtures: blocked without
+// the ids it binds, and a create-less load reading the first listed record.
+function liveFlowGate(entity: any, needs: any, entidEnv: string): string {
+  let out = ''
+  if (0 < needs.keys.length) {
+    out += `        if setup["live"]:
+            for _live_key in [${needs.keys.map((k: string) => JSON.stringify(k)).join(', ')}]:
+                if setup.get("synthetic_only") or setup["idmap"].get(_live_key) is None:
+                    runner.live_miss(LIVE_STRICT, f"Live entity test blocked: needs {_live_key} via ${entidEnv}")
+`
+  }
+  if (null != needs.blocked) {
+    out += `        if setup["live"]:
+            runner.live_miss(LIVE_STRICT, "Live entity test blocked: " + ${JSON.stringify(needs.blocked)})
+`
+  }
+  out += '        client = setup["client"]\n'
+  if (null != needs.discover) {
+    const match = Object.entries(needs.discover)
+      .map(([k, v]: any) => `${JSON.stringify(k)}: setup["idmap"].get(${JSON.stringify(v)})`).join(', ')
+    out += `        if setup["live"]:
+            runner.live_existing(setup, LIVE_STRICT, ${JSON.stringify(entity.name)},
+                                 lambda: client.${entity.Name}(None).list({${match}}, None))
+`
+  }
+  return out
+}
 
 
 // See TestEntity_ts.ts for the GenCtx/OpGen contract.
@@ -95,11 +126,15 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const genCtx: GenCtx = { model, entity, flow: basicflow, PROJUPPER }
 
-  // The stream test streams the "list" op and asserts a 3-item collection, so
-  // it only applies to entities that actually declare a `list` op. Others
-  // (e.g. Batch = create/load) have no list endpoint — make_point would error
-  // and the stream would yield nothing — so skip the test for them.
-  const hasList = !!(entity.op && (entity.op as any)?.list)
+  const strict = liveStrict(model, target.name)
+  const needs = liveFlowNeeds(entity, basicflow)
+  const entidEnv = PROJUPPER + '_TEST_' + envToken(entity.name) + '_ENTID'
+
+  // The stream test streams the "list" op with no match and asserts a 3-item
+  // collection, so it only applies to an entity whose list a bare call can
+  // reach: not one without a list (e.g. Batch = create/load), not a nested
+  // list needing its parent's id, and not one whose routes all need an action.
+  const hasList = opReachable((entity.op as any)?.list, [])
 
   File({ name: 'test_' + entity.name + '_entity.' + target.ext }, () => {
 
@@ -114,9 +149,16 @@ import pytest
 from ${model.const.Name.toLowerCase()}_sdk.utility.voxgig_struct import voxgig_struct as vs
 from ${model.const.Name.toLowerCase()}_sdk import ${model.const.Name}SDK
 from ${model.const.Name.toLowerCase()}_sdk.core import helpers
+from ${model.const.Name.toLowerCase()}_sdk.config import shared_config
+from ${model.const.Name.toLowerCase()}_sdk.feature.base_feature import ${model.const.Name}BaseFeature
 
 _TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 from test import runner
+${hasList ? failHookClass(model, entity) : ''}
+
+
+${liveStrictNote(strict, '#')}
+LIVE_STRICT = ${strict ? 'True' : 'False'}
 
 
 class Test${entity.Name}Entity:
@@ -159,8 +201,8 @@ ${hasList ? `
                 else:
                     got.append(item)
             assert len(got) == 3
-` : ''}
-    def test_should_run_basic_flow(self):
+${failureTests(model, entity)}` : ''}${validateTest(model, entity)}
+${strict ? '' : `    @runner.live_observe("${PROJUPPER}_TEST_LIVE", LIVE_STRICT)\n`}    def test_should_run_basic_flow(self):
         setup = _${entity.name}_basic_setup(None)
         # Per-op sdk-test-control.json skip — basic test exercises a flow with
         # multiple ops; skipping any one skips the whole flow (steps depend
@@ -171,13 +213,7 @@ ${hasList ? `
             if _skip:
                 pytest.skip(_reason or "skipped via sdk-test-control.json")
                 return
-        # The basic flow consumes synthetic IDs from the fixture. In live mode
-        # without an *_ENTID env override, those IDs hit the live API and 4xx.
-        if setup.get("synthetic_only"):
-            pytest.skip("live entity test uses synthetic IDs from fixture — "
-                        "set ${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID JSON to run live")
-        client = setup["client"]
-
+${liveFlowGate(entity, needs, entidEnv)}
 `)
 
     // Check if the flow has a create step
@@ -216,7 +252,7 @@ def _${entity.name}_basic_setup(extra):
     runner.load_env_local()
 
     entity_data_file = os.path.join(_TEST_DIR, "../../.sdk/test/entity/${entity.name}/${entity.Name}TestData.json")
-    with open(entity_data_file, "r") as f:
+    with open(entity_data_file, "r", encoding="utf-8") as f:
         entity_data_source = f.read()
 
     entity_data = json.loads(entity_data_source)
@@ -242,9 +278,8 @@ def _${entity.name}_basic_setup(extra):
 
 `)
 
-    Content(`    # Detect ENTID env override before envOverride consumes it. When live
-    # mode is on without a real override, the basic test runs against synthetic
-    # IDs from the fixture and 4xx's. We surface this so the test can skip.
+    Content(`    # Whether *_ENTID supplied the idmap, read before env_override consumes
+    # it: without it, the ids a live flow binds are the fixture's synthetic ones.
     _entid_env_raw = os.environ.get(
         "${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID")
     _idmap_overridden = _entid_env_raw is not None and _entid_env_raw.strip().startswith("{")
@@ -588,6 +623,97 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A feature whose PreSpec hook raises, counting the PreUnexpected calls it sees.
+function failHookClass(model: Model, entity: ModelEntity): string {
+  return `
+
+class _FailHook(${model.const.Name}BaseFeature):
+    def __init__(self):
+        super().__init__()
+        self.name = "failhook"
+        self.unexpected = 0
+
+    def init(self, ctx, options):
+        pass
+
+    def PreSpec(self, ctx):
+        raise RuntimeError("${entity.name} hook failed")
+
+    def PreUnexpected(self, ctx):
+        self.unexpected += 1
+`
+}
+
+
+// A failed operation raises from a stream as it does from the operation: a
+// transport failure, and a hook that rejects the call. A raising hook fires
+// PreUnexpected. The caller's ctrl stays its own.
+function failureTests(model: Model, entity: ModelEntity): string {
+  const Name = model.const.Name
+  const Entity = entity.Name
+  return `
+    def test_should_report_a_failed_stream(self):
+        offline = {"net": {"offline": True}}
+        with pytest.raises(Exception, match="offline"):
+            list(${Name}SDK.test(offline, None).${Entity}(None).stream("list", None, None))
+
+        quiet = {"ctrl": {"throw": False}}
+        list(${Name}SDK.test(offline, None).${Entity}(None).stream("list", None, quiet))
+
+        if "rbac" in (shared_config().get("feature") or {}):
+            denied = ${Name}SDK.test(
+                None, {"feature": {"rbac": {"active": True, "deny": True}}})
+            with pytest.raises(Exception) as err:
+                list(denied.${Entity}(None).stream("list", None, None))
+            assert "rbac_denied" == getattr(err.value, "code", None)
+
+    def test_should_leave_the_callers_ctrl(self):
+        explain = {}
+        ctrl = {"explain": explain}
+        list(${Name}SDK.test(None, None).${Entity}(None).stream("list", None, {"ctrl": ctrl}))
+        assert ["explain"] == list(ctrl.keys())
+        assert explain is ctrl["explain"] and 0 < len(explain)
+
+    def test_should_fire_pre_unexpected(self):
+        hook = _FailHook()
+        client = ${Name}SDK({"feature": {"test": {"active": True}}, "extend": [hook]})
+        with pytest.raises(Exception, match="hook failed"):
+            client.${Entity}(None).list(None, None)
+        assert 0 < hook.unexpected
+
+        fired = hook.unexpected
+        assert client.${Entity}(None).list(None, {"throw": False}) is None
+        assert fired < hook.unexpected
+`
+}
+
+
+// An invalid request fails with validate's own error, before it is sent.
+function validateTest(model: Model, entity: ModelEntity): string {
+  const bad = invalidRequest(entity)
+  if (null == bad) {
+    return ''
+  }
+  const args = Object.entries(bad.args)
+    .map(([k, v]) => JSON.stringify(k) + ': ' + pyLit(v)).join(', ')
+  return `
+    def test_should_refuse_an_invalid_request(self):
+        if "validate" not in (shared_config().get("feature") or {}):
+            pytest.skip("feature not present in this SDK: validate")
+        client = ${model.const.Name}SDK.test(
+            None, {"feature": {"validate": {"active": True}}})
+        with pytest.raises(Exception) as err:
+            client.${entity.Name}(None).${bad.op}({${args}}, None)
+        assert "validate_failed" == getattr(err.value, "code", None)
+`
+}
+
+
+function pyLit(v: any): string {
+  return true === v ? 'True' : false === v ? 'False' : JSON.stringify(v)
 }
 
 

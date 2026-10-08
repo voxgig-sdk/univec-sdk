@@ -1,7 +1,7 @@
 package SCALAPACKAGE.feature
 
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
-import SCALAPACKAGE.core.{Context, SdkClient}
+import SCALAPACKAGE.core.{Context, Helpers, SdkClient}
 
 // Audit trail. Emits a structured record for every operation — who (actor),
 // what (entity + op), the outcome, and a correlation id — suitable for
@@ -74,17 +74,23 @@ class AuditFeature extends BaseFeature("audit", "0.0.1", true) {
       opname = ctx.op.name
     }
 
-    val record = new LinkedHashMap[String, Object]()
-    record.put("seq", java.lang.Integer.valueOf(this.seq))
-    record.put("ts", java.lang.Long.valueOf(FeatureOptions.foptNow(this.options).getAsLong()))
-    record.put("actor", actor)
-    record.put("entity", entity)
-    record.put("op", opname)
-    record.put("outcome", outcome)
-    record.put("correlationId", ctx.id)
+    val raw = new LinkedHashMap[String, Object]()
+    raw.put("seq", java.lang.Integer.valueOf(this.seq))
+    raw.put("ts", java.lang.Long.valueOf(FeatureOptions.foptNow(this.options).getAsLong()))
+    raw.put("actor", actor)
+    raw.put("entity", entity)
+    raw.put("op", opname)
+    raw.put("outcome", outcome)
+    raw.put("correlationId", ctx.id)
     if (ctx.result != null) {
-      record.put("status", java.lang.Integer.valueOf(ctx.result.status))
+      raw.put("status", java.lang.Integer.valueOf(ctx.result.status))
     }
+    val record =
+      if (ctx.utility == null || ctx.utility.clean == null) raw
+      else {
+        val out = Helpers.toMapAny(ctx.utility.clean(ctx, raw))
+        if (out == null) raw else out
+      }
 
     this.records.add(record)
     val max = FeatureOptions.foptInt(this.options, "max", 1000)

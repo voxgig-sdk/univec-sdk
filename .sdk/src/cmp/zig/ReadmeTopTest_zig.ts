@@ -1,5 +1,5 @@
 
-import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape, requiredItems } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -13,6 +13,7 @@ import { zigVarName } from './utility_zig'
 // A type-correct zig expression constructing a voxgig struct Value.
 function zigLit(type: any): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'h.vnull()'
   if ('INTEGER' === k || 'NUMBER' === k) return 'h.vnum(1)'
   if ('BOOLEAN' === k) return 'h.vbool(true)'
   if ('ARRAY' === k) return 'h.olist()'
@@ -43,29 +44,36 @@ const client = sdk.test_sdk(h.vnull(), h.vnull());
     const idF = entityIdField(exampleEntity)
     const isMatchOp = 'load' === primaryOp || 'remove' === primaryOp
     let arg = 'h.vnull()'
-    if (isMatchOp) {
+    if (isMatchOp || ('list' === primaryOp && 0 < requiredItems(exampleEntity, 'list').length)) {
       // Every REQUIRED match key (id first) — the same shape that generates
       // the op's request match.
-      const items = opRequestShape(exampleEntity, primaryOp).items
-        .filter((it: any) => !it.optional || it.name === idF)
+      const items = (isMatchOp ? opRequestShape(exampleEntity, primaryOp).items
+        .filter((it: any) => !it.optional || it.name === idF) : requiredItems(exampleEntity, 'list'))
         .sort((a: any, b: any) =>
           (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
       arg = 0 < items.length
         ? `h.jo(&.{${items.map((it: any) =>
-          `.{ "${it.name}", ${it.name === idF ? 'h.vstr("test01")' : zigLit(it.type)} }`).join(', ')}})`
+          `.{ ${JSON.stringify(it.name)}, ${isMatchOp && it.name === idF ? 'h.vstr("test01")' : zigLit(it.type)} }`).join(', ')}})`
         : 'h.vnull()'
-    } else if ('create' === primaryOp || 'update' === primaryOp) {
+    } else if ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp) {
       const items = opRequestShape(exampleEntity, primaryOp).items
         .filter((it: any) => it.name !== idF && it.name !== 'id')
       const required = items.filter((it: any) => !it.optional)
       const chosen = required.length ? required : items.slice(0, 3)
       arg = 0 < chosen.length
-        ? `h.jo(&.{${chosen.map((it: any) => `.{ "${it.name}", ${zigLit(it.type)} }`).join(', ')}})`
+        ? `h.jo(&.{${chosen.map((it: any) => `.{ ${JSON.stringify(it.name)}, ${zigLit(it.type)} }`).join(', ')}})`
         : 'h.omap()'
     }
-    const eVar = zigVarName(exampleEntity.name) + ('list' === primaryOp ? 's' : '')
+    const eVar = zigVarName(exampleEntity.name)
+    const ok = 'list' === primaryOp
+      ? `.ok => |${eVar}s| {
+        for (${eVar}s) |${eVar}| {
+            std.debug.print("{s}\\n", .{h.stringify(${eVar}.asEntity().data(null))});
+        }
+    },`
+      : `.ok => |${eVar}| std.debug.print("{s}\\n", .{h.stringify(${eVar}.asEntity().data(null))}),`
     Content(`switch (client.${method}(h.vnull()).${primaryOp}(${arg}, h.vnull())) {
-    .ok => |${eVar}| std.debug.print("{s}\\n", .{h.stringify(${eVar})}),
+    ${ok}
     .err => |e| std.debug.print("${primaryOp} failed: {s}\\n", .{e.msg}),
 }
 `)

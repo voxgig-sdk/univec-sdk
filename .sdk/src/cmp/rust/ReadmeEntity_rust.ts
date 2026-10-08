@@ -1,12 +1,12 @@
 
-import { cmp, each, Content, canonToType, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, canonScalarKey, entityIdField, opRequestShape, opNeedsAction } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { rustVarName, rustMethodName } from './utility_rust'
+import { rustVarName, rustMethodName, rustListMatch } from './utility_rust'
 
 
 // Type names come from the shared canonToType 'rust' column (single source of truth).
@@ -14,6 +14,7 @@ import { rustVarName, rustMethodName } from './utility_rust'
 // A type-correct rust expression constructing a voxgig struct Value.
 function rustLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Value::Null'
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value::Num(1.0)'
   if ('BOOLEAN' === k) return 'Value::Bool(true)'
   if ('ARRAY' === k) return 'Value::empty_list()'
@@ -24,11 +25,12 @@ function rustLit(type: any, placeholder: string = 'example'): string {
 
 // Operation method descriptions (language-agnostic wording, rust signatures).
 const OP_DESC: Record<string, { method: string, desc: string }> = {
-  load:   { method: 'load(reqmatch, ctrl)',   desc: 'Load a single entity by match criteria.' },
-  list:   { method: 'list(reqmatch, ctrl)',   desc: 'List entities, optionally matching the given criteria.' },
-  create: { method: 'create(reqdata, ctrl)',  desc: 'Create a new entity with the given data.' },
-  update: { method: 'update(reqdata, ctrl)',  desc: 'Update an existing entity.' },
-  remove: { method: 'remove(reqmatch, ctrl)', desc: 'Remove the matching entity.' },
+  load:   { method: 'load(reqmatch, ctrl)',   desc: 'Load a single entity by match criteria. `Ok` is the entity.' },
+  list:   { method: 'list(reqmatch, ctrl)',   desc: 'List entities, optionally matching the given criteria. `Ok` is a `Vec` of entities, one per record.' },
+  create: { method: 'create(reqdata, ctrl)',  desc: 'Create a new entity with the given data. `Ok` is the entity.' },
+  update: { method: 'update(reqdata, ctrl)',  desc: 'Update an existing entity. `Ok` is the entity.' },
+  patch:  { method: 'patch(reqdata, ctrl)',  desc: 'Change part of an existing entity. `Ok` is the entity.' },
+  remove: { method: 'remove(reqmatch, ctrl)', desc: 'Remove the matching entity. `Ok` is the entity, marked as deleted.' },
 }
 
 
@@ -53,6 +55,8 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
+    // An op that needs an action has no plain call to show.
+    const callable = opnames.filter((o: string) => !opNeedsAction(entity.op[o]))
     const fields = Object.values(entity.fields || {})
     const idF = entityIdField(entity)
     const eVar = rustVarName(entity.name)
@@ -108,7 +112,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 `)
     }
 
-    if (opnames.includes('load')) {
+    if (callable.includes('load')) {
       const loadItems = opRequestShape(entity, 'load').items
         .filter((it: any) => !it.optional || it.name === idF)
         .sort((a: any, b: any) =>
@@ -122,22 +126,26 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
 \`\`\`rust
 let ${eVar} = client.${method}(Value::Noval).load(${loadArg}, Value::Noval).unwrap();
+println!("{:?}", ${eVar}.data(None));
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('list')) {
+    if (callable.includes('list')) {
       Content(`#### Example: List
 
 \`\`\`rust
-let ${eVar}s = client.${method}(Value::Noval).list(Value::Noval, Value::Noval).unwrap();
+let ${eVar}s = client.${method}(Value::Noval).list(${rustListMatch(entity)}, Value::Noval).unwrap();
+for ${eVar} in &${eVar}s {
+    println!("{:?}", ${eVar}.data(None));
+}
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('create')) {
+    if (callable.includes('create')) {
       const createItems = opRequestShape(entity, 'create').items
         .filter((it: any) => !it.optional)
       Content(`#### Example: Create

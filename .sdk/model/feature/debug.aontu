@@ -15,7 +15,9 @@ main: kit: feature: debug: {
       active: false
       # maximum retained entries
       max: 100
-      # header names to mask in captured traces
+      # header names masked in captured traces IN ADDITION to the SDK's own
+      # clean rules (clean.keys and every registered secret value), which
+      # apply to the whole entry, url and error message included
       redact: ['authorization', 'cookie', 'set-cookie', 'api-key', 'apikey', 'x-api-key', 'idempotency-key']
     }
   }

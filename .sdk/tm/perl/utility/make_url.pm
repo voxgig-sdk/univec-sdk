@@ -29,6 +29,15 @@ $REGISTRY{make_url} = sub {
     [$spec->{base}, $spec->{prefix}, $spec->{path}, $spec->{suffix}], '/', 1);
   my $resmatch = {};
 
+  # Sent with the request, never recorded as the entity's match.
+  my %authquery = map { $_ => 1 } @{ $spec->{authquery} || [] };
+
+  # A route the definition ends with a slash keeps it: a server such as a
+  # Django REST one redirects or refuses the route without it.
+  my $orig = $ctx->{point} ? UnivecHelpers::gp($ctx->{point}, 'orig') : undef;
+  $url .= '/' if defined $orig && !ref $orig && $orig =~ m{/\z}
+    && !(defined $spec->{suffix} && '' ne $spec->{suffix}) && $url !~ m{/\z};
+
   my $param_items = Voxgig::Struct::items($spec->{params});
   if ($param_items) {
     for my $item (@$param_items) {
@@ -42,6 +51,15 @@ $REGISTRY{make_url} = sub {
     }
   }
 
+  # A placeholder left in the route would send the request to the wrong route.
+  # The base's own placeholders are server variables, resolved with the options.
+  my $base = defined $spec->{base} && !ref $spec->{base} ? $spec->{base} : '';
+  $base =~ s{/+\z}{};
+  my $route = 0 == index($url, $base) ? substr($url, length $base) : $url;
+  my @unfilled = $route =~ /(\{[^{}\/]+\})/g;
+  return ('', $ctx->make_error('url_param_missing',
+    'URL path has no value for ' . join(', ', @unfilled) . '.')) if @unfilled;
+
   # Append query string from spec.query.
   my $qsep = '?';
   my $query_items = Voxgig::Struct::items($spec->{query});
@@ -51,7 +69,7 @@ $REGISTRY{make_url} = sub {
       if (UnivecHelpers::rb_truthy($val) && defined $key && !ref $key) {
         $url .= $qsep . Voxgig::Struct::escurl("$key") . '=' . Voxgig::Struct::escurl("$val");
         $qsep = '&';
-        $resmatch->{$key} = $val;
+        $resmatch->{$key} = $val unless $authquery{$key};
       }
     }
   }

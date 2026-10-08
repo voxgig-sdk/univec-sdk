@@ -5,6 +5,7 @@ import {
   cmp, each,
   File, Content, Copy, Folder, Fragment,
   targetFeatures,
+  inactiveFeatureExcludes,
   pluginExcludes,
   TEST_CONTROL_EXCLUDE
 } from '@voxgig/sdkgen'
@@ -38,31 +39,14 @@ const Main = cmp(async function Main(props: any) {
   const { model } = props.ctx$
 
   const entity: ModelEntity = getModelPath(model, `main.${KIT}.entity`)
-  // Gated by the applicability tags, so this target never imports or
-  // registers a feature it has no source for. One rule, one place:
-  // helpers/applicability.
+  // Gated by the applicability tags, so this target never names a feature it
+  // has no source for (helpers/applicability).
   const feature = targetFeatures(model, target)
 
   // The Scala package root for every runtime piece (like GOMODULE for go).
   const scalapackage = scalaPackage(model)
 
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const allfeature = getModelPath(model, `main.${KIT}.feature`,
-    { required: false, only_active: false }) || {}
-  const inactivePluginExcludes: RegExp[] = []
-  for (const fname of Object.keys(allfeature)) {
-    if (null != (feature as any)[fname]) continue
-    const groups = getModelPath(model, `main.${KIT}.feature.${fname}.plugin`,
-      { required: false, only_active: false }) || {}
-    for (const gname of Object.keys(groups)) {
-      for (const one of (groups[gname].path || [])) {
-        const pat = esc(String(one))
-        inactivePluginExcludes.push(new RegExp('(^|/)' +
-          pat.replace(/\\\/$/, '') + (/\/$/.test(String(one)) ? '/' : '$')))
-      }
-    }
-  }
-
   const SHARED_SEKRETO_PLUGINS = ['Httpjson.scala', 'Sigv4.scala']
   const pluginDirExcludes: RegExp[] = []
   if (null == (feature as any).secrets) {
@@ -83,8 +67,8 @@ const Main = cmp(async function Main(props: any) {
     exclude: [
       /src\//,
       TEST_CONTROL_EXCLUDE,
+      ...inactiveFeatureExcludes(props.ctx$, target),
       ...pluginExcludes(model),
-      ...inactivePluginExcludes,
       ...pluginDirExcludes,
     ],
     replace: {

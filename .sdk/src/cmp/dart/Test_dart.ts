@@ -11,6 +11,7 @@ import { cmp, each, snakify, Folder, File, Content, entityCollection,
   targetFeatures, TestControl } from '@voxgig/sdkgen'
 
 
+import { TestClean } from './TestClean_dart'
 import { TestDirect } from './TestDirect_dart'
 import { TestEntity } from './TestEntity_dart'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_dart'
@@ -49,6 +50,7 @@ import 'pipeline_test.dart' as pipeline_test;
 import 'feature_test.dart' as feature_test;
 import 'netsim_test.dart' as netsim_test;
 import 'custom_test.dart' as custom_test;
+import 'clean_test.dart' as clean_test;
 import 'readme_examples_test.dart' as readme_examples_test;
 `)
 
@@ -77,6 +79,7 @@ Future<void> main() async {
   feature_test.tests();
   netsim_test.tests();
   custom_test.tests();
+  clean_test.tests();
   readme_examples_test.tests();
 `)
 
@@ -103,6 +106,8 @@ Future<void> main() async {
 }
 `)
     })
+
+    TestClean({ target })
 
     // Documentation dart-examples presence & completeness gate.
     ReadmeExamplesTest({ target })

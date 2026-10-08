@@ -27,10 +27,12 @@ class UnivecLogFeature < UnivecBaseFeature
     end
   end
 
+  # A log line leaves the pipeline, so it is cleaned before the logger sees
+  # it, as every emitted record is.
   def _loghook(hook, ctx, level = "info")
     return unless @logger
     opname = ctx.op ? ctx.op.name : ""
-    msg = "hook=#{hook} op=#{opname}"
+    msg = ctx.utility.clean.call(ctx, "hook=#{hook} op=#{opname}")
     if @logger.respond_to?(:puts)
       @logger.puts("[#{level.upcase}] #{msg}")
     end

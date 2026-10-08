@@ -7,6 +7,7 @@ import { cmp, each, Folder, File, Content, entityCollection } from '@voxgig/sdkg
 
 import { TestEntity } from './TestEntity_zig'
 import { TestDirect } from './TestDirect_zig'
+import { TestClean } from './TestClean_zig'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_zig'
 
 
@@ -25,6 +26,7 @@ const Test = cmp(function Test(props: any) {
 
 const std = @import("std");
 const sdk = @import("sdk");
+const fh = @import("fh.zig");
 const h = sdk.h;
 const Value = sdk.Value;
 
@@ -46,6 +48,10 @@ test "sdk_constructs_in_test_mode" {
       // Validate the documented zig quick-start examples run.
       ReadmeExamplesTest({ target })
     })
+
+    // The canary sweep, its own file: build.zig names every test file, and
+    // the generator's compile lane runs this one alone as `test-clean`.
+    TestClean({ target })
   })
 })
 

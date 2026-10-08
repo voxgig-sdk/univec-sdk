@@ -1,3 +1,5 @@
+import 'MediaUtility.dart';
+
 dynamic prepareBody(dynamic ctx) {
   final op = ctx.op;
 
@@ -8,6 +10,10 @@ dynamic prepareBody(dynamic ctx) {
   dynamic body;
 
   if ('data' == op.input) {
+    if (isRawRequest(ctx.point)) {
+      return rawBody(ctx.reqdata);
+    }
+
     try {
       body = transformRequest(ctx);
     } catch (err) {

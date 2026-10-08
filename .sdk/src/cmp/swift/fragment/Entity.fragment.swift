@@ -19,5 +19,7 @@ public final class EntyClass: ProjectNameEntityBase {
 
   // #UpdateOp
 
+  // #PatchOp
+
   // #RemoveOp
 }

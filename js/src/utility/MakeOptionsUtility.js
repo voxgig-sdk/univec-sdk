@@ -1,6 +1,8 @@
 
 const { OPTSPEC } = require('../Schema')
 
+const { clean, cleanAdd, cleanAddSensitive, makeCleanConfig, splitvalues } = require('./CleanUtility')
+
 
 function makeOptions(ctx) {
   const utility = ctx.utility
@@ -10,7 +12,6 @@ function makeOptions(ctx) {
   const setprop = struct.setprop
   const merge = struct.merge
   const validate = struct.validate
-  const escre = struct.escre
 
   // `auth: null` is the documented way to disable auth outright, and
   // prepareAuth honours it before it ever reads the apikey. But it cannot
@@ -31,6 +32,21 @@ function makeOptions(ctx) {
 
   if (authsuppressed) {
     delete opts.auth
+  }
+
+  // The secret registry exists BEFORE validation, fed from the raw input, so
+  // the constructor's own rejection of a mistyped credential is clean too.
+  let config = ctx.config || {}
+  let cfgopts = config.options || {}
+
+  // An absent block is left out, or merge would erase the defaults.
+  const layer = (b) => null != b && 'object' === typeof b && !Array.isArray(b) ? b : {}
+  const cleancfg = makeCleanConfig(merge([{}, OPTSPEC.clean,
+    struct.clone(layer(cfgopts.clean)), layer(opts.clean)]))
+  const cleanctx = { options: { __derived__: { clean: cleancfg } } }
+  cleanAddSensitive(cleanctx, settings(opts))
+  for (const raw of [...splitvalues(cfgopts.clean?.values), ...splitvalues(opts.clean?.values)]) {
+    cleanAdd(cleanctx, raw)
   }
 
   // Feature add-order. `options.feature` may be given as an ordered ARRAY of
@@ -57,8 +73,6 @@ function makeOptions(ctx) {
     setprop(utility, key, val)
   }
 
-  let config = ctx.config || {}
-  let cfgopts = config.options || {}
 
   // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
   //
@@ -80,7 +94,12 @@ function makeOptions(ctx) {
   // contaminate every instance constructed after it.
   opts = merge([{}, struct.clone(cfgopts), opts])
 
-  opts = validate(opts, optspec)
+  try {
+    opts = validate(opts, optspec)
+  }
+  catch (err) {
+    throw clean(cleanctx, err)
+  }
 
   // The platform fetch, supplied AFTER validate rather than as a spec
   // default. `system.fetch` is declared `$ANY`, which passes a caller's own
@@ -147,23 +166,28 @@ function makeOptions(ctx) {
   }
 
   opts.__derived__ = {
-    clean: {
-      keyre: undefined
-    },
+    clean: cleancfg,
     featureorder,
   }
 
-  const keyre = opts.clean.keys
-    .split(/\s*,\s*/)
-    .filter((s) => null != s && '' !== s)
-    .map((key) => escre(key)).join('|')
-
-  if ('' != keyre) {
-    opts.__derived__.clean.keyre = keyre
-  }
+  // Again over the merged result: the config's own defaults can carry one.
+  cleanAddSensitive({ options: opts }, settings(opts))
 
   return opts
 }
+
+// Registration skips entity blocks, and rbac's rules, keyed by entity and op names.
+function settings(opts) {
+  const plain = (b, name) => null != b && 'object' === typeof b && !Array.isArray(b)
+    ? { ...b, entity: undefined, ...('rbac' === name ? { rules: undefined } : {}) } : b
+  const feature = Array.isArray(opts.feature) ? opts.feature.map((b) => plain(b, b?.name))
+    : null != opts.feature && 'object' === typeof opts.feature
+      ? Object.fromEntries(Object.entries(opts.feature).map(([k, v]) => [k, plain(v, k)]))
+      : opts.feature
+  return { ...opts, clean: undefined, __derived__: undefined, entity: undefined,
+    test: plain(opts.test), feature }
+}
+
 
 module.exports = {
   makeOptions

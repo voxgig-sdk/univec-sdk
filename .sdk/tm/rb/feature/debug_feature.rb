@@ -2,8 +2,9 @@
 #
 # Request/response capture for debugging. Records a bounded ring buffer of
 # per-operation traces - method, URL, redacted headers, response status and
-# timing. Sensitive header values (matching "redact", default
-# authorization/cookie/api-key style names) are masked. An optional
+# timing. The SDK's own clean rules (clean.keys and every registered secret
+# value) apply to the whole entry, and the "redact" option ADDS header names
+# on top of them. An optional
 # "on_entry" callback receives each finished entry (e.g. to stream to a
 # console). "max" caps the buffer (default 100). The clock is injectable
 # ("now", ms) for deterministic tests.
@@ -11,11 +12,6 @@
 require_relative 'base_feature'
 
 class UnivecDebugFeature < UnivecBaseFeature
-  REDACT_DEFAULT = [
-    "authorization", "cookie", "set-cookie", "api-key", "apikey",
-    "x-api-key", "idempotency-key",
-  ].freeze
-
   def initialize
     super
     @version = "0.0.1"
@@ -55,7 +51,7 @@ class UnivecDebugFeature < UnivecBaseFeature
       "op" => "#{ctx.op ? ctx.op.entity : '_'}.#{ctx.op ? ctx.op.name : '_'}",
       "method" => method,
       "url" => url,
-      "headers" => _redact(headers),
+      "headers" => _redact(ctx, headers),
       "start" => _now,
       "status" => nil,
       "ok" => nil,
@@ -101,6 +97,11 @@ class UnivecDebugFeature < UnivecBaseFeature
       entry["status"] = ctx.result.status
     end
 
+    # The whole entry leaves through the buffer and the callback: the url
+    # and the error message can carry a query credential the header mask
+    # above never saw.
+    entry = ctx.utility.clean.call(ctx, entry)
+
     track = @client.instance_variable_get(:@_debug)
     if track.nil?
       track = { "entries" => [] }
@@ -120,14 +121,16 @@ class UnivecDebugFeature < UnivecBaseFeature
     end
   end
 
-  def _redact(headers)
+  # The core clean rules apply (clean.keys, every registered value); the
+  # feature's own `redact` list ADDS header names on top of them.
+  def _redact(ctx, headers)
     return {} if headers.nil?
-    patterns = @options["redact"] || REDACT_DEFAULT
+    patterns = (@options["redact"] || []).map { |n| n.to_s.downcase }
     out = {}
     headers.each do |k, v|
-      out[k] = patterns.include?(k.to_s.downcase) ? "<redacted>" : v
+      out[k] = patterns.include?(k.to_s.downcase) ? "[redacted]" : v
     end
-    out
+    ctx.utility.clean.call(ctx, out)
   end
 
   def _now

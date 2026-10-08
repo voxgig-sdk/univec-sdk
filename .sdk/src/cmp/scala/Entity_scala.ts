@@ -45,7 +45,7 @@ const Entity = cmp(function Entity(props: any) {
       // implementation. Otherwise emit a stub that satisfies the SdkEntity
       // contract (so the package compiles) but errors at runtime.
       const opfrags =
-        (['load', 'list', 'create', 'update', 'remove']
+        (['load', 'list', 'create', 'update', 'patch', 'remove']
           .reduce((a: any, opname: string) =>
           (a['// #' + camelify(opname) + 'Op'] =
             !opnames.includes(opname) ?

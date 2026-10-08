@@ -19,6 +19,10 @@ public class ProxyFeature : BaseFeature
     private Dictionary<string, object?>? _options;
     private List<string> _noProxy = new();
 
+    // The proxy target as configured, for routing; Url below is the cleaned
+    // form, since a proxy URL may carry credentials as userinfo.
+    private string _target = "";
+
     // Activity tracking (mirrors the ts client._proxy record).
     public int Routed;
     public string Url = "";
@@ -43,14 +47,14 @@ public class ProxyFeature : BaseFeature
             return;
         }
 
-        Url = FoptStr(_options, "url", "");
+        _target = FoptStr(_options, "url", "");
         var noProxy = FoptStrList(_options, "noProxy");
 
         if (FoptBool(_options, "fromEnv", false))
         {
-            if (Url == "")
+            if (_target == "")
             {
-                Url = FirstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy");
+                _target = FirstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy");
             }
             if (noProxy == null)
             {
@@ -72,6 +76,23 @@ public class ProxyFeature : BaseFeature
             }
         }
 
+        // A proxy URL may carry credentials as userinfo, from the option or
+        // the environment, and neither is under a sensitive key name.
+        if (_target != "" && Uri.TryCreate(_target, UriKind.Absolute, out var parsed) &&
+            parsed.UserInfo != "")
+        {
+            foreach (var part in parsed.UserInfo.Split(':', 2))
+            {
+                if (part != "")
+                {
+                    ctx.Utility!.CleanAdd(ctx, part);
+                    try { ctx.Utility.CleanAdd(ctx, Uri.UnescapeDataString(part)); }
+                    catch (Exception) { }
+                }
+            }
+        }
+        Url = FcleanStr(ctx, _target);
+
         var inner = ctx.Utility!.Fetcher;
 
         ctx.Utility.Fetcher = (ctx2, url, fetchdef) =>
@@ -83,14 +104,14 @@ public class ProxyFeature : BaseFeature
 
     private Dictionary<string, object?> Route(string url, Dictionary<string, object?> fetchdef)
     {
-        if (Url == "" || Bypass(url))
+        if (_target == "" || Bypass(url))
         {
             return fetchdef;
         }
 
         var routed = new Dictionary<string, object?>(fetchdef)
         {
-            ["proxy"] = Url,
+            ["proxy"] = _target,
         };
 
         Routed++;

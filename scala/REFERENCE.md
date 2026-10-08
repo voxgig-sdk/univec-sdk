@@ -113,7 +113,7 @@ val convert = client.convert(null)
 
 #### `create(reqdata, ctrl) -> Object`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```scala
 val result = client.convert(null).create(java.util.Map.of(
@@ -162,7 +162,7 @@ val embed = client.embed(null)
 
 #### `create(reqdata, ctrl) -> Object`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```scala
 val result = client.embed(null).create(java.util.Map.of(
@@ -212,7 +212,7 @@ val ephemeralKey = client.ephemeralKey(null)
 
 #### `create(reqdata, ctrl) -> Object`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```scala
 val result = client.ephemeralKey(null).create(java.util.Map.of(
@@ -269,11 +269,11 @@ val model = client.model(null)
 
 #### `list(reqmatch, ctrl) -> Object`
 
-List entities matching the given criteria. The match is optional — call `list(null, null)` to list all records. Returns an aggregate list and raises on error.
+List entities matching the given criteria. The match is optional — call `list(null, null)` to list all records. Returns a list of entities, one per record, and raises on error.
 
 ```scala
-val results = client.model(null).list(null, null)
-println(results)
+val results = client.model(null).list(null, null).asInstanceOf[java.util.List[SdkEntity]]
+results.forEach(item => println(item.data()))
 ```
 
 ### Common Methods
@@ -950,6 +950,7 @@ Timeout.
 | Option | Type |
 |---|---|
 | `clearTimer` | function |
+| `now` | function |
 | `setTimer` | function |
 
 These take no default: the feature behaves one way when you supply them and

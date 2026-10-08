@@ -144,6 +144,18 @@
 (defn- st [fa k] (clojure.core/get (deref fa) k))
 
 
+;; Every value the chain resolves and every token bought can leave through
+;; the SDK's diagnostics, so each is registered with the clean utility the
+;; moment this feature sees it.
+(defn- register! [fa v]
+  (when (string? v)
+    (when-let [client (st fa :client)]
+      (when-let [rc (:root-ctx client)]
+        (when-let [ctx (deref rc)]
+          (when (core/oget ctx :utility)
+            (core/ucall ctx :clean-add v)))))))
+
+
 ;; The LIVE options map (the root context's validated options), which this
 ;; feature only ever READS. `client-options-map` would hand back a clone,
 ;; and a clone cannot answer "did the caller suppress auth" for the map the
@@ -224,9 +236,6 @@
         (throw (sekreto/sekretoerror
                 (str "secrets: token exchange failed: " (core/err-msg err) " from " url))))
 
-      ;; core/default-http-fetch NEVER returns an err - a connection failure
-      ;; comes back as status 0 with the exception in statusText - so the
-      ;; STATUS is what decides, not a nil error.
       (let [status (core/to-int (vs/getprop res "status"))]
         (when (or (< status 200) (>= status 300))
           (throw (sekreto/sekretoerror
@@ -239,6 +248,7 @@
             (throw (sekreto/sekretoerror
                     (str "secrets: token exchange returned no '" (:response x)
                          "' field from " url))))
+          (register! fa token)
           token)))))
 
 
@@ -275,6 +285,7 @@
   (if-let [s (st fa :sek)]
     ;; tryget: nil for a MISS, THROWS for a provider ERROR.
     (let [found (sekreto/tryget s (st fa :secretname))]
+      (register! fa found)
       (if (nil? (st fa :exchange))
         ;; An UNCACHED miss after an earlier hit is a revocation: the chain
         ;; now says no provider has the secret, so the value must not keep
@@ -484,6 +495,7 @@
             given (vec (or (vs/getprop options "providers") []))]
 
         (swap! fa assoc :secretname secretname :cache cache :exchange exchange)
+        (register! fa explicit)
 
         ;; The plugin DEFINITIONS the model selected, handed in by the
         ;; generated sdk.config. Upstream sekreto's contract since the

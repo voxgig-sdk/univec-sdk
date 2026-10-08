@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityOps , serverVariables} from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, opRequestShape, entityIdField, entityOps , serverVariables, javaMapOf } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { javaVarName, javaPackage } from './utility_java'
+import { javaVarName, javaPackage, javaListMatch, javaLit } from './utility_java'
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -44,23 +44,14 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
     'options.put("server", server);\n'
 
 
-  // A type-correct Java literal for a param — the loose object model means
-  // all values live in a Map<String, Object>.
-  const javaLit = (type: any, placeholder: string = 'example'): string => {
-    const k = canonScalarKey(type)
-    if ('INTEGER' === k) return '1L'
-    if ('NUMBER' === k) return '1.0'
-    if ('BOOLEAN' === k) return 'true'
-    if ('ARRAY' === k) return 'List.of()'
-    if ('OBJECT' === k) return 'Map.of()'
-    return `"${placeholder}"`
-  }
-
   if (authActive) {
     Content(`### 1. Create a client
 
 \`\`\`java
+import java.util.List;
+import java.util.Map;
 import ${javaPackage(model)}.core.${SDK};
+import ${javaPackage(model)}.core.SdkEntity;
 
 Map<String, Object> options = new java.util.LinkedHashMap<>();
 options.put("apikey", System.getenv("${envName(model)}_APIKEY"));
@@ -73,7 +64,10 @@ ${javaServerLines}${SDK} client = new ${SDK}(options);
     Content(`### 1. Create a client
 
 \`\`\`java
+import java.util.List;
+import java.util.Map;
 import ${javaPackage(model)}.core.${SDK};
+import ${javaPackage(model)}.core.SdkEntity;
 
 ${'' === javaServerLines
       ? `${SDK} client = new ${SDK}();`
@@ -96,13 +90,15 @@ ${'' === javaServerLines
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`list(null, null)\` returns an aggregate list of records (as \`Object\`, an
-aggregate list) and raises on error.
+\`list(null, null)\` returns a list of entities, one per record (as \`Object\`),
+and raises on error; an entity's \`data()\` reads its record.
 
 \`\`\`java
 try {
-    Object ${eVar}List = client.${accessor}(null).list(null, null);
-    System.out.println(${eVar}List);
+    List<?> ${eVar}List = (List<?>) client.${accessor}(null).list(${javaListMatch(exampleEntity)}, null);
+    for (Object ${eVar}Item : ${eVar}List) {
+        System.out.println(((SdkEntity) ${eVar}Item).data());
+    }
 }
 catch (RuntimeException err) {
     System.out.println("list failed: " + err.getMessage());
@@ -139,8 +135,8 @@ ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
 
 \`\`\`java
 try {
-    Object ${neVar} = client.${neAccessor}(null).load(Map.of(${neMatch.join(', ')}), null);
-    System.out.println(${neVar});
+    SdkEntity ${neVar} = (SdkEntity) client.${neAccessor}(null).load(${javaMapOf(neMatch)}, null);
+    System.out.println(${neVar}.data());
 }
 catch (RuntimeException err) {
     System.out.println("load failed: " + err.getMessage());
@@ -155,9 +151,9 @@ catch (RuntimeException err) {
         .sort((a: any, b: any) =>
           (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
       const loadArg = 0 < loadRequired.length
-        ? `Map.of(${loadRequired.map((it: any) =>
+        ? javaMapOf(loadRequired.map((it: any) =>
           `"${it.name}", ${javaLit(it.type,
-            it.name === idF ? 'example_id' : 'example_' + it.name)}`).join(', ')})`
+            it.name === idF ? 'example_id' : 'example_' + it.name)}`))
         : 'null'
 
       Content(`### 3. Load ${article} ${eName.toLowerCase()}
@@ -166,8 +162,8 @@ catch (RuntimeException err) {
 
 \`\`\`java
 try {
-    Object ${eVar} = client.${accessor}(null).load(${loadArg}, null);
-    System.out.println(${eVar});
+    SdkEntity ${eVar} = (SdkEntity) client.${accessor}(null).load(${loadArg}, null);
+    System.out.println(${eVar}.data());
 }
 catch (RuntimeException err) {
     System.out.println("load failed: " + err.getMessage());
@@ -196,14 +192,15 @@ catch (RuntimeException err) {
       return it && it.type
     }
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`java
 `)
       if (opnames.includes('create')) {
         Content(`// Create — returns the ENTITY (call data() for the record)
-Object created = client.${accessor}(null).create(Map.of(${examplePairs('create').join(', ')}), null);
+Object created = client.${accessor}(null).create(${javaMapOf(examplePairs('create'))}, null);
 
 `)
       }
@@ -211,7 +208,15 @@ Object created = client.${accessor}(null).create(Map.of(${examplePairs('create')
         const updatePairs = (idF ? [`"${idF}", ${javaLit(idParamType('update'), 'example_id')}`] : [])
           .concat(examplePairs('update'))
         Content(`// Update — supply the id in the match/data
-client.${accessor}(null).update(Map.of(${updatePairs.join(', ')}), null);
+client.${accessor}(null).update(${javaMapOf(updatePairs)}, null);
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`"${idF}", ${javaLit(idParamType('patch'), 'example_id')}`] : [])
+          .concat(examplePairs('patch'))
+        Content(`// Patch — sends only the fields given
+client.${accessor}(null).patch(${javaMapOf(patchPairs)}, null);
 
 `)
       }
@@ -224,7 +229,7 @@ client.${accessor}(null).update(Map.of(${updatePairs.join(', ')}), null);
             ? `"${it.name}", ${javaLit(idParamType('remove'), 'example_id')}`
             : `"${it.name}", ${javaLit(it.type, 'example_' + it.name)}`)
         Content(`// Remove
-client.${accessor}(null).remove(${removePairs.length ? `Map.of(${removePairs.join(', ')})` : 'null'}, null);
+client.${accessor}(null).remove(${removePairs.length ? javaMapOf(removePairs) : 'null'}, null);
 `)
       }
       Content(`\`\`\`

@@ -5,7 +5,11 @@ const __1 = require("..");
 const live_scenarios_1 = require("./live-scenarios");
 const utility_1 = require("./utility");
 (0, utility_1.loadEnvLocal)(__dirname + '/../.env.local');
-(0, node_test_1.test)('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' }, async () => {
+// main.kit.test.live.strict is true (the default is true): a live
+// request that fails, or a live test missing an input it needs,
+// fails the test.
+// An account with no record for a test to read skips it either way.
+(0, node_test_1.test)('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' }, async (t) => {
     await (0, live_scenarios_1.runLiveScenarios)(__1.SDK, [
         {
             "entity": "convert",
@@ -1723,6 +1727,6 @@ const utility_1 = require("./utility");
             },
             "reachable": true
         }
-    ], 'UNIVEC', { server: {}, secret: process.env.UNIVEC_SECRET });
+    ], 'UNIVEC', { server: {}, secret: process.env.UNIVEC_SECRET }, { strict: true, t });
 });
 //# sourceMappingURL=live.test.js.map

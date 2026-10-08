@@ -33,6 +33,8 @@ require_relative 'transform_response'
 
 UnivecUtility.registrar = ->(u) {
   u.clean = UnivecUtilities::Clean
+  u.clean_add = UnivecUtilities::CleanAdd
+  u.clean_explain = UnivecUtilities::CleanExplain
   u.done = UnivecUtilities::Done
   u.make_error = UnivecUtilities::MakeError
   u.feature_add = UnivecUtilities::FeatureAdd

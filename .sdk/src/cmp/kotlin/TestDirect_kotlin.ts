@@ -13,6 +13,8 @@ import {
   snakify,
   isAuthActive, envName, envToken,
   pointParts,
+  liveStrict,
+  liveStrictNote,
 } from '@voxgig/sdkgen'
 
 
@@ -144,6 +146,14 @@ import ${kotlinpackage}.utility.Json
 @Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE")
 class ${entity.Name}DirectTest {
 
+${liveStrictNote(liveStrict(model, target.name), '//', '  ')}
+  private val LIVE_STRICT = ${liveStrict(model, target.name)}
+
+  private fun liveOk(result: Map<String, Any?>): Boolean {
+    val status = Helpers.toInt(result["status"])
+    return result["err"] == null && result["ok"] == true && status in 200..299
+  }
+
 `)
 
     if (hasList && listPoint) {
@@ -160,8 +170,9 @@ class ${entity.Name}DirectTest {
       const listSkipBlock = listLiveIdKeys.length > 0
         ? `    if (setup.live) {
       for (liveKey in arrayOf<String>(${listLiveIdKeys.map((k: string) => `"${k}"`).join(', ')})) {
-        Assumptions.assumeTrue(setup.idmap[liveKey] != null,
-            "live test needs " + liveKey + " via *_ENTID env var (synthetic IDs only)")
+        if (setup.idmap[liveKey] == null) {
+          RunnerSupport.liveMiss(LIVE_STRICT, "Live test blocked: needs " + liveKey + " via ${entidEnvVar}")
+        }
       }
     }
 `
@@ -211,10 +222,12 @@ ${listSkipBlock}    val client = setup.client
       }
 
       Content(`    if (setup.live) {
-      Assumptions.assumeTrue(result["ok"] == true,
-          "list call not ok (likely synthetic IDs against live API): " + result)
-      val status = Helpers.toInt(result["status"])
-      Assumptions.assumeTrue(status in 200..299, "expected 2xx status, got " + result["status"])
+      if (!liveOk(result)) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live list failed: " + RunnerSupport.liveDescribe(result))
+      }
+      if (RunnerSupport.liveList(result["data"]) == null) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live list returned no list: " + RunnerSupport.liveDescribe(result))
+      }
     } else {
       assertEquals(true, result["ok"], "expected ok to be true")
       assertEquals(200, Helpers.toInt(result["status"]), "expected status 200")
@@ -252,23 +265,18 @@ ${listSkipBlock}    val client = setup.client
     if (hasLoad && loadPoint) {
       const ancestorParams = loadParams.filter((p: any) => p.n !== 'id')
 
+      const liveKey = (p: any) => p.n === 'id' ? entity.name + '01' : p.n.replace(/_id$/, '') + '01'
       let loadLiveIdKeys: string[] = []
       if (loadParams.length > 0 && !loadAllHaveExamples) {
-        if (hasList) {
-          loadLiveIdKeys = listParams.map((p: any) => {
-            return p.n === 'id'
-              ? entity.name + '01'
-              : p.n.replace(/_id$/, '') + '01'
-          })
-        } else {
-          loadLiveIdKeys = loadParams.map((p: any) => p.n + '01')
-        }
+        loadLiveIdKeys = [...new Set((hasList ?
+          [...listParams, ...loadParams.filter((p: any) => p.n !== 'id')] : loadParams).map(liveKey))]
       }
       const loadSkipBlock = loadLiveIdKeys.length > 0
         ? `    if (setup.live) {
       for (liveKey in arrayOf<String>(${loadLiveIdKeys.map(k => `"${k}"`).join(', ')})) {
-        Assumptions.assumeTrue(setup.idmap[liveKey] != null,
-            "live test needs " + liveKey + " via *_ENTID env var (synthetic IDs only)")
+        if (setup.idmap[liveKey] == null) {
+          RunnerSupport.liveMiss(LIVE_STRICT, "Live test blocked: needs " + liveKey + " via ${entidEnvVar}")
+        }
       }
     }
 `
@@ -317,17 +325,30 @@ ${loadSkipBlock}    val client = setup.client
           "path", "${listPath}",
           "method", "GET",
           "params", listParams))
-      Assumptions.assumeTrue(listResult["ok"] == true,
-          "list call not ok (likely synthetic IDs against live API): " + listResult)
-
-      val listData = if (listResult["data"] is List<*>) listResult["data"] as List<Any?> else mutableListOf<Any?>()
-      Assumptions.assumeTrue(listData.isNotEmpty(), "no entities to load in live mode")
+      if (!liveOk(listResult)) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live list discovery failed: " + RunnerSupport.liveDescribe(listResult))
+      }
+      val listData = RunnerSupport.liveList(listResult["data"])
+      if (listData == null) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live list discovery returned no list: " + RunnerSupport.liveDescribe(listResult))
+      }
+      if (listData!!.isEmpty()) {
+        RunnerSupport.liveEmpty("The account has no ${entity.name} record to load")
+      }
       val firstEnt = Helpers.toMapAny(listData[0]) ?: linkedMapOf()
+      if (firstEnt["id"] == null) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live load blocked: discovery returned no usable identity")
+      }
       params["id"] = firstEnt["id"]
 `)
           for (const p of ancestorParams) {
             const key = p.n.replace(/_id$/, '') + '01'
             Content(`      params["${p.n}"] = setup.idmap["${key}"]
+`)
+          }
+        } else if (loadParams.length > 0) {
+          for (const p of loadParams) {
+            Content(`      params["${p.n}"] = setup.idmap["${liveKey(p)}"]
 `)
           }
         }
@@ -362,10 +383,12 @@ ${loadSkipBlock}    val client = setup.client
       }
 
       Content(`    if (setup.live) {
-      Assumptions.assumeTrue(result["ok"] == true,
-          "load call not ok (likely synthetic IDs against live API): " + result)
-      val status = Helpers.toInt(result["status"])
-      Assumptions.assumeTrue(status in 200..299, "expected 2xx status, got " + result["status"])
+      if (!liveOk(result)) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live load failed: " + RunnerSupport.liveDescribe(result))
+      }
+      if (result["data"] == null) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live load returned no data: " + RunnerSupport.liveDescribe(result))
+      }
     } else {
       assertEquals(true, result["ok"], "expected ok to be true")
       assertEquals(200, Helpers.toInt(result["status"]), "expected status 200")

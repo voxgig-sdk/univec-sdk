@@ -38,6 +38,11 @@ object ResultBody {
       if (response != null && response.jsonFunc != null && response.body != null) {
         result.body = response.jsonFunc.get()
       }
+      if (response != null && response.unreadable) {
+        val sent = if (ctx.spec == null) null else ctx.spec.headers
+        result.err = Response.unreadableBody(ctx, result.status, result.headers, response.body,
+          sent, result.err)
+      }
     }
 
     result

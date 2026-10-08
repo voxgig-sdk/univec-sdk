@@ -752,8 +752,10 @@ let () =
       (* A non-live client: the credential becomes the deterministic
        * `test-<response>` and no purchase is attempted. Observed through
        * ctrl.explain, which records the live fetchdef whose headers map
-       * the wrapper rewrites in place. *)
+       * the wrapper rewrites in place. The explain record is cleaned, so
+       * clean is off for the header to read raw. *)
       let client = Sdk_client.test_with Noval (jo [
+          ("clean", jo [("active", Bool false)]);
           ("feature", jo [("secrets", jo [("active", Bool true); refresh_chain "R1";
                                           ("name", Str "refresh_token"); xchg []])])]) in
       let explain = empty_map () in

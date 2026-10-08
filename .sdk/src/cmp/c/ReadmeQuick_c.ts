@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { cIdent, cVarName } from './utility_c'
+import { cIdent, cVarName, cListMatch } from './utility_c'
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -37,6 +37,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   // A type-correct C expression constructing a voxgig struct Value.
   const cLit = (type: any, placeholder: string = 'example'): string => {
     const k = canonScalarKey(type)
+    if ('NULL' === k) return 'v_null()'
     if ('INTEGER' === k || 'NUMBER' === k) return 'v_num(1)'
     if ('BOOLEAN' === k) return 'v_bool(true)'
     if ('ARRAY' === k) return 'v_list()'
@@ -73,17 +74,18 @@ PNError* err = NULL;
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`list()\` returns a List of records and sets \`*err\` on failure — check
-\`err\` after the call.
+\`list()\` returns a \`NULL\`-terminated array of entities, one per record,
+and sets \`*err\` on failure — check \`err\` after the call. \`vt->data\`
+reads an entity's record.
 
 \`\`\`c
 Entity* ${evar} = ${acc}(client, NULL);
-voxgig_value* ${evar}s = ${evar}->vt->list(${evar}, NULL, NULL, &err);
+Entity** ${evar}s = ${evar}->vt->list(${evar}, ${cListMatch(exampleEntity)}, NULL, &err);
 if (err) {
     fprintf(stderr, "list failed: %s\\n", err->msg);
 } else {
-    for (size_t i = 0; i < (size_t)voxgig_size(${evar}s); i++) {
-        printf("%s\\n", voxgig_to_json(voxgig_getelem(${evar}s, v_int(i), NULL)));
+    for (size_t i = 0; ${evar}s[i]; i++) {
+        printf("%s\\n", voxgig_to_json(${evar}s[i]->vt->data(${evar}s[i], NULL)));
     }
 }
 \`\`\`
@@ -112,15 +114,16 @@ if (err) {
       Content(`### 3. Load ${neArticle} ${neName.toLowerCase()}
 
 ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
-\`load()\` returns the bare record and sets \`*err\` on failure.
+\`load()\` returns the entity and sets \`*err\` on failure; \`vt->data\` reads
+its record.
 
 \`\`\`c
 Entity* ${neVar} = ${neAcc}(client, NULL);
-voxgig_value* ${neVar}_rec = ${neVar}->vt->load(${neVar}, ${neMatch}, NULL, &err);
+Entity* loaded = ${neVar}->vt->load(${neVar}, ${neMatch}, NULL, &err);
 if (err) {
     fprintf(stderr, "load failed: %s\\n", err->msg);
 } else {
-    printf("%s\\n", voxgig_to_json(${neVar}_rec));
+    printf("%s\\n", voxgig_to_json(loaded->vt->data(loaded, NULL)));
 }
 \`\`\`
 
@@ -140,14 +143,15 @@ if (err) {
 
       Content(`### 3. Load ${article} ${eName.toLowerCase()}
 
-\`load()\` returns the bare record and sets \`*err\` on failure.
+\`load()\` returns the entity and sets \`*err\` on failure; \`vt->data\` reads
+its record.
 
 \`\`\`c
-${acquire}voxgig_value* ${evar}_rec = ${evar}->vt->load(${evar}, ${loadArg}, NULL, &err);
+${acquire}Entity* loaded = ${evar}->vt->load(${evar}, ${loadArg}, NULL, &err);
 if (err) {
     fprintf(stderr, "load failed: %s\\n", err->msg);
 } else {
-    printf("%s\\n", voxgig_to_json(${evar}_rec));
+    printf("%s\\n", voxgig_to_json(loaded->vt->data(loaded, NULL)));
 }
 \`\`\`
 
@@ -172,14 +176,16 @@ if (err) {
       const it = opRequestShape(exampleEntity, opname).items.find((x: any) => x.name === idF)
       return it && it.type
     }
-    // The id VALUE for an update/remove match: read it off the returned
-    // `created` record with getp when its data type carries the id AND a
-    // create ran; otherwise a type-correct literal.
-    const idValueFor = (opname: string): string => (null != dataIdF && opnames.includes('create'))
-      ? `getp(created, "${dataIdF}")`
+    // The id VALUE for an update/remove match: `created_id`, read off the
+    // created entity's record, when its data type carries the id AND a create
+    // ran; otherwise a type-correct literal.
+    const readsId = null != dataIdF && opnames.includes('create')
+    const idValueFor = (opname: string): string => readsId
+      ? 'created_id'
       : cLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       const acquire = (opnames.includes('list') || opnames.includes('load'))
         ? ''
         : `Entity* ${evar} = ${acc}(client, NULL);\n`
@@ -188,15 +194,27 @@ if (err) {
 \`\`\`c
 ${acquire}`)
       if (opnames.includes('create')) {
-        Content(`// Create — returns the bare created record
-voxgig_value* created = ${evar}->vt->create(${evar}, ${cmapExpr(examplePairs('create'))}, NULL, &err);
-
+        const idLine = readsId && (opnames.includes('update') || opnames.includes('remove'))
+          ? `voxgig_value* created_id = created
+    ? getp(created->vt->data(created, NULL), "${dataIdF}") : v_undef();
+`
+          : ''
+        Content(`// Create — returns the created entity, or NULL with *err set
+Entity* created = ${evar}->vt->create(${evar}, ${cmapExpr(examplePairs('create'))}, NULL, &err);
+${idLine}
 `)
       }
       if (opnames.includes('update')) {
         const updatePairs = (idF ? [`"${idF}", ${idValueFor('update')}`] : []).concat(examplePairs('update'))
         Content(`// Update
 ${evar}->vt->update(${evar}, ${cmapExpr(updatePairs)}, NULL, &err);
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`"${idF}", ${idValueFor('patch')}`] : []).concat(examplePairs('patch'))
+        Content(`// Patch — sends only the fields given
+${evar}->vt->patch(${evar}, ${cmapExpr(patchPairs)}, NULL, &err);
 
 `)
       }

@@ -5,12 +5,14 @@ use warnings;
 
 use File::Basename ();
 use Cwd ();
+use Scalar::Util ();
 
 my $__dir;
 BEGIN { $__dir = File::Basename::dirname(Cwd::abs_path(__FILE__)) }
 require(Cwd::abs_path("$__dir/../lib/Voxgig/Struct.pm"));
 require(Cwd::abs_path("$__dir/../core/helpers.pm"));
 require(Cwd::abs_path("$__dir/../core/spec.pm"));
+require(Cwd::abs_path("$__dir/prepare_method.pm"));
 
 package UnivecUtilities;
 
@@ -20,7 +22,12 @@ $REGISTRY{make_spec} = sub {
   my ($ctx) = @_;
 
   if ($ctx->{out}{spec}) {
-    $ctx->{spec} = $ctx->{out}{spec};
+    my $preset = $ctx->{out}{spec};
+    # A PreSpec hook (validate) rejects the operation by placing its error
+    # here; the pipeline raises it, and ctx.spec stays a request spec.
+    return (undef, $preset)
+      if Scalar::Util::blessed($preset) && $preset->isa('UnivecError');
+    $ctx->{spec} = $preset;
     return ($ctx->{spec}, undef);
   }
 
@@ -47,10 +54,12 @@ $REGISTRY{make_spec} = sub {
   $ctx->{spec}{method} = $utility->{prepare_method}->($ctx);
 
   my $allow_method = UnivecHelpers::gpath($options, 'allow.method');
+  my $allow_ok = UnivecUtilities::allowed($allow_method, $ctx->{spec}{method});
   $allow_method = '' unless defined $allow_method && !ref $allow_method;
-  unless (index($allow_method, $ctx->{spec}{method}) >= 0) {
+  unless ($allow_ok) {
+    my $shown = $ctx->{spec}{method} // '';
     return (undef, $ctx->make_error('spec_method_allow',
-      "Method \"$ctx->{spec}{method}\" not allowed by SDK option allow.method value: \"$allow_method\""));
+      "Method \"$shown\" not allowed by SDK option allow.method value: \"$allow_method\""));
   }
 
   $ctx->{spec}{params} = $utility->{prepare_params}->($ctx);
@@ -79,8 +88,23 @@ $REGISTRY{make_spec} = sub {
 
   $ctx->{ctrl}{explain}{spec} = $ctx->{spec} if $ctx->{ctrl}{explain};
 
+  # Whatever prepare_auth sets in the query, under whichever name, is the
+  # credential; a key it leaves as it was is the caller's.
+  my %query = %{ $ctx->{spec}{query} || {} };
+
   my ($spec, $err) = $utility->{prepare_auth}->($ctx);
   return (undef, $err) if $err;
+
+  my $same = sub {
+    my ($was, $now) = @_;
+    return !defined $now unless defined $was;
+    return 0 if !defined $now || ref $was ne ref $now;
+    return ref $now ? $was == $now : $was eq $now;
+  };
+  my $now = $spec->{query} || {};
+  $spec->{authquery} = [ grep {
+    !exists $query{$_} || !$same->($query{$_}, $now->{$_})
+  } sort keys %$now ];
 
   $ctx->{spec} = $spec;
   return ($spec, undef);

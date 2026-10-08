@@ -4,7 +4,7 @@
 // EJECT-START
 
   /// List EntityName entities by match (see EntityNameListMatch in
-  /// ProjectNameTypes.dart). Returns a list of EntityName entity instances.
+  /// ProjectNameTypes.dart). Returns a list of entities, one per record.
   Future<dynamic> list([dynamic reqmatch, dynamic ctrl]) async {
     final utility = this.utility;
 
@@ -74,9 +74,15 @@
 
       return done(ctx);
     } catch (err) {
-      // #PreUnexpected-Hook
+      // What a hook throws here must not escape the cleaning below.
+      dynamic failure = err;
+      try {
+        // #PreUnexpected-Hook
+      } catch (hookerr) {
+        failure = hookerr;
+      }
 
-      final uerr = unexpected(ctx, err);
+      final uerr = unexpected(ctx, failure);
 
       if (null != uerr) {
         throw uerr;

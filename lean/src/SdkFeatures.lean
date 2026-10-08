@@ -58,12 +58,18 @@ def appendTo (parent : Value) (key : String) (v : Value) : SIO Unit := do
 def baseFeature : SIO Feature := do
   pure { name := "base" }
 
+-- A log line leaves the pipeline, so the bucket keeps the CLEANED record:
+-- the spec after auth holds the credential. Lean options cannot carry a
+-- logger closure, so the record is the bucket's `last` entry.
 def logFeature : SIO Feature := do
   pure { name := "log"
        , hook := fun stage ctx => do
            if stage == "PreRequest" then do
              let b ← trackCtx ctx "log" (newMap #[("calls", .num 0.0)])
-             bumpNum b "calls" 1.0 }
+             bumpNum b "calls" 1.0
+             let record ← newMap #[("hook", .str stage), ("op", .str (← SdkUtility.opnameOf ctx)),
+                                   ("spec", ← gp ctx "spec"), ("ctx", ← SdkUtility.contextJson ctx)]
+             sp b "last" (← SdkUtility.clean ctx record) }
 
 -- ---------------------------------------------------------------------------
 -- retry
@@ -341,22 +347,28 @@ def telemetryFeature : SIO Feature := do
              let s ← newMap #[("id", .str ("s" ++ sid)), ("name", .str opname),
                               ("start", .num (← nowMs)), ("ok", .bool false)]
              spanR.set s
-             appendTo t "spans" s
              bumpNum t "active" 1.0
-           else if stage == "PreDone" then do
+           else if stage == "PreDone" || stage == "PreUnexpected" then do
+             -- Closed once per operation: the span leaves into the bucket as
+             -- a cleaned copy when it is complete, not while it is open.
              let s ← spanR.get
              match s with
              | .map _ => do
+               spanR.set .noval
                let t ← trackCtx ctx "telemetry" mk
                let endMs ← nowMs
                sp s "end" (.num endMs)
                sp s "durationMs" (.num (endMs - numOf (← gp s "start") 0.0))
-               sp s "ok" (.bool (truthy (← gp (← gp ctx "result") "ok")))
+               sp s "ok" (.bool (stage == "PreDone" && truthy (← gp (← gp ctx "result") "ok")))
+               appendTo t "spans" (← SdkUtility.clean ctx s)
                bumpNum t "active" (-1.0)
              | _ => pure () }
 
 -- ---------------------------------------------------------------------------
 -- debug (redacted request/response log)
+--
+-- The core clean rules apply to every entry (clean.keys, every registered
+-- value); the feature's own `redact` list ADDS header names on top of them.
 -- ---------------------------------------------------------------------------
 
 def debugFeature : SIO Feature := do
@@ -370,33 +382,39 @@ def debugFeature : SIO Feature := do
              newMap #[("entries", es)]
            if stage == "PreRequest" then do
              let o ← optsR.get
-             let d ← trackCtx ctx "debug" mk
-             let patterns ← optStrList o "redact"
-               #["authorization", "cookie", "set-cookie", "api-key", "apikey",
-                 "x-api-key", "idempotency-key"]
+             let patterns := (← optStrList o "redact" #[]).map lower
              let specV ← gp ctx "spec"
              let hdrs ← gp specV "headers"
              let safe ← emptyMap
              match hdrs with
              | .map i =>
                for k in (← keysof (.map i)) do
-                 if patterns.contains (lower k) then sp safe k (.str "<redacted>")
+                 if patterns.contains (lower k) then sp safe k (.str "[redacted]")
                  else sp safe k (← gp (.map i) k)
              | _ => pure ()
              let opname ← SdkUtility.opnameOf ctx
+             let url ← gp specV "url"
              let e ← newMap #[("op", .str opname), ("start", .num (← nowMs)),
-                              ("headers", safe), ("ok", .bool false)]
+                              ("url", url), ("headers", ← SdkUtility.clean ctx safe),
+                              ("ok", .bool false)]
              entryR.set e
-             appendTo d "entries" e
-           else if stage == "PreDone" then do
+           else if stage == "PreDone" || stage == "PreUnexpected" then do
+             -- The whole entry leaves through the buffer once it is finished:
+             -- the url and the error message can carry a query credential the
+             -- header mask never saw.
              let e ← entryR.get
              match e with
              | .map _ => do
+               entryR.set .noval
+               let d ← trackCtx ctx "debug" mk
                let endMs ← nowMs
                sp e "durationMs" (.num (endMs - numOf (← gp e "start") 0.0))
                let res ← gp ctx "result"
-               sp e "ok" (.bool (truthy (← gp res "ok")))
+               sp e "ok" (.bool (stage == "PreDone" && truthy (← gp res "ok")))
                sp e "status" (← gp res "status")
+               if stage == "PreUnexpected" then
+                 sp e "error" (← gp (← gp (← gp ctx "ctrl") "err") "message")
+               appendTo d "entries" (← SdkUtility.clean ctx e)
              | _ => pure () }
 
 -- ---------------------------------------------------------------------------
@@ -414,7 +432,7 @@ def auditFeature : SIO Feature := do
                                  ("entity", ← gp (← gp ctx "op") "entity"),
                                  ("ok", .bool (truthy (← gp res "ok"))),
                                  ("at", .num (← nowMs))]
-             appendTo a "records" rec0 }
+             appendTo a "records" (← SdkUtility.clean ctx rec0) }
 
 -- ---------------------------------------------------------------------------
 -- clienttrack (request/session identity headers)
@@ -620,7 +638,7 @@ def costFeature : SIO Feature := do
                         ("actor", Value.str actor), ("amount", Value.num amount),
                         ("currency", ← gp rec_ "currency"), ("source", ← gp p "source"),
                         ("attempts", ← gp p "attempts")]
-    sp rec_ "last" last
+    sp rec_ "last" (← SdkUtility.clean ctx last)
     resetPending
 
   pure { name := "cost"
@@ -700,6 +718,25 @@ def proxyFeature : SIO Feature := do
            optsR.set om
            if (← optActive opts) then do
              let client ← clientOf ctx
+             -- A proxy URL may carry credentials as userinfo, and neither
+             -- part is under a sensitive key name. The init context has no
+             -- options, so they are registered against the client's.
+             let purl0 ← gpS om "url"
+             let authority := match (purl0.splitOn "://") with
+               | [_, rest] => (rest.splitOn "/").headD ""
+               | _ => ""
+             if (authority.splitOn "@").length > 1 then
+               let info := "@".intercalate ((authority.splitOn "@").dropLast)
+               -- The password runs from the first colon and may hold more.
+               let parts := match info.splitOn ":" with
+                 | user :: rest => [user, ":".intercalate rest]
+                 | [] => []
+               let options ← gp client "options"
+               for part in parts do
+                 if part != "" then
+                   SdkUtility.cleanAddOptions options (.str part)
+                   if let some decoded := SdkUtility.percentDecode part then
+                     SdkUtility.cleanAddOptions options (.str decoded)
              let inner ← getFetcher client
              setFetcher client fun c u f => do
                let o ← optsR.get
@@ -710,7 +747,7 @@ def proxyFeature : SIO Feature := do
                  let proxies ← newMap #[("http", .str purl), ("https", .str purl)]
                  sp f "proxies" proxies
                  let b ← trackCtx c "proxy"
-                   (newMap #[("routed", .num 0.0), ("url", .str purl)])
+                   (do newMap #[("routed", .num 0.0), ("url", ← SdkUtility.clean c (.str purl))])
                  bumpNum b "routed" 1.0
                  inner c u f }
 

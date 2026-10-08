@@ -19,13 +19,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `($reqmatch, $ctrl) -> hashref` | Load a single entity by match criteria. Dies on error. |',
-    list: '| `list` | `($reqmatch, $ctrl) -> arrayref` | List entities matching the criteria. Dies on error. |',
-    create: '| `create` | `($reqdata, $ctrl) -> hashref` | Create a new entity. Dies on error. |',
-    update: '| `update` | `($reqdata, $ctrl) -> hashref` | Update an existing entity. Dies on error. |',
-    remove: '| `remove` | `($reqmatch, $ctrl) -> hashref` | Remove an entity. Dies on error. |',
+    load: '| `load` | `($reqmatch, $ctrl) -> entity` | Load a single entity by match criteria, and return it. Dies on error. |',
+    list: '| `list` | `($reqmatch, $ctrl) -> arrayref` | List entities matching the criteria, one per record. Dies on error. |',
+    create: '| `create` | `($reqdata, $ctrl) -> entity` | Create a new entity, and return it. Dies on error. |',
+    update: '| `update` | `($reqdata, $ctrl) -> entity` | Update an existing entity, and return it. Dies on error. |',
+    patch: '| `patch` | `($reqdata, $ctrl) -> entity` | Change part of an existing entity, and return it. Dies on error. |',
+    remove: '| `remove` | `($reqmatch, $ctrl) -> entity` | Remove an entity, and return it marked as deleted. Dies on error. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -93,9 +94,10 @@ ${opRows}
 
 ### Result shape
 
-Entity operations return the ENTITY (call data_get for the record) (a \`hashref\` for single-entity
-ops, an \`arrayref\` for \`list\`) and die on error. Wrap calls in
-\`eval { ... }\` and inspect \`$@\` to handle failures.
+Entity operations return the entity, and \`list\` an \`arrayref\` of
+entities, one per record; \`data_get\` reads an entity's record (a
+\`hashref\`). They die on error, so wrap calls in \`eval { ... }\` and
+inspect \`$@\` to handle failures.
 
 The \`direct()\` escape hatch never dies — it returns a result \`hashref\`
 you branch on via \`$result->{ok}\`:

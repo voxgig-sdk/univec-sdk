@@ -261,7 +261,7 @@ defmodule Univec.Feature.Cost do
     S.setprop(f, "seq", seq)
 
     record =
-      S.jm([
+      Feature.clean(ctx, S.jm([
         "seq", seq,
         "entity", entity,
         "op", opname,
@@ -270,7 +270,7 @@ defmodule Univec.Feature.Cost do
         "currency", S.getprop(cost, "currency"),
         "source", source,
         "attempts", S.getprop(pending, "attempts")
-      ])
+      ]))
 
     S.setprop(cost, "last", record)
 

@@ -96,11 +96,13 @@ public final class TelemetryFeature: BaseFeature {
     span.entries["durationMs"] = .int(dur)
     span.entries["ok"] = .bool(ok)
 
+    let finished = fclean(ctx, span)
+
     activeSpans -= 1
-    spans.append(span)
+    spans.append(finished)
 
     if let exporter = gp(options, "exporter").asNative as? (VMap) -> Void {
-      exporter(span)
+      exporter(finished)
     }
   }
 

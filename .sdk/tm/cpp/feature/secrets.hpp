@@ -264,6 +264,7 @@ public:
     std::vector<sekreto::ProviderSpec> specs;
 
     if (!explicitcred.empty()) {
+      registerSecret(explicitcred);
       try {
         std::string key = sekreto::envkey(secretname_, "");
         sekreto::ProviderSpec seat;
@@ -426,6 +427,15 @@ private:
     if (initerr_.empty()) initerr_ = msg;
   }
 
+  // Every value this feature resolves or buys is a secret the SDK handles,
+  // and none arrives under an option key the intake registration saw.
+  void registerSecret(const std::string& value) {
+    CtxPtr ctx = nullptr == client ? nullptr : client->rootctx;
+    if (ctx && ctx->utility && ctx->utility->cleanAdd) {
+      ctx->utility->cleanAdd(ctx, Value(value));
+    }
+  }
+
   // ---- options map -> sekreto ------------------------------------------------
 
   // An SDK Value as the plugin value model sekreto::specof reads. `values`
@@ -524,6 +534,7 @@ private:
     // required server variable, for the same reason.
     if (nullptr == client || "live" != client->mode) {
       cred_ = "test-" + x.response;
+      registerSecret(cred_);
       track_.buys++;
       return "";
     }
@@ -599,6 +610,7 @@ private:
     }
 
     cred_ = token.as_string();
+    registerSecret(cred_);
     track_.buys++;
     return "";
   }
@@ -630,6 +642,7 @@ private:
       return e.what();
     }
     track_.resolves++;
+    if (found.has_value()) registerSecret(found.value());
 
     if (!exchange_) {
       // A hit is the credential. An UNCACHED miss after an earlier hit is a

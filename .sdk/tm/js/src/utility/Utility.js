@@ -1,7 +1,7 @@
 
 
-const { clean } = require('./CleanUtility')
-const { done } = require('./DoneUtility')
+const { clean, cleanAdd } = require('./CleanUtility')
+const { cleanExplain, done } = require('./DoneUtility')
 const { makeError } = require('./MakeErrorUtility')
 const { featureAdd } = require('./FeatureAddUtility')
 const { featureHook } = require('./FeatureHookUtility')
@@ -37,6 +37,8 @@ const { StructUtility } = require('./StructUtility')
 class Utility {
 
   clean = clean
+  cleanAdd = cleanAdd
+  cleanExplain = cleanExplain
   done = done
   makeError = makeError
   featureAdd = featureAdd

@@ -19,6 +19,14 @@ const CRED_NAME: &str = "authorization";
 const OPTION_APIKEY: &str = "apikey";
 const NOT_FOUND: &str = "__NOTFOUND__";
 
+/// The client's `auth.name` option, when set, replaces the name the API declares.
+fn auth_name(options: &Value) -> String {
+    match getpath(&["auth", "name"], options) {
+        Value::Str(s) if !s.is_empty() => s.to_lowercase(),
+        _ => CRED_NAME.to_string(),
+    }
+}
+
 pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecError> {
     let spec = ctx.spec.borrow().clone().ok_or_else(|| {
         ctx.make_error("auth_no_spec", "Expected context spec property to be defined.")
@@ -33,8 +41,15 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecE
     // Public APIs that need no auth omit the options.auth block entirely.
     let auth = getp(&options, "auth");
     if auth.is_noval() || auth.is_null() {
-        vs::del_prop(headers, &Value::str(CRED_NAME));
+        vs::del_prop(headers.clone(), &Value::str(CRED_NAME));
         return Ok(spec);
+    }
+
+    let name = auth_name(&options);
+
+    // A credential left under the declared name would travel beside the renamed one.
+    if name != CRED_NAME {
+        vs::del_prop(headers.clone(), &Value::str(CRED_NAME));
     }
 
     let apikey = vs::get_prop(&options, &Value::str(OPTION_APIKEY), Value::str(NOT_FOUND));
@@ -46,7 +61,7 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecE
     };
 
     if skip {
-        vs::del_prop(headers, &Value::str(CRED_NAME));
+        vs::del_prop(headers.clone(), &Value::str(&name));
     } else {
         let auth_prefix = match getpath(&["auth", "prefix"], &options) {
             Value::Str(s) => s,
@@ -58,11 +73,11 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, UnivecE
         };
         // Empty prefix (raw apiKey credential) must not add a leading space.
         if auth_prefix.is_empty() {
-            setp(&headers, CRED_NAME, Value::str(apikey_val));
+            setp(&headers, &name, Value::str(apikey_val));
         } else {
             setp(
                 &headers,
-                CRED_NAME,
+                &name,
                 Value::str(format!("{} {}", auth_prefix, apikey_val)),
             );
         }

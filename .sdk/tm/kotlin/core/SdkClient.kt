@@ -81,6 +81,11 @@ abstract class SdkClient(sdkopts: MutableMap<String, Any?>?) {
     this.util.featureHook(this.rootctx, "PostConstruct")
   }
 
+  // The options hold the credential; a printed client shows only its name.
+  override fun toString(): String {
+    return this.javaClass.simpleName + "(mode=" + this.mode + ")"
+  }
+
   fun optionsMap(): MutableMap<String, Any?> {
     val out = Struct.clone(this.options)
     if (out is MutableMap<*, *>) {
@@ -120,6 +125,14 @@ abstract class SdkClient(sdkopts: MutableMap<String, Any?>?) {
     var method = if (methodRaw is String) methodRaw else ""
     if ("" == method) {
       method = "GET"
+    }
+    method = method.uppercase()
+
+    val allowMethod = Struct.getpath(options, listOf("allow", "method"))
+    if (!Helpers.allowed(allowMethod, method)) {
+      throw ctx.makeError("spec_method_allow",
+        "Method \"" + method + "\" not allowed by SDK option allow.method value: \"" +
+          ((allowMethod as? String) ?: "") + "\"")
     }
 
     var params = Helpers.toMapAny(Struct.getprop(fetchargs, "params"))
@@ -174,8 +187,7 @@ abstract class SdkClient(sdkopts: MutableMap<String, Any?>?) {
 
   // Is this raw-access op permitted by the SDK's allow.op option?
   private fun opAllowed(op: String): Boolean {
-    val allow = Struct.getpath(this.options, listOf("allow", "op"))
-    return allow is String && allow.contains(op)
+    return Helpers.allowed(Struct.getpath(this.options, listOf("allow", "op")), op)
   }
 
   private fun opDenied(op: String): MutableMap<String, Any?> {
@@ -262,12 +274,14 @@ abstract class SdkClient(sdkopts: MutableMap<String, Any?>?) {
 
     val out = linkedMapOf<String, Any?>()
 
+    // A raw request returns its failure rather than passing it through
+    // makeError, so it is cleaned here.
     val fetchdef: MutableMap<String, Any?>
     try {
       fetchdef = this.prepare(fetchargs)
     } catch (err: RuntimeException) {
       out["ok"] = false
-      out["err"] = err
+      out["err"] = utility.clean(ctx, err)
       return out
     }
 
@@ -277,7 +291,7 @@ abstract class SdkClient(sdkopts: MutableMap<String, Any?>?) {
       fetched = utility.fetcher(ctx, if (url is String) url else "", fetchdef)
     } catch (err: RuntimeException) {
       out["ok"] = false
-      out["err"] = err
+      out["err"] = utility.clean(ctx, err)
       return out
     }
 
@@ -304,18 +318,28 @@ abstract class SdkClient(sdkopts: MutableMap<String, Any?>?) {
       val noBody = status == 204 || status == 304 || "0" == contentLength
 
       var jsonData: Any? = null
+      var bodyErr: RuntimeException? = null
       if (!noBody) {
         val jf = Struct.getprop(fm, "json")
         if (jf is Supplier<*>) {
           // The supplier returns null on parse error in our fetcher.
           jsonData = (jf as Supplier<Any?>).get()
         }
+        if (true == Struct.getprop(fm, "unreadable")) {
+          val failed = if (status in 200..299) null else ctx.makeError(
+            "request_status", "request: " + status + ": " + Struct.getprop(fm, "statusText"))
+          bodyErr = Response.unreadableBody(ctx, status, headers, Struct.getprop(fm, "body"),
+            fetchdef["headers"], failed)
+        }
       }
 
-      out["ok"] = status in 200..299
+      out["ok"] = bodyErr == null && status in 200..299
       out["status"] = status
       out["headers"] = headers
       out["data"] = jsonData
+      if (bodyErr != null) {
+        out["err"] = utility.clean(ctx, bodyErr)
+      }
       return out
     }
 

@@ -71,6 +71,13 @@ include = ["${model.const.Name.toLowerCase()}_sdk*"]
 "*" = ["py.typed"]
 `)
   })
+
+  // setuptools puts the readme in the sdist but not the reference it links.
+  // A wheel holds only the package, so the sdist is where the docs travel.
+  File({ name: 'MANIFEST.in' }, () => {
+    Content(`include README.md REFERENCE.md
+`)
+  })
 })
 
 

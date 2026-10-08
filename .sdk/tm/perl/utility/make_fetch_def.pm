@@ -10,6 +10,7 @@ my $__dir;
 BEGIN { $__dir = File::Basename::dirname(Cwd::abs_path(__FILE__)) }
 require(Cwd::abs_path("$__dir/../lib/Voxgig/Struct.pm"));
 require(Cwd::abs_path("$__dir/../core/result.pm"));
+require(Cwd::abs_path("$__dir/media.pm"));
 
 package UnivecUtilities;
 
@@ -34,10 +35,9 @@ $REGISTRY{make_fetch_def} = sub {
     'method' => $spec->{method},
     'headers' => $spec->{headers},
   };
-  if (UnivecHelpers::rb_truthy($spec->{body})) {
-    $fetchdef->{body} = Voxgig::Struct::ismap($spec->{body})
-      ? Voxgig::Struct::jsonify($spec->{body})
-      : $spec->{body};
+  my $body = $spec->{body};
+  if (defined $body && !Voxgig::Struct::is_none($body) && !Voxgig::Struct::is_jnull($body)) {
+    $fetchdef->{body} = request_body($ctx->{point}, $body);
   }
 
   return ($fetchdef, undef);

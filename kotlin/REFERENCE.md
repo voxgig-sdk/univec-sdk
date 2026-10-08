@@ -113,7 +113,7 @@ val convert = client.convert(null)
 
 #### `create(reqdata, ctrl) -> Any?`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```kotlin
 val result = client.convert(null).create(mutableMapOf<String, Any?>(
@@ -162,7 +162,7 @@ val embed = client.embed(null)
 
 #### `create(reqdata, ctrl) -> Any?`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```kotlin
 val result = client.embed(null).create(mutableMapOf<String, Any?>(
@@ -212,7 +212,7 @@ val ephemeralKey = client.ephemeralKey(null)
 
 #### `create(reqdata, ctrl) -> Any?`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```kotlin
 val result = client.ephemeralKey(null).create(mutableMapOf<String, Any?>(
@@ -269,11 +269,13 @@ val model = client.model(null)
 
 #### `list(reqmatch, ctrl) -> Any?`
 
-List entities matching the given criteria. The match is optional — call `list(null, null)` to list all records. Returns an aggregate list and raises on error.
+List entities matching the given criteria. The match is optional — call `list(null, null)` to list all records. Returns a list of entities, one per record, and raises on error.
 
 ```kotlin
-val results = client.model(null).list(null, null)
-println(results)
+val results = client.model(null).list(null, null) as List<*>
+for (item in results) {
+    println((item as SdkEntity).data())
+}
 ```
 
 ### Common Methods
@@ -949,6 +951,7 @@ Timeout.
 | Option | Type |
 |---|---|
 | `clearTimer` | function |
+| `now` | function |
 | `setTimer` | function |
 
 These take no default: the feature behaves one way when you supply them and

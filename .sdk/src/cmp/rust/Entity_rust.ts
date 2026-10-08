@@ -39,12 +39,12 @@ const Entity = cmp(function Entity(props: any) {
       const opnames = Object.keys(entity.op || {})
 
       const opfrags =
-        (['load', 'list', 'create', 'update', 'remove']
+        (['load', 'list', 'create', 'update', 'patch', 'remove']
           .reduce((a: any, opname: string) =>
           (a['#' + camelify(opname) + 'Op'] =
             !opnames.includes(opname) ?
               ({ indent }: any) => {
-                const arg = ('create' === opname || 'update' === opname) ?
+                const arg = ('create' === opname || 'update' === opname || 'patch' === opname) ?
                   'reqdata' : 'reqmatch'
                 // The stub mirrors the real signature: ops resolve to the
                 // ENTITY (`list` to a vector of them), so an unsupported op

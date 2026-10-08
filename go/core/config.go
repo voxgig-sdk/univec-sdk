@@ -320,6 +320,7 @@ func MakeConfig() map[string]any {
 				},
 				"optspec": map[string]any{
 					"clearTimer": "`$FUNCTION`",
+					"now": "`$FUNCTION`",
 					"setTimer": "`$FUNCTION`",
 				},
 				"strict": false,
@@ -488,6 +489,10 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+								"response": map[string]any{
+									"kind": "json",
+									"media": "application/json",
+								},
 							},
 							map[string]any{
 								"kind": "http",
@@ -605,6 +610,10 @@ func MakeConfig() map[string]any {
 											"SDK live coverage test.",
 										},
 									},
+								},
+								"response": map[string]any{
+									"kind": "json",
+									"media": "application/json",
 								},
 							},
 							map[string]any{
@@ -733,6 +742,10 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+								"response": map[string]any{
+									"kind": "json",
+									"media": "application/json",
+								},
 							},
 							map[string]any{
 								"kind": "http",
@@ -859,6 +872,10 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+								"response": map[string]any{
+									"kind": "json",
+									"media": "application/json",
+								},
 							},
 						},
 					},
@@ -982,6 +999,10 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+								"response": map[string]any{
+									"kind": "json",
+									"media": "application/json",
+								},
 							},
 							map[string]any{
 								"kind": "http",
@@ -1078,6 +1099,10 @@ func MakeConfig() map[string]any {
 										},
 									},
 								},
+								"response": map[string]any{
+									"kind": "json",
+									"media": "application/json",
+								},
 							},
 						},
 					},
@@ -1160,6 +1185,10 @@ func MakeConfig() map[string]any {
 									"auth": "public",
 									"id": "key",
 									"retention": "No deletion endpoint; issued key is subject to the service daily allowance",
+								},
+								"response": map[string]any{
+									"kind": "json",
+									"media": "application/json",
 								},
 							},
 						},
@@ -1273,6 +1302,10 @@ func MakeConfig() map[string]any {
 									},
 									"auth": "public",
 									"id": "models",
+								},
+								"response": map[string]any{
+									"kind": "json",
+									"media": "application/json",
 								},
 							},
 						},

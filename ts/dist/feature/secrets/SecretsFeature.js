@@ -40,6 +40,7 @@ class SecretsFeature extends BaseFeature_1.BaseFeature {
             options.apikey :
             (null == xopts ? undefined : xopts.refresh);
         if ('string' === typeof explicit && '' !== explicit) {
+            this._register(explicit);
             providers.push({
                 kind: 'memory',
                 name: 'options',
@@ -68,6 +69,12 @@ class SecretsFeature extends BaseFeature_1.BaseFeature {
     sekreto() {
         return this._sekreto;
     }
+    _register(value) {
+        const ctx = this._client._rootctx;
+        if (null != ctx && null != ctx.utility && 'function' === typeof ctx.utility.cleanAdd) {
+            ctx.utility.cleanAdd(ctx, value);
+        }
+    }
     PreSpec(_ctx) {
         return this.resolve();
     }
@@ -94,6 +101,7 @@ class SecretsFeature extends BaseFeature_1.BaseFeature {
             return false;
         }
         const found = await this._sekreto.try(this._secretname);
+        this._register(found);
         if (null == this._exchange) {
             if (undefined !== found) {
                 // The same live-mutation seam TestFeature uses for the transport:
@@ -166,6 +174,7 @@ class SecretsFeature extends BaseFeature_1.BaseFeature {
         if ("string" !== typeof token || "" === token) {
             throw new Error("secrets: token exchange returned no '" + x.response + "' field from " + url);
         }
+        this._register(token);
         return token;
     }
     async _withRefresh(ctx, url, fetchdef, inner) {

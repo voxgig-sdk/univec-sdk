@@ -116,6 +116,18 @@ sub get_root_ctx {
   return $self->{_rootctx};
 }
 
+# The options and the root context both hold the credential, so the
+# client's printed form is its name alone; `options_map` is the documented
+# way to read them back.
+sub TO_JSON {
+  return { 'name' => 'ProjectName' };
+}
+
+sub to_string {
+  my ($self) = @_;
+  return 'ProjectName ' . Voxgig::Struct::jsonify($self->TO_JSON);
+}
+
 # #SecretsAccessor
 sub prepare {
   my ($self, $fetchargs) = @_;
@@ -134,7 +146,14 @@ sub prepare {
   my $path = ProjectNameHelpers::gp($fetchargs, 'path');
   $path = '' unless defined $path && !ref $path;
   my $method_val = ProjectNameHelpers::gp($fetchargs, 'method');
-  $method_val = 'GET' unless defined $method_val && !ref $method_val;
+  $method_val = 'GET' unless defined $method_val && !ref $method_val && '' ne $method_val;
+  $method_val = uc $method_val;
+  my $allow_method = ProjectNameHelpers::gpath($opts, 'allow.method');
+  unless (ProjectNameUtilities::allowed($allow_method, $method_val)) {
+    $allow_method = '' unless defined $allow_method && !ref $allow_method;
+    die $ctx->make_error('spec_method_allow',
+      "Method \"$method_val\" not allowed by SDK option allow.method value: \"$allow_method\"");
+  }
   my $params = ProjectNameHelpers::to_map(
     ProjectNameHelpers::gp($fetchargs, 'params')) || {};
   my $query = ProjectNameHelpers::to_map(
@@ -189,8 +208,8 @@ sub direct {
 # Is this raw-access op permitted by the SDK's allow.op option?
 sub _op_allowed {
   my ($self, $op) = @_;
-  my $allow = ProjectNameHelpers::gpath($self->{options}, 'allow.op');
-  return (defined $allow && !ref $allow && index($allow, $op) >= 0) ? 1 : 0;
+  return ProjectNameUtilities::allowed(
+    ProjectNameHelpers::gpath($self->{options}, 'allow.op'), $op);
 }
 
 sub _op_denied {
@@ -232,7 +251,7 @@ sub _raw_request {
   my $url = defined $fetchdef->{url} ? $fetchdef->{url} : '';
   my ($fetched, $fetch_err) = $utility->{fetcher}->($ctx, $url, $fetchdef);
 
-  return { 'ok' => 0, 'err' => $fetch_err } if $fetch_err;
+  return { 'ok' => 0, 'err' => $utility->{clean}->($ctx, $fetch_err) } if $fetch_err;
 
   if (!defined $fetched) {
     return {
@@ -254,20 +273,31 @@ sub _raw_request {
       || (defined $content_length && '0' eq "$content_length")) ? 1 : 0;
 
     my $json_data;
+    my $body_err;
     unless ($no_body) {
       my $jf = ProjectNameHelpers::gp($fetched, 'json');
       if (ref $jf eq 'CODE') {
         # Non-JSON body - leave data undef, keep status/headers.
         $json_data = eval { $jf->() };
       }
+      if (ProjectNameHelpers::gp($fetched, 'unreadable')) {
+        my $reason = ProjectNameHelpers::gp($fetched, 'statusText');
+        my $failed = ($status >= 200 && $status < 300) ? undef
+          : $ctx->make_error('request_status',
+            "request: $status: " . (defined $reason ? $reason : ''));
+        $body_err = ProjectNameUtilities::unreadable_body($ctx, $status, $headers,
+          ProjectNameHelpers::gp($fetched, 'body'), $fetchdef->{headers}, $failed);
+      }
     }
 
-    return {
-      'ok' => ($status >= 200 && $status < 300) ? 1 : 0,
+    my $out = {
+      'ok' => (!defined $body_err && $status >= 200 && $status < 300) ? 1 : 0,
       'status' => $status,
       'headers' => $headers,
       'data' => $json_data,
     };
+    $out->{err} = $utility->{clean}->($ctx, $body_err) if defined $body_err;
+    return $out;
   }
 
   return {

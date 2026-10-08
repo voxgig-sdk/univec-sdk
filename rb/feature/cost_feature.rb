@@ -237,7 +237,7 @@ class UnivecCostFeature < UnivecBaseFeature
     _bump(cost["actors"], actor, amount)
 
     @seq += 1
-    record = {
+    record = ctx.utility.clean.call(ctx, {
       "seq" => @seq,
       "entity" => entity,
       "op" => opname,
@@ -246,7 +246,7 @@ class UnivecCostFeature < UnivecBaseFeature
       "currency" => cost["currency"],
       "source" => source,
       "attempts" => entry["attempts"],
-    }
+    })
     cost["last"] = record
 
     sink = @options["sink"]

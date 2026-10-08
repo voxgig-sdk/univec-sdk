@@ -1,15 +1,18 @@
 
-import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape, requiredItems } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
+import { cljString } from './utility_clojure'
+
 
 // A type-correct Clojure literal for a field's canonical type.
 function cljLit(type: any): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'nil'
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return 'true'
   if ('ARRAY' === k) return '(vs/jt)'
@@ -32,20 +35,28 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   let testArg = 'nil'
   if (exampleEntity && isMatchOp) {
     testArg = idF ? `(vs/jm "${idF}" "test01")` : 'nil'
-  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp)) {
+  } else if (exampleEntity && 'list' === primaryOp && 0 < requiredItems(exampleEntity, 'list').length) {
+    const chosen = requiredItems(exampleEntity, 'list')
+    testArg = `(vs/jm ${chosen.map((it: any) => `${cljString(it.name)} ${cljLit(it.type)}`).join(' ')})`
+  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp)) {
     const items = opRequestShape(exampleEntity, primaryOp).items
       .filter((it: any) => it.name !== idF && it.name !== 'id')
     const required = items.filter((it: any) => !it.optional)
     const chosen = required.length ? required : items.slice(0, 3)
-    testArg = `(vs/jm ${chosen.map((it: any) => `"${it.name}" ${cljLit(it.type)}`).join(' ')})`
+    testArg = `(vs/jm ${chosen.map((it: any) => `${cljString(it.name)} ${cljLit(it.type)}`).join(' ')})`
   }
 
   // The op-driven test-mode line, shown only when the SDK has an entity op.
-  const testModeExample = primaryOp
-    ? `;; Entity ops return the bare record and raise on error.
+  const testModeExample = 'list' === primaryOp
+    ? `;; list returns a vector of entities, one per mock record; it raises on error.
+(def ${eLow}s (e-${eLow}/list (api/${eLow} client nil) ${testArg} nil))
+(doseq [item ${eLow}s]
+  (println ((:data-get item))))`
+    : primaryOp
+    ? `;; Entity ops return the entity; they raise on error.
 (def ${eLow} (e-${eLow}/${primaryOp} (api/${eLow} client nil) ${testArg} nil))
-;; ${eLow} contains the mock response record
-(println ${eLow})`
+;; ((:data-get ${eLow})) reads the entity's mock record
+(println ((:data-get ${eLow})))`
     : `(def result (api/direct client (vs/jm "path" "/api/resource" "method" "GET")))
 (println result)`
 

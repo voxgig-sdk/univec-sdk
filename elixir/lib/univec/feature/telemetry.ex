@@ -132,15 +132,17 @@ defmodule Univec.Feature.Telemetry do
       S.setprop(span, "durationMs", max(0, fin - S.getprop(span, "start")))
       S.setprop(span, "ok", ok)
 
+      out = F.clean(ctx, span)
+
       telemetry = S.getprop(S.getprop(f, "client"), "_telemetry")
       S.setprop(telemetry, "active", S.getprop(telemetry, "active") - 1)
-      F.list_push(S.getprop(telemetry, "spans"), span)
+      F.list_push(S.getprop(telemetry, "spans"), out)
 
       exporter = S.getprop(F.opts(f), "exporter")
 
       if S.isfunc(exporter) do
         try do
-          exporter.(span)
+          exporter.(out)
         rescue
           _ -> nil
         end

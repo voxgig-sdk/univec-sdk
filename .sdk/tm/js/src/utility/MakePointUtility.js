@@ -1,3 +1,6 @@
+const { paramValue } = require('./ParamUtility')
+const { allowed } = require('./PrepareMethodUtility')
+
 
 // The entity's OWN route among an op's points, as opposed to a
 // CROSS-REFERENCE: another resource's route that happens to return this
@@ -45,6 +48,23 @@ function ownPoint(points) {
 }
 
 
+// The path parameters of a point that neither the call nor the entity gives a
+// value for, looked up as prepareParams looks them up.
+function unfilled(ctx, point) {
+  const missing = []
+
+  for (const part of (point.parts || [])) {
+    const found = /^\{([^{}\/]+)\}$/.exec(String(part))
+    const name = found && found[1]
+    if (null != name && null == paramValue(ctx, point, name)) {
+      missing.push(name)
+    }
+  }
+
+  return missing
+}
+
+
 function makePoint(ctx) {
   if (ctx.out.point) {
     return ctx.point = ctx.out.point
@@ -54,7 +74,7 @@ function makePoint(ctx) {
   const op = ctx.op
   const options = ctx.options
 
-  if (!options.allow.op.includes(op.name)) {
+  if (!allowed(options.allow.op, op.name)) {
     return ctx.error('point_op_allow', 'Operation "' + op.name +
       '" not allowed by SDK option allow.op value: "' + options.allow.op + '"')
   }
@@ -124,7 +144,24 @@ function makePoint(ctx) {
           '" action "' + reqselector.$action + '" is not valid.')
       }
 
-      point = ownPoint(op.points)
+      // A call without an action falls back to a point without one, as
+      // generation does, and only to a route the call can fill.
+      const plain = op.points.filter((cand) => null == (cand.select && cand.select.$action))
+
+      if (0 === plain.length) {
+        return ctx.error('point_action_required', 'Operation "' + op.name +
+          '" has only action endpoints; pass $action to choose one.')
+      }
+
+      const fillable = plain.filter((cand) => 0 === unfilled(ctx, cand).length)
+
+      if (0 === fillable.length) {
+        return ctx.error('point_no_match', 'Operation "' + op.name +
+          '" has no endpoint whose path parameters are all given (missing: ' +
+          unfilled(ctx, ownPoint(plain)).join(', ') + ').')
+      }
+
+      point = ownPoint(fillable)
     }
 
     if (

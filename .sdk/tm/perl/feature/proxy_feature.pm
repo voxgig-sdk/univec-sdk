@@ -36,6 +36,7 @@ sub new {
   $self->{options} = {};
   $self->{url} = undef;
   $self->{no_proxy} = [];
+  $self->{ctx} = undef;
   return $self;
 }
 
@@ -65,6 +66,21 @@ sub init {
     @np = @$no_proxy;
   }
   $self->{no_proxy} = [grep { defined $_ && '' ne $_ } @np];
+
+  # A proxy URL may carry credentials as userinfo, from the option or the
+  # environment, and neither is under a sensitive key name.
+  $self->{ctx} = $ctx;
+  if (defined $self->{url} && !ref $self->{url}
+    && "$self->{url}" =~ m{\A[A-Za-z][A-Za-z0-9+.-]*://([^/?#@]*)@}) {
+    my $userinfo = $1;
+    for my $part (split /:/, $userinfo, 2) {
+      next unless defined $part && '' ne $part;
+      $ctx->{utility}{clean_add}->($ctx, $part);
+      my $decoded = $part;
+      $decoded =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/ge;
+      $ctx->{utility}{clean_add}->($ctx, $decoded);
+    }
+  }
 
   my $feature = $self;
   my $utility = $ctx->{utility};
@@ -118,7 +134,11 @@ sub _track {
   my ($self, $url) = @_;
   my $track = $self->{client}{_proxy};
   if (!$track) {
-    $track = { 'routed' => 0, 'url' => $self->{url} };
+    my $ctx = $self->{ctx};
+    $track = {
+      'routed' => 0,
+      'url' => $ctx ? $ctx->{utility}{clean}->($ctx, $self->{url}) : $self->{url},
+    };
     $self->{client}{_proxy} = $track;
   }
   $track->{routed} += 1;

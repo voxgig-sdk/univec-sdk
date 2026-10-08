@@ -14,6 +14,7 @@ const Context = ctxmod.Context;
 const CtxSpec = ctxmod.CtxSpec;
 const Utility = utility_mod.Utility;
 const OpResult = types.OpResult;
+const StreamResult = types.StreamResult;
 const OutVal = types.OutVal;
 const Entity = types.Entity;
 
@@ -147,16 +148,34 @@ pub const EntyClass = struct {
         return self.doneResult(ctx);
     }
 
+    // What make_error or done hands back, as a stream: the error, or under
+    // `throw: false` the data there is.
+    fn streamItems(res: OpResult) StreamResult {
+        const data = switch (res) {
+            .err => |e| return .{ .err = e },
+            .ok => |v| v,
+        };
+        if (data == .array) {
+            return .{ .ok = data.array.data.items };
+        } else if (!h.is_noval(data)) {
+            var out: std.ArrayList(Value) = .empty;
+            out.append(h.A(), data) catch {};
+            return .{ .ok = out.toOwnedSlice(h.A()) catch &.{} };
+        }
+        return .{ .ok = &.{} };
+    }
+
     /// Streaming operation. Runs `action` through the full pipeline and
-    /// returns a slice of the result items, so the `streaming` feature's
-    /// incremental output is reachable from a generated entity (a normal op
-    /// call materialises the whole result). This runtime is synchronous and
-    /// zig has no built-in lazy iterators, so the returned slice is a
-    /// materialised cursor the caller walks. `callopts` parameterises the
-    /// call: inbound yields the streaming feature's items when active, else
-    /// the materialised items; outbound attaches an iterable `body` to the
-    /// request (reqdata `body$`); `ctrl` threads pipeline control.
-    pub fn stream(self: *EntyClass, action: []const u8, args: Value, callopts: Value) []Value {
+    /// returns the result items, so the `streaming` feature's incremental
+    /// output is reachable from a generated entity (a normal op call
+    /// materialises the whole result). This runtime is synchronous and zig
+    /// has no built-in lazy iterators, so the items are a materialised slice
+    /// the caller walks; a failed operation is `.err`, as an operation's is.
+    /// `callopts` parameterises the call: inbound yields the streaming
+    /// feature's items when active, else the materialised items; outbound
+    /// attaches an iterable `body` to the request (reqdata `body$`); `ctrl`
+    /// threads pipeline control.
+    pub fn stream(self: *EntyClass, action: []const u8, args: Value, callopts: Value) StreamResult {
         const utility = self.utility;
 
         const stream_opts: Value = switch (callopts) {
@@ -164,10 +183,13 @@ pub const EntyClass = struct {
             else => h.omap(),
         };
 
-        const ctrl: Value = switch (h.to_map(h.getp(stream_opts, "ctrl"))) {
-            .object => h.to_map(h.getp(stream_opts, "ctrl")),
-            else => h.omap(),
-        };
+        // A copy: the caller's ctrl gains no key, and explain stays its own record.
+        const ctrl = h.omap();
+        const given = h.to_map(h.getp(stream_opts, "ctrl"));
+        if (given == .object) {
+            var it = given.object.iterator();
+            while (it.next()) |kv| h.setp(ctrl, kv.key_ptr.*, kv.value_ptr.*);
+        }
         h.setp(ctrl, "stream", stream_opts);
 
         const reqmatch: Value = switch (args) {
@@ -196,25 +218,26 @@ pub const EntyClass = struct {
         }
 
         // Run the same pipeline as run_op, firing the feature hooks (the
-        // streaming feature attaches result.stream on PreResult).
+        // streaming feature attaches result.stream on PreResult). A failed
+        // step leaves through make_error, as an operation's does.
         utility.feature_hook(ctx, "PrePoint");
-        const point = utility.make_point(ctx) catch return &.{};
+        const point = utility.make_point(ctx) catch return streamItems(self.opError(ctx));
         ctx.out_set("point", OutVal{ .val = point });
 
         utility.feature_hook(ctx, "PreSpec");
-        const spec = utility.make_spec(ctx) catch return &.{};
+        const spec = utility.make_spec(ctx) catch return streamItems(self.opError(ctx));
         ctx.out_set("spec", OutVal{ .spec = spec });
 
         utility.feature_hook(ctx, "PreRequest");
-        const resp = utility.make_request(ctx) catch return &.{};
+        const resp = utility.make_request(ctx) catch return streamItems(self.opError(ctx));
         ctx.out_set("request", OutVal{ .response = resp });
 
         utility.feature_hook(ctx, "PreResponse");
-        const resp2 = utility.make_response(ctx) catch return &.{};
+        const resp2 = utility.make_response(ctx) catch return streamItems(self.opError(ctx));
         ctx.out_set("response", OutVal{ .response = resp2 });
 
         utility.feature_hook(ctx, "PreResult");
-        const result = utility.make_result(ctx) catch return &.{};
+        const result = utility.make_result(ctx) catch return streamItems(self.opError(ctx));
         ctx.out_set("result", OutVal{ .result = result });
 
         utility.feature_hook(ctx, "PreDone");
@@ -223,19 +246,13 @@ pub const EntyClass = struct {
         // fall back to the materialised items so stream always yields.
         if (ctx.result) |res| {
             if (res.stream) |sf| {
-                return sf.call(sf.ctx);
+                // done() does not run on this path, so its record is cleaned here.
+                utility.clean_explain(ctx);
+                return .{ .ok = sf.call(sf.ctx) };
             }
         }
 
-        const data = utility.done(ctx) catch return &.{};
-        if (data == .array) {
-            return data.array.data.items;
-        } else if (!h.is_noval(data)) {
-            var out: std.ArrayList(Value) = .empty;
-            out.append(h.A(), data) catch {};
-            return out.toOwnedSlice(h.A()) catch &.{};
-        }
-        return &.{};
+        return streamItems(self.doneResult(ctx));
     }
 
     // ---- Entity interface ----
@@ -312,6 +329,8 @@ pub const EntyClass = struct {
     // #CreateOp
 
     // #UpdateOp
+
+    // #PatchOp
 
     // #RemoveOp
 };

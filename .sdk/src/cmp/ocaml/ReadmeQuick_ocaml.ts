@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { ocamlVarName } from './utility_ocaml'
+import { ocamlVarName, ocamlListMatch } from './utility_ocaml'
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -37,6 +37,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
 \`\`\`ocaml
 open Voxgig_struct
 open Sdk_helpers
+open Sdk_types
 
 let client = ${ctor}
 \`\`\`
@@ -56,6 +57,7 @@ let client = ${ctor}
     // A type-correct OCaml `value` literal for a param.
     const ocamlLit = (type: any, placeholder: string = 'example'): string => {
       const k = canonScalarKey(type)
+      if ('NULL' === k) return 'Null'
       if ('INTEGER' === k || 'NUMBER' === k) return '(Num 1.)'
       if ('BOOLEAN' === k) return '(Bool true)'
       if ('ARRAY' === k) return '(empty_list ())'
@@ -71,7 +73,7 @@ record with \`e_data_get\`.
 
 \`\`\`ocaml
 (try
-   let ${fn}s = (Sdk_client.${fn} client Noval).e_list (empty_map ()) Noval in
+   let ${fn}s = (Sdk_client.${fn} client Noval).e_list ${ocamlListMatch(exampleEntity)} Noval in
    List.iter (fun e -> print_endline (stringify (e.e_data_get ()))) ${fn}s
  with Sdk_error.E err -> Printf.eprintf "list failed: %s\\n" (Sdk_error.message err))
 \`\`\`
@@ -158,10 +160,11 @@ record.
       return it && it.type
     }
     const idValueFor = (opname: string): string => (null != dataIdF && opnames.includes('create'))
-      ? `(getp created "${dataIdF}")`
+      ? `(getp (created.e_data_get ()) "${dataIdF}")`
       : ocamlLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`ocaml
@@ -177,6 +180,13 @@ print_endline (stringify (created.e_data_get ()));
         const updatePairs = (idF ? [`("${idF}", ${idValueFor('update')})`] : []).concat(examplePairs('update'))
         Content(`(* Update *)
 ignore ((Sdk_client.${fn} client Noval).e_update (jo [${updatePairs.join('; ')}]) Noval);
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`("${idF}", ${idValueFor('patch')})`] : []).concat(examplePairs('patch'))
+        Content(`(* Patch — sends only the fields given *)
+ignore ((Sdk_client.${fn} client Noval).e_patch (jo [${patchPairs.join('; ')}]) Noval);
 
 `)
       }

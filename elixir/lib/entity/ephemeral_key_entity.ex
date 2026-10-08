@@ -1,7 +1,7 @@
 # Univec SDK EphemeralKey entity
 #
 # Per-entity module. Generic construction/data/match operations delegate to
-# EntityBase; each active op (load/list/create/update/remove) builds a ctx
+# EntityBase; each active op (load/list/create/update/patch/remove) builds a ctx
 # and drives it through Univec.Pipeline.run_op.
 
 defmodule Univec.Entity.EphemeralKey do
@@ -30,9 +30,10 @@ defmodule Univec.Entity.EphemeralKey do
   
 
   
-  # Returns the created ephemeral_key entity map (Univec.Types.ephemeral_key/0)
-  # on success; pipeline errors surface as the error value built by
-  # Utility.make_error (shape is utility-configurable), hence term().
+  # Returns the created ephemeral_key entity, whose data_get/1 reads its record
+  # (Univec.Types.ephemeral_key/0), on success; pipeline errors surface as
+  # the error value built by Utility.make_error (shape is
+  # utility-configurable), hence term().
   @spec create(map(), Univec.Types.ephemeral_key_create_data() | nil, map() | nil) :: term()
   def create(ent, reqdata, ctrl \\ nil) do
     ctx =
@@ -61,6 +62,8 @@ defmodule Univec.Entity.EphemeralKey do
   end
 
 
+
+  
 
   
 

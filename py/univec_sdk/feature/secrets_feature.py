@@ -153,6 +153,7 @@ class UnivecSecretsFeature(UnivecBaseFeature):
             explicit = xopts.get("refresh") if isinstance(xopts, dict) else None
 
         if isinstance(explicit, str) and "" != explicit:
+            self._register(explicit)
             providers.append({
                 "kind": "memory",
                 "name": "options",
@@ -198,6 +199,14 @@ class UnivecSecretsFeature(UnivecBaseFeature):
     def sekreto(self):
         return self._sekreto
 
+    # Every value this feature resolves or buys is a secret the SDK handles,
+    # and none arrives under an option key the intake registration saw.
+    def _register(self, value):
+        ctx = getattr(self._client, "_rootctx", None)
+        utility = getattr(ctx, "utility", None)
+        if callable(getattr(utility, "clean_add", None)):
+            utility.clean_add(ctx, value)
+
     def PreSpec(self, _ctx):
         return self.resolve()
 
@@ -231,6 +240,7 @@ class UnivecSecretsFeature(UnivecBaseFeature):
         # RAISES for "a store could not answer" - only the miss falls
         # through.
         found = self._sekreto.try_(self._secretname)
+        self._register(found)
 
         if self._exchange is None:
             if found is not None:
@@ -366,6 +376,8 @@ class UnivecSecretsFeature(UnivecBaseFeature):
             raise Exception(
                 "secrets: token exchange returned no '" + x["response"]
                 + "' field from " + url)
+
+        self._register(token)
 
         return token
 

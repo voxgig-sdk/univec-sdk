@@ -1,10 +1,12 @@
 
-import { cmp, each, Content, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, entityIdField, opRequestShape, opNeedsAction } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
+
+import { perlListArgs } from './utility_perl'
 
 
 // A type-correct, executable Perl literal for a field's canonical type. The
@@ -12,6 +14,7 @@ import {
 // value. Strings render the quoted placeholder.
 function perlLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'undef'
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return '1'
   if ('ARRAY' === k) return '[]'
@@ -37,6 +40,7 @@ const OP_DESC: Record<string, { method: string, desc: string }> = {
   list:   { method: 'list()',        desc: 'List entities, optionally matching the given criteria.' },
   create: { method: 'create($data)', desc: 'Create a new entity with the given data.' },
   update: { method: 'update($data)', desc: 'Update an existing entity.' },
+  patch:  { method: 'patch($data)',  desc: 'Change part of an existing entity.' },
   remove: { method: 'remove($match)', desc: 'Remove the matching entity.' },
 }
 
@@ -62,6 +66,8 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
+    // An op that needs an action has no plain call to show.
+    const callable = opnames.filter((o: string) => !opNeedsAction(entity.op[o]))
     const fields = Object.values(entity.fields || {})
     const idF = entityIdField(entity)
     const eVar = entity.name
@@ -116,7 +122,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 `)
     }
 
-    if (opnames.includes('load')) {
+    if (callable.includes('load')) {
       // The id key plus every REQUIRED match key (parent path params like
       // page_id) — the same shape the runtime resolves path params from, so
       // the example always works.
@@ -138,17 +144,19 @@ my $${eVar} = $client->${entity.Name}->load(${loadArg});
 `)
     }
 
-    if (opnames.includes('list')) {
+    if (callable.includes('list')) {
       Content(`#### Example: List
 
 \`\`\`perl
-my $${eVar}s = $client->${entity.Name}->list;
+# an arrayref of entities, one per record; data_get reads each record
+my $${eVar}s = $client->${entity.Name}->list${perlListArgs(entity)};
+print $_->data_get->{id}, "\\n" for @$${eVar}s;
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('create')) {
+    if (callable.includes('create')) {
       // Members come from the SAME shape the runtime validates
       // (opRequestShape): every required member must appear — including a
       // required id and parent keys like page_id — with a real, executable

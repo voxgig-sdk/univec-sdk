@@ -144,7 +144,7 @@ sub runnable {
   my ($b) = @_;
   return 1 if $b =~ /\\Q$SDK_CLASS\\E->(?:new|test)\\b/;
   return 1 if $b =~ /\\\$client\\b/;
-  return 1 if $b =~ /->(?:load|list|create|update|remove)\\b/;
+  return 1 if $b =~ /->(?:load|list|create|update|patch|remove)\\b/;
   return 0;
 }
 
@@ -155,7 +155,7 @@ sub looks_sdk {
   my ($b) = @_;
   return 1 if $b =~ /\\\$client\\b/;
   return 1 if $b =~ /\\b\\Q$SDK_CLASS\\E\\b/;
-  return 1 if $b =~ /->(?:load|list|create|update|remove)\\b/;
+  return 1 if $b =~ /->(?:load|list|create|update|patch|remove)\\b/;
   for my $name (keys %ENTITIES) {
     return 1 if $b =~ /->\\Q$name\\E\\b/;
   }

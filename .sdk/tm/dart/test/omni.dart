@@ -94,6 +94,7 @@ import 'vendor/omni/omni.dart' as omni;
 
 import 'utility.dart' show resolveTestPath;
 
+import '../lib/Context.dart' show Context;
 import '../lib/utility/ErrUtility.dart';
 import '../lib/utility/voxgig_struct.dart' as vs;
 
@@ -398,8 +399,7 @@ dynamic _stripchecks(dynamic testspec) {
 // Write the OBSERVABLE state of a typed context back into the ctx map the
 // entry holds, which is where a `match: {ctx: ...}` assertion reads. Exactly
 // what the retired runner produced: it put the Context itself in `entry.ctx`
-// and normalised the whole match base through jsonNorm, so the assertions
-// have always read `Context.toJSON()`.
+// and normalised the whole match base through jsonNorm.
 void _syncctx(dynamic ctxmap, dynamic ctx) {
   if (ctxmap is! Map) {
     return;
@@ -413,6 +413,19 @@ void _syncctx(dynamic ctxmap, dynamic ctx) {
   ctxmap.clear();
   norm.forEach((key, val) => ctxmap[key] = val);
 }
+
+// A context's fields as they are, as the go and java resolvers read them:
+// Context.toJSON() is the cleaned record that leaves the SDK, and would mask
+// the credential a prepareAuth case asserts.
+Map<String, dynamic> _ctxstate(Context ctx) => {
+      'id': ctx.id,
+      'op': ctx.op,
+      'spec': ctx.spec,
+      'entity': ctx.entity,
+      'result': ctx.result,
+      'response': ctx.response,
+      'meta': ctx.meta,
+    };
 
 // Carry pass A's argument mutations into pass B's argument list. Containers
 // are spliced (contents replaced, identity kept) because omni already handed
@@ -510,7 +523,7 @@ dynamic _tojson(dynamic val, [Set<dynamic>? seen]) {
 
   try {
     seen.add(val);
-    final out = _tojson((val as dynamic).toJSON(), seen);
+    final out = _tojson(val is Context ? _ctxstate(val) : (val as dynamic).toJSON(), seen);
     seen.remove(val);
     return out;
   } catch (_e) {

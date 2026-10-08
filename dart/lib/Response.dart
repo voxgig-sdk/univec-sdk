@@ -9,6 +9,8 @@ class Response {
   dynamic jsonFn;
   dynamic err;
   dynamic body;
+  // Set by a transport that could not read a non-blank body as JSON.
+  bool unreadable = false;
 
   Response(dynamic resmap) {
     status = vs.getprop(resmap, 'status', -1);
@@ -17,10 +19,13 @@ class Response {
     jsonFn = vs.getprop(resmap, 'json');
     body = vs.getprop(resmap, 'body');
     err = vs.getprop(resmap, 'err');
+    unreadable = true == vs.getprop(resmap, 'unreadable');
   }
 
   Future<dynamic> json() async =>
       null == jsonFn ? null : await Future.value(jsonFn());
+
+  Map<String, dynamic> toJson() => toJSON();
 
   Map<String, dynamic> toJSON() => {
         'status': status,

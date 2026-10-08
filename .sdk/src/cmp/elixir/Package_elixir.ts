@@ -44,6 +44,11 @@ const Package = cmp(async function Package(props: any) {
     ]
   end`
 
+  // Hex fails a build that lists a missing file, so the docs are listed only
+  // when the readme phase writes them.
+  const docs = false === target.phase?.readme?.active ? [] : ['README.md', 'REFERENCE.md']
+  const files = ['lib', 'mix.exs', 'LICENSE', ...docs]
+
   File({ name: 'mix.exs' }, () => {
     Content(`defmodule ${Name}.MixProject do
   use Mix.Project
@@ -71,8 +76,10 @@ ${depsBlock}
   defp elixirc_paths(:test), do: ["lib", "test/support", "test/vendor"]
   defp elixirc_paths(_), do: ["lib"]
 
+  # Hex ships only these files; its default list leaves REFERENCE.md out.
   defp package do
     [
+      files: [${files.map((f) => JSON.stringify(f)).join(', ')}],
       licenses: ["MIT"],
       links: %{"Homepage" => ${JSON.stringify(repoUrl)}}
     ]

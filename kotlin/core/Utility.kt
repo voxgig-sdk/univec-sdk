@@ -14,6 +14,7 @@ typealias FetcherFn = (Context, String, MutableMap<String, Any?>) -> Any?
 class Utility private constructor(register: Boolean) {
 
   lateinit var clean: (Context, Any?) -> Any?
+  lateinit var cleanAdd: (Context, Any?) -> Unit
   lateinit var done: (Context) -> Any?
   lateinit var makeError: (Context, RuntimeException?) -> Any?
   lateinit var featureAdd: (Context, Feature) -> Unit
@@ -59,6 +60,7 @@ class Utility private constructor(register: Boolean) {
     val u = Utility(false)
 
     u.clean = this.clean
+    u.cleanAdd = this.cleanAdd
     u.done = this.done
     u.makeError = this.makeError
     u.featureAdd = this.featureAdd

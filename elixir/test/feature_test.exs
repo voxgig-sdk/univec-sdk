@@ -615,7 +615,8 @@ defmodule Univec.FeatureTest do
       entries = S.getprop(track(h, "_debug"), "entries")
       assert S.size(entries) == 1
       assert S.size(seen) == 2
-      assert S.getprop(S.getprop(S.getelem(seen, 0), "headers"), "authorization") == "<redacted>"
+      # Masked by the core clean rule (clean.keys), not a feature list of its own.
+      assert S.getprop(S.getprop(S.getelem(seen, 0), "headers"), "authorization") == "[redacted]"
     end
   end
 
@@ -640,7 +641,7 @@ defmodule Univec.FeatureTest do
       FH.op(h, %{headers: S.jm(["x-secret", "hide", "x-ok", "show"])})
       entry = S.getelem(S.getprop(track(h, "_debug"), "entries"), 0)
       hdrs = S.getprop(entry, "headers")
-      assert S.getprop(hdrs, "x-secret") == "<redacted>"
+      assert S.getprop(hdrs, "x-secret") == "[redacted]"
       assert S.getprop(hdrs, "x-ok") == "show"
     end
   end

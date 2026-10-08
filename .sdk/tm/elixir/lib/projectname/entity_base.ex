@@ -108,7 +108,8 @@ defmodule Univec.EntityBase do
   # materialises the whole result). When the streaming feature is active the
   # result carries a `stream` closure and this yields from it (honouring
   # chunkSize); otherwise it falls back to the materialised items, so stream
-  # always yields. Records are unwrapped to bare struct maps (matching list).
+  # always yields. An entity is yielded as its record, the struct map its
+  # data_get/1 returns.
   # `callopts` parameterises the call:
   #   - ctrl:   per-call pipeline control (threaded onto the op ctx);
   #   - body:   an enumerable/list payload for outbound (upload) streaming,
@@ -116,7 +117,10 @@ defmodule Univec.EntityBase do
   #   - signal: an optional 0-arity fn; when it returns true iteration stops.
   def stream(ent, action, args \\ nil, callopts \\ nil) do
     callopts = if S.ismap(callopts), do: callopts, else: S.jm([])
-    ctrl = H.or_(H.to_map(S.getprop(callopts, "ctrl")), S.jm([]))
+    # A copy: the caller's ctrl gains no key, and explain stays its own record.
+    ctrl = S.jm([])
+    given = H.to_map(S.getprop(callopts, "ctrl"))
+    if given != nil, do: Enum.each(H.entries(given), fn {k, v} -> S.setprop(ctrl, k, v) end)
     S.setprop(ctrl, "stream", callopts)
 
     ctxmap =
@@ -153,7 +157,7 @@ defmodule Univec.EntityBase do
     # materialised items so stream always yields.
     items =
       if S.isfunc(stream_fn) do
-        stream_fn.()
+        source(ctx, stream_fn)
       else
         rd = if result != nil, do: S.getprop(result, "resdata"), else: nil
 
@@ -167,6 +171,55 @@ defmodule Univec.EntityBase do
     items
     |> Stream.take_while(fn _ -> not (S.isfunc(signal) and signal.() == true) end)
     |> Stream.map(&stream_unwrap/1)
+    |> guarded(ctx)
+  end
+
+  # The streaming feature's items. What its function raises leaves through
+  # run_op's catch path; under throw: false the stream is empty.
+  defp source(ctx, stream_fn) do
+    stream_fn.()
+  rescue
+    e -> Pipeline.unexpected(ctx, e, __STACKTRACE__) || []
+  end
+
+  # A reducer's own exception, told apart from the stream's.
+  defmodule CallerRaised do
+    defexception [:error, :stack]
+
+    @impl true
+    def message(%{error: e}), do: Exception.message(e)
+  end
+
+  # The caller iterates after run_op has returned, so what the stream raises
+  # leaves as an operation's failure would: PreUnexpected fires, and under
+  # throw: false the stream ends. The caller's own reducer runs inside the
+  # same reduce; what it raises is only cleaned, as run_op's rescue would.
+  defp guarded(enum, ctx) do
+    fn acc, fun -> reduce_step(ctx, acc, fn -> Enumerable.reduce(enum, acc, callers(fun)) end) end
+  end
+
+  defp callers(fun) do
+    fn item, acc ->
+      try do
+        fun.(item, acc)
+      rescue
+        e -> reraise(%CallerRaised{error: e, stack: __STACKTRACE__}, __STACKTRACE__)
+      end
+    end
+  end
+
+  defp reduce_step(ctx, acc, step) do
+    case stream_step(ctx, acc, step) do
+      {:suspended, acc2, cont} -> {:suspended, acc2, fn a -> reduce_step(ctx, a, fn -> cont.(a) end) end}
+      done -> done
+    end
+  end
+
+  defp stream_step(ctx, {_, value}, step) do
+    step.()
+  rescue
+    e in CallerRaised -> reraise(Utility.clean_exception(ctx, e.error), e.stack)
+    e -> Pipeline.unexpected(ctx, e, __STACKTRACE__) || {:done, value}
   end
 
   # Unwrap an entity node to its bare record; recurse into chunk lists.

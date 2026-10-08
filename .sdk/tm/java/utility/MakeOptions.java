@@ -1,6 +1,7 @@
 package JAVAPACKAGE.utility;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,38 @@ final class MakeOptions {
       opts.remove("auth");
     }
 
+    Map<String, Object> config = ctx.config;
+    if (config == null) {
+      config = new LinkedHashMap<>();
+    }
+    Map<String, Object> cfgopts = Helpers.toMapAny(config.get("options"));
+    if (cfgopts == null) {
+      cfgopts = new LinkedHashMap<>();
+    }
+
+    // The secret registry exists BEFORE validation, fed from the raw input, so
+    // the constructor's own rejection of a mistyped credential is clean too.
+    // Both clean blocks are cloned for the reason the options merge below is,
+    // and an absent one is left out: merge lets a null replace everything.
+    List<Map<String, Object>> cleanblocks = Arrays.asList(
+        Helpers.toMapAny(cfgopts.get("clean")), Helpers.toMapAny(options.get("clean")));
+    List<Object> cleanmerge = new ArrayList<>();
+    cleanmerge.add(new LinkedHashMap<String, Object>());
+    cleanmerge.add(Struct.clone(Schema.optspec().get("clean")));
+    for (Map<String, Object> block : cleanblocks) {
+      if (block != null) {
+        cleanmerge.add(Struct.clone(block));
+      }
+    }
+    final Map<String, Object> cleancfg =
+        Clean.makeCleanConfig(Helpers.toMapAny(Struct.merge(cleanmerge)));
+    Clean.addSensitiveOptions(cleancfg, without(options, "clean"));
+    for (Map<String, Object> block : cleanblocks) {
+      for (String raw : Clean.splitvalues(block == null ? null : block.get("values"))) {
+        Clean.add(cleancfg, raw);
+      }
+    }
+
     // Feature add-order. options.feature may be given as an ordered LIST of
     // { name, active, ...opts } entries (the list position IS the order in
     // which features are added), or as a { name: {opts} } map. Normalize a
@@ -83,15 +116,6 @@ final class MakeOptions {
         }
       }
       opts.put("feature", fmap);
-    }
-
-    Map<String, Object> config = ctx.config;
-    if (config == null) {
-      config = new LinkedHashMap<>();
-    }
-    Map<String, Object> cfgopts = Helpers.toMapAny(config.get("options"));
-    if (cfgopts == null) {
-      cfgopts = new LinkedHashMap<>();
     }
 
     // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
@@ -125,7 +149,16 @@ final class MakeOptions {
 
     Map<String, Object> vopts = new LinkedHashMap<>();
     vopts.put("errs", new ArrayList<>());
-    Object validated = Struct.validate(merged, optspec, vopts);
+    Object validated;
+    try {
+      validated = Struct.validate(merged, optspec, vopts);
+    }
+    catch (IllegalArgumentException err) {
+      // The message quotes the offending value; a rewrite is the only way to
+      // clean a JDK exception, so the type is kept and the text replaced.
+      throw new IllegalArgumentException(
+          (String) Clean.cleanWith(cleancfg, String.valueOf(err.getMessage())), err.getCause());
+    }
     opts = (Map<String, Object>) validated;
 
     // Restore the suppression the optspec default would otherwise erase.
@@ -198,22 +231,6 @@ final class MakeOptions {
       opts.put("base", resolved.toString());
     }
 
-    // Derived clean config.
-    String cleanKeys = "key,token,id";
-    Object ck = Struct.getpath(opts, List.of("clean", "keys"));
-    if (ck instanceof String) {
-      cleanKeys = (String) ck;
-    }
-
-    List<String> filtered = new ArrayList<>();
-    for (String p : cleanKeys.split(",")) {
-      p = p.trim();
-      if (!"".equals(p)) {
-        filtered.add(Struct.escre(p));
-      }
-    }
-    String keyre = String.join("|", filtered);
-
     // Resolve the feature add-order: an explicit list order (above) wins;
     // otherwise order the map test-first, then the remaining names sorted, so
     // the outcome is deterministic and `test` is always the base transport.
@@ -249,14 +266,21 @@ final class MakeOptions {
     }
 
     Map<String, Object> derived = new LinkedHashMap<>();
-    Map<String, Object> derivedClean = new LinkedHashMap<>();
-    if (!"".equals(keyre)) {
-      derivedClean.put("keyre", keyre);
-    }
-    derived.put("clean", derivedClean);
+    derived.put("clean", cleancfg);
     derived.put("featureorder", featureorder);
     opts.put("__derived__", derived);
 
+    // Again over the merged result: the config's own defaults can carry one.
+    Clean.addSensitiveOptions(cleancfg, without(opts, "clean", "__derived__"));
+
     return opts;
+  }
+
+  private static Map<String, Object> without(Map<String, Object> map, String... keys) {
+    Map<String, Object> out = new LinkedHashMap<>(map);
+    for (String key : keys) {
+      out.remove(key);
+    }
+    return out;
   }
 }

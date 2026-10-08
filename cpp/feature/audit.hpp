@@ -87,6 +87,7 @@ private:
     if (ctx->result) {
       map_put(record, "status", Value(ctx->result->status));
     }
+    record = ctx->utility->clean(ctx, record);
 
     records.as_list()->push_back(record);
     int max = fopt::foptInt(options, "max", 1000);

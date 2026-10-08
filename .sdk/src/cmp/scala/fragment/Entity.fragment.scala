@@ -20,5 +20,7 @@ class EntyClass(client0: SdkClient, entopts0: JMap[String, Object]) extends Enti
 
 // #UpdateOp
 
+// #PatchOp
+
 // #RemoveOp
 }

@@ -9,6 +9,7 @@ Complete API reference for the Univec C# SDK.
 
 ```csharp
 using UnivecSdk;
+using Voxgig.Struct;
 
 var client = new UnivecSDK(options);
 ```
@@ -116,7 +117,7 @@ var convert = client.Convert();
 
 #### `Create(reqdata, ctrl = null) -> object?`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```csharp
 var result = client.Convert().Create(new Dictionary<string, object?>
@@ -166,7 +167,7 @@ var embed = client.Embed();
 
 #### `Create(reqdata, ctrl = null) -> object?`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```csharp
 var result = client.Embed().Create(new Dictionary<string, object?>
@@ -217,7 +218,7 @@ var ephemeralKey = client.EphemeralKey();
 
 #### `Create(reqdata, ctrl = null) -> object?`
 
-Create a new entity with the given data. Returns the created entity data and raises on error.
+Create a new entity with the given data. Returns the created entity and raises on error.
 
 ```csharp
 var result = client.EphemeralKey().Create(new Dictionary<string, object?>
@@ -275,11 +276,14 @@ var model = client.Model();
 
 #### `List(reqmatch, ctrl = null) -> object?`
 
-List entities matching the given criteria. The match is optional — call `List(null)` to list all records. Returns an aggregate list and raises on error.
+List entities matching the given criteria. The match is optional — call `List(null)` to list all records. Returns a list of entities, one per record, and raises on error.
 
 ```csharp
-var results = client.Model().List(null);
-Console.WriteLine(results);
+var results = (List<object?>)client.Model().List(null)!;
+foreach (var item in results)
+{
+    Console.WriteLine(StructUtils.Jsonify(((IEntity)item!).Data()));
+}
 ```
 
 ### Common Methods
@@ -958,6 +962,7 @@ Timeout.
 | Option | Type |
 |---|---|
 | `clearTimer` | function |
+| `now` | function |
 | `setTimer` | function |
 
 These take no default: the feature behaves one way when you supply them and

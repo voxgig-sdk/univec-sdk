@@ -122,11 +122,17 @@ public class TelemetryFeature extends BaseFeature {
     span.put("durationMs", dur);
     span.put("ok", ok);
 
+    Map<String, Object> out = span;
+    if (ctx.utility != null && ctx.utility.clean != null) {
+      Map<String, Object> cleaned = Helpers.toMapAny(ctx.utility.clean.apply(ctx, span));
+      out = cleaned == null ? span : cleaned;
+    }
+
     this.activeSpans--;
-    this.spans.add(span);
+    this.spans.add(out);
 
     if (this.options.get("exporter") instanceof Consumer) {
-      ((Consumer<Map<String, Object>>) this.options.get("exporter")).accept(span);
+      ((Consumer<Map<String, Object>>) this.options.get("exporter")).accept(out);
     }
   }
 

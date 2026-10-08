@@ -28,11 +28,13 @@ defmodule Univec.Feature.Log do
       logger = S.getprop(F.opts(f), "logger")
 
       logger =
-        if S.ismap(logger) do
+        if S.ismap(logger) or S.isfunc(logger) do
           logger
         else
           mk = fn level ->
-            fn msg -> IO.write(:stderr, "[" <> level <> "] " <> msg <> "\n") end
+            fn record ->
+              IO.write(:stderr, "[" <> level <> "] " <> S.jsonify(record, S.jm(["indent", 0])) <> "\n")
+            end
           end
 
           S.jm(["info", mk.("INFO"), "debug", mk.("DEBUG"), "warn", mk.("WARN"), "error", mk.("ERROR")])
@@ -44,6 +46,9 @@ defmodule Univec.Feature.Log do
     nil
   end
 
+  # A log line leaves the pipeline, so it carries the cleaned record: the
+  # spec after auth holds the credential, and a logger serialises whatever it
+  # is handed. `logger` is a fn of the record, or a map with an "info" fn.
   defp loghook(f, hook, ctx) do
     if F.active?(f) do
       logger = S.getprop(f, "logger")
@@ -51,9 +56,17 @@ defmodule Univec.Feature.Log do
       if logger != nil do
         op = S.getprop(ctx, "op")
         opname = if op != nil, do: S.getprop(op, "name"), else: ""
-        msg = "hook=" <> hook <> " op=" <> to_string(opname)
-        log_fn = S.getprop(logger, "info")
-        if S.isfunc(log_fn), do: log_fn.(msg)
+
+        record =
+          F.clean(ctx, S.jm([
+            "hook", hook,
+            "op", opname,
+            "spec", S.getprop(ctx, "spec"),
+            "ctx", Univec.Context.to_data(ctx)
+          ]))
+
+        log_fn = if S.isfunc(logger), do: logger, else: S.getprop(logger, "info")
+        if S.isfunc(log_fn), do: log_fn.(record)
       end
     end
 

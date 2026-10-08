@@ -11,9 +11,15 @@
 #ifndef SDK_CORE_TYPES_HPP
 #define SDK_CORE_TYPES_HPP
 
+#include <algorithm>
+#include <atomic>
+#include <cctype>
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <ostream>
+#include <shared_mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -48,7 +54,11 @@ using FeaturePtr = std::shared_ptr<Feature>;
 using UtilityPtr = std::shared_ptr<Utility>;
 using CtxPtr = std::shared_ptr<Context>;
 
-using OpMap = std::map<std::string, OperationPtr>;
+// Shared by every context of one client, so by requests on several threads.
+struct OpMap {
+  std::mutex lock;
+  std::map<std::string, OperationPtr> ops;
+};
 using OpMapPtr = std::shared_ptr<OpMap>;
 
 // Generated (core/config.hpp) — the embedded API config + feature factory.
@@ -69,6 +79,26 @@ inline long long toLong(const Value& v, long long def) {
 }
 inline Value toMapAny(const Value& v) { return v.is_map() ? v : Value::undef(); }
 
+// Whether a comma-separated allow option names the item: whole names, any case.
+inline bool allowed(const Value& names, const std::string& item) {
+  if (!names.is_string() || item.empty()) return false;
+  const std::string list = names.as_string();
+  size_t start = 0;
+  for (;;) {
+    size_t end = list.find(',', start);
+    size_t s = start;
+    size_t e = std::string::npos == end ? list.size() : end;
+    while (s < e && std::isspace((unsigned char)list[s])) s++;
+    while (e > s && std::isspace((unsigned char)list[e - 1])) e--;
+    if (e - s == item.size() && std::equal(item.begin(), item.end(), list.begin() + s,
+          [](char a, char b) { return std::toupper((unsigned char)a) == std::toupper((unsigned char)b); })) {
+      return true;
+    }
+    if (std::string::npos == end) return false;
+    start = end + 1;
+  }
+}
+
 SdkErrorPtr unsupportedOp(const std::string& opname, const std::string& entityname);
 
 } // namespace Helpers
@@ -80,16 +110,41 @@ public:
   std::string sdk = "Univec";
   std::string code;
   std::string msg;
+  // Reachable for a debugger, never printed: the context holds the live
+  // spec and options, and an error is what gets logged (ADR-003).
   Context* ctx = nullptr;
-  ResultPtr result_obj;
-  SpecPtr spec_obj;
+  int status = -1;
+  // Masked plain-data copies, never the live Result/Spec: masking them can
+  // never mask the pipeline's own request.
+  Value result = Value::undef();
+  Value spec = Value::undef();
 
   SdkError(const std::string& code_, const std::string& msg_, Context* ctx_)
       : std::runtime_error(msg_), code(code_), msg(msg_), ctx(ctx_) {}
 
   const char* what() const noexcept override { return msg.c_str(); }
   const std::string& getMessage() const { return msg; }
+  bool notFound() const { return 404 == status; }
+
+  // What makeError attached is already cleaned; the context is not part of
+  // the record.
+  Value toValue() const {
+    Value o = vmap();
+    map_put(o, "sdk", Value(sdk));
+    map_put(o, "code", Value(code));
+    map_put(o, "message", Value(msg));
+    map_put(o, "status", Value(status));
+    if (!result.is_undef()) map_put(o, "result", result);
+    if (!spec.is_undef()) map_put(o, "spec", spec);
+    return o;
+  }
+
+  std::string to_string() const { return sdk + "Error " + vs::jsonify(toValue(), 0); }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const SdkError& err) {
+  return os << err.to_string();
+}
 
 // ---- Control ----------------------------------------------------------
 
@@ -120,6 +175,9 @@ public:
   Value body = Value::undef();
   std::string url = "";
   std::string path = "";
+  // The query parameters prepareAuth placed: the credential, which the
+  // request sends and the entity's match leaves out.
+  std::vector<std::string> authquery;
 
   Spec() {
     headers = vmap();
@@ -188,6 +246,8 @@ public:
   JsonFunc jsonFunc;
   Value body = Value::undef();
   SdkErrorPtr err;
+  // Set by a transport that could not read a non-blank body as JSON.
+  bool unreadable = false;
 
   Response() = default;
 
@@ -211,6 +271,8 @@ public:
       };
     }
     body = getp(m, "body");
+    Value ur = getp(m, "unreadable");
+    unreadable = ur.is_bool() && ur.as_bool();
   }
 };
 
@@ -461,15 +523,28 @@ public:
 
   SdkErrorPtr makeError(const std::string& code, const std::string& msg);
 
+  // The raw record, for the pipeline's own use.
+  Value toValue() const;
+
+  // The serialised context leaves the pipeline (a logger, an error dump), so
+  // it is cleaned; the live fields stay raw.
+  std::string to_string() const;
+
 private:
   OperationPtr resolveOp(const std::string& opname);
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Context& ctx) {
+  return os << ctx.to_string();
+}
 
 // ---- Utility (swappable pipeline function bundle) ---------------------
 
 class Utility {
 public:
   std::function<Value(CtxPtr, const Value&)> clean;
+  std::function<void(CtxPtr, const Value&)> cleanAdd;
+  std::function<void(CtxPtr)> cleanExplain;
   std::function<Value(CtxPtr)> done;
   std::function<Value(CtxPtr, SdkErrorPtr)> makeError;
   std::function<void(CtxPtr, FeaturePtr)> featureAdd;
@@ -512,6 +587,8 @@ public:
   UtilityPtr copy() const {
     auto u = std::shared_ptr<Utility>(new Utility(NoRegister{}));
     u->clean = clean;
+    u->cleanAdd = cleanAdd;
+    u->cleanExplain = cleanExplain;
     u->done = done;
     u->makeError = makeError;
     u->featureAdd = featureAdd;
@@ -553,6 +630,24 @@ public:
 
 // ---- SdkClient --------------------------------------------------------
 
+// A registration replaces the secret registry (options.__derived__.clean
+// .values) while requests copy the options: it holds this lock exclusively,
+// and every read of that slot holds it shared.
+inline std::shared_mutex& cleanRegistryLock() {
+  // winpthreads sets up a static rwlock on its first lock, failing threads
+  // that race it with EINVAL; that first lock runs in this static's
+  // initialization, which every other caller waits for.
+  struct Warmed {
+    std::shared_mutex lock;
+    Warmed() {
+      lock.lock();
+      lock.unlock();
+    }
+  };
+  static Warmed warmed;
+  return warmed.lock;
+}
+
 class SdkClient {
 public:
   std::string mode = "live";
@@ -569,6 +664,9 @@ public:
   UtilityPtr getUtility();
   CtxPtr getRootCtx() { return rootctx; }
 
+  // The options hold the credential; the printed client names itself only.
+  std::string to_string() const { return "UnivecSDK{mode=" + mode + "}"; }
+
   Value prepare(const Value& fetchargs);
   Value direct(const Value& fetchargs);
   Value graphql(const std::string& query, const Value& variables = Value::undef(),
@@ -583,6 +681,10 @@ public:
 
   static Value testOptions(const Value& testopts, const Value& sdkopts);
 };
+
+inline std::ostream& operator<<(std::ostream& os, const SdkClient& client) {
+  return os << client.to_string();
+}
 
 // ---- SdkEntity contract -----------------------------------------------
 
@@ -602,6 +704,7 @@ public:
   virtual std::vector<SdkEntityPtr> list(const Value& reqmatch, const Value& ctrl) = 0;
   virtual SdkEntityPtr create(const Value& reqdata, const Value& ctrl) = 0;
   virtual SdkEntityPtr update(const Value& reqdata, const Value& ctrl) = 0;
+  virtual SdkEntityPtr patch(const Value& reqdata, const Value& ctrl) = 0;
   virtual SdkEntityPtr remove(const Value& reqmatch, const Value& ctrl) = 0;
 };
 
@@ -666,7 +769,7 @@ inline SdkErrorPtr Helpers::unsupportedOp(const std::string& opname,
 
 // ---- Context ----
 inline Context::Context(const CtxSpec& cs, const CtxPtr& basectx) {
-  static long long counter = 10000000;
+  static std::atomic<long long> counter{10000000};
   id = "C" + std::to_string(++counter);
 
   // Client
@@ -748,8 +851,11 @@ inline OperationPtr Context::resolveOp(const std::string& opname) {
   if (entity) entname = entity->getName();
   std::string cacheKey = entname + ":" + opname;
 
-  auto it = opmap->find(cacheKey);
-  if (it != opmap->end()) return it->second;
+  {
+    std::lock_guard<std::mutex> guard(opmap->lock);
+    auto it = opmap->ops.find(cacheKey);
+    if (it != opmap->ops.end()) return it->second;
+  }
 
   if (opname.empty()) {
     return std::make_shared<Operation>(vmap());
@@ -758,7 +864,7 @@ inline OperationPtr Context::resolveOp(const std::string& opname) {
   Value opcfg = Struct::getpath(config, {"entity", entname, "op", opname});
 
   std::string input = "match";
-  if (opname == "update" || opname == "create") input = "data";
+  if (opname == "update" || opname == "create" || opname == "patch") input = "data";
 
   Value points = Value::undef();
   if (opcfg.is_map()) {
@@ -774,12 +880,47 @@ inline OperationPtr Context::resolveOp(const std::string& opname) {
   map_put(opdef, "points", points);
 
   auto op_ = std::make_shared<Operation>(opdef);
-  (*opmap)[cacheKey] = op_;
-  return op_;
+  // Every request racing to build this Operation gets the one stored first.
+  std::lock_guard<std::mutex> guard(opmap->lock);
+  return opmap->ops.emplace(cacheKey, op_).first->second;
 }
 
 inline SdkErrorPtr Context::makeError(const std::string& code, const std::string& msg) {
   return std::make_shared<SdkError>(code, msg, this);
+}
+
+inline Value Context::toValue() const {
+  Value o = vmap();
+  map_put(o, "id", Value(id));
+  if (op) {
+    map_put(o, "op", vmap({{"entity", Value(op->entity)}, {"name", Value(op->name)},
+                           {"input", Value(op->input)}}));
+  }
+  if (spec) map_put(o, "spec", spec->toValue());
+  if (entity) map_put(o, "entity", Value(entity->getName()));
+  if (result) map_put(o, "result", result->toValue());
+  if (response) {
+    Value r = vmap();
+    map_put(r, "status", Value(response->status));
+    map_put(r, "statusText", Value(response->statusText));
+    if (response->headers.is_map()) map_put(r, "headers", response->headers);
+    if (!response->body.is_undef()) map_put(r, "body", response->body);
+    if (response->err) map_put(r, "err", vmap({{"message", Value(response->err->msg)}}));
+    map_put(o, "response", r);
+  }
+  if (meta.is_map()) map_put(o, "meta", meta);
+  return o;
+}
+
+inline std::string Context::to_string() const {
+  Value record = toValue();
+  if (utility && utility->clean) {
+    // clean takes the context by shared pointer; the record is what it reads
+    // the configuration from, so a non-owning alias is enough here.
+    CtxPtr self(const_cast<Context*>(this), [](Context*) {});
+    record = utility->clean(self, record);
+  }
+  return "Context " + vs::jsonify(record, 0);
 }
 
 // ---- SdkClient ----
@@ -839,6 +980,7 @@ inline SdkClient::SdkClient(const Value& options_) {
 }
 
 inline Value SdkClient::optionsMap() {
+  std::shared_lock<std::shared_mutex> guard(cleanRegistryLock());
   Value out = Struct::clone(options);
   return out.is_map() ? out : vmap();
 }
@@ -872,6 +1014,14 @@ inline Value SdkClient::prepare(const Value& fetchargs_) {
   Value methodRaw = getp(fetchargs, "method");
   std::string method = methodRaw.is_string() ? methodRaw.as_string() : "";
   if (method.empty()) method = "GET";
+  for (auto& ch : method) ch = (char)std::toupper((unsigned char)ch);
+
+  Value allowMethod = Struct::getpath(opts, {"allow", "method"});
+  if (!Helpers::allowed(allowMethod, method)) {
+    throw ctx->makeError("spec_method_allow",
+        "Method \"" + method + "\" not allowed by SDK option allow.method value: \"" +
+        (allowMethod.is_string() ? allowMethod.as_string() : std::string()) + "\"");
+  }
 
   Value params = Helpers::toMapAny(getp(fetchargs, "params"));
   if (!params.is_map()) params = vmap();
@@ -911,9 +1061,7 @@ inline Value SdkClient::prepare(const Value& fetchargs_) {
 
 // Is this raw-access op permitted by the SDK's allow.op option?
 inline bool SdkClient::opAllowed(const std::string& op) {
-  Value allow = Struct::getpath(options, {"allow", "op"});
-  if (!allow.is_string()) return false;
-  return std::string::npos != allow.as_string().find(op);
+  return Helpers::allowed(Struct::getpath(options, {"allow", "op"}), op);
 }
 
 inline Value SdkClient::opDenied(const std::string& op) {
@@ -979,6 +1127,74 @@ inline Value SdkClient::graphql(const std::string& query, const Value& variables
   return res;
 }
 
+// A body that is not JSON. An HTTP failure keeps its own error, with the
+// response described; otherwise the code tells a wrong content type from
+// malformed JSON.
+inline SdkErrorPtr unreadableBody(CtxPtr ctx, int status, const Value& headers, const Value& text,
+                                  const Value& sent, SdkErrorPtr failed) {
+  auto lower = [](std::string s) {
+    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+  };
+  auto headerValue = [&lower](const Value& h, const std::string& name) -> std::string {
+    if (!h.is_map()) return "";
+    for (const auto& kv : *h.as_map()) {
+      if (lower(kv.first) == name) {
+        return kv.second.is_string() ? kv.second.as_string() : Struct::stringify(kv.second);
+      }
+    }
+    return "";
+  };
+  auto clean = [&ctx](const std::string& s) -> std::string {
+    if (!ctx->utility || !ctx->utility->clean) return s;
+    Value v = ctx->utility->clean(ctx, Value(s));
+    return v.is_string() ? v.as_string() : s;
+  };
+
+  std::string type = headerValue(headers, "content-type");
+  std::string agent = clean(headerValue(sent, "user-agent"));
+  std::string detail = "HTTP " + std::to_string(status) + ", content-type " +
+    (type.empty() ? std::string("none") : type) + ", user-agent " +
+    (agent.empty() ? std::string("transport default") : agent);
+
+  if (!is_nullish(text)) {
+    // Cleaned whole: a secret the bound would split could leave its prefix.
+    std::string raw = text.is_string() ? text.as_string() : Struct::stringify(text);
+    std::string flat;
+    bool space = false;
+    for (unsigned char c : raw) {
+      if (std::isspace(c)) {
+        space = !flat.empty();
+        continue;
+      }
+      if (space) {
+        flat += ' ';
+        space = false;
+      }
+      flat += static_cast<char>(c);
+    }
+    flat = clean(flat);
+    size_t points = 0;
+    size_t end = 0;
+    for (; end < flat.size(); end++) {
+      if ((static_cast<unsigned char>(flat[end]) & 0xC0) == 0x80) continue;
+      if (160 == points) break;
+      points++;
+    }
+    detail += ", body: " + (end < flat.size() ? flat.substr(0, end) + "..." : flat);
+  }
+
+  if (failed) {
+    failed->msg += " (" + detail + ")";
+    return failed;
+  }
+  if (type.empty() || lower(type).find("json") != std::string::npos) {
+    return ctx->makeError("response_json_invalid", "response: body is not valid JSON (" + detail + ")");
+  }
+  return ctx->makeError("response_content_type",
+    "response: expected JSON, got " + type + " (" + detail + ")");
+}
+
 // Ungated request path shared by direct and graphql, each of which checks its
 // own allow.op token first. Private, rather than a flag on fetchargs: a
 // caller-supplied marker would let anyone opt straight back out of the gate
@@ -1012,7 +1228,7 @@ inline Value SdkClient::rawRequest(const Value& fetchargs_) {
     fetched = u->fetcher(ctx, url.is_string() ? url.as_string() : "", fetchdef);
   } catch (const SdkErrorPtr& err) {
     map_put(out, "ok", Value(false));
-    map_put(out, "err", vmap({{"message", Value(err->msg)}}));
+    map_put(out, "err", vmap({{"message", u->clean(ctx, Value(err->msg))}}));
     return out;
   }
 
@@ -1043,10 +1259,24 @@ inline Value SdkClient::rawRequest(const Value& fetchargs_) {
       }
     }
 
-    map_put(out, "ok", Value(status >= 200 && status < 300));
+    SdkErrorPtr bodyErr;
+    Value ur = getp(fetched, "unreadable");
+    if (!noBody && ur.is_bool() && ur.as_bool()) {
+      SdkErrorPtr failed;
+      if (status < 200 || status >= 300) {
+        Value st = getp(fetched, "statusText");
+        failed = ctx->makeError("request_status", "request: " + std::to_string(status) + ": " +
+          (st.is_string() ? st.as_string() : std::string("")));
+      }
+      bodyErr = unreadableBody(ctx, status, headers, getp(fetched, "body"),
+        getp(fetchdef, "headers"), failed);
+    }
+
+    map_put(out, "ok", Value(!bodyErr && status >= 200 && status < 300));
     map_put(out, "status", Value(status));
     map_put(out, "headers", headers);
     map_put(out, "data", jsonData);
+    if (bodyErr) map_put(out, "err", vmap({{"message", u->clean(ctx, Value(bodyErr->msg))}}));
     return out;
   }
 
@@ -1138,6 +1368,9 @@ inline Value EntityBase::runOp(CtxPtr ctx, const std::function<void()>& postDone
   } catch (const SdkErrorPtr& err) {
     if (ctx->ctrl->err && err == ctx->ctrl->err) throw;
     return u->makeError(ctx, err);
+  } catch (const std::exception& e) {
+    // An exception a hook threw never passed through makeError.
+    return u->makeError(ctx, ctx->makeError("unexpected", e.what()));
   }
 }
 
@@ -1148,8 +1381,14 @@ inline std::vector<Value> EntityBase::stream(const std::string& action,
 
   Value streamOpts = callopts.is_map() ? callopts : vmap();
 
-  Value ctrl = Helpers::toMapAny(getp(streamOpts, "ctrl"));
-  if (!ctrl.is_map()) ctrl = vmap();
+  // A copy: the caller's ctrl gains no key, and explain stays its own record.
+  Value ctrl = vmap();
+  Value given = Helpers::toMapAny(getp(streamOpts, "ctrl"));
+  if (given.is_map()) {
+    for (const auto& kv : *given.as_map()) {
+      map_put(ctrl, kv.first, kv.second);
+    }
+  }
   map_put(ctrl, "stream", streamOpts);
 
   CtxSpec cs;
@@ -1197,6 +1436,8 @@ inline std::vector<Value> EntityBase::stream(const std::string& action,
     // back to the materialised items so stream always yields.
     ResultPtr res = ctx->result;
     if (res && res->stream) {
+      // done() does not run on this path, so its record is cleaned here.
+      u->cleanExplain(ctx);
       return res->stream();
     }
 
@@ -1211,6 +1452,9 @@ inline std::vector<Value> EntityBase::stream(const std::string& action,
   } catch (const SdkErrorPtr& err) {
     if (ctx->ctrl->err && err == ctx->ctrl->err) throw;
     u->makeError(ctx, err);
+    return std::vector<Value>();
+  } catch (const std::exception& e) {
+    u->makeError(ctx, ctx->makeError("unexpected", e.what()));
     return std::vector<Value>();
   }
 }

@@ -101,14 +101,16 @@ class UnivecTelemetryFeature(UnivecBaseFeature):
         span["durationMs"] = max(0, span["end"] - span["start"])
         span["ok"] = ok
 
+        out = ctx.utility.clean(ctx, span)
+
         telemetry = self.client._telemetry
         telemetry["active"] -= 1
-        telemetry["spans"].append(span)
+        telemetry["spans"].append(out)
 
         exporter = self.options.get("exporter")
         if callable(exporter):
             try:
-                exporter(span)
+                exporter(out)
             except Exception:
                 pass
 

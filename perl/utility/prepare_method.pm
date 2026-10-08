@@ -44,4 +44,17 @@ $REGISTRY{prepare_method} = sub {
   return $METHOD_MAP{$opname};
 };
 
+# Whether a comma-separated allow option names the item: whole names, any case.
+sub allowed {
+  my ($names, $item) = @_;
+  return 0 unless defined $item && !ref $item && '' ne $item;
+  return 0 unless defined $names && !ref $names;
+  my $want = uc $item;
+  for my $name (split /,/, $names) {
+    (my $trimmed = $name) =~ s/^\s+|\s+$//g;
+    return 1 if uc($trimmed) eq $want;
+  }
+  return 0;
+}
+
 1;

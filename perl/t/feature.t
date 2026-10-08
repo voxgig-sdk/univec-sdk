@@ -30,7 +30,7 @@ sub has_feature {
 sub default_method {
   my ($opname) = @_;
   return 'POST' if 'create' eq $opname;
-  return 'PATCH' if 'update' eq $opname;
+  return 'PATCH' if 'update' eq $opname || 'patch' eq $opname;
   return 'DELETE' if 'remove' eq $opname;
   return 'GET';
 }
@@ -791,7 +791,9 @@ if (has_feature('debug')) {
     my $entries = $h->track('_debug')->{entries};
     is(scalar @$entries, 1, 'debug ring buffer capped at max');
     is(scalar @$seen, 2, 'debug on_entry saw each op');
-    is($seen->[0]{headers}{authorization}, '<redacted>', 'debug redacts authorization');
+    # Masked by the SDK's own clean rule (authorization is a clean.keys
+    # name), which the feature's redact list now sits on top of.
+    is($seen->[0]{headers}{authorization}, '[redacted]', 'debug redacts authorization');
   }
 
   if (has_feature('netsim')) {
@@ -809,7 +811,7 @@ if (has_feature('debug')) {
     my $h = harness([fspec('debug', 'now' => sub { 7 }, 'redact' => ['x-secret'])]);
     $h->op('headers' => { 'x-secret' => 'hide', 'x-ok' => 'show' });
     my $entry = $h->track('_debug')->{entries}[0];
-    is($entry->{headers}{'x-secret'}, '<redacted>', 'debug custom redact');
+    is($entry->{headers}{'x-secret'}, '[redacted]', 'debug custom redact');
     is($entry->{headers}{'x-ok'}, 'show', 'debug leaves other headers');
   }
 }

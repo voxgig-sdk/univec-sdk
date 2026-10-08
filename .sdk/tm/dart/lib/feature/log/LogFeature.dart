@@ -72,13 +72,19 @@ class LogFeature extends BaseFeature {
   @override
   dynamic PreResult(dynamic ctx) => _loghook('PreResult', ctx);
 
+  // A log line leaves the pipeline, so it carries the cleaned record: the
+  // spec after auth holds the credential, and a logger prints what it is
+  // handed.
   dynamic _loghook(String hook, dynamic ctx) {
     if (null != _logger) {
-      _logger({
+      final clean = ctx.utility.clean;
+      _logger(clean(ctx, {
         'hook': hook,
         'op': null == ctx.op ? null : ctx.op.name,
         'client': null == _client ? null : 'Univec',
-      });
+        'spec': ctx.spec,
+        'ctx': ctx.toJSON(),
+      }));
     }
     return null;
   }

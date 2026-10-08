@@ -203,6 +203,7 @@ public final class FeatureHarness {
       case "create":
         return "POST";
       case "update":
+      case "patch":
         return "PATCH";
       case "remove":
         return "DELETE";

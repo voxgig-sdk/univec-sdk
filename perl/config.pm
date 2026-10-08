@@ -338,6 +338,7 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
       },
       "optspec": {
         "clearTimer": "`$FUNCTION`",
+        "now": "`$FUNCTION`",
         "setTimer": "`$FUNCTION`"
       },
       "strict": false,
@@ -505,6 +506,10 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                     }
                   }
                 }
+              },
+              "response": {
+                "kind": "json",
+                "media": "application/json"
               }
             },
             {
@@ -623,6 +628,10 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                     "SDK live coverage test."
                   ]
                 }
+              },
+              "response": {
+                "kind": "json",
+                "media": "application/json"
               }
             },
             {
@@ -750,6 +759,10 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                     }
                   }
                 }
+              },
+              "response": {
+                "kind": "json",
+                "media": "application/json"
               }
             },
             {
@@ -876,6 +889,10 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                     "SDK live coverage test."
                   ]
                 }
+              },
+              "response": {
+                "kind": "json",
+                "media": "application/json"
               }
             }
           ]
@@ -999,6 +1016,10 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                     "SDK live coverage test."
                   ]
                 }
+              },
+              "response": {
+                "kind": "json",
+                "media": "application/json"
               }
             },
             {
@@ -1095,6 +1116,10 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                     "SDK live coverage test."
                   ]
                 }
+              },
+              "response": {
+                "kind": "json",
+                "media": "application/json"
               }
             }
           ]
@@ -1178,6 +1203,10 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                 "auth": "public",
                 "id": "key",
                 "retention": "No deletion endpoint; issued key is subject to the service daily allowance"
+              },
+              "response": {
+                "kind": "json",
+                "media": "application/json"
               }
             }
           ]
@@ -1291,6 +1320,10 @@ my $CONFIG_JSON = <<'END_CONFIG_JSON';
                 },
                 "auth": "public",
                 "id": "models"
+              },
+              "response": {
+                "kind": "json",
+                "media": "application/json"
               }
             }
           ]

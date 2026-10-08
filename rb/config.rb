@@ -337,6 +337,7 @@ module UnivecConfig
           },
           "optspec" => {
             "clearTimer" => "`$FUNCTION`",
+            "now" => "`$FUNCTION`",
             "setTimer" => "`$FUNCTION`",
           },
           "strict" => false,
@@ -505,6 +506,10 @@ module UnivecConfig
                       },
                     },
                   },
+                  "response" => {
+                    "kind" => "json",
+                    "media" => "application/json",
+                  },
                 },
                 {
                   "kind" => "http",
@@ -622,6 +627,10 @@ module UnivecConfig
                         "SDK live coverage test.",
                       ],
                     },
+                  },
+                  "response" => {
+                    "kind" => "json",
+                    "media" => "application/json",
                   },
                 },
                 {
@@ -750,6 +759,10 @@ module UnivecConfig
                       },
                     },
                   },
+                  "response" => {
+                    "kind" => "json",
+                    "media" => "application/json",
+                  },
                 },
                 {
                   "kind" => "http",
@@ -876,6 +889,10 @@ module UnivecConfig
                       ],
                     },
                   },
+                  "response" => {
+                    "kind" => "json",
+                    "media" => "application/json",
+                  },
                 },
               ],
             },
@@ -999,6 +1016,10 @@ module UnivecConfig
                       ],
                     },
                   },
+                  "response" => {
+                    "kind" => "json",
+                    "media" => "application/json",
+                  },
                 },
                 {
                   "kind" => "http",
@@ -1095,6 +1116,10 @@ module UnivecConfig
                       ],
                     },
                   },
+                  "response" => {
+                    "kind" => "json",
+                    "media" => "application/json",
+                  },
                 },
               ],
             },
@@ -1177,6 +1202,10 @@ module UnivecConfig
                     "auth" => "public",
                     "id" => "key",
                     "retention" => "No deletion endpoint; issued key is subject to the service daily allowance",
+                  },
+                  "response" => {
+                    "kind" => "json",
+                    "media" => "application/json",
                   },
                 },
               ],
@@ -1290,6 +1319,10 @@ module UnivecConfig
                     },
                     "auth" => "public",
                     "id" => "models",
+                  },
+                  "response" => {
+                    "kind" => "json",
+                    "media" => "application/json",
                   },
                 },
               ],

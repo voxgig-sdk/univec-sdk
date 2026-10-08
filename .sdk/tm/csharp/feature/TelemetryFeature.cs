@@ -117,12 +117,14 @@ public class TelemetryFeature : BaseFeature
         span["durationMs"] = dur;
         span["ok"] = ok;
 
+        var finished = Fclean(ctx, span);
+
         ActiveSpans--;
-        Spans.Add(span);
+        Spans.Add(finished);
 
         if (Opt(_options, "exporter") is Action<Dictionary<string, object?>> exporter)
         {
-            exporter(span);
+            exporter(finished);
         }
     }
 

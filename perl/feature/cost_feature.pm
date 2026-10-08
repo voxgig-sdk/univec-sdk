@@ -283,7 +283,7 @@ sub _commit {
   $self->_bump($cost->{actors}, $actor, $amount);
 
   $self->{seq} += 1;
-  my $record = {
+  my $record = $ctx->{utility}{clean}->($ctx, {
     'seq' => $self->{seq},
     'entity' => $entity,
     'op' => $opname,
@@ -292,7 +292,7 @@ sub _commit {
     'currency' => $cost->{currency},
     'source' => $source,
     'attempts' => $entry->{attempts},
-  };
+  });
   $cost->{last} = $record;
 
   my $sink = $self->{options}{sink};

@@ -35,16 +35,17 @@ voxgig_value* make_error_util(Context* ctx, PNError* err, PNError** out) {
 
   voxgig_value* spec_val = ctx->spec ? spec_to_value(ctx->spec) : voxgig_new_undef();
 
+  clean_explain_util(ctx);
+
   Control* c = ctx->ctrl;
   if (control_has_explain(c)) {
     setp(c->explain, "err", cmap(1, "message", v_str(msg)));
   }
 
   PNError* sdk_err = pn_error_new("", msg);
+  // A hook's own error supplies the code as well as the message.
   free(sdk_err->code);
-  size_t cn = strlen(use->code);
-  sdk_err->code = (char*)malloc(cn + 1);
-  memcpy(sdk_err->code, use->code, cn + 1);
+  sdk_err->code = clean_str(ctx, use->code);
   sdk_err->result = clean_util(ctx, result_to_value(result));
   sdk_err->spec = clean_util(ctx, spec_val);
 

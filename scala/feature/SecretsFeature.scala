@@ -64,6 +64,16 @@ class SecretsFeature extends BaseFeature("secrets", "0.1.0", true) {
 
   private var client: SdkClient = null
 
+  // Every value this feature resolves or buys is a secret the SDK handles,
+  // and none arrives under an option key the intake registration saw.
+  private def register(value: Object): Unit = {
+    if (this.client == null) return
+    val ctx = this.client.getRootCtx()
+    if (ctx != null && ctx.utility != null && ctx.utility.cleanAdd != null) {
+      ctx.utility.cleanAdd(ctx, value)
+    }
+  }
+
   // The LIVE options map (root ctx options). READ ONLY: this feature never
   // writes it - see the class note.
   private var liveopts: JMap[String, Object] = null
@@ -171,6 +181,7 @@ class SecretsFeature extends BaseFeature("secrets", "0.1.0", true) {
     val entries = ListBuffer.empty[Any]
 
     if ("" != explicit) {
+      register(explicit)
       try
         entries += ProviderSpec(
           kind = "memory",
@@ -291,6 +302,7 @@ class SecretsFeature extends BaseFeature("secrets", "0.1.0", true) {
     // tryget returns None for a MISS and RAISES for an ERROR. That is the
     // whole miss-vs-error rule, and it is sekreto's, not this feature's.
     val found = this.sek.tryget(this.secretname)
+    register(found.orNull)
 
     if (!this.xactive) {
       // An UNCACHED miss after an earlier hit is a revocation: the chain now
@@ -439,6 +451,7 @@ class SecretsFeature extends BaseFeature("secrets", "0.1.0", true) {
     // required server variable, for the same reason.
     if ("live" != this.client.mode) {
       this.cred = "test-" + this.xresponse
+      register(this.cred)
       return this.cred
     }
 
@@ -503,6 +516,7 @@ class SecretsFeature extends BaseFeature("secrets", "0.1.0", true) {
           "' field from " + url)
     }
 
+    register(token)
     this.cred = token
     token
   }

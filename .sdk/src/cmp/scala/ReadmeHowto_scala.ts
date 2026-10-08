@@ -1,24 +1,12 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, entityIdField, pickExampleEntity, opRequestShape, requiredItems, javaMapOf } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { scalaVarName } from './utility_scala'
-
-
-// A type-correct Scala literal for a field's canonical type.
-function scalaLit(type: any): string {
-  const k = canonScalarKey(type)
-  if ('INTEGER' === k) return '1L'
-  if ('NUMBER' === k) return '1.0'
-  if ('BOOLEAN' === k) return 'true'
-  if ('ARRAY' === k) return 'java.util.List.of()'
-  if ('OBJECT' === k) return 'java.util.Map.of()'
-  return '"example"'
-}
+import { scalaVarName, scalaLit } from './utility_scala'
 
 
 const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
@@ -39,23 +27,30 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   let testArg = 'null'
   if (exampleEntity && isMatchOp) {
     testArg = idF ? `java.util.Map.of("${idF}", "test01")` : 'null'
-  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp)) {
+  } else if (exampleEntity && 'list' === primaryOp && 0 < requiredItems(exampleEntity, 'list').length) {
+    const chosen = requiredItems(exampleEntity, 'list')
+    testArg = javaMapOf(chosen.map((it: any) =>
+      `${JSON.stringify(it.name)}, ${scalaLit(it.type)}`), 'java.util.')
+  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp)) {
     const items = opRequestShape(exampleEntity, primaryOp).items
       .filter((it: any) => it.name !== idF && it.name !== 'id')
     const required = items.filter((it: any) => !it.optional)
     const chosen = required.length ? required : items.slice(0, 3)
-    testArg = `java.util.Map.of(${chosen.map((it: any) =>
-      `"${it.name}", ${scalaLit(it.type)}`).join(', ')})`
+    testArg = javaMapOf(chosen.map((it: any) =>
+      `${JSON.stringify(it.name)}, ${scalaLit(it.type)}`), 'java.util.')
   }
 
   // The op-driven test-mode line, shown only when the SDK has an entity op.
   // A direct()-only SDK (no ops anywhere) shows a direct() call instead.
-  const testModeExample = primaryOp
-    ? `// Entity ops return the ENTITY and raises on error;
-// call data() for the record.
-val ${eVar} = client.${accessor}(null).${primaryOp}(${testArg}, null)
-// ${eVar} holds the mock response record
-println(${eVar})`
+  const testModeExample = 'list' === primaryOp
+    ? `// list returns a list of entities, one per mock record; it raises on error.
+val ${eVar}List = client.${accessor}(null).list(${testArg}, null).asInstanceOf[java.util.List[SdkEntity]]
+${eVar}List.forEach(${eVar}Item => println(${eVar}Item.data()))`
+    : primaryOp
+    ? `// Entity ops return the entity; they raise on error.
+val ${eVar} = client.${accessor}(null).${primaryOp}(${testArg}, null).asInstanceOf[SdkEntity]
+// data() reads the entity's mock record
+println(${eVar}.data())`
     : `val result = client.direct(java.util.Map.of(
     "path", "/api/resource",
     "method", "GET"))

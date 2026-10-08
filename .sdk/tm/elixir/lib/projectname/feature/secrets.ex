@@ -229,6 +229,8 @@ defmodule Univec.Feature.Secrets do
         if xopts == nil, do: nil, else: S.getprop(xopts, "refresh")
       end
 
+    register(f, explicit)
+
     first =
       if is_binary(explicit) and explicit != "" do
         [%Sekreto.ProviderSpec{
@@ -431,7 +433,18 @@ defmodule Univec.Feature.Secrets do
     end
   end
 
+  # Every value the chain resolves and every token bought can leave through
+  # the SDK's diagnostics, so each is registered with the clean utility the
+  # moment this feature sees it.
+  defp register(f, v) do
+    client = S.getprop(f, "client")
+    ctx = if client != nil, do: S.getprop(client, "_rootctx"), else: nil
+    if is_binary(v) and ctx != nil, do: F.clean_add(ctx, v)
+    nil
+  end
+
   defp settle(f, found) do
+    register(f, found)
     x = S.getprop(f, "_exchange")
 
     if x == nil do
@@ -637,11 +650,13 @@ defmodule Univec.Feature.Secrets do
     if S.getprop(client, "mode") != "live" do
       token = "test-" <> x.response
       S.setprop(f, "_cred", token)
+      register(f, token)
       {:ok, token}
     else
       case buy_once(f, x) do
         {:ok, token} ->
           S.setprop(f, "_cred", token)
+          register(f, token)
           {:ok, token}
 
         other ->

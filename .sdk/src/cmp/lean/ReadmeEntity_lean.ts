@@ -12,7 +12,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
   for (const op of ops) {
     const call =
       'create' === op ? `${ns}.create sdk data (← emptyMap)`
-        : 'update' === op ? `${ns}.update sdk match data (← emptyMap)`
+        : 'update' === op || 'patch' === op ? `${ns}.${op} sdk match data (← emptyMap)`
           : `${ns}.${op} sdk match (← emptyMap)`
     rows += `| \`${op}\` | \`${call}\` |\n`
   }

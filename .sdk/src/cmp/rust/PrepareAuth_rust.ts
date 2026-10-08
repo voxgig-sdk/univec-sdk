@@ -76,12 +76,10 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, ${spec.
 
   // HTTP Basic is header-only by definition: the scheme is
   // `Authorization: Basic base64(user:pass)`. It cannot be expressed as a
-  // query parameter or a cookie, so the branch — and the base64 encoder it
-  // needs, which the rust core does not otherwise ship — is emitted only
-  // where it can mean something.
+  // query parameter or a cookie, so the branch is emitted only where it can
+  // mean something. The encoder is the clean utility's, which needs it for
+  // the base64 form of every registered value.
   const withBasic = spec.basic && 'header' === spec.where
-
-  const withGetpath = 'header' === spec.where
 
   const bag = bagName(spec.where)
 
@@ -96,9 +94,11 @@ use std::rc::Rc;
 
 use crate::core::context::Context;
 use crate::core::error::${spec.errtype};
-use crate::core::helpers::{getp, ${withGetpath ? 'getpath, ' : ''}setp};
+use crate::core::helpers::{getp, getpath, setp};
 use crate::core::spec::Spec;
-use crate::utility::voxgigstruct as vs;
+${withBasic ? `use crate::utility::clean::{base64_encode, clean_add};
+` : ''}${'cookie' === spec.where ? `use crate::utility::prepare_headers::cookie_keep;
+` : ''}use crate::utility::voxgigstruct as vs;
 use crate::utility::voxgigstruct::Value;
 
 ${credComment(spec.where)}
@@ -108,6 +108,14 @@ ${'cookie' === spec.where ? `const COOKIE_HEADER: &str = "cookie";
 ${withBasic ? `const OPTION_SECRET: &str = "secret";
 ` : ''}const NOT_FOUND: &str = "__NOTFOUND__";
 
+/// The client's \`auth.name\` option, when set, replaces the name the API declares.
+fn auth_name(options: &Value) -> String {
+    match getpath(&["auth", "name"], options) {
+        Value::Str(s) if !s.is_empty() => ${'header' === spec.where ? 's.to_lowercase()' : 's'},
+        _ => CRED_NAME.to_string(),
+    }
+}
+${'cookie' === spec.where ? COOKIE_HELPER : ''}
 pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, ${spec.errtype}> {
     let spec = ctx.spec.borrow().clone().ok_or_else(|| {
         ctx.make_error("auth_no_spec", "Expected context spec property to be defined.")
@@ -122,8 +130,15 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, ${spec.
     // Public APIs that need no auth omit the options.auth block entirely.
     let auth = getp(&options, "auth");
     if auth.is_noval() || auth.is_null() {
-        ${clear(spec.where)};
+        ${clear(spec.where, 'CRED_NAME')};
         return Ok(spec);
+    }
+
+    let name = auth_name(&options);
+
+    // A credential left under the declared name would travel beside the renamed one.
+    if name != CRED_NAME {
+        ${clear(spec.where, 'CRED_NAME')};
     }
 
     let apikey = vs::get_prop(&options, &Value::str(OPTION_APIKEY), Value::str(NOT_FOUND));
@@ -136,9 +151,11 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, ${spec.
 `
 
   const basicBlock = !withBasic ? '' : `
-    // True HTTP Basic Auth needs TWO credentials, base64-joined - a single
+    // True HTTP Basic Auth joins the two credentials, base64-encoded - a single
     // token in the header (the branch below) can never authenticate against
     // an API that actually checks \`Authorization: Basic base64(user:pass)\`.
+    // The password may be empty (RFC 7617): Lob, for one, documents the key as
+    // the user with a blank password (\`curl -u key:\`).
     if let Value::Bool(true) = getpath(&["auth", "basic"], &options) {
         let secret = vs::get_prop(&options, &Value::str(OPTION_SECRET), Value::str(NOT_FOUND));
 
@@ -148,18 +165,21 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, ${spec.
             _ => false,
         };
 
-        if skip || no_secret {
-            vs::del_prop(headers, &Value::str(CRED_NAME));
+        if skip {
+            ${clear(spec.where, '&name')};
         } else {
             let apikey_val = match &apikey {
                 Value::Str(s) => s.clone(),
                 _ => String::new(),
             };
             let secret_val = match &secret {
-                Value::Str(s) => s.clone(),
+                Value::Str(s) if !no_secret => s.clone(),
                 _ => String::new(),
             };
             let b64 = base64_encode(format!("{}:{}", apikey_val, secret_val).as_bytes());
+            // The joined, encoded pair is a wire form neither credential's own
+            // registration covers.
+            clean_add(ctx, &b64);
 
             let auth_prefix = match getpath(&["auth", "prefix"], &options) {
                 Value::Str(s) => s,
@@ -167,11 +187,11 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, ${spec.
             };
             // Empty prefix (raw apiKey credential) must not add a leading space.
             if auth_prefix.is_empty() {
-                setp(&headers, CRED_NAME, Value::str(b64));
+                setp(&headers, &name, Value::str(b64));
             } else {
                 setp(
                     &headers,
-                    CRED_NAME,
+                    &name,
                     Value::str(format!("{} {}", auth_prefix, b64)),
                 );
             }
@@ -183,7 +203,7 @@ pub fn prepare_auth_util(ctx: &Rc<Context>) -> Result<Rc<RefCell<Spec>>, ${spec.
 
   const tail = `
     if skip {
-        ${clear(spec.where)};
+        ${clear(spec.where, '&name')};
     } else {
 ${place(spec.where)}
     }
@@ -192,47 +212,7 @@ ${place(spec.where)}
 }
 `
 
-  const encoder = !withBasic ? '' : `
-/// Standard base64, for the \`Authorization: Basic base64(user:pass)\` value.
-///
-/// In-tree because the crate takes no dependency for it: the secrets
-/// feature's base64 DECODER lives behind a feature module this utility
-/// cannot reach, and adding a crate for twenty lines would put a dependency
-/// into every SDK whose API happens to use HTTP Basic.
-fn base64_encode(input: &[u8]) -> String {
-    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
-
-    for chunk in input.chunks(3) {
-        // \`chunks\` hands back a 1- or 2-byte tail for input that is not a
-        // multiple of three; the missing bytes read as zero and are padded out
-        // below.
-        let b0 = chunk[0] as usize;
-        let b1 = *chunk.get(1).unwrap_or(&0) as usize;
-        let b2 = *chunk.get(2).unwrap_or(&0) as usize;
-
-        out.push(ALPHABET[b0 >> 2] as char);
-        out.push(ALPHABET[((b0 & 0x03) << 4) | (b1 >> 4)] as char);
-        // The tail is padded, never truncated: a decoder that counts groups
-        // of four needs the '=' to know how many bytes came back.
-        out.push(if 1 < chunk.len() {
-            ALPHABET[((b1 & 0x0f) << 2) | (b2 >> 6)] as char
-        } else {
-            '='
-        });
-        out.push(if 2 < chunk.len() {
-            ALPHABET[b2 & 0x3f] as char
-        } else {
-            '='
-        });
-    }
-
-    out
-}
-`
-
-  return head + basicBlock + tail + encoder
+  return head + basicBlock + tail
 }
 
 
@@ -257,9 +237,35 @@ function bagName(where: string): string {
 }
 
 
-function clear(where: string): string {
-  return `vs::del_prop(${bagName(where)}, &Value::str(CRED_NAME))`
+// A cookie credential is a pair inside the `cookie` header, not a header.
+function clear(where: string, name: string): string {
+  if ('cookie' === where) {
+    return `set_cookie(&headers, ${name}, None)`
+  }
+  return `vs::del_prop(${bagName(where)}.clone(), &Value::str(${name}))`
 }
+
+
+// The caller's other cookies stay; only the credential's pair is spliced.
+const COOKIE_HELPER = `
+/// Rewrites the cookie header with the named pair removed, then set to the
+/// value when there is one; every other cookie is kept in order.
+fn set_cookie(headers: &Value, name: &str, value: Option<&str>) {
+    let existing = match getp(headers, COOKIE_HEADER) {
+        Value::Str(s) => s,
+        _ => String::new(),
+    };
+    let mut kept = cookie_keep(&existing, &[name.to_string()]);
+    if let Some(value) = value {
+        kept.push(format!("{}={}", name, value));
+    }
+    if kept.is_empty() {
+        vs::del_prop(headers.clone(), &Value::str(COOKIE_HEADER));
+    } else {
+        setp(headers, COOKIE_HEADER, Value::str(kept.join("; ")));
+    }
+}
+`
 
 
 function place(where: string): string {
@@ -269,7 +275,7 @@ function place(where: string): string {
             _ => String::new(),
         };
         // No prefix: a query parameter carries the raw credential.
-        setp(&query, CRED_NAME, Value::str(apikey_val));`
+        setp(&query, &name, Value::str(apikey_val));`
   }
 
   if ('cookie' === where) {
@@ -277,22 +283,9 @@ function place(where: string): string {
             Value::Str(s) => s.clone(),
             _ => String::new(),
         };
-        let pair = format!("{}={}", CRED_NAME, apikey_val);
-        // APPEND: the cookie header may already carry pairs this SDK did not
-        // set, and replacing it outright would drop them.
-        let existing = match getp(&headers, COOKIE_HEADER) {
-            Value::Str(s) => s,
-            _ => String::new(),
-        };
-        if existing.is_empty() {
-            setp(&headers, COOKIE_HEADER, Value::str(pair));
-        } else {
-            setp(
-                &headers,
-                COOKIE_HEADER,
-                Value::str(format!("{}; {}", existing, pair)),
-            );
-        }`
+        // Spliced in, replacing an earlier pair of the same name, beside any
+        // cookie the caller set.
+        set_cookie(&headers, &name, Some(apikey_val.as_str()));`
   }
 
   return `        let auth_prefix = match getpath(&["auth", "prefix"], &options) {
@@ -305,11 +298,11 @@ function place(where: string): string {
         };
         // Empty prefix (raw apiKey credential) must not add a leading space.
         if auth_prefix.is_empty() {
-            setp(&headers, CRED_NAME, Value::str(apikey_val));
+            setp(&headers, &name, Value::str(apikey_val));
         } else {
             setp(
                 &headers,
-                CRED_NAME,
+                &name,
                 Value::str(format!("{} {}", auth_prefix, apikey_val)),
             );
         }`

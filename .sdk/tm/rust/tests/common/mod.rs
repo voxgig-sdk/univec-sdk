@@ -186,6 +186,113 @@ pub struct EntityTestSetup {
     pub now: i64,
 }
 
+// A live check that did not pass, as main.kit.test.live.strict decides:
+// strict panics; lenient prints the reason and the caller returns, which
+// is as near a skip as a Rust test comes.
+pub fn live_miss(strict: bool, reason: &str) {
+    if strict {
+        panic!("{}", reason);
+    }
+    eprintln!("skip: {}", reason);
+}
+
+// A live response that succeeded: no error, ok, and a 2xx status.
+pub fn live_ok(result: &Value) -> bool {
+    let err = getp(result, "err");
+    (err.is_noval() || err.is_null())
+        && getp(result, "ok") == Value::Bool(true)
+        && (200..300).contains(&to_int(&getp(result, "status")))
+}
+
+// An account holding no record for the test to read skips either way.
+pub fn live_empty(reason: &str) {
+    eprintln!("skip: {}", reason);
+}
+
+// A live list response's records: the body, or the first list an envelope
+// holds.
+pub fn live_list(data: &Value) -> Option<Value> {
+    if let Value::List(_) = data {
+        return Some(data.clone());
+    }
+    if let Value::Map(_) = data {
+        for key in vs::keysof_vec(data) {
+            let value = getp(data, &key);
+            if let Value::List(_) = value {
+                return Some(value);
+            }
+        }
+    }
+    None
+}
+
+// A live response for a message: the SDK's error, or else its status and
+// content type, never its body.
+pub fn live_describe(result: &Value) -> String {
+    let err = getp(result, "err");
+    if !err.is_noval() && !err.is_null() {
+        return vs::stringify(&err, None, false);
+    }
+    let mut out = format!("HTTP {}", vs::stringify(&getp(result, "status"), None, false));
+    let headers = getp(result, "headers");
+    for key in vs::keysof_vec(&headers) {
+        if key.eq_ignore_ascii_case("content-type") {
+            let ctype = vs::stringify(&getp(&headers, &key), None, false);
+            out.push(' ');
+            out.push_str(ctype.split(';').next().unwrap_or("").trim());
+        }
+    }
+    out
+}
+
+// The record a create-less flow reads live: the first its list returns, put
+// where the flow reads the fixture's existing records. False once the test
+// is settled and has to return.
+pub fn live_existing(
+    data: &Value,
+    strict: bool,
+    name: &str,
+    list: impl FnOnce() -> Result<Value, UnivecError>,
+) -> bool {
+    let found = match list() {
+        Ok(found) => found,
+        Err(err) => {
+            live_miss(strict, &format!("Live list discovery failed: {}", err));
+            return false;
+        }
+    };
+    if !matches!(found, Value::List(_)) {
+        live_miss(strict, "Live list discovery returned no list");
+        return false;
+    }
+    let first = vs::get_elem(&found, &Value::Num(0.0), Value::Noval);
+    if first.is_noval() {
+        live_empty(&format!("The account has no {} record to load", name));
+        return false;
+    }
+    let mut existing = getp(data, "existing");
+    if !matches!(existing, Value::Map(_)) {
+        existing = Value::empty_map();
+        setp(data, "existing", existing.clone());
+    }
+    setp(&existing, name, jo(vec![("live01", first)]));
+    true
+}
+
+// In a lenient live run a panicking check is reported and the test returns,
+// observing the live API rather than failing on it.
+pub fn live_observe(err: Box<dyn std::any::Any + Send>, live: bool, strict: bool) {
+    if strict || !live {
+        std::panic::resume_unwind(err);
+    }
+    let reason = err
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| err.downcast_ref::<&str>().map(|s| s.to_string()))
+        .unwrap_or_default();
+    eprintln!("skip: live run, main.kit.test.live.strict is false: {}", reason);
+}
+
 /// Extract data maps from a list result (rust list results already carry
 /// plain data maps).
 pub fn entity_list_to_data(list: &Value) -> Value {
@@ -531,7 +638,7 @@ pub struct FhOpResult {
 pub fn fh_default_method(op: &str) -> &'static str {
     match op {
         "create" => "POST",
-        "update" => "PATCH",
+        "update" | "patch" => "PATCH",
         "remove" => "DELETE",
         _ => "GET",
     }

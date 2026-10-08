@@ -11,10 +11,25 @@ use Cwd ();
 use UnivecSDK;
 require(Cwd::abs_path("$FindBin::Bin/runner.pm"));
 
+# main.kit.test.live.strict is true (the default is true): a live
+# request that fails, or a live test missing an input it needs,
+# fails the test.
+# An account with no record for a test to read skips it either way.
+use constant LIVE_STRICT => 1;
+
 {
   my $testsdk = UnivecSDK->test(undef, undef);
   my $ent = $testsdk->Embed(undef);
   ok(defined $ent, 'embed: create instance');
+}
+
+SKIP: {
+  skip('feature not present in this SDK: validate', 1)
+    unless UnivecConfig::shared_config()->{feature}{validate};
+  my $client = UnivecSDK->test(undef, { feature => { validate => { active => 1 } } });
+  my $err = eval { $client->Embed(undef)->create({ 'embeddings' => 'x', 'model' => 1, 'texts' => 'x' }, undef); undef } // $@;
+  is(ref $err ? $err->{code} : undef, 'validate_failed',
+    'embed: an invalid request fails with validate_failed');
 }
 
 BASIC_FLOW: {
@@ -29,13 +44,6 @@ BASIC_FLOW: {
       pass('embed: basic flow skipped via sdk-test-control.json');
       last BASIC_FLOW;
     }
-  }
-  # The basic flow consumes synthetic IDs from the fixture. In live mode
-  # without an *_ENTID env override, those IDs hit the live API and 4xx.
-  if ($setup->{synthetic_only}) {
-    note('live entity test uses synthetic IDs from fixture - set UNIVEC_TEST_EMBED_ENTID JSON to run live');
-    pass('embed: basic flow skipped (synthetic IDs only)');
-    last BASIC_FLOW;
   }
   my $client = $setup->{client};
   my %V;
@@ -79,10 +87,8 @@ sub embed_basic_setup {
     }
   );
 
-  # Detect ENTID env override before env_override consumes it. When live
-  # mode is on without a real override, the basic test runs against
-  # synthetic IDs from the fixture and 4xx's. Surface this so the test can
-  # skip.
+  # Whether *_ENTID supplied the idmap, read before env_override consumes
+  # it: without it, the ids a live flow binds are the fixture's synthetic ones.
   my $entid_env_raw = $ENV{'UNIVEC_TEST_EMBED_ENTID'};
   my $idmap_overridden = (defined $entid_env_raw && $entid_env_raw =~ /^\s*\{/) ? 1 : 0;
 

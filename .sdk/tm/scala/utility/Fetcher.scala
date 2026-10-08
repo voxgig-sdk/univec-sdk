@@ -48,6 +48,8 @@ object Fetcher {
     var bodyPublisher = HttpRequest.BodyPublishers.noBody()
     fetchdef.get("body") match {
       case b: String if b != "" => bodyPublisher = HttpRequest.BodyPublishers.ofString(b)
+      case b: Array[Byte] => bodyPublisher = HttpRequest.BodyPublishers.ofByteArray(b)
+      case b: java.io.InputStream => bodyPublisher = HttpRequest.BodyPublishers.ofInputStream(() => b)
       case _ =>
     }
 
@@ -70,7 +72,15 @@ object Fetcher {
         }
       case _ =>
     }
-    if (!hasUA) reqb.setHeader("User-Agent", "Mozilla/5.0 (compatible; UnivecSDK/1.0)")
+    // The default User-Agent is recorded with the headers the request sent.
+    if (!hasUA) {
+      val agent = "Mozilla/5.0 (compatible; UnivecSDK/1.0)"
+      reqb.setHeader("User-Agent", agent)
+      fetchdef.get("headers") match {
+        case hm: JMap[_, _] => hm.asInstanceOf[JMap[String, Object]].put("user-agent", agent)
+        case _ =>
+      }
+    }
 
     val resp =
       try clientFor(fetchdef).send(reqb.build(), HttpResponse.BodyHandlers.ofString())
@@ -86,7 +96,11 @@ object Fetcher {
     }
 
     val bodyText = if (resp.body() == null) "" else resp.body()
-    val jsonBody: Object = if (bodyText.isEmpty) null else Json.parseOrNull(bodyText)
+    var unreadable = false
+    val jsonBody: Object =
+      if (bodyText.isBlank) null
+      else try Json.parse(bodyText)
+      catch { case _: RuntimeException => unreadable = true; null }
     val jsonSupplier: Supplier[Object] = () => jsonBody
 
     val out = new LinkedHashMap[String, Object]()
@@ -95,6 +109,7 @@ object Fetcher {
     out.put("headers", headers)
     out.put("json", jsonSupplier)
     out.put("body", bodyText)
+    out.put("unreadable", java.lang.Boolean.valueOf(unreadable))
     out
   }
 

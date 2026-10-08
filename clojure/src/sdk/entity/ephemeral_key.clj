@@ -73,6 +73,21 @@
 
 (defn deleted [ent] (true? (deref (:_deleted ent))))
 
+(defn- unexpected
+  "The catch path every entity call leaves through: an error a hook threw,
+  SDK-shaped or not, never passed through make-error. Nil when the caller
+  switched throwing off."
+  [ctx operr]
+  ;; What a hook throws here must not escape the cleaning below.
+  (let [err (try
+              (core/feature-hook ctx "PreUnexpected")
+              operr
+              (catch Throwable hookerr hookerr))]
+    (core/clean-explain! ctx)
+    (let [cleaned (core/clean-throwable ctx err)]
+      (when-not (= false (core/oget (core/oget ctx :ctrl) :throw))
+        (throw cleaned)))))
+
 (defn- run-op [ctx post-done]
   (try
     (core/feature-hook ctx "PrePoint")
@@ -109,8 +124,7 @@
                                   (post-done)
                                   ((core/uget ctx :done) ctx))))))))))))))))
     (catch Throwable operr
-      (core/feature-hook ctx "PreUnexpected")
-      (throw operr))))
+      (unexpected ctx operr))))
 
 ;; Streaming operation. Runs `action` (an op name, e.g. "list") through the
 ;; full pipeline and returns a LAZY SEQUENCE of result items, so the
@@ -118,7 +132,8 @@
 ;; materialises the whole result). When the streaming feature is active the
 ;; result carries a `stream` thunk and this yields from it (honouring
 ;; chunkSize); otherwise it falls back to the materialised items, so stream
-;; always yields. Records are unwrapped to bare struct maps (matching list).
+;; always yields. An entity is yielded as its record, the struct map its
+;; data-get returns.
 ;; `callopts` parameterises the call:
 ;;   - ctrl:   per-call pipeline control (threaded onto the op ctx);
 ;;   - body:   an async-iterable/list payload for outbound (upload) streaming,
@@ -126,7 +141,9 @@
 ;;   - signal: an optional 0-arg fn; when it returns true iteration stops.
 (defn stream [ent action args callopts]
   (let [callopts (let [m (core/to-map callopts)] (if m m (vs/jm)))
-        ctrl (let [c (core/to-map (vs/getprop callopts "ctrl"))] (if c c (vs/jm)))
+        ;; A copy: the caller's ctrl gains no key, and explain stays its own record.
+        ctrl (let [c (core/to-map (vs/getprop callopts "ctrl"))]
+               (if c (java.util.LinkedHashMap. ^java.util.Map c) (vs/jm)))
         _ (.put ^java.util.Map ctrl "stream" callopts)
         ctxmap (vs/jm "opname" action "ctrl" ctrl
                       "match" (deref (:_match ent)) "data" (deref (:_data ent)))
@@ -152,12 +169,15 @@
                      (vs/islist item) (mapv unwrap (vec item))
                      :else item))
           ;; Inbound: prefer the streaming feature's iterator; else fall back
-          ;; to the materialised items so stream always yields.
-          raw (if (and result (fn? (core/oget result :stream)))
-                (vec ((core/oget result :stream)))
-                (let [rd (when result (core/oget result :resdata))]
-                  (cond (vs/islist rd) (vec rd) (nil? rd) [] :else [rd])))
-          items (mapv unwrap raw)]
+          ;; to the materialised items so stream always yields. Realised after
+          ;; run-op has returned, so what the stream throws is cleaned here.
+          items (try
+                  (mapv unwrap
+                        (if (and result (fn? (core/oget result :stream)))
+                          (vec ((core/oget result :stream)))
+                          (let [rd (when result (core/oget result :resdata))]
+                            (cond (vs/islist rd) (vec rd) (nil? rd) [] :else [rd]))))
+                  (catch Throwable e (unexpected ctx e) []))]
       ;; A lazy sequence that checks `signal` between yields.
       (letfn [(lz [xs] (lazy-seq
                          (when (and (seq xs) (not (signalled?)))
@@ -180,6 +200,8 @@
                 (when (core/oget result :resdata)
                   (reset! (:_data ent)
                           (let [m (core/to-map (vs/clone (core/oget result :resdata)))] (if m m (vs/jm)))))))))))
+
+
 
 
 

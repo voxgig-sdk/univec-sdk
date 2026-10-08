@@ -9,6 +9,8 @@
 # fetchdef["proxy"] for the transport to honour. Hosts matching "noProxy"
 # (exact or suffix) bypass the proxy.
 
+require 'uri'
+
 require_relative 'base_feature'
 
 class UnivecProxyFeature < UnivecBaseFeature
@@ -22,6 +24,7 @@ class UnivecProxyFeature < UnivecBaseFeature
     @options = {}
     @url = nil
     @no_proxy = []
+    @ctx = nil
   end
 
   def init(ctx, options)
@@ -42,6 +45,26 @@ class UnivecProxyFeature < UnivecBaseFeature
 
     @no_proxy = (no_proxy.is_a?(String) ? no_proxy.split(/\s*,\s*/) : (no_proxy || []))
       .reject { |s| s.nil? || s == "" }
+
+    # A proxy URL may carry credentials as userinfo, from the option or the
+    # environment, and neither is under a sensitive key name.
+    @ctx = ctx
+    if @url.is_a?(String)
+      begin
+        parsed = URI.parse(@url)
+        [parsed.user, parsed.password].each do |part|
+          next if part.nil? || part.empty?
+          ctx.utility.clean_add.call(ctx, part)
+          begin
+            ctx.utility.clean_add.call(ctx, URI.decode_www_form_component(part))
+          rescue StandardError
+            nil
+          end
+        end
+      rescue StandardError
+        nil
+      end
+    end
 
     feature = self
     utility = ctx.utility
@@ -85,7 +108,8 @@ class UnivecProxyFeature < UnivecBaseFeature
   def _track(url)
     track = @client.instance_variable_get(:@_proxy)
     if track.nil?
-      track = { "routed" => 0, "url" => @url }
+      ctx = @ctx
+      track = { "routed" => 0, "url" => ctx.nil? ? @url : ctx.utility.clean.call(ctx, @url) }
       @client.instance_variable_set(:@_proxy, track)
     end
     track["routed"] += 1

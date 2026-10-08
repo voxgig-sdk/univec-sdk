@@ -52,7 +52,25 @@ defmodule Univec.Feature.Proxy do
 
       np_list = Enum.filter(np_list, fn s -> s != nil and s != "" end)
 
+      # A proxy URL may carry credentials as userinfo, from the option or
+      # the environment, and neither is under a sensitive key name.
+      if is_binary(url) do
+        case URI.parse(url).userinfo do
+          nil ->
+            nil
+
+          ui ->
+            Enum.each(String.split(ui, ":", parts: 2), fn part ->
+              if part != "" do
+                F.clean_add(ctx, part)
+                F.clean_add(ctx, URI.decode(part))
+              end
+            end)
+        end
+      end
+
       S.setprop(f, "url", url)
+      S.setprop(f, "clean_url", if(is_binary(url), do: F.clean(ctx, url), else: url))
       S.setprop(f, "no_proxy", S.jt(np_list))
 
       utility = S.getprop(ctx, "utility")
@@ -112,7 +130,7 @@ defmodule Univec.Feature.Proxy do
 
   defp track(f) do
     client = S.getprop(f, "client")
-    track = F.track_node(client, "_proxy", S.jm(["routed", 0, "url", S.getprop(f, "url")]))
+    track = F.track_node(client, "_proxy", S.jm(["routed", 0, "url", S.getprop(f, "clean_url")]))
     S.setprop(track, "routed", S.getprop(track, "routed") + 1)
   end
 

@@ -138,6 +138,10 @@ class UnivecSecretsFeature extends UnivecBaseFeature
     private string $cred = '';
     private bool $resolved = false;
 
+    // The root context, whose secret registry every value this feature
+    // resolves or buys goes into.
+    private ?UnivecContext $rootctx = null;
+
     public function __construct()
     {
         parent::__construct();
@@ -155,6 +159,7 @@ class UnivecSecretsFeature extends UnivecBaseFeature
         $this->options = $options;
         $this->liveopts = is_array($ctx->options) ? $ctx->options : [];
         $this->active = ($options['active'] ?? null) === true;
+        $this->rootctx = $ctx;
 
         if (!$this->active) {
             return;
@@ -207,6 +212,7 @@ class UnivecSecretsFeature extends UnivecBaseFeature
             $specs = [];
 
             if (is_string($explicit) && '' !== $explicit) {
+                $this->_register($explicit);
                 $specs[] = [
                     'kind' => 'memory',
                     'name' => 'options',
@@ -273,6 +279,16 @@ class UnivecSecretsFeature extends UnivecBaseFeature
     public function credential(): string
     {
         return $this->cred;
+    }
+
+    // Every value this feature resolves or buys is a secret the SDK handles,
+    // and none arrives under an option key the intake registration saw.
+    private function _register(mixed $value): void
+    {
+        $ctx = $this->rootctx;
+        if (null !== $ctx && null !== $ctx->utility && is_callable($ctx->utility->clean_add)) {
+            ($ctx->utility->clean_add)($ctx, $value);
+        }
     }
 
     // transport wraps whatever transport was current at init.
@@ -357,6 +373,7 @@ class UnivecSecretsFeature extends UnivecBaseFeature
         if (!is_string($found)) {
             $found = null;
         }
+        $this->_register($found);
 
         if (null === $this->exchange) {
             // An UNCACHED miss after an earlier hit is a revocation: the
@@ -496,6 +513,7 @@ class UnivecSecretsFeature extends UnivecBaseFeature
         }
 
         $token = $this->buy_once();
+        $this->_register($token);
         $this->setcred($token);
         return $token;
     }

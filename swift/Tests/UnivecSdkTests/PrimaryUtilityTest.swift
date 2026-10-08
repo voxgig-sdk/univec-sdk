@@ -347,7 +347,10 @@ final class PrimaryUtilityTest: XCTestCase {
       return .map(r)
     }
 
+    // Concrete base: a live construction must satisfy any server variables a
+    // templated base URL declares; a literal base sidesteps the requirement.
     let opts = VMap()
+    opts.entries["base"] = .string("http://localhost:8080")
     opts.entries["system"] = .map(vm(("fetch", .nat(fetch))))
     let liveClient = UnivecSDK(opts)
     let liveUtility = liveClient.getUtility()
@@ -367,7 +370,10 @@ final class PrimaryUtilityTest: XCTestCase {
     // Create a live SDK then set mode to test (not using testSDK, which
     // installs the test feature).
     let fetch: SystemFetch = { _, _ in .map(VMap()) }
+    // Concrete base: a live construction must satisfy any server variables a
+    // templated base URL declares; a literal base sidesteps the requirement.
     let opts = VMap()
+    opts.entries["base"] = .string("http://localhost:8080")
     opts.entries["system"] = .map(vm(("fetch", .nat(fetch))))
     let blockedClient = UnivecSDK(opts)
     blockedClient.mode = "test"

@@ -34,6 +34,10 @@ main: kit: entity: embed: {
       name: "create"
       points: [
         {
+          bf: [
+            "model"
+            "texts"
+          ]
           co: {
             id: "POST /v1/embed"
             source: "openapi3"
@@ -103,6 +107,10 @@ main: kit: entity: embed: {
           }
           m: "POST"
           o: "/v1/embed"
+          rs: {
+            kind: "json"
+            media: "application/json"
+          }
           s: [
             {
               lit: "v1"
@@ -117,6 +125,10 @@ main: kit: entity: embed: {
           }
         }
         {
+          bf: [
+            "model"
+            "texts"
+          ]
           co: {
             id: "POST /v1/ephemeral/embed"
             source: "openapi3"
@@ -192,6 +204,10 @@ main: kit: entity: embed: {
           o: "/v1/ephemeral/embed"
           q: {
             "$action": "ephemeral"
+          }
+          rs: {
+            kind: "json"
+            media: "application/json"
           }
           s: [
             {

@@ -84,9 +84,9 @@ class ${Name}PrepareAuth
 
   const bag = bagVar(spec.where)
 
-  return head + `class ${Name}PrepareAuth
+  return head + `${'cookie' === spec.where ? "require_once __DIR__ . '/PrepareHeaders.php';\n\n" : ''}class ${Name}PrepareAuth
 {
-${constants(spec)}${cookieHelper(spec)}
+${constants(spec)}${authName(spec)}${cookieHelper(spec)}
     public static function call(${Name}Context $ctx): array
     {
         $spec = $ctx->spec;
@@ -99,8 +99,14 @@ ${constants(spec)}${cookieHelper(spec)}
 
         // Public APIs that need no auth omit the options.auth block entirely.
         if (!isset($options['auth']) || $options['auth'] === null) {
-${suppressed(spec.where)}            return [$spec, null];
+${clear(spec.where, 'self::' + credConst(spec.where))}            return [$spec, null];
         }
+
+        $name = self::authName($options);
+
+        // A credential left under the declared name would travel beside the renamed one.
+        if ($name !== self::${credConst(spec.where)}) {
+${clear(spec.where, 'self::' + credConst(spec.where))}        }
 
         $apikey = \\Voxgig\\Struct\\Struct::getprop($options, self::OPTION_APIKEY, self::NOT_FOUND);
 ${basicBlock(spec)}${placeBlock(spec)}
@@ -141,11 +147,24 @@ ${secretConst}    private const NOT_FOUND = '__NOTFOUND__';
 
 // A spec reaching prepare_auth may already carry the credential pair, and
 // leaving it sends a withdrawn credential.
-function suppressed(where: string): string {
+function clear(where: string, name: string): string {
   if ('cookie' === where) {
-    return `            self::applyCookie($headers, null);\n`
+    return `            self::applyCookie($headers, ${name}, null);\n`
   }
-  return `            unset($${bagVar(where)}[self::${credConst(where)}]);\n`
+  return `            unset($${bagVar(where)}[${name}]);\n`
+}
+
+
+function authName(spec: AuthSpec): string {
+  const name = 'header' === spec.where ? 'strtolower($name)' : '$name'
+  return `
+    // The client's auth.name option, when set, replaces the name the API declares.
+    private static function authName(array $options): string
+    {
+        $name = \\Voxgig\\Struct\\Struct::getpath($options, 'auth.name');
+        return is_string($name) && '' !== $name ? ${name} : self::${credConst(spec.where)};
+    }
+`
 }
 
 
@@ -156,24 +175,13 @@ function cookieHelper(spec: AuthSpec): string {
   }
 
   return `
-    private static function applyCookie(array &$headers, ?string $value): void
+    private static function applyCookie(array &$headers, string $name, ?string $value): void
     {
-        $kept = [];
         $existing = $headers[self::HEADER_COOKIE] ?? '';
-
-        if (is_string($existing) && '' !== $existing) {
-            foreach (explode(';', $existing) as $part) {
-                $piece = trim($part);
-                if ('' === $piece || $piece === self::COOKIE_AUTH
-                    || str_starts_with($piece, self::COOKIE_AUTH . '=')) {
-                    continue;
-                }
-                $kept[] = $piece;
-            }
-        }
+        $kept = is_string($existing) ? ${spec.Name}PrepareHeaders::cookieKeep($existing, [$name]) : [];
 
         if (null !== $value) {
-            $kept[] = self::COOKIE_AUTH . '=' . $value;
+            $kept[] = $name . '=' . $value;
         }
 
         if ([] === $kept) {
@@ -201,21 +209,26 @@ function basicBlock(spec: AuthSpec): string {
   }
 
   return `
-        // True HTTP Basic Auth needs TWO credentials, base64-joined - a
+        // True HTTP Basic Auth joins the two credentials, base64-encoded - a
         // single token in the header (the branch below) can never
         // authenticate against an API that actually checks
-        // \`Authorization: Basic base64(user:pass)\`.
+        // \`Authorization: Basic base64(user:pass)\`. The password may be
+        // empty (RFC 7617): Lob, for one, documents the key as the user with
+        // a blank password (\`curl -u key:\`).
         if (true === (\\Voxgig\\Struct\\Struct::getpath($options, 'auth.basic') ?? false)) {
             $secret = \\Voxgig\\Struct\\Struct::getprop($options, self::OPTION_SECRET, self::NOT_FOUND);
             $apikey_val = is_string($apikey) && $apikey !== self::NOT_FOUND ? $apikey : '';
             $secret_val = is_string($secret) && $secret !== self::NOT_FOUND ? $secret : '';
 
-            if ($apikey_val === '' || $secret_val === '') {
-                unset($headers[self::HEADER_AUTH]);
+            if ($apikey_val === '') {
+                unset($headers[$name]);
             } else {
                 $auth_prefix = \\Voxgig\\Struct\\Struct::getpath($options, 'auth.prefix') ?? '';
                 $b64 = base64_encode("{$apikey_val}:{$secret_val}");
-                $headers[self::HEADER_AUTH] = $auth_prefix === ''
+                // The joined, encoded pair is a wire form neither credential's
+                // own registration covers.
+                ($ctx->utility->clean_add)($ctx, $b64);
+                $headers[$name] = $auth_prefix === ''
                     ? $b64 : "{$auth_prefix} {$b64}";
             }
 
@@ -234,10 +247,10 @@ function placeBlock(spec: AuthSpec): string {
         $missing = ${missing};
 
         if ($missing) {
-            self::applyCookie($headers, null);
+            self::applyCookie($headers, $name, null);
         } else {
             // One \`Cookie:\` header holds every cookie, separated by '; '.
-            self::applyCookie($headers, is_string($apikey) ? $apikey : '');
+            self::applyCookie($headers, $name, is_string($apikey) ? $apikey : '');
         }
 `
   }
@@ -247,12 +260,12 @@ function placeBlock(spec: AuthSpec): string {
         if (
             ${missing}
         ) {
-            unset($query[self::QUERY_AUTH]);
+            unset($query[$name]);
         } else {
             // NO PREFIX IN A QUERY STRING. \`?token=Bearer%20abc\` is not a
             // thing any API reads; the prefix is a header convention and is
             // dropped here deliberately rather than silently concatenated.
-            $query[self::QUERY_AUTH] = is_string($apikey) ? $apikey : '';
+            $query[$name] = is_string($apikey) ? $apikey : '';
         }
 `
   }
@@ -261,12 +274,12 @@ function placeBlock(spec: AuthSpec): string {
         if (
             ${missing}
         ) {
-            unset($headers[self::HEADER_AUTH]);
+            unset($headers[$name]);
         } else {
             $auth_prefix = \\Voxgig\\Struct\\Struct::getpath($options, 'auth.prefix') ?? '';
             $apikey_val = is_string($apikey) ? $apikey : '';
             // Empty prefix (raw apiKey credential) must not add a leading space.
-            $headers[self::HEADER_AUTH] = $auth_prefix === ''
+            $headers[$name] = $auth_prefix === ''
                 ? $apikey_val : "{$auth_prefix} {$apikey_val}";
         }
 `

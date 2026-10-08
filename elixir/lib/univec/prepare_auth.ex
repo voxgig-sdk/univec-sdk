@@ -30,21 +30,36 @@ defmodule Univec.PrepareAuth do
         S.delprop(headers, @cred_name)
         {spec, nil}
       else
+        name = auth_name(options)
+
+        # A credential left under the declared name would travel beside the renamed one.
+        if name != @cred_name do
+          S.delprop(headers, @cred_name)
+        end
+
         apikey = S.getprop(options, @option_apikey, @not_found)
 
         if (is_binary(apikey) and apikey == @not_found) or apikey == nil or apikey == "" do
-          S.delprop(headers, @cred_name)
+          S.delprop(headers, name)
         else
           ap = S.getpath(options, "auth.prefix")
           auth_prefix = if is_binary(ap), do: ap, else: ""
           apikey_val = if is_binary(apikey), do: apikey, else: ""
           # Empty prefix (raw apiKey credential) must not add a leading space.
           hv = if auth_prefix != "", do: auth_prefix <> " " <> apikey_val, else: apikey_val
-          S.setprop(headers, @cred_name, hv)
+          S.setprop(headers, name, hv)
         end
 
         {spec, nil}
       end
+    end
+  end
+
+  # The client's auth.name option, when set, replaces the name the API declares.
+  defp auth_name(options) do
+    case S.getpath(options, "auth.name") do
+      given when is_binary(given) and given != "" -> String.downcase(given)
+      _ -> @cred_name
     end
   end
 

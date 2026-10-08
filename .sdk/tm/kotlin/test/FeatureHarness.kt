@@ -142,7 +142,7 @@ object FeatureHarness {
   fun fhDefaultMethod(op: String): String {
     return when (op) {
       "create" -> "POST"
-      "update" -> "PATCH"
+      "update", "patch" -> "PATCH"
       "remove" -> "DELETE"
       else -> "GET"
     }

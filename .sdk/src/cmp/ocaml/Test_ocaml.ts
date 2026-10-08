@@ -8,6 +8,7 @@ import { cmp, each, Folder, entityCollection } from '@voxgig/sdkgen'
 
 import { TestEntity } from './TestEntity_ocaml'
 import { TestDirect } from './TestDirect_ocaml'
+import { TestClean } from './TestClean_ocaml'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_ocaml'
 
 
@@ -23,6 +24,10 @@ const Test = cmp(function Test(props: any) {
       TestEntity({ target, entity })
       TestDirect({ target, entity })
     })
+
+    // The canary sweep (test/clean_test.ml), linked by the Makefile's
+    // CLEAN_TESTS.
+    TestClean({ target, entity })
 
     // Structural gate over the ```ocaml blocks in the generated docs.
     ReadmeExamplesTest({ target })

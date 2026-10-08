@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
+import { crateIdent, rustVarName, rustMethodName, rustListMatch } from './utility_rust'
 
 
 // A type-correct rust expression constructing a voxgig struct Value for a
@@ -15,6 +15,7 @@ import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
 // render a typed literal.
 function rustLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Value::Null'
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value::Num(1.0)'
   if ('BOOLEAN' === k) return 'Value::Bool(true)'
   if ('ARRAY' === k) return 'Value::empty_list()'
@@ -37,7 +38,7 @@ const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
     : `${model.const.Name}SDK::new(Value::Noval)`
 
   Content(`\`\`\`rust
-use ${rustcrate}::{jo, ${model.const.Name}SDK, Value};
+use ${rustcrate}::{jo, ${model.const.Name}Entity, ${model.const.Name}SDK, Entity, Value};
 
 let client = ${ctor};
 
@@ -53,12 +54,10 @@ let client = ${ctor};
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
-      Content(`// List all ${eName.toLowerCase()}s (returns a Value::List, Err on failure)
-let ${eVar}s = client.${method}(Value::Noval).list(Value::Noval, Value::Noval).unwrap();
-if let Value::List(items) = &${eVar}s {
-    for ${eVar} in items.borrow().iter() {
-        println!("{:?}", ${eVar});
-    }
+      Content(`// List all ${eName.toLowerCase()}s (one entity per record, Err on failure)
+let ${eVar}s = client.${method}(Value::Noval).list(${rustListMatch(exampleEntity)}, Value::Noval).unwrap();
+for ${eVar} in &${eVar}s {
+    println!("{:?}", ${eVar}.data(None));
 }
 `)
     }
@@ -77,9 +76,9 @@ if let Value::List(items) = &${eVar}s {
             it.name === idF ? 'example_id' : 'example_' + it.name)})`).join(', ')}])`
         : 'Value::Noval'
       Content(`
-// Load a specific ${eName.toLowerCase()} (returns the record, Err on failure)
+// Load a specific ${eName.toLowerCase()} (returns the entity, Err on failure)
 let ${eVar} = client.${method}(Value::Noval).load(${loadArg}, Value::Noval).unwrap();
-println!("{:?}", ${eVar});
+println!("{:?}", ${eVar}.data(None));
 `)
     }
   }

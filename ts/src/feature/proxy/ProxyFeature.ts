@@ -14,6 +14,7 @@ class ProxyFeature extends BaseFeature {
   _options: any = {}
   _url?: string
   _noProxy: string[] = []
+  _ctx?: Context
 
 
   init(ctx: Context, options: FeatureOptions): void | Promise<any> {
@@ -36,6 +37,22 @@ class ProxyFeature extends BaseFeature {
 
     this._noProxy = ('string' === typeof noProxy ? noProxy.split(/\s*,\s*/) : (noProxy || []))
       .filter((s: string) => null != s && '' !== s)
+
+    // A proxy URL may carry credentials as userinfo, from the option or the
+    // environment, and neither is under a sensitive key name.
+    this._ctx = ctx
+    if ('string' === typeof this._url) {
+      try {
+        const parsed = new URL(this._url)
+        for (const part of [parsed.username, parsed.password]) {
+          if ('' !== part) {
+            ctx.utility.cleanAdd(ctx, part)
+            try { ctx.utility.cleanAdd(ctx, decodeURIComponent(part)) } catch (_e) { }
+          }
+        }
+      }
+      catch (_e) { }
+    }
 
     const self = this
     const utility = ctx.utility
@@ -92,7 +109,8 @@ class ProxyFeature extends BaseFeature {
   _track(this: any, url: string) {
     const client: any = this._client
     if (null == client._proxy) {
-      client._proxy = { routed: 0, url: this._url }
+      const ctx = this._ctx
+      client._proxy = { routed: 0, url: null == ctx ? this._url : ctx.utility.clean(ctx, this._url) }
     }
     client._proxy.routed++
   }

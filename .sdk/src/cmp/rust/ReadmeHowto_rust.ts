@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape, requiredItems } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -13,6 +13,7 @@ import { crateIdent, rustVarName, rustMethodName } from './utility_rust'
 // A type-correct rust expression constructing a voxgig struct Value.
 function rustLit(type: any): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Value::Null'
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value::Num(1.0)'
   if ('BOOLEAN' === k) return 'Value::Bool(true)'
   if ('ARRAY' === k) return 'Value::empty_list()'
@@ -37,21 +38,29 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   let testArg = 'Value::Noval'
   if (exampleEntity && isMatchOp) {
     testArg = idF ? `jo(vec![("${idF}", Value::str("test01"))])` : 'Value::Noval'
-  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp)) {
+  } else if (exampleEntity && 'list' === primaryOp && 0 < requiredItems(exampleEntity, 'list').length) {
+    const chosen = requiredItems(exampleEntity, 'list')
+    testArg = `jo(vec![${chosen.map((it: any) => `(${JSON.stringify(it.name)}, ${rustLit(it.type)})`).join(', ')}])`
+  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp)) {
     const items = opRequestShape(exampleEntity, primaryOp).items
       .filter((it: any) => it.name !== idF && it.name !== 'id')
     const required = items.filter((it: any) => !it.optional)
     const chosen = required.length ? required : items.slice(0, 3)
     testArg = 0 < chosen.length
-      ? `jo(vec![${chosen.map((it: any) => `("${it.name}", ${rustLit(it.type)})`).join(', ')}])`
+      ? `jo(vec![${chosen.map((it: any) => `(${JSON.stringify(it.name)}, ${rustLit(it.type)})`).join(', ')}])`
       : 'Value::empty_map()'
   }
 
   // The op-driven test-mode line. A direct()-only SDK shows a direct() call.
-  const testModeExample = primaryOp
-    ? `// Entity ops return the bare record on Ok and Err on failure.
+  const testModeExample = 'list' === primaryOp
+    ? `// list returns one entity per mock record on Ok, and Err on failure.
+for ${eVar} in client.${method}(Value::Noval).list(${testArg}, Value::Noval).unwrap() {
+    println!("{:?}", ${eVar}.data(None));
+}`
+    : primaryOp
+    ? `// Entity ops return the entity on Ok and Err on failure.
 let ${eVar} = client.${method}(Value::Noval).${primaryOp}(${testArg}, Value::Noval).unwrap();
-// ${eVar} contains the mock response record`
+// ${eVar}.data(None) is the mock response record`
     : `let result = client.direct(jo(vec![
     ("path", Value::str("/api/resource")),
     ("method", Value::str("GET")),
@@ -103,6 +112,8 @@ println!("{:?}", getp(&fetchdef, "headers"));
 Create a mock client for unit testing — no server required:
 
 \`\`\`rust
+use ${rustcrate}::{jo, test_sdk, ${model.const.Name}Entity, Entity, Value};
+
 let client = test_sdk(Value::Noval, Value::Noval);
 
 ${testModeExample}

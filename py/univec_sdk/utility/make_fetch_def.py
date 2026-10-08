@@ -1,7 +1,7 @@
 # Univec SDK utility: make_fetch_def
 
 from __future__ import annotations
-from univec_sdk.utility.voxgig_struct import voxgig_struct as vs
+from univec_sdk.utility.media import request_body
 
 
 def make_fetch_def_util(ctx):
@@ -29,9 +29,6 @@ def make_fetch_def_util(ctx):
     }
 
     if spec.body is not None:
-        if isinstance(spec.body, dict):
-            fetchdef["body"] = vs.jsonify(spec.body)
-        else:
-            fetchdef["body"] = spec.body
+        fetchdef["body"] = request_body(ctx.point, spec.body)
 
     return fetchdef, None

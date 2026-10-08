@@ -697,7 +697,7 @@ test "feature debug: redacts and honours onentry max" {
     try testing.expect(df.entries.items.len == 1);
     try testing.expect(seen.len() == 2);
     const hdrs = h.getp(seen.at(0), "headers");
-    try testing.expect(h.veq(h.getp(hdrs, "authorization"), h.vstr("<redacted>")));
+    try testing.expect(h.veq(h.getp(hdrs, "authorization"), h.vstr("[redacted]")));
 }
 
 test "feature debug: captures failures" {
@@ -728,7 +728,7 @@ test "feature debug: injected clock and custom redact" {
         .{ "x-ok", h.vstr("show") },
     }) });
     const hdrs = h.getp(df.entries.items[0], "headers");
-    try testing.expect(h.veq(h.getp(hdrs, "x-secret"), h.vstr("<redacted>")));
+    try testing.expect(h.veq(h.getp(hdrs, "x-secret"), h.vstr("[redacted]")));
     try testing.expect(h.veq(h.getp(hdrs, "x-ok"), h.vstr("show")));
 }
 

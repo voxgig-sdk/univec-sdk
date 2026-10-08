@@ -1,5 +1,5 @@
 
-import { cmp, Content, entityIdField, pickExampleEntity, opRequestShape, safeVarName, exampleVarName, jsKey } from '@voxgig/sdkgen'
+import { cmp, Content, entityIdField, pickExampleEntity, opRequestShape, safeVarName, exampleVarName, jsKey, requiredItems } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -30,11 +30,12 @@ const client = ${model.const.Name}SDK.test()
     const primaryOpDef = exampleEntity.op && exampleEntity.op[primaryOp]
     const idF = entityIdField(exampleEntity)
     let arg = ''
-    if ('load' === primaryOp || 'remove' === primaryOp) {
+    const isMatchOp = 'load' === primaryOp || 'remove' === primaryOp
+    if (isMatchOp || 'list' === primaryOp) {
       // Every REQUIRED match key (id first, then parent path params like
       // page_id) — the same shape the runtime resolves path params from.
-      const items = opRequestShape(exampleEntity, primaryOp).items
-        .filter((it: any) => !it.optional || it.name === idF)
+      const items = (isMatchOp ? opRequestShape(exampleEntity, primaryOp).items
+        .filter((it: any) => !it.optional || it.name === idF) : requiredItems(exampleEntity, 'list'))
         .sort((a: any, b: any) =>
           (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
       arg = 0 < items.length
@@ -42,7 +43,7 @@ const client = ${model.const.Name}SDK.test()
           `${jsKey(it.name)}: ${exampleValue(exampleEntity, primaryOpDef, it.name,
             it.name === idF ? 'test01' : 'example_' + it.name)}`).join(', ')} }`
         : ''
-    } else if ('create' === primaryOp || 'update' === primaryOp) {
+    } else if ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp) {
       const items = opRequestShape(exampleEntity, primaryOp).items
         .filter((it: any) => it.name !== idF && it.name !== 'id')
       const required = items.filter((it: any) => !it.optional)
@@ -50,10 +51,13 @@ const client = ${model.const.Name}SDK.test()
       arg = `{ ${chosen.map((it: any) =>
         `${jsKey(it.name)}: ${exampleValue(exampleEntity, primaryOpDef, it.name, 'example_' + it.name)}`).join(', ')} }`
     }
+    const one = exampleVarName(eName.toLowerCase(), 'js')
     Content(`const ${eVar} = await client.${eName}().${primaryOp}(${arg})
-// ${eVar} is ${'list' === primaryOp ? 'an array of entities' : 'the entity'}, populated with mock data
-// — call ${eVar}${'list' === primaryOp ? '[0]' : ''}.data() for the record itself
-console.log(${eVar})
+${'list' === primaryOp
+    ? `// ${eVar} is an array of ${eName} entities, one per mock record
+console.log(${eVar}.map((${one}) => ${one}.data()))`
+    : `// ${eVar} is the ${eName} entity; .data() reads its mock record
+console.log(${eVar}.data())`}
 `)
   }
 

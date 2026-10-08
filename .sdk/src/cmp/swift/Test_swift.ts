@@ -10,6 +10,7 @@ import { cmp, each, Folder, entityCollection } from '@voxgig/sdkgen'
 
 import { TestEntity } from './TestEntity_swift'
 import { TestDirect } from './TestDirect_swift'
+import { TestClean } from './TestClean_swift'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_swift'
 
 
@@ -23,6 +24,8 @@ const Test = cmp(function Test(props: any) {
   // are generated here.
   Folder({ name: 'Tests' }, () => {
     Folder({ name: swiftTestDir(model) }, () => {
+      TestClean({ target })
+
       const entity = each(entityCollection(model))
         .filter((e: any) => false !== e.active)
 

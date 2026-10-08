@@ -233,7 +233,7 @@ func (f *CostFeature) commit(ctx *core.Context, pending *costPending, entity, op
 	f.bump(f.Actors, actor, amount)
 
 	f.seq++
-	record := map[string]any{
+	record := fclean(ctx, map[string]any{
 		"seq":      f.seq,
 		"entity":   entity,
 		"op":       opname,
@@ -242,7 +242,7 @@ func (f *CostFeature) commit(ctx *core.Context, pending *costPending, entity, op
 		"currency": f.Currency,
 		"source":   source,
 		"attempts": pending.attempts,
-	}
+	})
 	f.Last = record
 
 	if sink, ok := f.options["sink"].(func(map[string]any)); ok {

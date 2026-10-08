@@ -3,7 +3,7 @@
 import { test, describe } from 'node:test'
 import { strictEqual, ok, deepStrictEqual } from 'node:assert'
 
-import { stdutil } from '..'
+import { UnivecSDK, stdutil } from '..'
 
 
 const struct: any = (stdutil as any).struct
@@ -73,9 +73,40 @@ describe('pipeline:makePoint + makeSpec', () => {
     strictEqual((stdutil as any).makePoint(base({ out: { point: preset } })), preset)
   })
 
+  test('an allow list names whole operations, in any case', () => {
+    const point = { method: 'GET', parts: ['a'] }
+    const op = { name: 'load', points: [point] }
+    strictEqual((stdutil as any).makePoint(base({ op, options: { allow: { op: 'reload,unload' } } })).code,
+      'point_op_allow')
+    strictEqual((stdutil as any).makePoint(base({ op, options: { allow: { op: 'list, LOAD' } } })), point)
+  })
+
+  test('an allow list names whole methods', () => {
+    const ctx = base({
+      op: { name: 'update', points: [] },
+      point: { method: 'pu', parts: ['a'] },
+      options: { allow: { method: 'GET,PUT' }, base: 'http://x' },
+    })
+    strictEqual((stdutil as any).makeSpec(ctx).code, 'spec_method_allow')
+  })
+
   test('makeSpec short-circuits a feature-supplied spec', () => {
     const preset = { method: 'GET' }
     strictEqual((stdutil as any).makeSpec(base({ out: { spec: preset } })), preset)
+  })
+})
+
+
+describe('pipeline:direct', () => {
+
+  test('direct and graphql answer a method allow.method refuses with a result map', async () => {
+    const sdk = UnivecSDK.test({}, { allow: { method: 'GET' } })
+    const direct: any = await sdk.direct({ path: '/a', method: 'POST' })
+    strictEqual(direct.ok, false)
+    strictEqual(direct.err.code, 'spec_method_allow')
+    const graphql: any = await sdk.graphql('{ a }')
+    strictEqual(graphql.ok, false)
+    strictEqual(graphql.err.code, 'spec_method_allow')
   })
 })
 
@@ -333,9 +364,9 @@ describe('pipeline:prepareAuth', () => {
   }
 
   // `basic: false` is explicit: an HTTP Basic API's generated config carries
-  // `auth.basic: true`, and a client that merges it in takes a branch needing
-  // a secret as well. With none supplied that branch writes nothing, which
-  // the probe below would then read as a public API.
+  // `auth.basic: true`, and a client that merges it in takes the Basic
+  // branch, which base64-joins the key with a password rather than placing
+  // the key as it is.
   function auth(prefix: string): any {
     return { prefix, basic: false }
   }
@@ -423,6 +454,46 @@ describe('pipeline:prepareAuth', () => {
   test('a missing apikey option drops the credential', () => {
     strictEqual(placed({ auth: auth('Bearer') }, 'stale'), undefined)
   })
+
+  // HTTP Basic joins the key with a password, which may be empty (RFC 7617):
+  // Lob documents its key as the user with a blank password. An SDK for an
+  // API that is not HTTP Basic has no such branch, and the first placement
+  // below tells the two apart.
+  test('HTTP Basic sends the key with a blank password', () => {
+    if (null == CRED || 'headers' !== CRED.where || '' !== CRED.pair) return
+    const basic = { prefix: 'Basic', basic: true }
+    const b64 = (s: string) => Buffer.from(s).toString('base64')
+    if (placed({ apikey: 'K', secret: 'S', auth: basic }) !== 'Basic ' + b64('K:S')) return
+    strictEqual(placed({ apikey: 'K', auth: basic }), 'Basic ' + b64('K:'))
+    strictEqual(placed({ apikey: 'K', secret: '', auth: basic }), 'Basic ' + b64('K:'))
+    strictEqual(placed({ apikey: '', secret: 'S', auth: basic }, 'stale'), undefined)
+  })
+})
+
+
+describe('pipeline:prepareQuery', () => {
+
+  // The generated config lists path parameters as args.params. A match field
+  // that fills the path must not be sent again as a query parameter, which a
+  // strict server rejects.
+  test('a path parameter stays out of the query', () => {
+    const point = { args: { params: [{ name: 'id', kind: 'param' }] } }
+    const ctx = base({ point, reqmatch: { id: 'i1', q: 'x' } })
+    deepStrictEqual((stdutil as any).prepareQuery(ctx), { q: 'x' })
+  })
+
+  test('an action is never a query parameter', () => {
+    const ctx = base({ point: { args: { params: [] } }, reqmatch: { $action: 'go', q: 'x' } })
+    deepStrictEqual((stdutil as any).prepareQuery(ctx), { q: 'x' })
+  })
+
+  // A query argument's orig is the name the API definition gives it, which
+  // the model may have renamed for the caller.
+  test('a query argument goes out under its orig', () => {
+    const point = { args: { query: [{ name: 'item_id', orig: 'itemIds', kind: 'query' }] } }
+    const ctx = base({ point, reqmatch: { item_id: ['i1'], q: 'x' } })
+    deepStrictEqual((stdutil as any).prepareQuery(ctx), { itemIds: ['i1'], q: 'x' })
+  })
 })
 
 
@@ -438,5 +509,25 @@ describe('pipeline:result helpers', () => {
     const ctx = base({ response: { json: async () => ({ a: 1 }), body: null }, result: {} })
     await (stdutil as any).resultBody(ctx)
     strictEqual(ctx.result.body, undefined)
+  })
+
+  // The agent and the body preview may carry a registered value; the body is
+  // cleaned before the bound so a split value cannot leave its prefix.
+  test('resultBody masks a registered value in the agent and across the preview bound', async () => {
+    const secret = 'PIPELINE-SECRET-a1b2c3d4e5f6'
+    const text = 'x'.repeat(150) + secret + 'y'.repeat(100)
+    const ctx = base({
+      options: { __derived__: { clean: { active: true, keys: [], values: [], mask: '[redacted]', hint: 0, min: 4 } } },
+      spec: { headers: { 'user-agent': 'Probe ' + secret } },
+      response: { body: 'body', json: async () => { throw Object.assign(new SyntaxError('bad json'), { text }) } },
+      result: { status: 200, headers: { 'content-type': 'text/html' } },
+    })
+    ;(stdutil as any).cleanAdd(ctx, secret)
+    await (stdutil as any).resultBody(ctx)
+    const message = String(ctx.result.err.message)
+    strictEqual(ctx.result.err.code, 'response_content_type')
+    ok(message.includes('user-agent Probe [redacted]'), message)
+    ok(message.includes('body: ' + 'x'.repeat(150) + '[redacted]'), message)
+    ok(!message.includes(secret.slice(0, 8)), message)
   })
 })

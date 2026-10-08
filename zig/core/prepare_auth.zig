@@ -38,6 +38,14 @@ const CRED_NAME = "authorization";
 const OPTION_APIKEY = "apikey";
 const NOT_FOUND = "__NOTFOUND__";
 
+// The client's auth.name option, when set, replaces the name the API declares.
+fn auth_name(options: Value) []const u8 {
+    return switch (h.getpath(&.{ "auth", "name" }, options)) {
+        .string => |s| if (s.len == 0) CRED_NAME else std.ascii.allocLowerString(h.A(), s) catch CRED_NAME,
+        else => CRED_NAME,
+    };
+}
+
 pub fn prepare_auth_util(ctx: *Context) E!*Spec {
     const spec = ctx.spec orelse return ctx.fail("auth_no_spec", "Expected context spec property to be defined.");
 
@@ -51,6 +59,13 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
         return spec;
     }
 
+    const name = auth_name(options);
+
+    // A credential left under the declared name would travel beside the renamed one.
+    if (!std.mem.eql(u8, name, CRED_NAME)) {
+        h.del_prop(headers, h.vstr(CRED_NAME));
+    }
+
     const apikey = vs.getprop(h.A(), options, h.vstr(OPTION_APIKEY), h.vstr(NOT_FOUND)) catch h.vstr(NOT_FOUND);
 
     const skip = switch (apikey) {
@@ -60,7 +75,7 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
     };
 
     if (skip) {
-        h.del_prop(headers, h.vstr(CRED_NAME));
+        h.del_prop(headers, h.vstr(name));
     } else {
         const auth_prefix: []const u8 = switch (h.getpath(&.{ "auth", "prefix" }, options)) {
             .string => |s| s,
@@ -73,9 +88,9 @@ pub fn prepare_auth_util(ctx: *Context) E!*Spec {
         // A raw credential (empty prefix, e.g. an apiKey scheme) must go in
         // as-is; only a non-empty prefix (Bearer/Basic/OAuth) is space-joined.
         if (auth_prefix.len == 0) {
-            h.setp(headers, CRED_NAME, h.vstr(apikey_val));
+            h.setp(headers, name, h.vstr(apikey_val));
         } else {
-            h.setp(headers, CRED_NAME, h.vstr(fmt("{s} {s}", .{ auth_prefix, apikey_val })));
+            h.setp(headers, name, h.vstr(fmt("{s} {s}", .{ auth_prefix, apikey_val })));
         }
     }
 

@@ -1,6 +1,7 @@
 package SCALAPACKAGE.entity
 
 import java.util.{ArrayList, LinkedHashMap, Iterator => JIterator, List => JList, Map => JMap}
+import scala.util.control.NonFatal
 import SCALAPACKAGE.core.{Context, Helpers, SdkClient, SdkEntity, Utility}
 import SCALAPACKAGE.utility.struct.Struct
 
@@ -121,11 +122,29 @@ abstract class EntityBase(name0: String, client0: SdkClient, entopts0: JMap[Stri
       }
       else out
     } catch {
-      case err: RuntimeException =>
-        // An error already finalised by makeError must not be wrapped twice.
-        if (err eq ctx.ctrl.err) throw err
-        utility.makeError(ctx, err)
+      case NonFatal(err) => unexpected(ctx, err)
     }
+  }
+
+  // The catch path. makeError fires PreUnexpected; an error a hook throws
+  // there escapes it, even under throw false, so it is cleaned here.
+  private def unexpected(ctx: Context, err: Throwable): Object = {
+    val cause = err match {
+      case e: RuntimeException =>
+        // An error already finalised by makeError must not be wrapped twice.
+        if (e eq ctx.ctrl.err) throw e
+        e
+      // Scala has no checked exceptions: a hook can throw a plain Exception,
+      // whose message can quote the request.
+      case _ => new RuntimeException(if (err.getMessage == null) String.valueOf(err) else err.getMessage)
+    }
+    try this.utility.makeError(ctx, cause)
+    catch { case NonFatal(thrown) if !(thrown eq ctx.ctrl.err) => throw cleanError(ctx, thrown) }
+  }
+
+  private def cleanError(ctx: Context, err: Throwable): Throwable = this.utility.clean(ctx, err) match {
+    case t: Throwable => t
+    case _ => err
   }
 
   // Streaming operations. Runs `action` through the full pipeline and returns
@@ -145,8 +164,10 @@ abstract class EntityBase(name0: String, client0: SdkClient, entopts0: JMap[Stri
 
     val signal = opts.get("signal")
 
-    var ctrl = Helpers.toMapAny(opts.get("ctrl"))
-    if (ctrl == null) ctrl = new LinkedHashMap[String, Object]()
+    // A copy: the caller's ctrl gains no key, and explain stays its own record.
+    val ctrl = new LinkedHashMap[String, Object]()
+    val callerCtrl = Helpers.toMapAny(opts.get("ctrl"))
+    if (callerCtrl != null) ctrl.putAll(callerCtrl)
     ctrl.put("stream", opts)
 
     val ctxmap = new LinkedHashMap[String, Object]()
@@ -172,7 +193,10 @@ abstract class EntityBase(name0: String, client0: SdkClient, entopts0: JMap[Stri
     // Inbound: prefer the streaming feature's incremental iterator; else fall
     // back to the materialised items so `stream` always yields.
     val source: JIterator[Object] =
-      if (ctx.result != null && ctx.result.stream != null) ctx.result.stream.get()
+      if (ctx.result != null && ctx.result.stream != null) {
+        try ctx.result.stream.get()
+        catch { case NonFatal(err) => unexpected(ctx, err); null }
+      }
       else {
         val items: JList[Object] = materialised match {
           case l: JList[_] => l.asInstanceOf[JList[Object]]
@@ -187,9 +211,39 @@ abstract class EntityBase(name0: String, client0: SdkClient, entopts0: JMap[Stri
       case _ => () => false
     }
 
+    // The caller iterates after runOp has returned, so a failing source takes
+    // the catch path here. Both source calls sit in hasNext: under throw
+    // false the stream then ends rather than failing in next.
     new Iterator[Object] {
-      override def hasNext: Boolean = !aborted() && source.hasNext
-      override def next(): Object = source.next()
+      private var ended = source == null
+      private var ready = false
+      private var item: Object = null
+
+      override def hasNext: Boolean =
+        if (ended || aborted()) false
+        else {
+          if (!ready) pull()
+          ready
+        }
+
+      override def next(): Object = {
+        if (!hasNext) throw new NoSuchElementException()
+        ready = false
+        item
+      }
+
+      private def pull(): Unit =
+        try {
+          ready = source.hasNext
+          ended = !ready
+          item = if (ready) source.next() else null
+        }
+        catch {
+          case NonFatal(err) =>
+            ended = true
+            ready = false
+            unexpected(ctx, err)
+        }
     }
   }
 }

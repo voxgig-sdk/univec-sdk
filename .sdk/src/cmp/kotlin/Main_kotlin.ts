@@ -5,6 +5,7 @@ import {
   cmp, each,
   File, Copy, Folder, Fragment,
   TEST_CONTROL_EXCLUDE,
+  inactiveFeatureExcludes,
   pluginExcludes
 } from '@voxgig/sdkgen'
 
@@ -51,7 +52,8 @@ const Main = cmp(async function Main(props: any) {
   // token used throughout the templates (package/import statements).
   Copy({
     from: 'tm/' + target.name,
-    exclude: [/src\//, TEST_CONTROL_EXCLUDE, ...pluginExcludes(model)],
+    exclude: [/src\//, TEST_CONTROL_EXCLUDE,
+      ...inactiveFeatureExcludes(props.ctx$, target), ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
       KOTLINPACKAGE: kotlinpackage,

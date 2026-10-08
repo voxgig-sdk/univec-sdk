@@ -1,5 +1,6 @@
 // Request specification (mirrors go core/spec.go).
 
+const std = @import("std");
 const h = @import("helpers.zig");
 const Value = h.Value;
 
@@ -17,6 +18,9 @@ pub const Spec = struct {
     body: Value = .{ .null = {} },
     url: []const u8 = "",
     path: []const u8 = "",
+    // The query parameters prepare_auth placed: the credential, which the
+    // request sends and the entity's match leaves out.
+    authquery: []const []const u8 = &.{},
 
     pub fn make(specmap: Value) *Spec {
         const s = h.A().create(Spec) catch unreachable;
@@ -47,6 +51,29 @@ pub const Spec = struct {
         if (h.get_str(specmap, "path")) |p| s.path = p;
 
         return s;
+    }
+
+    // Whatever prepare_auth set in the query, under whichever name, is the
+    // credential; a key it left as it was is the caller's.
+    pub fn note_authquery(self: *Spec, before: Value) void {
+        var out: std.ArrayList([]const u8) = .empty;
+        if (self.query == .object) {
+            var it = self.query.object.iterator();
+            while (it.next()) |kv| {
+                const was = h.getp(before, kv.key_ptr.*);
+                if (h.is_noval(was) or !h.veq(was, kv.value_ptr.*)) {
+                    out.append(h.A(), kv.key_ptr.*) catch {};
+                }
+            }
+        }
+        self.authquery = out.toOwnedSlice(h.A()) catch &.{};
+    }
+
+    pub fn authquery_has(self: *const Spec, key: []const u8) bool {
+        for (self.authquery) |name| {
+            if (std.mem.eql(u8, name, key)) return true;
+        }
+        return false;
     }
 
     pub fn to_value(self: *const Spec) Value {

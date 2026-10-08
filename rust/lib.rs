@@ -16,7 +16,7 @@ pub use crate::core::context::{Context, CtxSpec, OpMap};
 pub use crate::core::control::Control;
 pub use crate::core::error::UnivecError;
 pub use crate::core::helpers::{
-    call_json, call_vfn, ja, jo, json_thunk, unsupported_op, vfn,
+    call_json, call_vfn, getp, ja, jo, json_thunk, to_map, unsupported_op, vfn,
 };
 pub use crate::core::operation::Operation;
 pub use crate::core::point::Point;
@@ -30,6 +30,7 @@ pub use crate::core::types::{
 pub use crate::core::utility_type::Utility;
 pub use crate::feature::base::BaseFeature;
 pub use crate::utility::jsonparse::json_parse;
+pub use crate::utility::media::bytes_value;
 pub use crate::utility::voxgigstruct::Value;
 
 // No-argument convenience constructors: `univec_sdk::new()` /

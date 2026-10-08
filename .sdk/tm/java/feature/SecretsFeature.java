@@ -88,6 +88,10 @@ public class SecretsFeature extends BaseFeature {
   private boolean cache = true;
   private Sekreto sek;
 
+  // The context init was given: the registry every resolved value is added
+  // to lives on its options.
+  private Context rootctx;
+
   // Exchange state: null config when off; the refresh credential the chain
   // resolved; the single in-flight purchase.
   private SecretsExchange exchange;
@@ -145,6 +149,7 @@ public class SecretsFeature extends BaseFeature {
   @Override
   public void init(Context ctx, Map<String, Object> options) {
     this.client = ctx.client;
+    this.rootctx = ctx;
     this.liveopts = ctx.options == null ? new LinkedHashMap<>() : ctx.options;
     this.active = true;
 
@@ -194,6 +199,7 @@ public class SecretsFeature extends BaseFeature {
     List<Object> specs = new ArrayList<>();
 
     if (!"".equals(explicit)) {
+      register(explicit);
       String key = null;
       try {
         key = Sekreto.envkey(this.secretname, null);
@@ -393,6 +399,7 @@ public class SecretsFeature extends BaseFeature {
     // tryget: null is a MISS (the chain had nothing), an exception is an
     // ERROR and propagates to the gate above.
     String found = this.sek.tryget(this.secretname);
+    register(found);
 
     if (this.exchange == null) {
       synchronized (this.lock) {
@@ -570,6 +577,7 @@ public class SecretsFeature extends BaseFeature {
     // required server variable, for the same reason.
     if (!"live".equals(this.client.mode)) {
       String token = "test-" + this.exchange.response;
+      register(token);
       synchronized (this.lock) {
         this.cred = token;
       }
@@ -602,6 +610,7 @@ public class SecretsFeature extends BaseFeature {
     RuntimeException err = null;
     try {
       token = buyonce();
+      register(token);
     }
     catch (RuntimeException e) {
       err = e;
@@ -623,6 +632,15 @@ public class SecretsFeature extends BaseFeature {
       throw err;
     }
     return token;
+  }
+
+  // Every value this feature resolves or buys is a secret the SDK handles,
+  // and none arrives under an option key the intake registration saw.
+  private void register(String value) {
+    Context ctx = this.rootctx;
+    if (value != null && ctx != null && ctx.utility != null && ctx.utility.cleanAdd != null) {
+      ctx.utility.cleanAdd.apply(ctx, value);
+    }
   }
 
   private String buyonce() {

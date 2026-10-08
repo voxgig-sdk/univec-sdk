@@ -1,5 +1,5 @@
 
-import { ocamlString } from './utility_ocaml'
+import { ocamlOpField, ocamlString } from './utility_ocaml'
 
 
 // Emit the OCaml source for one entity CRUD operation, as an assignment to
@@ -8,11 +8,7 @@ import { ocamlString } from './utility_ocaml'
 // install a stub that errors at call time (so the entity_obj record is always
 // fully populated). Mirrors the rust/py Entity op fragments.
 function entityOp(opname: string, present: boolean, entityname: string): string {
-  const field =
-    'load' === opname ? 'e_load' :
-      'list' === opname ? 'e_list' :
-        'create' === opname ? 'e_create' :
-          'update' === opname ? 'e_update' : 'e_remove'
+  const field = ocamlOpField(opname)
 
   if (!present) {
     return `  ent.${field} <- (fun _ _ ->
@@ -21,13 +17,14 @@ function entityOp(opname: string, present: boolean, entityname: string): string 
 `
   }
 
-  const inputField = ('create' === opname || 'update' === opname) ? 'cs_reqdata' : 'cs_reqmatch'
-  const arg = ('create' === opname || 'update' === opname) ? 'reqdata' : 'reqmatch'
+  const body = 'create' === opname || 'update' === opname || 'patch' === opname
+  const inputField = body ? 'cs_reqdata' : 'cs_reqmatch'
+  const arg = body ? 'reqdata' : 'reqmatch'
 
   // Writeback after a successful op (mirrors the py op fragments):
-  //   load/update/remove -> match + data ; list -> match ; create -> data
-  const writeMatch = ('list' === opname || 'load' === opname || 'update' === opname || 'remove' === opname)
-  const writeData = ('create' === opname || 'load' === opname || 'update' === opname || 'remove' === opname)
+  //   load/update/patch/remove -> match + data ; list -> match ; create -> data
+  const writeMatch = 'create' !== opname
+  const writeData = 'list' !== opname
 
   let post = ''
   if (writeMatch) {

@@ -8,6 +8,7 @@
 #ifndef SDK_FEATURE_PROXY_HPP
 #define SDK_FEATURE_PROXY_HPP
 
+#include <cctype>
 #include <cstdlib>
 #include <initializer_list>
 #include <regex>
@@ -26,7 +27,9 @@ public:
   Value options = Value::undef();
   std::vector<std::string> noProxy;
 
-  // Activity tracking (mirrors the ts client._proxy record).
+  // Activity tracking (mirrors the ts client._proxy record). `url` is the
+  // CLEANED target: the raw one, userinfo included, stays in target_ for
+  // routing.
   int routed = 0;
   std::string url = "";
 
@@ -38,13 +41,13 @@ public:
     active = fopt::foptBool(options, "active", false);
     if (!active) return;
 
-    url = fopt::foptStr(options, "url", "");
+    target_ = fopt::foptStr(options, "url", "");
     bool hasNoProxy = fopt::foptList(options, "noProxy").is_list();
     std::vector<std::string> noProxyRaw = fopt::foptStrList(options, "noProxy");
 
     if (fopt::foptBool(options, "fromEnv", false)) {
-      if (url.empty()) {
-        url = firstEnv({"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"});
+      if (target_.empty()) {
+        target_ = firstEnv({"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"});
       }
       if (!hasNoProxy) {
         std::string np = firstEnv({"NO_PROXY", "no_proxy"});
@@ -63,6 +66,15 @@ public:
       }
     }
 
+    // A proxy URL may carry credentials as userinfo, from the option or the
+    // environment, and neither is under a sensitive key name.
+    for (const auto& part : userinfo(target_)) {
+      ctx->utility->cleanAdd(ctx, Value(part));
+      ctx->utility->cleanAdd(ctx, Value(percentDecode(part)));
+    }
+    Value shown = ctx->utility->clean(ctx, Value(target_));
+    url = shown.is_string() ? shown.as_string() : "";
+
     auto inner = ctx->utility->fetcher;
     ctx->utility->fetcher = [this, inner](CtxPtr ctx2, const std::string& u,
                                           const Value& fetchdef) -> Value {
@@ -71,8 +83,10 @@ public:
   }
 
 private:
+  std::string target_ = "";
+
   Value route(const std::string& u, const Value& fetchdef) {
-    if (url.empty() || bypass(u)) {
+    if (target_.empty() || bypass(u)) {
       return fetchdef;
     }
 
@@ -81,9 +95,41 @@ private:
     if (fetchdef.is_map()) {
       for (const auto& kv : *fetchdef.as_map()) map_put(out, kv.first, kv.second);
     }
-    map_put(out, "proxy", Value(url));
+    map_put(out, "proxy", Value(target_));
 
     routed++;
+    return out;
+  }
+
+  // The username and password of `scheme://user:pass@host...`, raw.
+  static std::vector<std::string> userinfo(const std::string& u) {
+    std::vector<std::string> out;
+    size_t scheme = u.find("://");
+    size_t start = std::string::npos == scheme ? 0 : scheme + 3;
+    size_t end = u.find_first_of("/?#", start);
+    std::string authority = u.substr(start, std::string::npos == end ? std::string::npos : end - start);
+    size_t at = authority.rfind('@');
+    if (std::string::npos == at) return out;
+    std::string info = authority.substr(0, at);
+    size_t colon = info.find(':');
+    std::string user = std::string::npos == colon ? info : info.substr(0, colon);
+    std::string pass = std::string::npos == colon ? "" : info.substr(colon + 1);
+    if (!user.empty()) out.push_back(user);
+    if (!pass.empty()) out.push_back(pass);
+    return out;
+  }
+
+  static std::string percentDecode(const std::string& s) {
+    std::string out;
+    for (size_t i = 0; i < s.size(); i++) {
+      if ('%' == s[i] && i + 2 < s.size() && std::isxdigit((unsigned char)s[i + 1]) &&
+          std::isxdigit((unsigned char)s[i + 2])) {
+        out.push_back(static_cast<char>(std::stoi(s.substr(i + 1, 2), nullptr, 16)));
+        i += 2;
+      } else {
+        out.push_back(s[i]);
+      }
+    }
     return out;
   }
 

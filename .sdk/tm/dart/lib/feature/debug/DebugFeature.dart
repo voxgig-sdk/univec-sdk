@@ -4,10 +4,11 @@ import '../base/BaseFeature.dart';
 
 // Request/response capture for debugging. Records a bounded ring buffer of
 // per-operation traces — method, URL, redacted headers, response status and
-// timing — on the client track (`debug.entries`). Sensitive header values
-// (matching `redact`, default authorization/cookie/api-key style names) are
-// masked. An optional `onEntry` callback receives each finished entry (e.g.
-// to stream to a console). `max` caps the buffer (default 100).
+// timing — on the client track (`debug.entries`). Every entry passes through
+// the SDK's clean utility (clean.keys, every registered value); the `redact`
+// option ADDS header names on top of that rule. An optional `onEntry`
+// callback receives each finished entry (e.g. to stream to a console). `max`
+// caps the buffer (default 100).
 class DebugFeature extends BaseFeature {
   dynamic _client;
   final Map<dynamic, dynamic> _entries = {};
@@ -41,7 +42,7 @@ class DebugFeature extends BaseFeature {
           (null == ctx.op ? '_' : (ctx.op.name ?? '_')).toString(),
       'method': null == spec ? null : spec.method,
       'url': null == spec ? null : (spec.url ?? spec.path),
-      'headers': _redact(null == spec ? null : spec.headers),
+      'headers': _redact(ctx, null == spec ? null : spec.headers),
       'start': _now(),
       'status': null,
       'ok': null,
@@ -90,7 +91,7 @@ class DebugFeature extends BaseFeature {
   }
 
   void _finish(dynamic ctx, bool ok) {
-    final entry = _entries[ctx];
+    var entry = _entries[ctx];
     if (null == entry) {
       return;
     }
@@ -101,6 +102,11 @@ class DebugFeature extends BaseFeature {
     if (null == entry['status'] && null != ctx.result) {
       entry['status'] = ctx.result.status;
     }
+
+    // The whole entry leaves through the buffer and the callback: the url
+    // and the error message can carry a query credential the header mask
+    // above never saw.
+    entry = ctx.utility.clean(ctx, entry);
 
     final List buf = _client.track['debug']['entries'];
     buf.add(entry);
@@ -119,28 +125,23 @@ class DebugFeature extends BaseFeature {
     }
   }
 
-  dynamic _redact(dynamic headers) {
+  // The core clean rules apply (clean.keys, every registered value); the
+  // feature's own `redact` list ADDS header names on top of them.
+  dynamic _redact(dynamic ctx, dynamic headers) {
     if (headers is! Map) {
       return {};
     }
-    final patterns = options['redact'] ??
-        [
-          'authorization',
-          'cookie',
-          'set-cookie',
-          'api-key',
-          'apikey',
-          'x-api-key',
-          'idempotency-key'
-        ];
+    final raw = options['redact'];
+    final patterns = (raw is List ? raw : const [])
+        .map((n) => n.toString().toLowerCase())
+        .toList();
     final out = <String, dynamic>{};
     for (final k in headers.keys) {
-      out[k.toString()] =
-          (patterns as List).contains(k.toString().toLowerCase())
-              ? '<redacted>'
-              : headers[k];
+      out[k.toString()] = patterns.contains(k.toString().toLowerCase())
+          ? '[redacted]'
+          : headers[k];
     }
-    return out;
+    return ctx.utility.clean(ctx, out);
   }
 
   num _now() {

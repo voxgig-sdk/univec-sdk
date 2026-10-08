@@ -30,5 +30,7 @@ public final class ModelEntity: UnivecEntityBase {
 
   // (update not defined by this API - base class throws unsupportedOp)
 
+  // (patch not defined by this API - base class throws unsupportedOp)
+
   // (remove not defined by this API - base class throws unsupportedOp)
 }

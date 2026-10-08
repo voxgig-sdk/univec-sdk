@@ -483,6 +483,125 @@ public static class TestRunner
         return new UnivecError(code, msg, null);
     }
 
+    // A live check that did not pass, as main.kit.test.live.strict decides:
+    // strict fails the test; lenient prints the reason and the caller
+    // returns, as xunit 2 has no runtime skip.
+    public static void LiveMiss(bool strict, string reason)
+    {
+        Assert.False(strict, reason);
+        Console.WriteLine("skip: " + reason);
+    }
+
+    // An account holding no record for the test to read skips either way.
+    public static void LiveEmpty(string reason)
+    {
+        Console.WriteLine("skip: " + reason);
+    }
+
+    // A live response that succeeded: no error, ok, and a 2xx status.
+    public static bool LiveOk(Dictionary<string, object?> result)
+    {
+        var status = UnivecSdk.Helpers.ToInt(result.TryGetValue("status", out var s) ? s : null);
+        return (!result.TryGetValue("err", out var err) || err == null)
+            && Equals(result.TryGetValue("ok", out var ok) ? ok : null, true)
+            && status >= 200 && status < 300;
+    }
+
+    // A live list response's records: the body, or the first list an
+    // envelope holds.
+    public static List<object?>? LiveList(object? data)
+    {
+        if (data is List<object?> list)
+        {
+            return list;
+        }
+        if (data is Dictionary<string, object?> map)
+        {
+            var keys = new List<string>(map.Keys);
+            keys.Sort(StringComparer.Ordinal);
+            foreach (var key in keys)
+            {
+                if (map[key] is List<object?> found)
+                {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    // A live response for a message: the SDK's error, or else its status and
+    // content type, never its body.
+    public static string LiveDescribe(Dictionary<string, object?> result)
+    {
+        if (result.TryGetValue("err", out var err) && err != null)
+        {
+            return err is Exception e ? e.Message : (err.ToString() ?? "");
+        }
+        var output = "HTTP " + (result.TryGetValue("status", out var status) ? status : null);
+        if (result.TryGetValue("headers", out var headers) &&
+            headers is Dictionary<string, object?> hmap)
+        {
+            foreach (var entry in hmap)
+            {
+                if (string.Equals(entry.Key, "content-type", StringComparison.OrdinalIgnoreCase)
+                    && entry.Value != null)
+                {
+                    output += " " + (entry.Value.ToString() ?? "").Split(';')[0].Trim();
+                }
+            }
+        }
+        return output;
+    }
+
+    // The record a create-less flow reads live: the first its list returns,
+    // put where the flow reads the fixture's existing records. False once
+    // the test is settled and has to return.
+    public static bool LiveExisting(Dictionary<string, object?> data, bool strict, string name,
+        Func<object?> list)
+    {
+        object? found;
+        try
+        {
+            found = list();
+        }
+        catch (Exception e)
+        {
+            LiveMiss(strict, "Live list discovery failed: " + e.Message);
+            return false;
+        }
+        if (found is not List<object?> items)
+        {
+            LiveMiss(strict, "Live list discovery returned no list");
+            return false;
+        }
+        if (items.Count == 0)
+        {
+            LiveEmpty("The account has no " + name + " record to load");
+            return false;
+        }
+        var record = items[0] is IEntity ent ? ent.Data() : items[0];
+        if (!(data.TryGetValue("existing", out var existing) &&
+            existing is Dictionary<string, object?> emap))
+        {
+            emap = new Dictionary<string, object?>();
+            data["existing"] = emap;
+        }
+        emap[name] = new Dictionary<string, object?> { ["live01"] = record };
+        return true;
+    }
+
+    // In a lenient live run a failing check is reported and the test
+    // returns, observing the live API rather than failing on it.
+    public static void LiveObserve(Exception err, bool live, bool strict)
+    {
+        if (strict || !live)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(err).Throw();
+        }
+        Console.WriteLine("skip: live run, main.kit.test.live.strict is false: " + err.Message);
+    }
+
     // EntityListToData extracts data maps from a list of entity objects.
     public static List<object?> EntityListToData(List<object?> list)
     {

@@ -5,17 +5,23 @@
 // success-path op never reaches. All utilities are reached through
 // `stdutil`, so this suite is API-agnostic. Port of ts test/pipeline.test.ts.
 
+import 'dart:io' show ContentType, HttpServer, InternetAddress;
+
 import 'harness.dart';
 
 import '../lib/UnivecSDK.dart';
 import '../lib/UnivecError.dart';
 import '../lib/Operation.dart';
+import '../lib/Point.dart';
 import '../lib/Response.dart';
 import '../lib/Result.dart';
 import '../lib/Spec.dart';
 import '../lib/feature/base/BaseFeature.dart';
 import '../lib/utility/ErrUtility.dart';
+import '../lib/utility/FetcherUtility.dart' show defaultUserAgent, httpFetch;
 import '../lib/utility/Utility.dart';
+import '../lib/utility/voxgig_struct.dart' as vs;
+import '../lib/feature/test/TestFeature.dart';
 
 // Transport-shaped response with a re-readable body + lowercased headers.
 Map<String, dynamic> resp(int status, [dynamic data, Map<String, dynamic>? headers]) {
@@ -128,6 +134,54 @@ void tests() {
       equal('point_op_allow', errcode(stdutil.makePoint(ctx)));
     });
 
+    test('an allow list names whole operations, in any case', (t) {
+      final op = {
+        'name': 'load',
+        'points': [
+          {
+            'method': 'GET',
+            'parts': ['a']
+          }
+        ]
+      };
+      equal(
+          'point_op_allow',
+          errcode(stdutil.makePoint(base({
+            'op': op,
+            'options': {
+              'allow': {'op': 'reload,unload'}
+            }
+          }))));
+      final ctx = base({
+        'op': op,
+        'options': {
+          'allow': {'op': 'list,\n LOAD'}
+        }
+      });
+      equal(true, identical(stdutil.makePoint(ctx), ctx.op.points[0]));
+    });
+
+    test('an allow list names whole methods', (t) {
+      final ctx = base({
+        'op': {'name': 'update', 'points': []},
+        'options': {
+          'allow': {'method': 'GET,PUT'},
+          'base': 'http://x'
+        }
+      });
+      ctx.point = Point({
+        'method': 'pu',
+        'parts': ['a']
+      });
+      equal('spec_method_allow', errcode(stdutil.makeSpec(ctx)));
+    });
+
+    test('a patch, like an update, takes the request data as its input', (t) {
+      equal('data', stdutil.makeContext({'opname': 'patch'}).op.input);
+      equal('data', stdutil.makeContext({'opname': 'update'}).op.input);
+      equal('match', stdutil.makeContext({'opname': 'load'}).op.input);
+    });
+
     test('makePoint rejects an operation with no endpoints', (t) {
       final ctx = base({
         'op': {'name': 'load', 'points': []},
@@ -167,6 +221,154 @@ void tests() {
         'out': {'spec': preset}
       });
       equal(true, identical(preset, stdutil.makeSpec(ctx)));
+    });
+  });
+
+  describe('pipeline:prepare + direct', () {
+    test('prepare sends a method allow.method names, in upper case', (t) async {
+      final sdk = UnivecSDK.test({}, {
+        'allow': {'method': 'PUT,\n get'}
+      });
+      final fetchdef = await sdk.prepare({'path': '/a', 'method': 'get'});
+      equal('GET', fetchdef['method']);
+      equal('spec_method_allow',
+          errcode(await sdk.prepare({'path': '/a', 'method': 'POST'})));
+      equal('spec_method_allow',
+          errcode(await sdk.prepare({'path': '/a', 'method': 'PU'})));
+    });
+
+    test('prepare refuses every method under an empty allow.method',
+        (t) async {
+      final sdk = UnivecSDK.test({}, {
+        'allow': {'method': ''}
+      });
+      equal('spec_method_allow',
+          errcode(await sdk.prepare({'path': '/a', 'method': 'get'})));
+    });
+
+    test('a null allow, allow.op or allow.method takes the default',
+        (t) async {
+      for (final allow in <dynamic>[
+        {'method': null},
+        {'op': null},
+        null
+      ]) {
+        final sdk = UnivecSDK.test({}, {'allow': allow});
+        equal('GET,PUT,POST,PATCH,DELETE,OPTIONS',
+            vs.getpath(sdk.options(), 'allow.method'));
+        equal('create,update,patch,load,list,remove,command,direct,graphql',
+            vs.getpath(sdk.options(), 'allow.op'));
+        equal('POST',
+            (await sdk.prepare({'path': '/a', 'method': 'post'}))['method']);
+        equal('spec_method_allow',
+            errcode(await sdk.prepare({'path': '/a', 'method': 'HEAD'})));
+      }
+    });
+
+    test('a list the allow option omits takes the default', (t) async {
+      final sdk = UnivecSDK.test({}, {'allow': {}});
+      equal('GET,PUT,POST,PATCH,DELETE,OPTIONS',
+          vs.getpath(sdk.options(), 'allow.method'));
+      equal('create,update,patch,load,list,remove,command,direct,graphql',
+          vs.getpath(sdk.options(), 'allow.op'));
+      equal('spec_method_allow',
+          errcode(await sdk.prepare({'path': '/a', 'method': 'HEAD'})));
+
+      // The caller's allow replaces a config allow that is null or not a map.
+      dynamic over(dynamic cfgallow, dynamic allow) =>
+          stdutil.makeOptions(stdutil.makeContext({
+            'utility': stdutil,
+            'options': {'allow': allow},
+            'config': {
+              'options': {'allow': cfgallow}
+            },
+          }));
+      for (final cfgallow in <dynamic>['x', null]) {
+        final opts = over(cfgallow, {'op': 'load'});
+        equal('GET,PUT,POST,PATCH,DELETE,OPTIONS',
+            vs.getpath(opts, 'allow.method'));
+        equal('load', vs.getpath(opts, 'allow.op'));
+      }
+      equal('create,update,patch,load,list,remove,command,direct,graphql',
+          vs.getpath(over('x', {'method': 'GET'}), 'allow.op'));
+    });
+
+    test('one options map builds two clients, each over its own model', (t) {
+      Map<String, dynamic> literal() => {
+            'base': 'http://api.test',
+            'allow': <String, dynamic>{'op': 'create,load,list'},
+            'headers': <String, dynamic>{'x-caller': 'c1'},
+            'entity': <String, dynamic>{
+              'widget': <String, dynamic>{'note': 'c1'}
+            },
+          };
+      // The constructor reads the generated config, so a client over the
+      // model narrowed to GET is the makeOptions it runs, given that model.
+      dynamic getOnly(dynamic options) =>
+          stdutil.makeOptions(stdutil.makeContext({
+            'utility': stdutil,
+            'options': options,
+            'config': {
+              ...config.toMap(),
+              'options': {
+                ...config.options,
+                'allow': {'method': 'GET'}
+              },
+            },
+          }));
+      final model = vs.clone(config.options);
+      final shared = literal();
+      UnivecSDK(shared);
+      deepEqual(literal(), shared, 'the first client changed the options map');
+      deepEqual(model, config.options, 'the first client changed the model');
+      final second = getOnly(shared);
+      deepEqual(getOnly(literal()), second, 'the second client');
+      equal('GET', vs.getpath(second, 'allow.method'));
+    });
+
+    test('direct is refused by a list that names only indirect', (t) async {
+      final sdk = UnivecSDK.test({}, {
+        'allow': {'op': 'indirect,reload'}
+      });
+      final res = await sdk.direct({'path': '/a'});
+      equal(false, res['ok']);
+      ok(res['err'].toString().contains('not allowed by SDK option allow.op'));
+    });
+
+    test('direct answers a method allow.method refuses with a result map',
+        (t) async {
+      final sdk = UnivecSDK.test({}, {
+        'allow': {'method': 'GET'}
+      });
+      final res = await sdk.direct({'path': '/a', 'method': 'POST'});
+      equal(false, res['ok']);
+      equal('spec_method_allow', errcode(res['err']));
+    });
+
+    test('direct reports a body the transport marks as not JSON', (t) async {
+      final sdk = UnivecSDK({
+        'base': 'http://nonjson.test',
+        'apikey': 'NONJSON-SECRET-7f2c',
+        'headers': {'user-agent': 'Probe/1.0'},
+        'system': {
+          'fetch': (dynamic url, dynamic fetchdef) => {
+                'status': 200,
+                'statusText': 'OK',
+                'headers': {'content-type': 'text/html'},
+                'body': '<html>key NONJSON-SECRET-7f2c ' + 'x' * 300 + '</html>',
+                'json': () => null,
+                'unreadable': true,
+              }
+        }
+      });
+      final res = await sdk.direct({'path': '/a'});
+      equal(false, res['ok']);
+      equal('response_content_type', errcode(res['err']));
+      final String msg = res['err'].message;
+      ok(msg.contains('expected JSON, got text/html (HTTP 200, '
+          'content-type text/html, user-agent Probe/1.0, body: <html>key '));
+      ok(!msg.contains('NONJSON-SECRET-7f2c'));
+      ok(msg.endsWith('...)'));
     });
   });
 
@@ -218,6 +420,41 @@ void tests() {
       });
       await stdutil.makeResponse(ctx);
       ok(null != ctx.ctrl['explain']['result']);
+    });
+
+    test('a body marked as not JSON is named by its label', (t) async {
+      Future<dynamic> run(int status, String? type, String body) async {
+        final r = resp(status, null,
+            null == type ? null : <String, dynamic>{'content-type': type});
+        r['body'] = body;
+        r['unreadable'] = true;
+        final ctx = base({
+          'spec': {
+            'step': 's',
+            'headers': {'user-agent': 'Probe/1.0'}
+          },
+          'response': r,
+          'result': {'ok': false}
+        });
+        await stdutil.makeResponse(ctx);
+        return ctx.result.err;
+      }
+
+      final bad = await run(200, 'application/json', '{"a": ');
+      equal('response_json_invalid', bad.code);
+      ok(bad.message.contains('body is not valid JSON (HTTP 200, '
+          'content-type application/json, user-agent Probe/1.0, body: {"a":)'));
+      final untyped = await run(200, null, 'not json');
+      equal('response_json_invalid', untyped.code);
+      ok(untyped.message.contains('content-type none'));
+      final html = await run(200, 'text/html', '<p>\n  challenge </p>');
+      equal('response_content_type', html.code);
+      ok(html.message.contains('expected JSON, got text/html'));
+      ok(html.message.contains('body: <p> challenge </p>)'));
+      final failed = await run(503, 'text/html', '<p>down</p>');
+      equal('request_status', failed.code);
+      ok(failed.message.contains('request: 503: ERR (HTTP 503, '
+          'content-type text/html, user-agent Probe/1.0, body: <p>down</p>)'));
     });
 
     test('a body-parse exception is captured on result.err', (t) async {
@@ -603,6 +840,244 @@ void tests() {
       });
       await stdutil.resultBody(ctx);
       equal(null, ctx.result.body);
+    });
+  });
+
+  // A header, cookie or query argument travels where the definition declares
+  // it. Port of the ts pathquery.test.ts cases.
+  describe('pipeline:prepareHeaders + prepareQuery + transformRequest', () {
+    dynamic hctx(Map<String, dynamic> point, Map<String, dynamic> reqmatch,
+        Map<String, dynamic> reqdata,
+        [Map<String, dynamic>? headers]) {
+      final ctx = stdutil.makeContext({
+        'point': point,
+        'reqmatch': reqmatch,
+        'reqdata': reqdata,
+      });
+      ctx.utility = stdutil;
+      ctx.client = _OptClient({'headers': headers ?? <String, dynamic>{}});
+      return ctx;
+    }
+
+    final headerPoint = <String, dynamic>{
+      'args': {
+        'header': [
+          {'name': 'idempotency_key', 'orig': 'Idempotency-Key', 'kind': 'header'},
+          {'name': 'x_trace', 'orig': 'X-Trace', 'kind': 'header'},
+          {'name': 'page_size', 'orig': 'Page-Size', 'kind': 'header'},
+        ]
+      }
+    };
+
+    test('a header argument from the match goes out under its orig', (t) {
+      deepEqual({'user-agent': 'sdk', 'idempotency-key': 'k1', 'page-size': '3'},
+          stdutil.prepareHeaders(hctx(headerPoint,
+              {'idempotency_key': 'k1', 'page_size': 3}, {}, {'user-agent': 'sdk'})));
+    });
+
+    test('a header argument from the data goes out too', (t) {
+      deepEqual({'x-trace': 't1'},
+          stdutil.prepareHeaders(hctx(headerPoint, {}, {'x_trace': 't1', 'name': 'n'})));
+    });
+
+    test('an absent or null header argument is not sent', (t) {
+      deepEqual({}, stdutil.prepareHeaders(hctx(headerPoint, {'idempotency_key': null}, {})));
+    });
+
+    test('a header argument replaces a default of the same name in any case', (t) {
+      deepEqual({'user-agent': 'sdk', 'idempotency-key': 'call'},
+          stdutil.prepareHeaders(hctx(headerPoint, {'idempotency_key': 'call'}, {},
+              {'Idempotency-Key': 'default', 'user-agent': 'sdk'})));
+    });
+
+    final cookiePoint = <String, dynamic>{
+      'args': {
+        'header': [
+          {'name': 'x_trace', 'orig': 'X-Trace', 'kind': 'header'}
+        ],
+        'cookie': [
+          {'name': 'session_id', 'orig': 'SESSIONID', 'kind': 'cookie'},
+          {'name': 'theme', 'orig': 'theme', 'kind': 'cookie'},
+          {'name': 'prefs', 'orig': 'prefs', 'kind': 'cookie'},
+        ],
+      }
+    };
+
+    test('a cookie argument goes out in the cookie header as name=value', (t) {
+      deepEqual({'cookie': 'SESSIONID=s1; theme=dark'},
+          stdutil.prepareHeaders(hctx(cookiePoint, {'session_id': 's1'},
+              {'theme': 'dark', 'name': 'n'})));
+    });
+
+    test('a cookie argument follows the cookies the caller sends, whatever the header case', (t) {
+      deepEqual({'user-agent': 'sdk', 'cookie': 'lang=en; SESSIONID=s1'},
+          stdutil.prepareHeaders(hctx(cookiePoint, {'session_id': 's1'}, {},
+              {'Cookie': 'lang=en', 'user-agent': 'sdk'})));
+    });
+
+    test('an absent or null cookie argument leaves the headers alone', (t) {
+      deepEqual({'Cookie': 'lang=en'},
+          stdutil.prepareHeaders(hctx(cookiePoint, {'session_id': null}, {},
+              {'Cookie': 'lang=en'})));
+    });
+
+    test('a cookie argument is form serialized and percent-encoded', (t) {
+      deepEqual({'cookie': 'SESSIONID=a%20b%3Bc%2Cd; theme=dark; theme=x%20y; lang=en%20gb; size=2'},
+          stdutil.prepareHeaders(hctx(cookiePoint, {'session_id': 'a b;c,d'},
+              {'theme': ['dark', 'x y'], 'prefs': {'size': 2, 'lang': 'en gb'}})));
+    });
+
+    test('a cookie argument replaces a cookie of the same name the caller sends', (t) {
+      deepEqual({'cookie': 'theme=dark; lang=en; SESSIONID=s1'},
+          stdutil.prepareHeaders(hctx(cookiePoint, {'session_id': 's1'}, {},
+              {'Cookie': 'SESSIONID=old; theme=dark ;lang=en'})));
+    });
+
+    test('a map cookie argument replaces the cookies its keys name, in their encoded form', (t) {
+      deepEqual({'cookie': 'theme=dark; SESSIONID=s1; lang=en; size=2'},
+          stdutil.prepareHeaders(hctx(cookiePoint, {'session_id': 's1'},
+              {'prefs': {'lang': 'en', 'size': 2}}, {'Cookie': 'lang=old; theme=dark'})));
+      deepEqual({'cookie': 'theme=dark; SESSIONID=s1; x%20y=new'},
+          stdutil.prepareHeaders(hctx(cookiePoint, {'session_id': 's1'},
+              {'prefs': {'x y': 'new'}}, {'Cookie': 'x%20y=old; theme=dark'})));
+    });
+
+    test('a default cookie whose value holds pairs is kept whole', (t) {
+      deepEqual({'cookie': 'session=a=b&theme=old; SESSIONID=s1; theme=dark'},
+          stdutil.prepareHeaders(hctx(cookiePoint, {'session_id': 's1'},
+              {'theme': 'dark'}, {'Cookie': 'session=a=b&theme=old'})));
+    });
+
+    test('the declared response media is asked for, unless the caller set an accept', (t) {
+      final media = <String, dynamic>{
+        'response': {'kind': 'json', 'media': 'application/vnd.api+json'},
+        'body': {'kind': 'json', 'media': 'application/vnd.api+json'},
+      };
+      deepEqual({'accept': 'application/vnd.api+json', 'content-type': 'application/vnd.api+json'},
+          stdutil.prepareHeaders(hctx(media, {}, {}, {'content-type': 'application/json'})));
+      deepEqual({'Accept': 'text/plain', 'content-type': 'text/plain'},
+          stdutil.prepareHeaders(hctx(media, {}, {},
+              {'Accept': 'text/plain', 'content-type': 'text/plain'})));
+    });
+
+    final queryPoint = <String, dynamic>{
+      'params': ['id'],
+      'transform': {'req': '`reqdata`'},
+      'args': {
+        'params': [
+          {'name': 'id'}
+        ],
+        'query': [
+          {'name': 'page_size', 'orig': 'pageSize', 'kind': 'query'},
+          {'name': 'lang', 'orig': 'lang', 'kind': 'query'},
+          {'name': 'trace', 'orig': 'trace', 'kind': 'query'},
+        ],
+        'header': [
+          {'name': 'x_trace', 'orig': 'X-Trace', 'kind': 'header'},
+          {'name': 'trace', 'orig': 'trace', 'kind': 'header'},
+        ],
+        'cookie': [
+          {'name': 'session_id', 'orig': 'SESSIONID', 'kind': 'cookie'},
+          {'name': 'lang', 'orig': 'lang', 'kind': 'cookie'},
+        ],
+      }
+    };
+
+    test('a path, header or cookie argument stays out of the query', (t) {
+      deepEqual({'q': 'x'},
+          stdutil.prepareQuery(hctx(queryPoint,
+              {'id': 'i1', 'x_trace': 't1', 'session_id': 's1', 'q': 'x', r'$action': 'a'}, {})));
+    });
+
+    test('a query argument goes out under its orig, from the match or the data', (t) {
+      deepEqual({'pageSize': 3, 'lang': 'en'},
+          stdutil.prepareQuery(hctx(queryPoint, {'page_size': 3}, {'lang': 'en'})));
+    });
+
+    test('a query argument that shares a header or cookie name still goes out', (t) {
+      deepEqual({'lang': 'en', 'trace': 't1'},
+          stdutil.prepareQuery(hctx(queryPoint, {'lang': 'en', 'trace': 't1'}, {})));
+    });
+
+    test('a routed argument is left out of the body', (t) {
+      deepEqual({'title': 'T'},
+          stdutil.transformRequest(hctx(queryPoint, {},
+              {'x_trace': 't1', 'session_id': 's1', 'page_size': 2, 'title': 'T', r'$action': 'a'})));
+    });
+
+    test('an argument the point marks as a field the body keeps stays in the body', (t) {
+      for (final kind in ['header', 'cookie', 'query']) {
+        final point = <String, dynamic>{
+          'transform': {'req': '`reqdata`'},
+          'args': {
+            kind: [
+              {'name': 'locale', 'orig': 'Locale', 'field': true},
+              {'name': 'session_id', 'orig': 'SESSIONID'},
+            ],
+          },
+        };
+        deepEqual({'name': 'n', 'locale': 'en'},
+            stdutil.transformRequest(
+                hctx(point, {}, {'name': 'n', 'locale': 'en', 'session_id': 's1'})));
+      }
+    });
+
+    test('a raw request body is sent as given', (t) {
+      final ctx = hctx(<String, dynamic>{
+        'body': {'kind': 'raw', 'media': 'text/plain'},
+      }, {}, {r'$body': 'hello'});
+      ctx.op = Operation({'name': 'create', 'entity': 'x', 'input': 'data'});
+      equal('hello', stdutil.prepareBody(ctx));
+    });
+  });
+
+  describe('fetcher:httpFetch', () {
+    test('marks a body that is not JSON and sends the default agent', (t) async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((req) {
+        final agent = req.headers.value('user-agent') ?? '';
+        if ('/json' == req.uri.path) {
+          req.response.headers.contentType = ContentType.json;
+          req.response.write('{"agent": "$agent"}');
+        } else if ('/page' == req.uri.path) {
+          req.response.headers.contentType = ContentType.html;
+          req.response.write('<p>$agent</p>');
+        }
+        req.response.close();
+      });
+      try {
+        final url = 'http://127.0.0.1:${server.port}';
+        equal('Mozilla/5.0 (compatible; UnivecSDK/1.0)', defaultUserAgent);
+
+        final sent = <String, dynamic>{};
+        final page = await httpFetch('$url/page', {'method': 'GET', 'headers': sent});
+        equal(true, page['unreadable']);
+        equal('<p>$defaultUserAgent</p>', page['body']);
+        equal(defaultUserAgent, sent['user-agent']);
+
+        final bare = <String, dynamic>{'method': 'GET'};
+        final blank = await httpFetch('$url/blank', bare);
+        equal(false, blank['unreadable']);
+        equal(null, blank['body']);
+        equal(defaultUserAgent, bare['headers']['user-agent']);
+
+        final own = <String, dynamic>{'User-Agent': 'Probe/1.0'};
+        final data = await httpFetch('$url/json', {'method': 'GET', 'headers': own});
+        equal(false, data['unreadable']);
+        equal('Probe/1.0', data['json']()['agent']);
+        equal(1, own.length);
+      } finally {
+        await server.close(force: true);
+      }
+    });
+  });
+
+  describe('feature:test mock envelope', () {
+    test('a list whose items each wrap the record answers the wrappers', (t) {
+      final spec = [r'`$EACH`', 'body', {r'`$MERGE`': '`.badge`'}];
+      final out = mockEnvelope(spec, [{'id': 'b1'}, {'id': 'b2'}]);
+      deepEqual([{'badge': {'id': 'b1'}}, {'badge': {'id': 'b2'}}], out);
+      deepEqual([{'id': 'b1'}, {'id': 'b2'}], vs.transform({'body': out}, spec));
     });
   });
 }

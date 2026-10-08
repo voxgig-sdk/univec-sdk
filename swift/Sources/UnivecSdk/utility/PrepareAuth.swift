@@ -15,6 +15,14 @@ private let headerAuth = "authorization"
 private let optionApikey = "apikey"
 private let notFound = "__NOTFOUND__"
 
+// The client's auth.name option, when set, replaces the name the API declares.
+private func prepareAuthName(_ options: VMap) -> String {
+  if let name = gpath(options, "auth", "name").asString, name != "" {
+    return name.lowercased()
+  }
+  return headerAuth
+}
+
 func prepareAuthUtil(_ ctx: Context) throws -> Spec {
   guard let spec = ctx.spec else {
     throw ctx.makeError("auth_no_spec", "Expected context spec property to be defined.")
@@ -30,6 +38,13 @@ func prepareAuthUtil(_ ctx: Context) throws -> Spec {
     return spec
   }
 
+  let name = prepareAuthName(options)
+
+  // A credential left under the declared name would travel beside the renamed one.
+  if name != headerAuth {
+    headers.entries.removeValue(forKey: headerAuth)
+  }
+
   let apikey = getprop(.map(options), .string(optionApikey), .string(notFound))
 
   var skip = isNil(apikey)
@@ -38,13 +53,13 @@ func prepareAuthUtil(_ ctx: Context) throws -> Spec {
   }
 
   if skip {
-    headers.entries.removeValue(forKey: headerAuth)
+    headers.entries.removeValue(forKey: name)
   } else {
     var authPrefix = ""
     if let ap = gpath(options, "auth", "prefix").asString { authPrefix = ap }
     let apikeyVal = apikey.asString ?? ""
     // Empty prefix (raw apiKey credential) must not add a leading space.
-    headers.entries[headerAuth] = .string(authPrefix == "" ? apikeyVal : authPrefix + " " + apikeyVal)
+    headers.entries[name] = .string(authPrefix == "" ? apikeyVal : authPrefix + " " + apikeyVal)
   }
 
   return spec

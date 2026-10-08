@@ -11,6 +11,13 @@ object PrepareAuth {
   val OPTION_APIKEY = "apikey"
   val NOT_FOUND = "__NOTFOUND__"
 
+  // The client's auth.name option, when set, replaces the name the API declares.
+  private def authName(options: Object): String =
+    Struct.getpath(options, java.util.List.of("auth", "name")) match {
+      case s: String if "" != s => s.toLowerCase(java.util.Locale.ROOT)
+      case _ => CRED_NAME
+    }
+
   def prepareAuth(ctx: Context): Spec = {
     val spec = ctx.spec
     if (spec == null) throw ctx.makeError("auth_no_spec", "Expected context spec property to be defined.")
@@ -24,6 +31,13 @@ object PrepareAuth {
       return spec
     }
 
+    val name = authName(options)
+
+    // A credential left under the declared name would travel beside the renamed one.
+    if (name != CRED_NAME) {
+      headers.remove(CRED_NAME)
+    }
+
     val apikey = Struct.getprop(options, OPTION_APIKEY, NOT_FOUND)
 
     var skip = false
@@ -34,15 +48,15 @@ object PrepareAuth {
     }
 
     if (skip) {
-      headers.remove(CRED_NAME)
+      headers.remove(name)
     } else {
       var authPrefix = ""
       Struct.getpath(options, java.util.List.of("auth", "prefix")) match { case s: String => authPrefix = s; case _ => }
       val apikeyVal = apikey match { case s: String => s; case _ => "" }
       // A raw credential (empty prefix, e.g. an apiKey scheme) must go in
       // as-is; only a non-empty prefix (Bearer/Basic/OAuth) is space-joined.
-      if ("" == authPrefix) headers.put(CRED_NAME, apikeyVal)
-      else headers.put(CRED_NAME, authPrefix + " " + apikeyVal)
+      if ("" == authPrefix) headers.put(name, apikeyVal)
+      else headers.put(name, authPrefix + " " + apikeyVal)
     }
 
     spec

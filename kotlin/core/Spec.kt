@@ -17,6 +17,9 @@ class Spec(specmap: Map<String, Any?>? = null) {
   var body: Any? = null
   var url: String = ""
   var path: String = ""
+  // The query parameters prepareAuth placed: the credential, which the
+  // request sends and the entity's match leaves out.
+  var authquery: MutableList<String> = mutableListOf()
 
   init {
     if (specmap != null) {

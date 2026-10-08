@@ -171,14 +171,37 @@ function maybeSkipControl(t, kind, name, live) {
     }
     return false;
 }
-function skipIfMissingIds(t, setup, requiredKeys) {
+// A live test without the ids its request needs is blocked rather than sent
+// with `undefined` in a path or query parameter. Returns true when skipped.
+function skipIfMissingIds(t, setup, requiredKeys, strict = true) {
     if (!setup.live)
         return false;
     const missing = requiredKeys.filter(k => null == setup.idmap?.[k]);
-    if (missing.length > 0) {
-        throw new Error(`Live test blocked: needs ${missing.join(', ')} via *_ENTID env var`);
+    return 0 < missing.length &&
+        liveMiss(t, strict, `Live test blocked: needs ${missing.join(', ')} via *_ENTID env var`);
+}
+// A live check that did not pass: strict fails the test, lenient skips it.
+function liveMiss(t, strict, reason) {
+    if (strict)
+        throw new Error(reason);
+    t.skip(reason);
+    return true;
+}
+// An empty list is a valid answer, so a test needing a record skips.
+function liveEmpty(t, reason) {
+    t.skip(reason);
+    return true;
+}
+// The SDK's error, already bounded and cleaned, or else status and content type.
+function describeLive(result) {
+    const err = result?.err;
+    if (null != err) {
+        return String(err.message || err.code || err);
     }
-    return false;
+    const headers = result?.headers;
+    const type = 'function' === typeof headers?.get ? headers.get('content-type') :
+        Object.entries(headers || {}).find(([k]) => 'content-type' === k.toLowerCase())?.[1];
+    return 'HTTP ' + result?.status + (type ? ' ' + String(type).split(';')[0] : '');
 }
 function loadEnvLocal(file) {
     let text;
@@ -232,6 +255,9 @@ module.exports = {
   isControlSkipped,
   maybeSkipControl,
   skipIfMissingIds,
+  liveMiss,
+  liveEmpty,
+  describeLive,
   loadEnvLocal,
   makeStepData,
   makeMatch,

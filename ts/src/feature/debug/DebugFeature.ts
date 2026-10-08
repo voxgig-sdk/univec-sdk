@@ -34,7 +34,7 @@ class DebugFeature extends BaseFeature {
       op: ((ctx.op && ctx.op.entity) || '_') + '.' + ((ctx.op && ctx.op.name) || '_'),
       method: spec.method,
       url: spec.url || spec.path,
-      headers: this._redact(spec.headers),
+      headers: this._redact(ctx, spec.headers),
       start: this._now(),
       status: undefined as any,
       ok: undefined as any,
@@ -73,7 +73,7 @@ class DebugFeature extends BaseFeature {
 
 
   _finish(this: any, ctx: any, ok: boolean) {
-    const entry = this._entries.get(ctx)
+    let entry = this._entries.get(ctx)
     if (null == entry) {
       return
     }
@@ -83,6 +83,11 @@ class DebugFeature extends BaseFeature {
     if (null == entry.status && null != ctx.result) {
       entry.status = ctx.result.status
     }
+
+    // The whole entry leaves through the buffer and the callback: the url
+    // and the error message can carry a query credential the header mask
+    // above never saw.
+    entry = ctx.utility.clean(ctx, entry)
 
     const client: any = this._client
     const buf = client._debug.entries
@@ -99,17 +104,18 @@ class DebugFeature extends BaseFeature {
   }
 
 
-  _redact(this: any, headers: any): any {
+  // The core clean rules apply (clean.keys, every registered value); the
+  // feature's own `redact` list ADDS header names on top of them.
+  _redact(this: any, ctx: any, headers: any): any {
     if (null == headers) {
       return {}
     }
-    const patterns = this._options.redact ||
-      ['authorization', 'cookie', 'set-cookie', 'api-key', 'apikey', 'x-api-key', 'idempotency-key']
+    const patterns = (this._options.redact || []).map((n: any) => String(n).toLowerCase())
     const out: any = {}
     for (const k of Object.keys(headers)) {
-      out[k] = patterns.indexOf(k.toLowerCase()) >= 0 ? '<redacted>' : headers[k]
+      out[k] = patterns.indexOf(k.toLowerCase()) >= 0 ? '[redacted]' : headers[k]
     }
-    return out
+    return ctx.utility.clean(ctx, out)
   }
 
 

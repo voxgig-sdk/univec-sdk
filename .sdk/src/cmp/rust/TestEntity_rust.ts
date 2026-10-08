@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable, invalidRequest } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -20,7 +20,8 @@ import {
   getMatchEntries,
   isAuthActive, envName, envToken,
   serverVarEnv,
-  serverVariables
+  serverVariables,
+  liveFlowNeeds, liveStrict, liveStrictNote,
 } from '@voxgig/sdkgen'
 
 
@@ -36,6 +37,54 @@ type GenCtx = {
 }
 
 type OpGen = (ctx: GenCtx, step: ModelEntityFlowStep, index: number) => void
+
+
+// The live prologue of a flow built from offline fixtures: blocked without
+// the ids it binds, a create-less load reading the first listed record, and
+// a lenient run observing its checks rather than failing on them.
+function liveFlowGate(entity: any, needs: any, entidEnv: string, method: string,
+  strict: boolean, hasSteps: boolean): string {
+  let out = ''
+  if (0 < needs.keys.length) {
+    out += `    if setup.live {
+        for live_key in [${needs.keys.map((k: string) => JSON.stringify(k)).join(', ')}] {
+            if setup.synthetic_only || getp(&setup.idmap, live_key).is_noval() {
+                live_miss(LIVE_STRICT, &format!("Live entity test blocked: needs {} via ${entidEnv}", live_key));
+                return;
+            }
+        }
+    }
+`
+  }
+  if (null != needs.blocked) {
+    out += `    if setup.live {
+        live_miss(LIVE_STRICT, ${JSON.stringify('Live entity test blocked: ' + needs.blocked)});
+        return;
+    }
+`
+  }
+  if (!hasSteps) {
+    return out
+  }
+  out += '    let client = setup.client.clone();\n'
+  if (null != needs.discover) {
+    const match = Object.entries(needs.discover)
+      .map(([k, v]: any) => `(${JSON.stringify(k)}, getp(&setup.idmap, ${JSON.stringify(v)}))`).join(', ')
+    out += `    if setup.live && !live_existing(&setup.data, LIVE_STRICT, ${JSON.stringify(entity.name)}, || {
+        client
+            .${method}(Value::Noval)
+            .list(jo(vec![${match}]), Value::Noval)
+            .map(|list| ja(list.iter().map(|e| e.data(None)).collect::<Vec<Value>>()))
+    }) {
+        return;
+    }
+`
+  }
+  if (!strict) {
+    out += '    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {\n'
+  }
+  return out
+}
 
 
 const TestEntity = cmp(function TestEntity(props: any) {
@@ -85,6 +134,9 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const genCtx: GenCtx = { model, entity, rustcrate, flow: basicflow, PROJUPPER }
 
+  const strict = liveStrict(model, target.name)
+  const needs = liveFlowNeeds(entity, basicflow)
+
   const opNames = Array.from(new Set(allSteps.map((s: any) => s.o).filter(Boolean)))
   const opsList = opNames.map(o => `"${o}"`).join(', ')
 
@@ -130,6 +182,9 @@ use ${rustcrate}::core::helpers::{getp, getpath, ja, jo, now_ms, setp, to_map};
 use ${rustcrate}::utility::voxgigstruct as vs;
 use ${rustcrate}::{test_sdk, Entity, ${model.const.Name}Entity, ${model.const.Name}SDK, Value};
 
+${liveStrictNote(strict, '//')}
+const LIVE_STRICT: bool = ${strict};
+
 #[test]
 fn ${evar}_entity_instance() {
     let testsdk = test_sdk(Value::Noval, Value::Noval);
@@ -138,10 +193,10 @@ fn ${evar}_entity_instance() {
 }
 `)
 
-    // The stream test drives the list op; only emit it when the entity has a
-    // list op (a create/load-only entity has no list endpoint, so
-    // stream("list") panics with point_no_points).
-    const flowHasList = allSteps.some((s: any) => 'list' === s.o)
+    // The stream test drives the list op with no match; only emit it when a
+    // bare call can reach a list route (see helpers/opShape opReachable).
+    const flowHasList = allSteps.some((s: any) => 'list' === s.o) &&
+      opReachable((entity.op as any)?.list, [])
     if (flowHasList) {
       Content(`
 #[test]
@@ -186,17 +241,14 @@ fn ${evar}_entity_stream() {
 `)
     }
 
+    Content(failureTests(rustcrate, entity, evar, method))
+
     Content(`
 #[test]
 fn ${evar}_entity_basic() {
     let setup = ${evar}_basic_setup(Value::Noval);
-${skipBlock}    // The basic flow consumes synthetic IDs from the fixture. In live mode
-    // without an *_ENTID env override, those IDs hit the live API and 4xx.
-    if setup.synthetic_only {
-        eprintln!("skip: live entity test uses synthetic IDs from fixture — set ${PROJUPPER}_TEST_${ENTUPPER}_ENTID JSON to run live");
-        return;
-    }
-${allSteps.length > 0 ? '    let client = setup.client.clone();\n' : ''}`)
+${skipBlock}${liveFlowGate(entity, needs, PROJUPPER + '_TEST_' + ENTUPPER + '_ENTID', method, strict,
+  allSteps.length > 0)}`)
 
     // No create step: bootstrap entity data from existing fixture data.
     const flowHasCreate = allSteps.some((s: any) => s.o === 'create')
@@ -222,7 +274,11 @@ ${allSteps.length > 0 ? '    let client = setup.client.clone();\n' : ''}`)
       }
     })
 
-    Content(`}
+    Content(`${strict || 0 === allSteps.length ? '' : `    }));
+    if let Err(err) = outcome {
+        live_observe(err, setup.live, LIVE_STRICT);
+    }
+`}}
 
 `)
 
@@ -268,9 +324,8 @@ ${allSteps.length > 0 ? '    let client = setup.client.clone();\n' : ''}`)
     )
     .unwrap_or_else(|_| Value::empty_map());
 
-    // Detect ENTID env override before env_override consumes it. When live
-    // mode is on without a real override, the basic test runs against
-    // synthetic IDs from the fixture and 4xx's.
+    // Whether *_ENTID supplied the idmap, read before env_override consumes
+    // it: without it, the ids a live flow binds are the fixture's synthetic ones.
     let entid_env_raw = std::env::var("${PROJUPPER}_TEST_${ENTUPPER}_ENTID").unwrap_or_default();
     let idmap_overridden =
         !entid_env_raw.trim().is_empty() && entid_env_raw.trim().starts_with('{');
@@ -669,6 +724,98 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A failed operation fails a stream as it fails the operation: a transport
+// failure, and a hook that rejects the call. The caller's ctrl stays its own.
+// An invalid request fails with validate's own error, before it is sent. A
+// rust hook cannot throw, so there is no throwing-hook case.
+function failureTests(rustcrate: string, entity: ModelEntity, evar: string, method: string): string {
+  const feature = (name: string) =>
+    `getp(&getp(&${rustcrate}::make_config(), "feature"), "${name}").is_noval()`
+  let out = ''
+
+  if (opReachable((entity.op as any)?.list, [])) {
+    out += `
+#[test]
+fn ${evar}_entity_stream_error() {
+    let offline = jo(vec![("net", jo(vec![("offline", Value::Bool(true))]))]);
+    let err = test_sdk(offline.clone(), Value::Noval)
+        .${method}(Value::Noval)
+        .stream("list", Value::empty_map(), Value::empty_map())
+        .err()
+        .expect("a failed operation should fail the stream");
+    assert!(err.msg.contains("offline"), "{}", err.msg);
+
+    let quiet = jo(vec![("ctrl", jo(vec![("throw", Value::Bool(false))]))]);
+    assert!(test_sdk(offline, Value::Noval)
+        .${method}(Value::Noval)
+        .stream("list", Value::empty_map(), quiet)
+        .is_ok());
+
+    if !${feature('rbac')} {
+        let denied = test_sdk(Value::Noval, jo(vec![(
+            "feature",
+            jo(vec![("rbac", jo(vec![("active", Value::Bool(true)), ("deny", Value::Bool(true))]))]),
+        )]));
+        let denyerr = denied
+            .${method}(Value::Noval)
+            .stream("list", Value::empty_map(), Value::empty_map())
+            .err()
+            .expect("a denied operation should fail the stream");
+        assert_eq!(denyerr.code, "rbac_denied");
+    }
+}
+
+#[test]
+fn ${evar}_entity_stream_ctrl() {
+    let explain = Value::empty_map();
+    let ctrl = jo(vec![("explain", explain.clone())]);
+    let items: Vec<Value> = test_sdk(Value::Noval, Value::Noval)
+        .${method}(Value::Noval)
+        .stream("list", Value::empty_map(), jo(vec![("ctrl", ctrl.clone())]))
+        .expect("stream failed")
+        .collect();
+    assert!(getp(&ctrl, "stream").is_noval(), "the stream changed the caller's ctrl");
+    let filled = match &explain {
+        Value::Map(m) => !m.borrow().is_empty(),
+        _ => false,
+    };
+    assert!(filled, "the caller's explain record was not filled");
+}
+`
+  }
+
+  const bad = invalidRequest(entity)
+  if (null != bad) {
+    const args = Object.entries(bad.args)
+      .map(([k, v]) => '(' + JSON.stringify(k) + ', ' +
+        ('number' === typeof v ? 'Value::Num(' + v + '.0)' :
+          'boolean' === typeof v ? 'Value::Bool(' + v + ')' :
+            'Value::str(' + JSON.stringify(v) + ')') + ')')
+      .join(', ')
+    out += `
+#[test]
+fn ${evar}_entity_validate() {
+    if ${feature('validate')} {
+        return;
+    }
+    let client = test_sdk(Value::Noval, jo(vec![(
+        "feature",
+        jo(vec![("validate", jo(vec![("active", Value::Bool(true))]))]),
+    )]));
+    let err = client
+        .${method}(Value::Noval)
+        .${bad.op}(jo(vec![${args}]), Value::Noval)
+        .err()
+        .expect("an invalid request should fail");
+    assert_eq!(err.code, "validate_failed");
+}
+`
+  }
+
+  return out
 }
 
 

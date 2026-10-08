@@ -12,7 +12,7 @@ module Harness where
 
 import Control.Exception (SomeException, try)
 import Data.IORef
-import Data.List (sort)
+import Data.List (intercalate, sort)
 
 import VoxgigStruct
   ( Value (..), emptyMap, emptyList, mkList, keysof, clone, ismap, escurl, vint
@@ -175,7 +175,7 @@ defaultOpArgs :: OpArgs
 defaultOpArgs = OpArgs "load" "widget" Nothing Nothing Nothing [] VNoval VNoval
 
 defaultMethodH :: String -> String
-defaultMethodH op = case op of "create" -> "POST"; "update" -> "PATCH"; "remove" -> "DELETE"; _ -> "GET"
+defaultMethodH op = case op of "create" -> "POST"; "update" -> "PATCH"; "patch" -> "PATCH"; "remove" -> "DELETE"; _ -> "GET"
 
 buildUrl :: Value -> IO String
 buildUrl spec = do
@@ -187,7 +187,7 @@ buildUrl spec = do
   present <- filterM' (\k -> do v <- getp q k; pure (not (isNoval v))) ks0
   let keys = sort present
   parts <- mapM (\k -> do v <- getp q k; ek <- escurlS k; ev <- escurlS (vstring v); pure (ek ++ "=" ++ ev)) keys
-  let qs = intercalate' "&" parts
+  let qs = intercalate "&" parts
   pure (base ++ path ++ (if null qs then "" else "?" ++ qs))
 
 filterM' :: (a -> IO Bool) -> [a] -> IO [a]

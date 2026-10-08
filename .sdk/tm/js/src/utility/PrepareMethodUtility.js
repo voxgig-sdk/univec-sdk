@@ -26,6 +26,15 @@ function prepareMethod(ctx) {
   return methodMap[key]
 }
 
+
+// Whether a comma-separated allow option names the item: whole names, any case.
+function allowed(list, item) {
+  const want = 'string' === typeof item ? item.toUpperCase() : ''
+  return '' !== want && 'string' === typeof list &&
+    list.split(',').some((name) => name.trim().toUpperCase() === want)
+}
+
 module.exports = {
+  allowed,
   prepareMethod
 }

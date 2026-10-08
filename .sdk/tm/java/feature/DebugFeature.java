@@ -12,10 +12,10 @@ import JAVAPACKAGE.core.SdkClient;
 
 // Request/response capture for debugging. Records a bounded ring buffer of
 // per-operation traces — method, URL, redacted headers, response status and
-// timing — on the feature's entries. Sensitive header values (matching
-// `redact`, default authorization/cookie/api-key style names) are masked.
-// An optional `onEntry` callback receives each finished entry (e.g. to
-// stream to a console). `max` caps the buffer (default 100).
+// timing — on the feature's entries. The SDK's own clean rules apply to the
+// whole entry; header names in `redact` are masked on top of them. An
+// optional `onEntry` callback receives each finished entry (e.g. to stream
+// to a console). `max` caps the buffer (default 100).
 @SuppressWarnings({"unchecked"})
 public class DebugFeature extends BaseFeature {
 
@@ -26,10 +26,6 @@ public class DebugFeature extends BaseFeature {
   public List<Map<String, Object>> entries = new ArrayList<>();
 
   private static final String DEBUG_ENTRY_KEY = "debug_entry";
-
-  private static final List<String> DEFAULT_REDACT = List.of(
-      "authorization", "cookie", "set-cookie", "api-key", "apikey",
-      "x-api-key", "idempotency-key");
 
   public DebugFeature() {
     super("debug", "0.0.1", true);
@@ -66,7 +62,7 @@ public class DebugFeature extends BaseFeature {
       else {
         entry.put("url", ctx.spec.path);
       }
-      entry.put("headers", redact(ctx.spec.headers));
+      entry.put("headers", redact(ctx, ctx.spec.headers));
     }
     ctx.out.put(DEBUG_ENTRY_KEY, entry);
   }
@@ -123,6 +119,11 @@ public class DebugFeature extends BaseFeature {
       entry.put("status", ctx.result.status);
     }
 
+    // The whole entry leaves through the buffer and the callback: the url
+    // and the error message can carry a query credential the header mask
+    // above never saw.
+    entry = clean(ctx, entry);
+
     this.entries.add(entry);
     int max = FeatureOptions.foptInt(this.options, "max", 100);
     while (this.entries.size() > max) {
@@ -134,30 +135,40 @@ public class DebugFeature extends BaseFeature {
     }
   }
 
-  private Map<String, Object> redact(Map<String, Object> headers) {
+  // The core clean rules apply (clean.keys, every registered value); the
+  // feature's own `redact` list ADDS header names on top of them.
+  private Map<String, Object> redact(Context ctx, Map<String, Object> headers) {
     Map<String, Object> out = new LinkedHashMap<>();
     if (headers == null) {
       return out;
     }
     List<String> patterns = FeatureOptions.foptStrList(this.options, "redact");
     if (patterns == null) {
-      patterns = DEFAULT_REDACT;
+      patterns = List.of();
     }
     for (Map.Entry<String, Object> h : headers.entrySet()) {
       boolean masked = false;
       for (String p : patterns) {
-        if (h.getKey().toLowerCase().equals(p)) {
+        if (h.getKey().toLowerCase().equals(p.toLowerCase())) {
           masked = true;
           break;
         }
       }
       if (masked) {
-        out.put(h.getKey(), "<redacted>");
+        out.put(h.getKey(), "[redacted]");
       }
       else {
         out.put(h.getKey(), h.getValue());
       }
     }
-    return out;
+    return clean(ctx, out);
+  }
+
+  private static Map<String, Object> clean(Context ctx, Map<String, Object> record) {
+    if (ctx.utility == null || ctx.utility.clean == null) {
+      return record;
+    }
+    Map<String, Object> out = Helpers.toMapAny(ctx.utility.clean.apply(ctx, record));
+    return out == null ? record : out;
   }
 }

@@ -415,11 +415,12 @@ fn commit(track: *CostTrack, options: Value, ctx: *Context, pending: Value, enti
     h.setp(record, "currency", h.vstr(track.currency));
     h.setp(record, "source", h.vstr(source));
     h.setp(record, "attempts", h.vfloat(h.get_f64(pending, "attempts") orelse 0));
-    track.last = record;
+    const out = ctx.util().clean(ctx, record);
+    track.last = out;
 
     const sink = h.getp(options, "sink");
     if (sink == .function) {
-        _ = h.call_vfn(sink, record);
+        _ = h.call_vfn(sink, out);
     }
 }
 

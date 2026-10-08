@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { swiftVarName } from './utility_swift'
+import { swiftVarName, swiftListMatch } from './utility_swift'
 
 
 // A type-correct Swift `Value` literal for a param: numeric/boolean/array/
@@ -15,6 +15,7 @@ import { swiftVarName } from './utility_swift'
 // The SDK's loose object model means every value is a `Value` inside a `VMap`.
 function swiftLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return '.null'
   if ('INTEGER' === k) return '.int(1)'
   if ('NUMBER' === k) return '.double(1.0)'
   if ('BOOLEAN' === k) return '.bool(true)'
@@ -65,10 +66,12 @@ let client = ${SDK}(options)
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
-      Content(`// List all ${eNameLower}s (returns a Value list, throws on error)
-let ${eVar}List = try client.${eName}().list(nil, nil)
-for ${eVar} in ${eVar}List.asList?.items ?? [] {
-    print(${eVar})
+      Content(`// List all ${eNameLower}s (a Value list of entities, one per record; throws on error)
+let ${eVar}List = try client.${eName}().list(${swiftListMatch(exampleEntity)}, nil)
+for ${eVar}Item in ${eVar}List.asList?.items ?? [] {
+    if let ${eVar}Entity = ${eVar}Item.asNative as? Entity {
+        print(${eVar}Entity.data())
+    }
 }
 `)
     }
@@ -87,9 +90,11 @@ for ${eVar} in ${eVar}List.asList?.items ?? [] {
             it.name === idF ? 'example_id' : 'example_' + it.name)})`).join(', ')}])`
         : 'nil'
       Content(`
-// Load a specific ${eNameLower} (returns the record, throws on error)
+// Load a specific ${eNameLower} (returns the entity, throws on error)
 let ${eVar} = try client.${eName}().load(${loadArg}, nil)
-print(${eVar})
+if let ${eVar}Entity = ${eVar}.asNative as? Entity {
+    print(${eVar}Entity.data())
+}
 `)
     }
   }

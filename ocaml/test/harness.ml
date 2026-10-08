@@ -117,7 +117,7 @@ let make_client ?(server : server option) ?(mode = "test") ?(base = "http://api.
 let feature (h : harness) (name : string) : feature option =
   List.find_opt (fun f -> f.f_name = name) h.h_client.cl_features
 
-let default_method op = match op with "create" -> "POST" | "update" -> "PATCH" | "remove" -> "DELETE" | _ -> "GET"
+let default_method op = match op with "create" -> "POST" | "update" | "patch" -> "PATCH" | "remove" -> "DELETE" | _ -> "GET"
 
 let build_url (sp : spec) : string =
   let q = match sp.sp_query with Map _ as m -> m | _ -> empty_map () in

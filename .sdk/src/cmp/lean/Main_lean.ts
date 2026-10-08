@@ -20,7 +20,7 @@ import { leanSecrets } from './utility_lean'
 
 
 // Op name -> generated wrapper. list/load/remove take a match; create takes
-// data; update takes both. Any non-standard op falls back to the match+data
+// data; update and patch take both. Any non-standard op falls back to the match+data
 // form. Every wrapper delegates to the config-driven SdkRuntime.
 function opWrapper(entName: string, opName: string): string {
   const q = `"${entName}"`
@@ -35,6 +35,8 @@ function opWrapper(entName: string, opName: string): string {
       return `  def create (c d co : Value) : SIO Value := SdkRuntime.opCreate c ${q} d co\n`
     case 'update':
       return `  def update (c m d co : Value) : SIO Value := SdkRuntime.opUpdate c ${q} m d co\n`
+    case 'patch':
+      return `  def patch (c m d co : Value) : SIO Value := SdkRuntime.opPatch c ${q} m d co\n`
     default:
       return `  def ${opName} (c m d co : Value) : SIO Value := SdkRuntime.runOp c ${q} "${opName}" m d co\n`
   }

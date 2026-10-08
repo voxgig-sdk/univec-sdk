@@ -7,11 +7,14 @@ import {
   nom,
 } from '@voxgig/apidef'
 
+import { cljListMatch } from './utility_clojure'
+
 
 // A type-correct Clojure literal for a param: numeric/boolean/array/object
 // params render a typed literal; strings render the quoted placeholder.
 function cljLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'nil'
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return 'true'
   if ('ARRAY' === k) return '(vs/jt)'
@@ -51,9 +54,9 @@ const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
-      Content(`;; List all ${eLow}s (returns a vector, raises on error)
-(doseq [${eLow} (e-${eLow}/list (api/${eLow} client nil) nil nil)]
-  (println ${eLow}))
+      Content(`;; List all ${eLow}s (a vector of entities, one per record; raises on error)
+(doseq [${eLow} (e-${eLow}/list (api/${eLow} client nil) ${cljListMatch(exampleEntity)} nil)]
+  (println ((:data-get ${eLow}))))
 `)
     }
 
@@ -71,9 +74,9 @@ const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
             it.name === idF ? 'example_id' : 'example_' + it.name)}`).join(' ')})`
         : 'nil'
       Content(`
-;; Load a specific ${eLow} (returns the record, raises on error)
+;; Load a specific ${eLow} (returns the entity, raises on error)
 (def ${eLow} (e-${eLow}/load (api/${eLow} client nil) ${loadArg} nil))
-(println ${eLow})
+(println ((:data-get ${eLow})))
 `)
     }
 

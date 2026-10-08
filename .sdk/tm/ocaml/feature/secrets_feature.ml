@@ -168,6 +168,14 @@ let make ?(plugins : Defs.definition list = [])
   let refuse (msg : string) =
     (match !initerr with None -> initerr := Some msg | Some _ -> ()) in
 
+  (* Every value the chain resolves and every token bought can leave through
+   * the SDK's diagnostics, so each is registered with the clean utility the
+   * moment this feature sees it. *)
+  let register (v : string) : unit =
+    match !client with
+    | Some { cl_rootctx = Some ctx; _ } -> (try (cu ctx).u_clean_add ctx v with _ -> ())
+    | _ -> () in
+
   let live_options () : value =
     match !client with Some c -> c.cl_options | None -> empty_map () in
 
@@ -263,11 +271,12 @@ let make ?(plugins : Defs.definition list = [])
     if "live" <> mode then begin
       let t = "test-" ^ x.xresponse in
       cred := t;
+      register t;
       Ok t
     end
     else
       match buyonce x with
-      | Ok t -> cred := t; Ok t
+      | Ok t -> cred := t; register t; Ok t
       | Error m -> Error m in
 
   (* One resolution. sekreto caches a hit itself when `cache` is on, so
@@ -283,6 +292,7 @@ let make ?(plugins : Defs.definition list = [])
       (match Sekreto.tryget s !secretname with
        | exception e -> Error (exn_message e)
        | found ->
+         (match found with Some v -> register v | None -> ());
          (match !exchange with
           | None ->
             (* An UNCACHED miss after an earlier hit is a revocation: the
@@ -417,6 +427,7 @@ let make ?(plugins : Defs.definition list = [])
         let synthesized : Defs.definition list ref = ref [] in
 
         if "" <> explicit then begin
+          register explicit;
           match Secret.envkey !secretname with
           | key ->
             specs := [ { Provider.nospec with Provider.kind = "memory"; name = "options";

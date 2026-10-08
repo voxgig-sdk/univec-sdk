@@ -6,12 +6,13 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { cppVarName } from './utility_cpp'
+import { cppVarName, cppListMatch } from './utility_cpp'
 
 
 // A type-correct C++ literal for a param.
 function cppLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Value(nullptr)'
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value(1)'
   if ('BOOLEAN' === k) return 'Value(true)'
   if ('ARRAY' === k) return 'vlist()'
@@ -57,10 +58,10 @@ ${ctor}
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
-      Content(`// List all ${acc}s (returns a Value list, throws on error)
-Value ${eVar}s = client->${acc}()->list(Value::undef(), Value::undef());
-for (const auto& ${eVar} : *${eVar}s.as_list()) {
-  std::cout << Struct::jsonify(${eVar}) << std::endl;
+      Content(`// List all ${acc}s (one entity per record, throws on error)
+std::vector<SdkEntityPtr> ${eVar}s = client->${acc}()->list(${cppListMatch(exampleEntity)}, Value::undef());
+for (const auto& ${eVar} : ${eVar}s) {
+  std::cout << Struct::jsonify(${eVar}->data()) << std::endl;
 }
 `)
     }
@@ -77,9 +78,9 @@ for (const auto& ${eVar} : *${eVar}s.as_list()) {
             it.name === idF ? 'example_id' : 'example_' + it.name)}}`).join(', ')}})`
         : 'Value::undef()'
       Content(`
-// Load a specific ${acc} (returns the record, throws on error)
-Value ${eVar} = client->${acc}()->load(${loadArg}, Value::undef());
-std::cout << Struct::jsonify(${eVar}) << std::endl;
+// Load a specific ${acc} (returns the entity, throws on error)
+SdkEntityPtr ${eVar} = client->${acc}()->load(${loadArg}, Value::undef());
+std::cout << Struct::jsonify(${eVar}->data()) << std::endl;
 `)
     }
   }

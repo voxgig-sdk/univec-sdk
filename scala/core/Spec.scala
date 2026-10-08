@@ -18,6 +18,9 @@ class Spec(specmap: JMap[String, Object]) {
   var body: Object = null
   var url: String = ""
   var path: String = ""
+  // The query parameters prepareAuth placed: the credential, which the
+  // request sends and the entity's match leaves out.
+  var authquery: JList[String] = new java.util.ArrayList[String]()
 
   def this() = this(null)
 

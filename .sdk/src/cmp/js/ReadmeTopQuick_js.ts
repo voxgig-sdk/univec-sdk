@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, packageName, envName, entityIdField, entityOps, opRequestShape, safeVarName, exampleVarName, jsKey, matchArg, idLiteral } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, packageName, envName, entityIdField, entityOps, opRequestShape, safeVarName, exampleVarName, jsKey, listMatchArg } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -8,12 +8,6 @@ import {
 } from '@voxgig/apidef'
 
 import { exampleValue } from './utility_js'
-
-
-function listMatchArg(ent: any): string {
-  const idF = entityIdField(ent)
-  return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))
-}
 
 
 const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
@@ -38,13 +32,16 @@ const client = ${ctor}
     const eVar = exampleVarName(eName.toLowerCase(), 'js')
     const opnames = entityOps(exampleEntity)
 
+    let hasCall = false
+
     if (opnames.includes('list')) {
-      Content(`// List all ${eName.toLowerCase()}s (returns an array)
-const ${eVar}s = await client.${eName}().list(${listMatchArg(exampleEntity)})
+      Content(`// List all ${eName.toLowerCase()}s (an array of entities, one per record)
+const ${eVar}s = await client.${eName}().list(${listMatchArg('js', exampleEntity)})
 for (const ${eVar} of ${eVar}s) {
-  console.log(${eVar})
+  console.log(${eVar}.data())
 }
 `)
+      hasCall = true
     }
 
     // Find a nested entity for a more interesting example: one with a parent
@@ -81,7 +78,15 @@ for (const ${eVar} of ${eVar}s) {
 const ${neVar} = await client.${neName}().load({
 ${neMatchLines.join('\n')}
 })
-console.log(${neVar})
+console.log(${neVar}.data())
+`)
+      hasCall = true
+    }
+
+    if (!hasCall && opnames.includes('load')) {
+      Content(`// Load a specific ${eName.toLowerCase()} (returns the entity)
+const ${eVar} = await client.${eName}().load()
+console.log(${eVar}.data())
 `)
     }
   }

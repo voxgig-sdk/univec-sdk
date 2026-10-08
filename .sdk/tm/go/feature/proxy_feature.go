@@ -1,6 +1,7 @@
 package feature
 
 import (
+	neturl "net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -13,8 +14,10 @@ type ProxyFeature struct {
 	client  *core.UnivecSDK
 	options map[string]any
 	noProxy []string
+	url     string
 
-	// Activity tracking (mirrors the ts client._proxy record).
+	// Activity tracking (mirrors the ts client._proxy record); the url here
+	// is the cleaned one, the routing target keeps its userinfo.
 	Routed int
 	Url    string
 }
@@ -40,12 +43,12 @@ func (f *ProxyFeature) Init(ctx *core.Context, options map[string]any) {
 		return
 	}
 
-	f.Url = foptStr(f.options, "url", "")
+	f.url = foptStr(f.options, "url", "")
 	noProxy := foptStrList(f.options, "noProxy")
 
 	if foptBool(f.options, "fromEnv", false) {
-		if f.Url == "" {
-			f.Url = firstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
+		if f.url == "" {
+			f.url = firstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
 		}
 		if noProxy == nil {
 			if np := firstEnv("NO_PROXY", "no_proxy"); np != "" {
@@ -62,6 +65,23 @@ func (f *ProxyFeature) Init(ctx *core.Context, options map[string]any) {
 		}
 	}
 
+	// A proxy URL may carry credentials as userinfo, from the option or the
+	// environment, and neither is under a sensitive key name.
+	f.Url = f.url
+	if parsed, err := neturl.Parse(f.url); err == nil && parsed.User != nil {
+		password, _ := parsed.User.Password()
+		for _, part := range []string{parsed.User.Username(), password} {
+			if part != "" && ctx.Utility.CleanAdd != nil {
+				ctx.Utility.CleanAdd(ctx, part)
+			}
+		}
+	}
+	if ctx.Utility.Clean != nil {
+		if cleaned, ok := ctx.Utility.Clean(ctx, f.url).(string); ok {
+			f.Url = cleaned
+		}
+	}
+
 	inner := ctx.Utility.Fetcher
 
 	ctx.Utility.Fetcher = func(ctx2 *core.Context, url string, fetchdef map[string]any) (any, error) {
@@ -71,7 +91,7 @@ func (f *ProxyFeature) Init(ctx *core.Context, options map[string]any) {
 }
 
 func (f *ProxyFeature) route(url string, fetchdef map[string]any) map[string]any {
-	if f.Url == "" || f.bypass(url) {
+	if f.url == "" || f.bypass(url) {
 		return fetchdef
 	}
 
@@ -79,7 +99,7 @@ func (f *ProxyFeature) route(url string, fetchdef map[string]any) map[string]any
 	for k, v := range fetchdef {
 		out[k] = v
 	}
-	out["proxy"] = f.Url
+	out["proxy"] = f.url
 
 	f.Routed++
 	return out

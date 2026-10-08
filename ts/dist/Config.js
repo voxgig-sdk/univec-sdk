@@ -367,6 +367,7 @@ class Config {
             },
             "optspec": {
                 "clearTimer": "`$FUNCTION`",
+                "now": "`$FUNCTION`",
                 "setTimer": "`$FUNCTION`"
             },
             "strict": false,
@@ -534,6 +535,10 @@ class Config {
                                         }
                                     }
                                 }
+                            },
+                            "response": {
+                                "kind": "json",
+                                "media": "application/json"
                             }
                         },
                         {
@@ -652,6 +657,10 @@ class Config {
                                         "SDK live coverage test."
                                     ]
                                 }
+                            },
+                            "response": {
+                                "kind": "json",
+                                "media": "application/json"
                             }
                         },
                         {
@@ -779,6 +788,10 @@ class Config {
                                         }
                                     }
                                 }
+                            },
+                            "response": {
+                                "kind": "json",
+                                "media": "application/json"
                             }
                         },
                         {
@@ -905,6 +918,10 @@ class Config {
                                         "SDK live coverage test."
                                     ]
                                 }
+                            },
+                            "response": {
+                                "kind": "json",
+                                "media": "application/json"
                             }
                         }
                     ]
@@ -1028,6 +1045,10 @@ class Config {
                                         "SDK live coverage test."
                                     ]
                                 }
+                            },
+                            "response": {
+                                "kind": "json",
+                                "media": "application/json"
                             }
                         },
                         {
@@ -1124,6 +1145,10 @@ class Config {
                                         "SDK live coverage test."
                                     ]
                                 }
+                            },
+                            "response": {
+                                "kind": "json",
+                                "media": "application/json"
                             }
                         }
                     ]
@@ -1207,6 +1232,10 @@ class Config {
                                 "auth": "public",
                                 "id": "key",
                                 "retention": "No deletion endpoint; issued key is subject to the service daily allowance"
+                            },
+                            "response": {
+                                "kind": "json",
+                                "media": "application/json"
                             }
                         }
                     ]
@@ -1320,6 +1349,10 @@ class Config {
                                 },
                                 "auth": "public",
                                 "id": "models"
+                            },
+                            "response": {
+                                "kind": "json",
+                                "media": "application/json"
                             }
                         }
                     ]

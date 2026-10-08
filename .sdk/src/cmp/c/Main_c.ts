@@ -4,6 +4,7 @@ import * as Path from 'node:path'
 import {
   cmp, each,
   File, Copy, Folder, Fragment,
+  inactiveFeatureExcludes,
   pluginExcludes,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -38,22 +39,6 @@ const Main = cmp(async function Main(props: any) {
   const entity: ModelEntity = getModelPath(model, `main.${KIT}.entity`)
 
   const feature = targetFeatures(model, target)
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const allfeature = getModelPath(model, `main.${KIT}.feature`,
-    { required: false, only_active: false }) || {}
-  const inactivePluginExcludes: RegExp[] = []
-  for (const fname of Object.keys(allfeature)) {
-    if (null != (feature as any)[fname]) continue
-    const groups = getModelPath(model, `main.${KIT}.feature.${fname}.plugin`,
-      { required: false, only_active: false }) || {}
-    for (const gname of Object.keys(groups)) {
-      for (const one of (groups[gname].path || [])) {
-        const pat = esc(String(one))
-        inactivePluginExcludes.push(new RegExp('(^|/)' +
-          pat.replace(/\\\/$/, '') + (/\/$/.test(String(one)) ? '/' : '$')))
-      }
-    }
-  }
 
   Package({ target })
 
@@ -61,15 +46,14 @@ const Main = cmp(async function Main(props: any) {
 
   Copy({
     from: 'tm/' + target.name,
-    exclude: [/src\//, ...pluginExcludes(model), ...inactivePluginExcludes],
+    exclude: [/src\//,
+      ...inactiveFeatureExcludes(props.ctx$, target), ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
     }
   })
 
-  // Generated core files: the client (client.c), the API config (config.c),
-  // and the per-API header (api.h, via EntityBase). The branded error type
-  // is a template (core/error.c).
+  // Generated core files; the branded error type is a template (core/error.c).
   Folder({ name: 'core' }, () => {
 
     File({ name: 'client.c' }, () => {

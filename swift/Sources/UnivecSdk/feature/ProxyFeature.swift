@@ -13,6 +13,10 @@ public final class ProxyFeature: BaseFeature {
   private var options: VMap?
   private var noProxy: [String] = []
 
+  // The proxy target as configured, for routing; `url` below is the cleaned
+  // form, since a proxy URL may carry credentials as userinfo.
+  private var target = ""
+
   // Activity tracking (mirrors the ts client._proxy record).
   public var routed = 0
   public var url = ""
@@ -36,12 +40,12 @@ public final class ProxyFeature: BaseFeature {
       return
     }
 
-    url = foptStr(options, "url", "")
+    target = foptStr(options, "url", "")
     var noProxyList = foptStrList(options, "noProxy")
 
     if foptBool(options, "fromEnv", false) {
-      if url == "" {
-        url = firstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
+      if target == "" {
+        target = firstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
       }
       if noProxyList == nil {
         let np = firstEnv("NO_PROXY", "no_proxy")
@@ -59,6 +63,17 @@ public final class ProxyFeature: BaseFeature {
       }
     }
 
+    // A proxy URL may carry credentials as userinfo, from the option or the
+    // environment, and neither is under a sensitive key name.
+    if target != "", let parsed = URLComponents(string: target) {
+      for part in [parsed.percentEncodedUser, parsed.percentEncodedPassword, parsed.user, parsed.password] {
+        if let p = part, p != "" {
+          ctx.utility!.cleanAdd(ctx, .string(p))
+        }
+      }
+    }
+    url = fcleanStr(ctx, target)
+
     let inner = ctx.utility!.fetcher!
 
     ctx.utility!.fetcher = { ctx2, url, fetchdef in
@@ -68,7 +83,7 @@ public final class ProxyFeature: BaseFeature {
   }
 
   private func route(_ requestUrl: String, _ fetchdef: VMap) -> VMap {
-    if url == "" || bypass(requestUrl) {
+    if target == "" || bypass(requestUrl) {
       return fetchdef
     }
 
@@ -76,7 +91,7 @@ public final class ProxyFeature: BaseFeature {
     for (k, v) in fetchdef.entries {
       routedDef.entries[k] = v
     }
-    routedDef.entries["proxy"] = .string(url)
+    routedDef.entries["proxy"] = .string(target)
 
     routed += 1
     return routedDef

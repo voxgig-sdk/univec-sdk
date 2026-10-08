@@ -17,6 +17,8 @@ class Point {
   dynamic relations;
   dynamic alias;
   dynamic transform;
+  dynamic response;
+  dynamic body;
 
   Point(dynamic altmap) {
     args = vs.getprop(altmap, 'args', {'params': []});
@@ -33,7 +35,11 @@ class Point {
     relations = vs.getprop(altmap, 'relations', []);
     alias = vs.getprop(altmap, 'alias', {});
     transform = vs.getprop(altmap, 'transform', {'req': null, 'res': null});
+    response = vs.getprop(altmap, 'response');
+    body = vs.getprop(altmap, 'body');
   }
+
+  Map<String, dynamic> toJson() => toJSON();
 
   Map<String, dynamic> toJSON() => {
         'args': args,
@@ -47,5 +53,7 @@ class Point {
         'relations': relations,
         'alias': alias,
         'transform': transform,
+        'response': response,
+        'body': body,
       };
 }

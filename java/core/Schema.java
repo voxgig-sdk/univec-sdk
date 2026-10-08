@@ -49,7 +49,7 @@ public final class Schema {
     b.append("{");
     b.append(" \"allow\": {");
     b.append("  \"method\": \"GET,PUT,POST,PATCH,DELETE,OPTIONS\",");
-    b.append("  \"op\": \"create,update,load,list,remove,command,direct,graphql\"");
+    b.append("  \"op\": \"create,update,patch,load,list,remove,command,direct,graphql\"");
     b.append(" },");
     b.append(" \"apikey\": \"\",");
     b.append(" \"auth\": {");
@@ -60,7 +60,12 @@ public final class Schema {
     b.append(" },");
     b.append(" \"base\": \"http://localhost:8000\",");
     b.append(" \"clean\": {");
-    b.append("  \"keys\": \"key,token,id\"");
+    b.append("  \"active\": true,");
+    b.append("  \"hint\": \"0\",");
+    b.append("  \"keys\": \"key,secret,token,password,passwd,authorization,cookie,credential,signature\",");
+    b.append("  \"mask\": \"[redacted]\",");
+    b.append("  \"min\": \"4\",");
+    b.append("  \"values\": \"\"");
     b.append(" },");
     b.append(" \"entity\": {");
     b.append("  \"`$CHILD`\": {");
@@ -799,6 +804,11 @@ public final class Schema {
     b.append("     \"`$NIL`\"");
     b.append("    ],");
     b.append("    \"clearTimer\": [");
+    b.append("     \"`$ONE`\",");
+    b.append("     \"`$FUNCTION`\",");
+    b.append("     \"`$NIL`\"");
+    b.append("    ],");
+    b.append("    \"now\": [");
     b.append("     \"`$ONE`\",");
     b.append("     \"`$FUNCTION`\",");
     b.append("     \"`$NIL`\"");

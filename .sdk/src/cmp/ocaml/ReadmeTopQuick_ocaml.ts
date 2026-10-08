@@ -6,13 +6,14 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { ocamlVarName } from './utility_ocaml'
+import { ocamlVarName, ocamlListMatch } from './utility_ocaml'
 
 
 // A type-correct OCaml `value` literal for a param: numeric/boolean/array/
 // object params render a typed literal; strings render the quoted placeholder.
 function ocamlLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Null'
   if ('INTEGER' === k || 'NUMBER' === k) return '(Num 1.)'
   if ('BOOLEAN' === k) return '(Bool true)'
   if ('ARRAY' === k) return '(empty_list ())'
@@ -36,6 +37,7 @@ const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
   Content(`\`\`\`ocaml
 open Voxgig_struct
 open Sdk_helpers
+open Sdk_types
 
 let () =
   let client = ${ctor} in
@@ -50,7 +52,7 @@ let () =
 
     if (opnames.includes('list')) {
       Content(`  (* List all ${fn} records (one ENTITY per record; raises on error) *)
-  let ${fn}s = (Sdk_client.${fn} client Noval).e_list (empty_map ()) Noval in
+  let ${fn}s = (Sdk_client.${fn} client Noval).e_list ${ocamlListMatch(exampleEntity)} Noval in
   List.iter (fun e -> print_endline (stringify (e.e_data_get ()))) ${fn}s;
 `)
     }

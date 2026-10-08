@@ -8,6 +8,7 @@ import {
   pkgDescription,
   repoInfo,
   packageVersion,
+  authorInfo,
 } from '@voxgig/sdkgen'
 
 
@@ -20,6 +21,8 @@ import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
+
+import { xmlText } from './utility_csharp'
 
 
 const Package = cmp(async function Package(props: any) {
@@ -63,7 +66,7 @@ const Package = cmp(async function Package(props: any) {
     <!-- NuGet package metadata (publication pending; see Makefile). -->
     <Version>${packageVersion(model, target.name)}</Version>
     <PackageId>${Name}.Sdk</PackageId>
-    <Authors>Voxgig</Authors>
+    <Authors>${xmlText(authorInfo(model, target.name).name)}</Authors>
     <Description>${pkgDescription(model, target.name)}</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>${repoUrl}</RepositoryUrl>

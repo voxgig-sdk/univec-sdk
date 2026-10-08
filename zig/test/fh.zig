@@ -314,7 +314,7 @@ pub fn fh_err_code(err: ?*SdkError) []const u8 {
 
 fn fhDefaultMethod(op: []const u8) []const u8 {
     if (std.mem.eql(u8, op, "create")) return "POST";
-    if (std.mem.eql(u8, op, "update")) return "PATCH";
+    if (std.mem.eql(u8, op, "update") or std.mem.eql(u8, op, "patch")) return "PATCH";
     if (std.mem.eql(u8, op, "remove")) return "DELETE";
     return "GET";
 }

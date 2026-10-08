@@ -7,6 +7,8 @@ import {
   nom,
 } from '@voxgig/apidef'
 
+import { perlListArgs } from './utility_perl'
+
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   const { target, ctx$: { model } } = props
@@ -56,6 +58,7 @@ my $client = ${ctor};
     // A type-correct, executable Perl literal for a param.
     const perlLit = (type: any, placeholder: string = 'example'): string => {
       const k = canonScalarKey(type)
+      if ('NULL' === k) return 'undef'
       if ('INTEGER' === k || 'NUMBER' === k) return '1'
       if ('BOOLEAN' === k) return '1'
       if ('ARRAY' === k) return '[]'
@@ -66,17 +69,17 @@ my $client = ${ctor};
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`list()\` returns an \`arrayref\` of records (each a \`hashref\`) and dies on
-error — iterate it directly.
+\`list()\` returns an \`arrayref\` of entities, one per record, and dies on
+error; \`data_get\` reads each record.
 
 \`\`\`perl
-my $${eVar}s = eval { $client->${eName}->list };
+my $${eVar}s = eval { $client->${eName}->list${perlListArgs(exampleEntity)} };
 if (my $err = $@) {
     print "list failed: $err\\n";
 }
 else {
     for my $${eVar} (@$${eVar}s) {
-        print "$${eVar}->{id}\\n";
+        print $${eVar}->data_get->{id}, "\\n";
     }
 }
 \`\`\`
@@ -114,7 +117,7 @@ if (my $err = $@) {
     print "load failed: $err\\n";
 }
 else {
-    print "$${neVar}->{id}\\n";
+    print $${neVar}->data_get->{id}, "\\n";
 }
 \`\`\`
 
@@ -141,7 +144,7 @@ if (my $err = $@) {
     print "load failed: $err\\n";
 }
 else {
-    print "$${eVar}->{id}\\n";
+    print $${eVar}->data_get->{id}, "\\n";
 }
 \`\`\`
 
@@ -169,10 +172,11 @@ else {
       return it && it.type
     }
     const idValueFor = (opname: string): string => (null != dataIdF && opnames.includes('create'))
-      ? `$created->{${dataIdF}}`
+      ? `$created->data_get->{${dataIdF}}`
       : perlLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`perl
@@ -186,8 +190,15 @@ my $created = $client->${eName}->create({ ${examplePairs('create').join(', ')} }
       if (opnames.includes('update')) {
         const updatePairs = (idF ? [`'${idF}' => ${idValueFor('update')}`] : []).concat(examplePairs('update'))
         const fromCreated = null != dataIdF && opnames.includes('create')
-        Content(`# Update${fromCreated ? " — the created record's id is a plain hash key" : ''}
+        Content(`# Update${fromCreated ? " — the created entity's record holds its id" : ''}
 $client->${eName}->update({ ${updatePairs.join(', ')} });
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`'${idF}' => ${idValueFor('patch')}`] : []).concat(examplePairs('patch'))
+        Content(`# Patch — sends only the fields given
+$client->${eName}->patch({ ${patchPairs.join(', ')} });
 
 `)
       }

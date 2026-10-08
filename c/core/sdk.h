@@ -55,6 +55,10 @@ typedef struct PNError {
 } PNError;
 
 PNError* pn_error_new(const char* code, const char* msg);
+// The error as a record and as its default print: the message and the
+// cleaned snapshots, nothing the pipeline holds live. Malloc'd string.
+voxgig_value* pn_error_to_value(PNError* e);
+char* pn_error_str(PNError* e);
 
 // ===========================================================================
 // Value helpers (mirrors core/helpers.rs). All return owned (unreleased)
@@ -83,6 +87,8 @@ voxgig_value* getpath_c(voxgig_value* store, const char** keys);
 // Convenience: up to a few string keys.
 voxgig_value* getpath2(voxgig_value* store, const char* a, const char* b);
 voxgig_value* getpath3(voxgig_value* store, const char* a, const char* b, const char* c);
+// Whether a comma-separated allow option names the item: whole names, any case.
+bool allow_list_has(voxgig_value* names, const char* item);
 // Property write (no-op when val is not a node). Borrows newval.
 void setp(voxgig_value* val, const char* key, voxgig_value* newval);
 
@@ -197,10 +203,14 @@ struct Spec {
   voxgig_value* body;
   char* url;
   char* path;
+  // List: the query parameters prepare_auth placed, the credential the
+  // request sends and the entity's match leaves out.
+  voxgig_value* authquery;
 };
 
 Spec* spec_new(voxgig_value* specmap);
 voxgig_value* spec_to_value(Spec* s);
+bool spec_authquery_has(Spec* s, const char* key);
 // mutable string setters (free old, dup new)
 void spec_set_step(Spec* s, const char* v);
 void spec_set_method(Spec* s, const char* v);
@@ -218,9 +228,17 @@ struct Response {
   voxgig_value* json;
   voxgig_value* body;
   PNError* err;
+  // Set by a transport that could not read a non-blank body as JSON.
+  bool unreadable;
 };
 
 Response* response_new(voxgig_value* resmap);
+
+// A body that is not JSON. An HTTP failure keeps its own error (failed, whose
+// message is extended in place), with the response described; otherwise the
+// code tells a wrong content type from malformed JSON.
+PNError* unreadable_body(Context* ctx, int64_t status, voxgig_value* headers,
+                         voxgig_value* text, voxgig_value* sent, PNError* failed);
 
 // ===========================================================================
 // SdkResult (mirrors core/result.rs)
@@ -329,6 +347,7 @@ typedef struct EntityVT {
   Entity** (*list)(Entity*, voxgig_value* reqmatch, voxgig_value* ctrl, PNError** err);
   Entity* (*create)(Entity*, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err);
   Entity* (*update)(Entity*, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err);
+  Entity* (*patch)(Entity*, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err);
   Entity* (*remove)(Entity*, voxgig_value* reqmatch, voxgig_value* ctrl, PNError** err);
 } EntityVT;
 
@@ -407,6 +426,11 @@ struct Context {
 Context* context_new(CtxSpec spec, Context* basectx);
 PNError* context_make_error(Context* ctx, const char* code, const char* msg);
 Utility* context_util(Context* ctx);
+// The context as a record, CLEANED: it leaves the pipeline (a logger, an
+// error dump), while the live fields stay raw for the pipeline's own use.
+// context_str is its JSON, malloc'd.
+voxgig_value* context_to_value(Context* ctx);
+char* context_str(Context* ctx);
 
 // ctx.out helpers.
 void ctx_out_set_point_val(Context* ctx, voxgig_value* v);
@@ -478,7 +502,20 @@ void** feature_plugins(const char* name, size_t* n);
 
 voxgig_value* clean_util(Context* ctx, voxgig_value* val);
 char* clean_str(Context* ctx, const char* val); // returns malloc'd
+// Register a secret value the SDK will mask from now on, through a context
+// or straight against the options map a feature holds.
+void clean_add_util(Context* ctx, const char* value);
+void clean_add_opts(voxgig_value* options, const char* value);
+bool clean_key_util(Context* ctx, const char* key);
+voxgig_value* clean_opts(voxgig_value* options, voxgig_value* val);
+voxgig_value* clean_make_config(voxgig_value* cleanopts);
+voxgig_value* clean_split_values(voxgig_value* values);
+void clean_add_sensitive_opts(voxgig_value* options, voxgig_value* val);
+void clean_add_sensitive_util(Context* ctx, voxgig_value* val);
+void clean_error_util(Context* ctx, PNError* err);
+char* clean_base64(const char* in); // returns malloc'd
 voxgig_value* done_util(Context* ctx, PNError** err);
+void clean_explain_util(Context* ctx);
 voxgig_value* make_error_util(Context* ctx, PNError* err, PNError** out);
 void feature_add_util(Context* ctx, Feature* f);
 void feature_hook_util(Context* ctx, const char* name);
@@ -493,8 +530,19 @@ voxgig_value* make_point_util(Context* ctx, PNError** err);
 Spec* make_spec_util(Context* ctx, PNError** err);
 char* make_url_util(Context* ctx, PNError** err); // malloc'd
 voxgig_value* param_util(Context* ctx, voxgig_value* paramdef);
+voxgig_value* param_value(Context* ctx, voxgig_value* point, const char* key);
+voxgig_value* call_args(Context* ctx, const char* kind); // list of [name, wire, val]
 Spec* prepare_auth_util(Context* ctx, PNError** err);
 voxgig_value* prepare_body_util(Context* ctx);
+// The caller's cookie pieces with every owned cookie removed (utility/prepare_headers.c).
+char* cookie_keep(const char* header, bool (*named)(const char* name, size_t nlen, void* ud), void* ud); // malloc'd, NULL when none
+// The media types a point declares (utility/media.c).
+bool media_is_json(const char* media);
+char* media_accept_of(voxgig_value* point);
+bool media_is_raw_request(voxgig_value* point);
+bool media_is_json_request(voxgig_value* point);
+void media_headers(voxgig_value* point, voxgig_value* headers);
+voxgig_value* media_raw_body(voxgig_value* reqdata);
 voxgig_value* prepare_headers_util(Context* ctx);
 const char* prepare_method_util(Context* ctx); // static string
 voxgig_value* prepare_params_util(Context* ctx);

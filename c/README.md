@@ -15,7 +15,7 @@ keeps the cognitive load low.
 
 ## Install
 C has no central package registry — a release is the git tag
-(`c/vX.Y.Z`, see [Releases](https://github.com/voxgig-sdk/univec-sdk/releases)). Build from a
+(`c/vX.Y.Z`, see [Tags](https://github.com/voxgig-sdk/univec-sdk/tags)). Build from a
 source checkout with the bundled `Makefile`; the voxgig struct library is
 vendored under `utility/struct`, so there are no external dependencies to
 fetch:
@@ -52,8 +52,8 @@ PNError* err = NULL;
 
 ```c
 Entity* convert = univec_convert(client, NULL);
-// Create — returns the bare created record
-voxgig_value* created = convert->vt->create(convert, cmap(3, "embeddings", v_list(), "source_model", v_str("example_source_model"), "target_model", v_str("example_target_model")), NULL, &err);
+// Create — returns the created entity, or NULL with *err set
+Entity* created = convert->vt->create(convert, cmap(3, "embeddings", v_list(), "source_model", v_str("example_source_model"), "target_model", v_str("example_target_model")), NULL, &err);
 
 ```
 
@@ -65,14 +65,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -81,8 +82,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -135,10 +136,10 @@ Create a mock client for unit testing — no server required:
 UnivecSDK* client = test_sdk(NULL, NULL);
 PNError* err = NULL;
 
-// Entity ops return the bare record and set *err on failure.
+// list returns one entity per mock record, and sets *err on failure.
 Entity* model = univec_model(client, NULL);
-voxgig_value* model_rec = model->vt->list(model, NULL, NULL, &err);
-// model_rec contains the mock response record
+Entity** models = model->vt->list(model, NULL, NULL, &err);
+// models[i]->vt->data(models[i], NULL) is a mock record
 ```
 
 ### Use a custom fetch function
@@ -234,8 +235,8 @@ All entities share the same `EntityVT` vtable, reached via `e->vt->...`.
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `list` | `(Entity*, reqmatch, ctrl, PNError**) -> voxgig_value*` | List entities matching the criteria (a List). |
-| `create` | `(Entity*, reqdata, ctrl, PNError**) -> voxgig_value*` | Create a new entity. |
+| `list` | `(Entity*, reqmatch, ctrl, PNError**) -> Entity**` | List entities matching the criteria: a `NULL`-terminated array, one per record. |
+| `create` | `(Entity*, reqdata, ctrl, PNError**) -> Entity*` | Create a new entity. |
 | `data` | `(Entity*, args) -> voxgig_value*` | Get entity data (pass a map to set). |
 | `matchv` | `(Entity*, args) -> voxgig_value*` | Get entity match criteria (pass a map to set). |
 | `make` | `(Entity*) -> Entity*` | Create a new instance with the same options. |
@@ -243,10 +244,10 @@ All entities share the same `EntityVT` vtable, reached via `e->vt->...`.
 
 ### Result shape
 
-Entity operations return the bare result data (a `voxgig_value` map for
-single-entity ops, a List for `list`) and set `*err` to a `PNError*` on
-failure. Always initialise `PNError* err = NULL;` and check it after the
-call.
+Entity operations return the entity, and `list` a `NULL`-terminated array
+of entities, one per record; `vt->data` reads an entity's record. On
+failure they return `NULL` and set `*err` to a `PNError*`. Always
+initialise `PNError* err = NULL;` and check it after the call.
 
 The `sdk_direct()` escape hatch never sets `*err` for a non-2xx response —
 it returns a result map you branch on via `getp(result, "ok")`:
@@ -331,7 +332,7 @@ Create an instance: `Entity* convert = univec_convert(client, NULL);`
 
 | Method | Description |
 | --- | --- |
-| `vt->create(e, reqdata, ctrl, &err)` | Create a new entity with the given data. |
+| `Entity* vt->create(e, reqdata, ctrl, &err)` | Create a new entity with the given data. |
 
 #### Fields
 
@@ -345,7 +346,7 @@ Create an instance: `Entity* convert = univec_convert(client, NULL);`
 
 ```c
 Entity* convert = univec_convert(client, NULL);
-voxgig_value* convert_rec = convert->vt->create(convert, cmap(3,
+Entity* created = convert->vt->create(convert, cmap(3,
     "embeddings", v_list(),  // voxgig_value* (list)
     "source_model", v_str("example_source_model"),  // char*
     "target_model", v_str("example_target_model"))  // char*
@@ -361,7 +362,7 @@ Create an instance: `Entity* embed = univec_embed(client, NULL);`
 
 | Method | Description |
 | --- | --- |
-| `vt->create(e, reqdata, ctrl, &err)` | Create a new entity with the given data. |
+| `Entity* vt->create(e, reqdata, ctrl, &err)` | Create a new entity with the given data. |
 
 #### Fields
 
@@ -375,7 +376,7 @@ Create an instance: `Entity* embed = univec_embed(client, NULL);`
 
 ```c
 Entity* embed = univec_embed(client, NULL);
-voxgig_value* embed_rec = embed->vt->create(embed, cmap(3,
+Entity* created = embed->vt->create(embed, cmap(3,
     "embeddings", v_list(),  // voxgig_value* (list)
     "model", v_str("example_model"),  // char*
     "texts", v_list())  // voxgig_value* (list)
@@ -391,7 +392,7 @@ Create an instance: `Entity* ephemeral_key = univec_ephemeral_key(client, NULL);
 
 | Method | Description |
 | --- | --- |
-| `vt->create(e, reqdata, ctrl, &err)` | Create a new entity with the given data. |
+| `Entity* vt->create(e, reqdata, ctrl, &err)` | Create a new entity with the given data. |
 
 #### Fields
 
@@ -406,7 +407,7 @@ Create an instance: `Entity* ephemeral_key = univec_ephemeral_key(client, NULL);
 
 ```c
 Entity* ephemeral_key = univec_ephemeral_key(client, NULL);
-voxgig_value* ephemeral_key_rec = ephemeral_key->vt->create(ephemeral_key, cmap(4,
+Entity* created = ephemeral_key->vt->create(ephemeral_key, cmap(4,
     "dailyLimit", v_num(1),  // int64_t
     "dailyUsed", v_num(1),  // int64_t
     "key", v_str("example_key"),  // char*
@@ -423,7 +424,7 @@ Create an instance: `Entity* model = univec_model(client, NULL);`
 
 | Method | Description |
 | --- | --- |
-| `vt->list(e, reqmatch, ctrl, &err)` | List entities, optionally matching the given criteria. |
+| `Entity** vt->list(e, reqmatch, ctrl, &err)` | List entities, optionally matching the given criteria: a `NULL`-terminated array, one per record. |
 
 #### Fields
 
@@ -444,7 +445,10 @@ Create an instance: `Entity* model = univec_model(client, NULL);`
 
 ```c
 Entity* model = univec_model(client, NULL);
-voxgig_value* models = model->vt->list(model, NULL, NULL, &err);
+Entity** models = model->vt->list(model, NULL, NULL, &err);
+for (size_t i = 0; models && models[i]; i++) {
+    printf("%s\n", voxgig_to_json(models[i]->vt->data(models[i], NULL)));
+}
 ```
 
 ## Features

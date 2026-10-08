@@ -2,6 +2,7 @@
 use std::rc::Rc;
 
 use crate::core::context::Context;
+use crate::core::helpers::{call_vfn, get_str, getp, jo};
 use crate::core::types::Feature;
 use crate::feature::support::*;
 use crate::utility::voxgigstruct::Value;
@@ -42,13 +43,47 @@ impl LogFeature {
             return;
         }
 
-        let opname = ctx.op.borrow().name.clone();
-        let specinfo = match ctx.spec.borrow().clone() {
-            Some(sp) => {
-                let s = sp.borrow();
-                format!("{} {}", s.method, s.path)
-            }
-            None => String::new(),
+        let (entity, opname) = {
+            let op = ctx.op.borrow();
+            (op.entity.clone(), op.name.clone())
+        };
+        let spec = match ctx.spec.borrow().clone() {
+            Some(sp) => sp.borrow().to_value(),
+            None => Value::Noval,
+        };
+
+        // A log line leaves the pipeline, so it carries the cleaned record:
+        // the spec after auth holds the credential, and a logger serialises
+        // whatever it is handed.
+        let record = ctx.util().clean(
+            ctx,
+            &jo(vec![
+                ("hook", Value::str(hook)),
+                (
+                    "op",
+                    jo(vec![
+                        ("entity", Value::str(entity)),
+                        ("name", Value::str(opname.clone())),
+                    ]),
+                ),
+                ("spec", spec),
+                ("ctx", ctx.to_value()),
+            ]),
+        );
+
+        let logger = getp(&self.options, "logger");
+        if let Value::Func(_) = logger {
+            call_vfn(&logger, &record);
+            return;
+        }
+
+        let specinfo = match getp(&record, "spec") {
+            Value::Map(_) => format!(
+                "{} {}",
+                get_str(&getp(&record, "spec"), "method").unwrap_or_default(),
+                get_str(&getp(&record, "spec"), "path").unwrap_or_default()
+            ),
+            _ => String::new(),
         };
 
         eprintln!(

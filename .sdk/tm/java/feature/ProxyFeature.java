@@ -1,5 +1,9 @@
 package JAVAPACKAGE.feature;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,7 +29,12 @@ public class ProxyFeature extends BaseFeature {
   private Map<String, Object> options;
   private List<String> noProxy = new ArrayList<>();
 
-  // Activity tracking (mirrors the ts client._proxy record).
+  // The proxy the transport is told to route through, raw: it may carry
+  // credentials as userinfo.
+  private String target = "";
+
+  // Activity tracking (mirrors the ts client._proxy record). `url` is the
+  // cleaned form of the target, since the record is what a caller prints.
   public int routed = 0;
   public String url = "";
 
@@ -46,12 +55,12 @@ public class ProxyFeature extends BaseFeature {
       return;
     }
 
-    this.url = FeatureOptions.foptStr(this.options, "url", "");
+    this.target = FeatureOptions.foptStr(this.options, "url", "");
     List<String> noProxyRaw = FeatureOptions.foptStrList(this.options, "noProxy");
 
     if (FeatureOptions.foptBool(this.options, "fromEnv", false)) {
-      if ("".equals(this.url)) {
-        this.url = firstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy");
+      if ("".equals(this.target)) {
+        this.target = firstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy");
       }
       if (noProxyRaw == null) {
         String np = firstEnv("NO_PROXY", "no_proxy");
@@ -71,6 +80,32 @@ public class ProxyFeature extends BaseFeature {
       }
     }
 
+    // A proxy URL may carry credentials as userinfo, from the option or the
+    // environment, and neither is under a sensitive key name.
+    if (!"".equals(this.target) && ctx.utility != null && ctx.utility.cleanAdd != null) {
+      try {
+        String userinfo = new URI(this.target).getRawUserInfo();
+        if (userinfo != null) {
+          int colon = userinfo.indexOf(':');
+          String[] parts = colon < 0
+              ? new String[] {userinfo}
+              : new String[] {userinfo.substring(0, colon), userinfo.substring(colon + 1)};
+          for (String part : parts) {
+            if (!"".equals(part)) {
+              ctx.utility.cleanAdd.apply(ctx, part);
+              ctx.utility.cleanAdd.apply(ctx, URLDecoder.decode(part, StandardCharsets.UTF_8));
+            }
+          }
+        }
+      }
+      catch (URISyntaxException | RuntimeException e) {
+        // An unparseable target routes nothing (see route), so there is
+        // nothing to register.
+      }
+    }
+    this.url = ctx.utility != null && ctx.utility.clean != null
+        ? String.valueOf(ctx.utility.clean.apply(ctx, this.target)) : this.target;
+
     final Utility.FetcherFn inner = ctx.utility.fetcher;
 
     ctx.utility.fetcher = (ctx2, u, fetchdef) ->
@@ -78,12 +113,12 @@ public class ProxyFeature extends BaseFeature {
   }
 
   private Map<String, Object> route(String u, Map<String, Object> fetchdef) {
-    if ("".equals(this.url) || bypass(u)) {
+    if ("".equals(this.target) || bypass(u)) {
       return fetchdef;
     }
 
     Map<String, Object> out = new LinkedHashMap<>(fetchdef);
-    out.put("proxy", this.url);
+    out.put("proxy", this.target);
 
     this.routed++;
     return out;

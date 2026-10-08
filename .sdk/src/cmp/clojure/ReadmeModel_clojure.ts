@@ -20,13 +20,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `(ent reqmatch ctrl) -> map` | Load a single entity by match criteria. Raises on error. |',
-    list: '| `list` | `(ent reqmatch ctrl) -> vector` | List entities matching the criteria. Raises on error. |',
-    create: '| `create` | `(ent reqdata ctrl) -> map` | Create a new entity. Raises on error. |',
-    update: '| `update` | `(ent reqdata ctrl) -> map` | Update an existing entity. Raises on error. |',
-    remove: '| `remove` | `(ent reqmatch ctrl) -> map` | Remove an entity. Raises on error. |',
+    load: '| `load` | `(ent reqmatch ctrl) -> entity` | Load a single entity by match criteria, and return it. Raises on error. |',
+    list: '| `list` | `(ent reqmatch ctrl) -> vector` | List entities matching the criteria, one per record. Raises on error. |',
+    create: '| `create` | `(ent reqdata ctrl) -> entity` | Create a new entity, and return it. Raises on error. |',
+    update: '| `update` | `(ent reqdata ctrl) -> entity` | Update an existing entity, and return it. Raises on error. |',
+    patch: '| `patch` | `(ent reqdata ctrl) -> entity` | Change part of an existing entity, and return it. Raises on error. |',
+    remove: '| `remove` | `(ent reqmatch ctrl) -> entity` | Remove an entity, and return it marked as deleted. Raises on error. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -99,9 +100,10 @@ State accessors are called by looking up the fn and applying it, e.g.
 
 ### Result shape
 
-Entity operations return the bare result data (a \`map\` for single-entity
-ops, a \`vector\` for \`list\`) and raise (via \`ex-info\`) on error. Wrap
-calls in \`try\`/\`catch\` to handle failures.
+Entity operations resolve to the entity, and \`list\` to a \`vector\` of
+entities, one per record. Read an entity's record with
+\`((:data-get ent))\`. They raise (via \`ex-info\`) on error, so wrap calls
+in \`try\`/\`catch\` to handle failures.
 
 The \`direct\` escape hatch never raises — it returns a result \`map\` you
 branch on via \`(vs/getprop result "ok")\`:

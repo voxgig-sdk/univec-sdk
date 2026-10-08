@@ -24,9 +24,9 @@ cd ${target.name} && zig build
   // Zig has no central package registry — the release IS the git tag. Depend
   // on it via the Zig package manager (a git-tagged url in build.zig.zon) or
   // build from a local source checkout.
-  const { releasesUrl } = repoInfo(model)
+  const { tagsUrl } = repoInfo(model)
   Content(`Zig has no central package registry, so this package is distributed as a
-git tag (\`${target.name}/vX.Y.Z\`, see [Releases](${releasesUrl})). Add it to
+git tag (\`${target.name}/vX.Y.Z\`, see [Tags](${tagsUrl})). Add it to
 your \`build.zig.zon\` dependencies, or build from a source checkout:
 
 \`\`\`bash

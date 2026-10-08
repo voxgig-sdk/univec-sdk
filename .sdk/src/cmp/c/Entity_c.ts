@@ -41,7 +41,7 @@ const Entity = cmp(function Entity(props: any) {
       // vtable is complete and the file compiles). Tag-form keys (`#LoadOp`)
       // match the marker line `// #LoadOp`.
       const opfrags =
-        (['load', 'list', 'create', 'update', 'remove']
+        (['load', 'list', 'create', 'update', 'patch', 'remove']
           .reduce((a: any, opname: string) =>
           (a['#' + camelify(opname) + 'Op'] =
             !opnames.includes(opname) ?

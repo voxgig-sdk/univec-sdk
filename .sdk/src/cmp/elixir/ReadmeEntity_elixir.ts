@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, entityIdField, opRequestShape, opNeedsAction, elixirAccessor, entityCollection, exampleVarName } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -7,7 +7,7 @@ import {
 } from '@voxgig/apidef'
 
 // Type names come from the shared canonToType 'elixir' column (single source of truth).
-import { elixirLit } from './utility_elixir'
+import { elixirLit, elixirListArgs } from './utility_elixir'
 
 
 // Operation method spelling for the Elixir target: each op is a function on
@@ -18,6 +18,7 @@ const OP_DESC: Record<string, { method: string, desc: string }> = {
   list:   { method: 'list(entity)',         desc: 'List entities, optionally matching the given criteria.' },
   create: { method: 'create(entity, data)', desc: 'Create a new entity with the given data.' },
   update: { method: 'update(entity, data)', desc: 'Update an existing entity.' },
+  patch:  { method: 'patch(entity, data)',  desc: 'Change part of an existing entity.' },
   remove: { method: 'remove(entity, match)', desc: 'Remove the matching entity.' },
 }
 
@@ -47,8 +48,11 @@ takes an entity handle built from the client:
 
   publishedEntities.map((entity: any) => {
     const EName = entity.Name
-    const eVar = entity.name
+    const eVar = exampleVarName(entity.name, 'elixir')
+    const eCall = elixirAccessor(entity, entityCollection(model))
     const opnames = Object.keys(entity.op || {})
+    // An op that needs an action has no plain call to show.
+    const callable = opnames.filter((o: string) => !opNeedsAction(entity.op[o]))
     const fields = Object.values(entity.fields || {})
     const idF = entityIdField(entity)
 
@@ -63,7 +67,7 @@ takes an entity handle built from the client:
 `)
     }
 
-    Content(`Create a handle: \`${eVar} = ${Name}.${eVar}(sdk)\`
+    Content(`Create a handle: \`${eVar} = ${Name}.${eCall}(sdk)\`
 
 `)
 
@@ -102,7 +106,7 @@ takes an entity handle built from the client:
 `)
     }
 
-    if (opnames.includes('load')) {
+    if (callable.includes('load')) {
       const loadItems = opRequestShape(entity, 'load').items
         .filter((it: any) => !it.optional || it.name === idF)
         .sort((a: any, b: any) =>
@@ -115,25 +119,25 @@ takes an entity handle built from the client:
       Content(`#### Example: Load
 
 \`\`\`elixir
-${eVar} = ${Name}.${eVar}(sdk)
-record = ${Name}.Entity.${EName}.load(${eVar}, ${loadArg})
+${eVar} = ${Name}.${eCall}(sdk)
+${eVar} = ${Name}.Entity.${EName}.load(${eVar}, ${loadArg})
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('list')) {
+    if (callable.includes('list')) {
       Content(`#### Example: List
 
 \`\`\`elixir
-${eVar} = ${Name}.${eVar}(sdk)
-records = ${Name}.Entity.${EName}.list(${eVar})
+${eVar} = ${Name}.${eCall}(sdk)
+${eVar}s = ${Name}.Entity.${EName}.list(${eVar}${elixirListArgs(entity, Name)})
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('create')) {
+    if (callable.includes('create')) {
       // Members come from the SAME shape the runtime validates
       // (opRequestShape): every required member must appear — with a real,
       // executable literal.
@@ -142,8 +146,8 @@ records = ${Name}.Entity.${EName}.list(${eVar})
       Content(`#### Example: Create
 
 \`\`\`elixir
-${eVar} = ${Name}.${eVar}(sdk)
-record = ${Name}.Entity.${EName}.create(${eVar}, ${Name}.Helpers.deep(%{
+${eVar} = ${Name}.${eCall}(sdk)
+${eVar} = ${Name}.Entity.${EName}.create(${eVar}, ${Name}.Helpers.deep(%{
 `)
       createItems.map((it: any) => {
         Content(`  "${it.name}" => ${elixirLit(it.type, 'example_' + it.name)},  # ${canonToType(it.type, target.name)}

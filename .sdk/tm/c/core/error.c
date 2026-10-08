@@ -22,3 +22,19 @@ PNError* pn_error_new(const char* code, const char* msg) {
   e->spec = NULL;
   return e;
 }
+
+// What make_error attached is already cleaned; the error carries no
+// context.
+voxgig_value* pn_error_to_value(PNError* e) {
+  if (!e) return voxgig_new_undef();
+  return cmap(5,
+    "sdk", v_str(e->sdk),
+    "code", v_str(e->code),
+    "message", v_str(e->msg),
+    "result", e->result ? v_share(e->result) : voxgig_new_undef(),
+    "spec", e->spec ? v_share(e->spec) : voxgig_new_undef());
+}
+
+char* pn_error_str(PNError* e) {
+  return voxgig_jsonify(pn_error_to_value(e), NULL);
+}

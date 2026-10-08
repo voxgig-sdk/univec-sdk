@@ -26,6 +26,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import * as Fs from 'node:fs'
+import * as Os from 'node:os'
 import * as Path from 'node:path'
 import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
@@ -35,11 +36,19 @@ import { UnivecSDK } from '..'
 
 const SDK_NAME = 'UnivecSDK'
 
+// The package root, by absolute path: the snippets compile outside the SDK.
+const SDK_ROOT = Path.join(__dirname, '..').split(Path.sep).join('/')
+
 // A fixture for every entity, so list()/load() resolve offline with no
 // network. Snippet client construction is rewritten to seed this.
 const TEST_SEED = {"entity":{"convert":{"test01":{"id":"test01"}},"embed":{"test01":{"id":"test01"}},"ephemeral_key":{"test01":{"id":"test01"}},"model":{"test01":{"id":"test01"}}}}
 const SEED_ARG = JSON.stringify(TEST_SEED)
 const SEEDED_CTOR = SDK_NAME + '.test(' + SEED_ARG + ')'
+
+// The client VARIABLE, not the word: a package name carries the word between
+// hyphens (@voxgig-sdk/multifon-client-sdk).
+const CLIENT = /(?<![\w$.\-\/'"`])client(?![\w$\-\/'"`])/
+const CLIENT_CALL = new RegExp(CLIENT.source + '\\s*\\.')
 
 
 // The three docs this gate covers, resolved relative to dist-test/.
@@ -106,7 +115,7 @@ function isRunnable(code: string): boolean {
   return (
     /new\s+UnivecSDK\b/.test(code) ||
     /\bUnivecSDK\.test\b/.test(code) ||
-    /\bclient\s*\./.test(code)
+    CLIENT_CALL.test(code)
   )
 }
 
@@ -116,7 +125,7 @@ function isRunnable(code: string): boolean {
 function buildSnippetModule(block: string): string {
   const inner = stripImports(block).split('\n').map((l) => '    ' + l).join('\n')
   return [
-    "import { " + SDK_NAME + " } from '..'",
+    'import { ' + SDK_NAME + ' } from ' + JSON.stringify(SDK_ROOT),
     '',
     'async function __ex() {',
     // Shared client for snippets that reference `client` without constructing
@@ -143,20 +152,23 @@ function compileBatch(indices: number[], blocks: string[], key: string): {
   errored: Set<number>; raw: string; unattributed: boolean
 } {
   const tsDir = Path.join(__dirname, '..')
-  const testDir = Path.join(tsDir, 'test')
-  // Leading dot: TypeScript wildcard includes skip dot-files, so these temp
-  // files are never swept into the normal build.
+  // Outside the SDK's tree, so a run leaves nothing there even when it is
+  // interrupted. `.cts` keeps them CommonJS whatever package.json is above.
+  const dir = Fs.mkdtempSync(Path.join(Os.tmpdir(), 'readme-examples-'))
   const files: string[] = []
 
   try {
     for (const i of indices) {
-      const f = Path.join(testDir, '.examples_' + key + '_snippet' + i + '.gen.ts')
+      const f = Path.join(dir, 'examples_' + key + '_snippet' + i + '.gen.cts')
       Fs.writeFileSync(f, buildSnippetModule(blocks[i]), 'utf8')
       files.push(f)
     }
 
     const requireFrom = createRequire(__filename)
-    const tsc = requireFrom.resolve('typescript/bin/tsc')
+    // Every TypeScript exports its package.json; TypeScript 7 exports no
+    // ./bin/tsc, so the binary is found through the manifest's bin.
+    const tsPackage = requireFrom.resolve('typescript/package.json')
+    const tsc = Path.join(Path.dirname(tsPackage), requireFrom(tsPackage).bin.tsc)
 
     const res = spawnSync(process.execPath, [
       tsc,
@@ -179,7 +191,7 @@ function compileBatch(indices: number[], blocks: string[], key: string): {
 
     if (0 !== res.status) {
       for (const line of raw.split('\n')) {
-        const m = /_snippet(\d+)\.gen\.ts\(\d+,\d+\):\s*error/.exec(line)
+        const m = /_snippet(\d+)\.gen\.cts\(\d+,\d+\):\s*error/.exec(line)
         if (null == m) {
           // A genuine error diagnostic not attributable to a snippet file
           // (e.g. inside the SDK itself) is an anomaly.
@@ -194,9 +206,7 @@ function compileBatch(indices: number[], blocks: string[], key: string): {
 
     return { errored, raw, unattributed }
   } finally {
-    for (const f of files) {
-      Fs.rmSync(f, { force: true })
-    }
+    Fs.rmSync(dir, { recursive: true, force: true })
   }
 }
 
@@ -244,7 +254,7 @@ function rewriteForRun(code: string): string {
   let out = stripImports(code)
   out = out.replace(/new\s+UnivecSDK\s*\([^)]*\)/g, () => SEEDED_CTOR)
   out = out.replace(/UnivecSDK\.test\s*\([^)]*\)/g, () => SEEDED_CTOR)
-  if (/\bclient\b/.test(out) && !/\b(?:const|let|var)\s+client\b/.test(out)) {
+  if (CLIENT.test(out) && !/\b(?:const|let|var)\s+client\b/.test(out)) {
     out = 'const client = ' + SEEDED_CTOR + '\n' + out
   }
   return out
@@ -255,7 +265,13 @@ function rewriteForRun(code: string): string {
 // test mode. Returns a list of failure descriptions (empty === all passed).
 async function executeBlocks(blocks: string[]): Promise<string[]> {
   const requireFrom = createRequire(__filename)
-  const ts = requireFrom('typescript')
+  // Node strips a snippet's types itself from 22.13; before that TypeScript 5
+  // does, through an API TypeScript 7 no longer ships.
+  const strip = requireFrom('node:module').stripTypeScriptTypes
+  const ts = 'function' === typeof strip ? null : requireFrom('typescript')
+  if (null == strip && 'function' !== typeof ts.transpileModule) {
+    throw new Error('running the examples needs node 22.13 or TypeScript 5 to strip their types')
+  }
 
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
   const silentConsole = { log() {}, error() {}, warn() {}, info() {} }
@@ -273,14 +289,16 @@ async function executeBlocks(blocks: string[]): Promise<string[]> {
       continue
     }
 
-    // Compile the snippet to JS (strips type annotations) so it runs under
-    // node exactly as a real caller would.
-    const js = ts.transpileModule(src, {
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2020,
-        module: ts.ModuleKind.ESNext,
-      },
-    }).outputText
+    // Strip the snippet's types so it runs under node exactly as a real
+    // caller would.
+    const js = null != strip
+      ? strip(src, { mode: 'transform' })
+      : ts.transpileModule(src, {
+        compilerOptions: {
+          target: ts.ScriptTarget.ES2020,
+          module: ts.ModuleKind.ESNext,
+        },
+      }).outputText
 
     let runner: any
     try {

@@ -13,4 +13,28 @@ defmodule Univec.Error do
   def new(code \\ "", msg \\ "", ctx \\ nil) do
     %__MODULE__{code: code, msg: msg, sdk: "Univec", ctx: ctx}
   end
+
+  # The HTTP status, promoted so a caller can branch without reaching into
+  # the result's shape; -1 when there was no response.
+  def status(%__MODULE__{result: result}) do
+    s = if Voxgig.Struct.ismap(result), do: Voxgig.Struct.getprop(result, "status"), else: nil
+    if is_number(s), do: trunc(s), else: -1
+  end
+
+  def not_found?(%__MODULE__{} = e), do: 404 == status(e)
+end
+
+# The context holds the live spec and options, and an error is what gets
+# logged: the printed form carries what make_error attached, which is already
+# cleaned, and never the context. A struct node prints as its JSON, since a
+# bare handle says nothing.
+defimpl Inspect, for: Univec.Error do
+  import Inspect.Algebra
+  alias Voxgig.Struct, as: S
+
+  def inspect(e, opts) do
+    show = fn v -> if S.isnode(v), do: S.jsonify(v, S.jm(["indent", 0])), else: v end
+    fields = [code: e.code, msg: e.msg, sdk: e.sdk, result: show.(e.result), spec: show.(e.spec)]
+    concat(["#Univec.Error<", to_doc(fields, opts), ">"])
+  end
 end

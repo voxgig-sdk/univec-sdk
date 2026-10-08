@@ -224,7 +224,7 @@ typedef struct {
 
 FH const char* fh_default_method(const char* op) {
   if (strcmp(op, "create") == 0) return "POST";
-  if (strcmp(op, "update") == 0) return "PATCH";
+  if (strcmp(op, "update") == 0 || strcmp(op, "patch") == 0) return "PATCH";
   if (strcmp(op, "remove") == 0) return "DELETE";
   return "GET";
 }

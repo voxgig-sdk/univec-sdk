@@ -50,7 +50,7 @@ static EphemeralKeySetup ephemeral_key_basic_setup(const Value& extra) {
 
   EphemeralKeySetup s;
   s.client = client;
-  s.d = entity_data;
+  s.data = entity_data;
   s.idmap = idmap_resolved;
   s.env = env;
   s.live = live;
@@ -65,6 +65,27 @@ static void ephemeral_key_entity_instance() {
   ASSERT_EQ(ent->getName(), std::string("ephemeral_key"), "entity name");
 }
 
+
+static bool ephemeral_key_has_feature(const std::string& name) {
+  Value fm = Helpers::toMapAny(getp(sharedConfig(), "feature"));
+  return fm.is_map() && !getp(fm, name).is_undef();
+}
+
+static void ephemeral_key_entity_validate() {
+  if (!ephemeral_key_has_feature("validate")) {
+    std::cerr << "skip: feature not present in this SDK: validate\n";
+    return;
+  }
+  auto vsdk = UnivecSDK::testSDK(Value::undef(), vmap({{"feature",
+      vmap({{"validate", vmap({{"active", Value(true)}})}})}}));
+  std::string code;
+  try {
+    vsdk->ephemeral_key()->create(vmap({{"dailyLimit", Value("x")}, {"dailyUsed", Value(1)}, {"key", Value("x")}, {"resetsAt", Value("x")}}), Value::undef());
+  } catch (const SdkErrorPtr& err) {
+    code = err->code;
+  }
+  ASSERT_EQ(code, std::string("validate_failed"), "an invalid request fails with validate_failed");
+}
 
 static void ephemeral_key_entity_basic() {
   auto setup = ephemeral_key_basic_setup(Value::undef());
@@ -89,6 +110,7 @@ static void ephemeral_key_entity_basic() {
 
 int main() {
   T_RUN(ephemeral_key_entity_instance);
+  T_RUN(ephemeral_key_entity_validate);
   T_RUN(ephemeral_key_entity_basic);
   return sdktest::summary("ephemeral_key_entity_test");
 }

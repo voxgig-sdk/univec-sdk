@@ -4,7 +4,7 @@ import {
   walk,
 } from '@voxgig/struct'
 
-import { sdkName } from '@voxgig/sdkgen'
+import { sdkName, canonScalarKey, requiredItems } from '@voxgig/sdkgen'
 
 
 // OCaml keywords that are illegal as a lowercase identifier. sdkgen's shared
@@ -31,6 +31,12 @@ function ocamlVarName(name: string): string {
 
 function entityModule(name: string): string {
   return 'sdk_entity_' + ocamlVarName(name)
+}
+
+
+// The entity_obj field holding an operation's closure.
+function ocamlOpField(opname: string): string {
+  return 'e_' + opname
 }
 
 
@@ -145,10 +151,23 @@ function clean(o: any, dropDefaults?: boolean): any {
 }
 
 
+// A list's required route and query parameters, as the match it is called with.
+function ocamlListMatch(entity: any): string {
+  const lit = (type: any): string =>
+    (({ NULL: 'Null', INTEGER: '(Num 1.)', NUMBER: '(Num 1.)', BOOLEAN: '(Bool true)', ARRAY: '(empty_list ())', OBJECT: '(empty_map ())' }) as any)[canonScalarKey(type)] ?? '(Str "example")'
+  const items = requiredItems(entity, 'list')
+  return 0 < items.length
+    ? `(jo [${items.map((it: any) => `("${ocamlString(it.name)}", ${lit(it.type)})`).join('; ')}])`
+    : '(empty_map ())'
+}
+
+
 export {
   clean,
   entityModule,
   formatOcamlValue,
+  ocamlListMatch,
+  ocamlOpField,
   ocamlString,
   ocamlVarName,
   packageName,

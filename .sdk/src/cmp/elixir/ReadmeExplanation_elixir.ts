@@ -17,7 +17,8 @@ that every later pipeline stage observes — the immutable-Elixir way to honour
 the shared-mutable hook contract.
 
 Build inputs from native Elixir maps with \`${model.Name}.Helpers.deep/1\`,
-and read fields off results with \`Voxgig.Struct.getprop/2\`.
+and read fields off a record, which an entity's \`data_get/1\` returns, with
+\`Voxgig.Struct.getprop/2\`.
 
 ### Module structure
 

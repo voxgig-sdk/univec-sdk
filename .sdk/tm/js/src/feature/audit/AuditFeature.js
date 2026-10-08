@@ -55,7 +55,7 @@ class AuditFeature extends BaseFeature {
     }
     this._seen.add(ctx)
     this._seq++
-    const record = {
+    const record = ctx.utility.clean(ctx, {
       seq: this._seq,
       ts: this._now(),
       actor: (ctx.ctrl && ctx.ctrl.actor) || this._options.actor || 'anonymous',
@@ -64,7 +64,7 @@ class AuditFeature extends BaseFeature {
       outcome,
       status: ctx.result && ctx.result.status,
       correlationId: ctx.id,
-    }
+    })
 
     const client = this._client
     const recs = client._audit.records

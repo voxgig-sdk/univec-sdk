@@ -13,6 +13,12 @@ use univec_sdk::core::helpers::{getp, getpath, ja, jo, now_ms, setp, to_map};
 use univec_sdk::utility::voxgigstruct as vs;
 use univec_sdk::{test_sdk, Entity, UnivecEntity, UnivecSDK, Value};
 
+// main.kit.test.live.strict is true (the default is true): a live
+// request that fails, or a live test missing an input it needs,
+// fails the test.
+// An account with no record for a test to read skips it either way.
+const LIVE_STRICT: bool = true;
+
 #[test]
 fn model_entity_instance() {
     let testsdk = test_sdk(Value::Noval, Value::Noval);
@@ -61,6 +67,70 @@ fn model_entity_stream() {
 }
 
 #[test]
+fn model_entity_stream_error() {
+    let offline = jo(vec![("net", jo(vec![("offline", Value::Bool(true))]))]);
+    let err = test_sdk(offline.clone(), Value::Noval)
+        .model(Value::Noval)
+        .stream("list", Value::empty_map(), Value::empty_map())
+        .err()
+        .expect("a failed operation should fail the stream");
+    assert!(err.msg.contains("offline"), "{}", err.msg);
+
+    let quiet = jo(vec![("ctrl", jo(vec![("throw", Value::Bool(false))]))]);
+    assert!(test_sdk(offline, Value::Noval)
+        .model(Value::Noval)
+        .stream("list", Value::empty_map(), quiet)
+        .is_ok());
+
+    if !getp(&getp(&univec_sdk::make_config(), "feature"), "rbac").is_noval() {
+        let denied = test_sdk(Value::Noval, jo(vec![(
+            "feature",
+            jo(vec![("rbac", jo(vec![("active", Value::Bool(true)), ("deny", Value::Bool(true))]))]),
+        )]));
+        let denyerr = denied
+            .model(Value::Noval)
+            .stream("list", Value::empty_map(), Value::empty_map())
+            .err()
+            .expect("a denied operation should fail the stream");
+        assert_eq!(denyerr.code, "rbac_denied");
+    }
+}
+
+#[test]
+fn model_entity_stream_ctrl() {
+    let explain = Value::empty_map();
+    let ctrl = jo(vec![("explain", explain.clone())]);
+    let items: Vec<Value> = test_sdk(Value::Noval, Value::Noval)
+        .model(Value::Noval)
+        .stream("list", Value::empty_map(), jo(vec![("ctrl", ctrl.clone())]))
+        .expect("stream failed")
+        .collect();
+    assert!(getp(&ctrl, "stream").is_noval(), "the stream changed the caller's ctrl");
+    let filled = match &explain {
+        Value::Map(m) => !m.borrow().is_empty(),
+        _ => false,
+    };
+    assert!(filled, "the caller's explain record was not filled");
+}
+
+#[test]
+fn model_entity_validate() {
+    if getp(&getp(&univec_sdk::make_config(), "feature"), "validate").is_noval() {
+        return;
+    }
+    let client = test_sdk(Value::Noval, jo(vec![(
+        "feature",
+        jo(vec![("validate", jo(vec![("active", Value::Bool(true))]))]),
+    )]));
+    let err = client
+        .model(Value::Noval)
+        .list(jo(vec![("executionProvider", Value::Num(1.0))]), Value::Noval)
+        .err()
+        .expect("an invalid request should fail");
+    assert_eq!(err.code, "validate_failed");
+}
+
+#[test]
 fn model_entity_basic() {
     let setup = model_basic_setup(Value::Noval);
     // Per-op sdk-test-control.json skip — the basic test exercises a flow
@@ -77,12 +147,6 @@ fn model_entity_basic() {
             eprintln!("skip: {}", reason);
             return;
         }
-    }
-    // The basic flow consumes synthetic IDs from the fixture. In live mode
-    // without an *_ENTID env override, those IDs hit the live API and 4xx.
-    if setup.synthetic_only {
-        eprintln!("skip: live entity test uses synthetic IDs from fixture — set UNIVEC_TEST_MODEL_ENTID JSON to run live");
-        return;
     }
     let client = setup.client.clone();
 
@@ -147,9 +211,8 @@ fn model_basic_setup(extra: Value) -> EntityTestSetup {
     )
     .unwrap_or_else(|_| Value::empty_map());
 
-    // Detect ENTID env override before env_override consumes it. When live
-    // mode is on without a real override, the basic test runs against
-    // synthetic IDs from the fixture and 4xx's.
+    // Whether *_ENTID supplied the idmap, read before env_override consumes
+    // it: without it, the ids a live flow binds are the fixture's synthetic ones.
     let entid_env_raw = std::env::var("UNIVEC_TEST_MODEL_ENTID").unwrap_or_default();
     let idmap_overridden =
         !entid_env_raw.trim().is_empty() && entid_env_raw.trim().starts_with('{');

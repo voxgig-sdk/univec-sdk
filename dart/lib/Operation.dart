@@ -22,6 +22,8 @@ class Operation {
     }
   }
 
+  Map<String, dynamic> toJson() => toJSON();
+
   Map<String, dynamic> toJSON() => {
         'entity': entity,
         'name': name,

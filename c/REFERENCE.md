@@ -105,13 +105,13 @@ Entity* convert = univec_convert(client, NULL);
 
 ### Operations
 
-#### `vt->create(Entity* e, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err)`
+#### `Entity* vt->create(Entity* e, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err)`
 
-Create a new entity with the given data. Returns the created entity data and sets `*err` on failure.
+Create a new entity with the given data. Returns the created entity, or `NULL` with `*err` set on failure.
 
 ```c
 Entity* convert = univec_convert(client, NULL);
-voxgig_value* result = convert->vt->create(convert, cmap(3,
+Entity* result = convert->vt->create(convert, cmap(3,
     "embeddings", v_list(),  // voxgig_value* (list)
     "source_model", v_str("example_source_model"),  // char*
     "target_model", v_str("example_target_model"))  // char*
@@ -155,13 +155,13 @@ Entity* embed = univec_embed(client, NULL);
 
 ### Operations
 
-#### `vt->create(Entity* e, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err)`
+#### `Entity* vt->create(Entity* e, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err)`
 
-Create a new entity with the given data. Returns the created entity data and sets `*err` on failure.
+Create a new entity with the given data. Returns the created entity, or `NULL` with `*err` set on failure.
 
 ```c
 Entity* embed = univec_embed(client, NULL);
-voxgig_value* result = embed->vt->create(embed, cmap(3,
+Entity* result = embed->vt->create(embed, cmap(3,
     "embeddings", v_list(),  // voxgig_value* (list)
     "model", v_str("example_model"),  // char*
     "texts", v_list())  // voxgig_value* (list)
@@ -206,13 +206,13 @@ Entity* ephemeral_key = univec_ephemeral_key(client, NULL);
 
 ### Operations
 
-#### `vt->create(Entity* e, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err)`
+#### `Entity* vt->create(Entity* e, voxgig_value* reqdata, voxgig_value* ctrl, PNError** err)`
 
-Create a new entity with the given data. Returns the created entity data and sets `*err` on failure.
+Create a new entity with the given data. Returns the created entity, or `NULL` with `*err` set on failure.
 
 ```c
 Entity* ephemeral_key = univec_ephemeral_key(client, NULL);
-voxgig_value* result = ephemeral_key->vt->create(ephemeral_key, cmap(4,
+Entity* result = ephemeral_key->vt->create(ephemeral_key, cmap(4,
     "dailyLimit", v_num(1),  // int64_t
     "dailyUsed", v_num(1),  // int64_t
     "key", v_str("example_key"),  // char*
@@ -264,15 +264,15 @@ Entity* model = univec_model(client, NULL);
 
 ### Operations
 
-#### `vt->list(Entity* e, voxgig_value* reqmatch, voxgig_value* ctrl, PNError** err)`
+#### `Entity** vt->list(Entity* e, voxgig_value* reqmatch, voxgig_value* ctrl, PNError** err)`
 
-List entities matching the given criteria. The match is optional — pass `NULL` to list all records. Returns a List.
+List entities matching the given criteria. The match is optional — pass `NULL` to list all records. Returns a `NULL`-terminated array of entities, one per record, or `NULL` with `*err` set on failure.
 
 ```c
 Entity* model = univec_model(client, NULL);
-voxgig_value* results = model->vt->list(model, NULL, NULL, &err);
-for (size_t i = 0; i < (size_t)voxgig_size(results); i++) {
-    printf("%s\n", voxgig_to_json(voxgig_getelem(results, v_int(i), NULL)));
+Entity** results = model->vt->list(model, NULL, NULL, &err);
+for (size_t i = 0; results && results[i]; i++) {
+    printf("%s\n", voxgig_to_json(results[i]->vt->data(results[i], NULL)));
 }
 ```
 
@@ -949,6 +949,7 @@ Timeout.
 | Option | Type |
 |---|---|
 | `clearTimer` | function |
+| `now` | function |
 | `setTimer` | function |
 
 These take no default: the feature behaves one way when you supply them and

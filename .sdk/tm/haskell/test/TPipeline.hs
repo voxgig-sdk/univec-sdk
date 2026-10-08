@@ -4,15 +4,18 @@
 
 module TPipeline (tests) where
 
+import Control.Exception (try)
 import Data.IORef
+import Data.List (isInfixOf, isSuffixOf)
 import Data.Maybe (isNothing)
 
-import VoxgigStruct (Value (..), emptyMap, emptyList, mkList, size, ismap, isNoval, vint)
+import VoxgigStruct (Value (..), InjArg (INone), emptyMap, emptyList, mkList, size, ismap, isNoval, vint, listItems, transform, jsonEncode)
 import SdkTypes
 import SdkHelpers
 import SdkRuntime
 import qualified SdkFeatures as F
 import qualified SdkClient as C
+import SdkConfig (makeConfig, makeFeature)
 import Testutil
 
 client :: IO Client
@@ -46,6 +49,39 @@ namedFeature nm opts = do
 
 errCodeIs :: Value -> String -> IO Bool
 errCodeIs e code = do c <- errCode e; pure (c == code)
+
+prepareAs :: Client -> String -> IO (Either SdkException Value)
+prepareAs cl m = do
+  fa <- jo [("path", VStr "/a"), ("method", VStr m)]
+  try (F.prepare cl fa)
+
+-- Whether the client prepares a POST and refuses a HEAD with spec_method_allow.
+postSentHeadRefused :: Client -> IO Bool
+postSentHeadRefused cl = do
+  sent <- prepareAs cl "post" >>= either (const (pure False))
+    (\fd -> (== "POST") . vstring <$> getp fd "method")
+  refused <- prepareAs cl "HEAD" >>= either
+    (\(SdkException e) -> errCodeIs e "spec_method_allow") (const (pure False))
+  pure (sent && refused)
+
+-- The allow.method and allow.op lists the client resolved.
+allowLists :: Client -> IO (String, String)
+allowLists cl = do
+  opts <- readIORef (clOptions cl)
+  am <- getpathS opts "allow.method"
+  ao <- getpathS opts "allow.op"
+  pure (vstring am, vstring ao)
+
+defaultAllowLists :: (String, String)
+defaultAllowLists =
+  ("GET,PUT,POST,PATCH,DELETE,OPTIONS", "create,update,patch,load,list,remove,command,direct,graphql")
+
+takesDefaultAllow :: Value -> IO Bool
+takesDefaultAllow sdkopts = do
+  cl <- C.testSdk VNoval sdkopts
+  lists <- allowLists cl
+  ok <- postSentHeadRefused cl
+  pure (lists == defaultAllowLists && ok)
 
 tests :: Counters -> IO ()
 tests c = do
@@ -95,6 +131,151 @@ tests c = do
     (_, merr) <- makePointUtil ctx
     case merr of Just e -> errCodeIs e "point_op_allow"; Nothing -> pure False
 
+  runTest c "make_point.allow_names_whole_ops" $ do
+    let attempt allowop = do
+          cl <- client; ctx <- mkCtx cl "load"
+          parts <- ja [VStr "a"]
+          point <- jo [("method", VStr "GET"), ("parts", parts)]
+          pts <- ja [point]
+          op <- newOperation =<< jo [("name", VStr "load"), ("points", pts)]
+          writeIORef (cOp ctx) op
+          ao <- jo [("op", VStr allowop)]; o <- jo [("allow", ao)]; writeIORef (cOptions ctx) o
+          snd <$> makePointUtil ctx
+    refused <- attempt "reload,unload"
+    named <- attempt "list,\n LOAD"
+    isRefused <- case refused of Just e -> errCodeIs e "point_op_allow"; Nothing -> pure False
+    pure (isRefused && isNothing named)
+
+  runTest c "make_context.patch_takes_data" $ do
+    cl <- client
+    ins <- mapM (\name -> do ctx <- mkCtx cl name; opInput <$> readIORef (cOp ctx)) ["patch", "update", "load"]
+    pure (ins == ["data", "data", "match"])
+
+  runTest c "make_spec.allow_names_whole_methods" $ do
+    cl <- client; ctx <- mkCtx cl "update"
+    parts <- ja [VStr "a"]
+    point <- jo [("method", VStr "pu"), ("parts", parts)]
+    writeIORef (cPoint ctx) point
+    am <- jo [("method", VStr "GET,PUT")]; o <- jo [("allow", am), ("base", VStr "http://x")]
+    writeIORef (cOptions ctx) o
+    (_, merr) <- makeSpecUtil ctx
+    case merr of Just e -> errCodeIs e "spec_method_allow"; Nothing -> pure False
+
+  runTest c "prepare.allow_names_whole_methods" $ do
+    am <- jo [("method", VStr "PUT,\n get")]; sdkopts <- jo [("allow", am)]
+    cl <- C.testSdk VNoval sdkopts
+    let prep m = do
+          fa <- jo [("path", VStr "/a"), ("method", VStr m)]
+          try (F.prepare cl fa) :: IO (Either SdkException Value)
+        refused r = case r of
+          Left (SdkException e) -> errCodeIs e "spec_method_allow"
+          Right _ -> pure False
+    got <- prep "get"
+    sent <- case got of
+      Right fd -> do m <- getp fd "method"; pure (vstring m == "GET")
+      Left _ -> pure False
+    post <- refused =<< prep "POST"
+    pu <- refused =<< prep "PU"
+    pure (sent && post && pu)
+
+  runTest c "prepare.empty_allow_method_refuses" $ do
+    am <- jo [("method", VStr "")]; sdkopts <- jo [("allow", am)]
+    cl <- C.testSdk VNoval sdkopts
+    fa <- jo [("path", VStr "/a"), ("method", VStr "get")]
+    r <- try (F.prepare cl fa) :: IO (Either SdkException Value)
+    case r of
+      Left (SdkException e) -> errCodeIs e "spec_method_allow"
+      Right _ -> pure False
+
+  runTest c "prepare.null_allow_takes_default" $ do
+    nm <- jo [("method", VNull)]; no <- jo [("op", VNull)]
+    shapes <- sequence [jo [("allow", nm)], jo [("allow", no)], jo [("allow", VNull)]]
+    and <$> mapM takesDefaultAllow shapes
+
+  runTest c "prepare.undefined_allow_takes_default" $ do
+    nm <- jo [("method", VNoval)]; no <- jo [("op", VNoval)]
+    shapes <- sequence [jo [("allow", nm)], jo [("allow", no)], jo [("allow", VNoval)]]
+    and <$> mapM takesDefaultAllow shapes
+
+  -- The caller's allow map replaces a config allow that is null or not a map.
+  runTest c "prepare.omitted_allow_key_takes_default" $ do
+    let over cfgallow allow = do
+          cfg <- makeConfig
+          cfgopts <- getp cfg "options"
+          setp cfgopts "allow" cfgallow
+          sdkopts <- jo [("allow", allow)]
+          F.sdkTest cfg makeFeature VNoval sdkopts
+        opOnly cfgallow = do
+          cl <- over cfgallow =<< jo [("op", VStr "load")]
+          lists <- allowLists cl
+          ok <- postSentHeadRefused cl
+          pure (lists == (fst defaultAllowLists, "load") && ok)
+    viaStr <- opOnly (VStr "x")
+    viaNull <- opOnly VNull
+    methodOnly <- allowLists =<< over (VStr "x") =<< jo [("method", VStr "GET")]
+    pure (viaStr && viaNull && methodOnly == ("GET", snd defaultAllowLists))
+
+  -- One options map builds two clients, the second over the model with its
+  -- allow.method narrowed to GET. The first leaves the map as it was, down to
+  -- its entity block, so the second resolves what a fresh map gives it and
+  -- refuses a POST, and building the second leaves its model as it was.
+  runTest c "options.reused_map_builds_independent_clients" $ do
+    let literal = do
+          ao <- jo [("op", VStr "create,load,list")]; hs <- jo [("x-caller", VStr "c1")]
+          w <- jo [("note", VStr "c1")]; ent <- jo [("widget", w)]
+          jo [("base", VStr "http://api.test"), ("allow", ao), ("headers", hs), ("entity", ent)]
+        getOnly = do
+          cfg <- makeConfig
+          cfgopts <- getp cfg "options"
+          setp cfgopts "allow" =<< jo [("method", VStr "GET")]
+          pure cfg
+        snapshot = jsonEncode True Nothing
+        resolved cl = snapshot =<< readIORef (clOptions cl)
+    shared <- literal
+    before <- snapshot shared
+    _ <- C.newSdk shared
+    after <- snapshot shared
+    model <- getOnly
+    modelBefore <- snapshot model
+    second <- F.makeClientBase model makeFeature shared
+    modelAfter <- snapshot model
+    freshModel <- getOnly
+    fresh <- F.makeClientBase freshModel makeFeature =<< literal
+    same <- (==) <$> resolved second <*> resolved fresh
+    refused <- prepareAs second "post" >>= either
+      (\(SdkException e) -> errCodeIs e "spec_method_allow") (const (pure False))
+    pure (after == before && modelAfter == modelBefore && same && refused)
+
+  runTest c "direct.allow_names_whole_ops" $ do
+    ao <- jo [("op", VStr "indirect,reload")]; sdkopts <- jo [("allow", ao)]
+    cl <- C.testSdk VNoval sdkopts
+    fa <- jo [("path", VStr "/a")]
+    res <- F.direct cl fa
+    okv <- getp res "ok"
+    errv <- getp res "err"
+    pure (not (isTrueV okv) && "not allowed by SDK option allow.op" `isInfixOf` vstring errv)
+
+  runTest c "direct.reports_unreadable_body" $ do
+    let page = "<html>key NONJSON-SECRET-7f2c " ++ replicate 300 'x' ++ "</html>"
+        fetchFn = VFunc (\_ _ _ _ -> do
+          hm <- jo [("content-type", VStr "text/html")]
+          jo [ ("status", VNum 200), ("statusText", VStr "OK"), ("headers", hm)
+             , ("body", VStr page), ("json", jsonThunk VNoval), ("unreadable", VBool True) ])
+    sys <- jo [("fetch", fetchFn)]
+    hs <- jo [("user-agent", VStr "Probe/1.0")]
+    opts <- jo [ ("base", VStr "http://nonjson.test"), ("apikey", VStr "NONJSON-SECRET-7f2c")
+               , ("headers", hs), ("system", sys) ]
+    cl <- C.newSdk opts
+    fa <- jo [("path", VStr "/a")]
+    res <- F.direct cl fa
+    okv <- getp res "ok"
+    errv <- getp res "err"
+    code <- getp errv "code"; msg <- getp errv "message"
+    let m = vstring msg
+    pure (not (isTrueV okv) && vstring code == "response_content_type"
+          && "expected JSON, got text/html (HTTP 200, content-type text/html, user-agent Probe/1.0, body: <html>key " `isInfixOf` m
+          && not ("NONJSON-SECRET-7f2c" `isInfixOf` m) && "...)" `isSuffixOf` m)
+
   runTest c "make_point.rejects_no_endpoints" $ do
     cl <- client; ctx <- mkCtx cl "load"
     (_, merr) <- makePointUtil ctx
@@ -142,6 +323,27 @@ tests c = do
     (_, merr) <- makeSpecUtil ctx
     case merr of Just e -> errCodeIs e "boom"; Nothing -> pure False
 
+  runTest c "test_mock.item_envelope" $ do
+    cl <- client; ctx <- mkCtx cl "list"
+    mergeSpec <- jo [("`$MERGE`", VStr "`.badge`")]
+    restf <- ja [VStr "`$EACH`", VStr "body", mergeSpec]
+    tm <- jo [("res", restf)]; point <- jo [("transform", tm)]
+    writeIORef (cPoint ctx) point
+    r1 <- jo [("id", VStr "b1")]; r2 <- jo [("id", VStr "b2")]
+    out <- F.mockEnvelope ctx =<< ja [r1, r2]
+    wrapped <- mapM (\i -> getp i "badge" >>= \r -> getp r "id") =<< listItems out
+    back <- (\b -> transform INone b restf) =<< jo [("body", out)]
+    ids <- mapM (\r -> getp r "id") =<< listItems back
+    pure ([s | VStr s <- wrapped] == ["b1", "b2"] && [s | VStr s <- ids] == ["b1", "b2"])
+
+  runTest c "test_mock.body_envelope" $ do
+    cl <- client; ctx <- mkCtx cl "load"
+    tm <- jo [("res", VStr "`body.item`")]; point <- jo [("transform", tm)]
+    writeIORef (cPoint ctx) point
+    out <- F.mockEnvelope ctx =<< jo [("id", VStr "i1")]
+    i <- getp out "item" >>= \r -> getp r "id"
+    pure (case i of VStr "i1" -> True; _ -> False)
+
   runTest c "make_response.guard_no_spec" $ do
     cl <- client; ctx <- mkCtx cl "load"
     writeIORef (cSpec ctx) VNoval
@@ -182,6 +384,44 @@ tests c = do
     _ <- makeResponseUtil ctx
     ctrlV <- readIORef (cCtrl ctx); exv <- getp ctrlV "explain"; resv <- getp exv "result"
     pure (ismap resv)
+
+  -- A body the transport marks as not JSON is named by its label.
+  let unreadableErr status ctype body = do
+        cl <- client; ctx <- mkCtx cl "load"
+        sp <- fullSpec
+        sh <- getp sp "headers"; setp sh "user-agent" (VStr "Probe/1.0")
+        writeIORef (cSpec ctx) sp
+        hm <- emptyMap
+        mapM_ (\t -> setp hm "content-type" (VStr t)) ctype
+        r <- newResponse =<< jo [ ("status", vint status), ("statusText", VStr (if status < 400 then "OK" else "ERR"))
+                                 , ("headers", hm), ("json", jsonThunk VNoval), ("body", VStr body)
+                                 , ("unreadable", VBool True) ]
+        writeIORef (cResponse ctx) r
+        res <- newResult =<< emptyMap; writeIORef (cResult ctx) res
+        _ <- makeResponseUtil ctx
+        rv <- readIORef (cResult ctx)
+        e <- getp rv "err"
+        code <- errCode e; msg <- errMsg e
+        pure (code, msg)
+
+  runTest c "make_response.unreadable_json_label" $ do
+    (code, msg) <- unreadableErr 200 (Just "application/json") "{\"a\": "
+    pure (code == "response_json_invalid"
+          && "body is not valid JSON (HTTP 200, content-type application/json, user-agent Probe/1.0, body: {\"a\":)" `isInfixOf` msg)
+
+  runTest c "make_response.unreadable_no_label" $ do
+    (code, msg) <- unreadableErr 200 Nothing "not json"
+    pure (code == "response_json_invalid" && "content-type none" `isInfixOf` msg)
+
+  runTest c "make_response.unreadable_other_label" $ do
+    (code, msg) <- unreadableErr 200 (Just "text/html") "<p>\n  challenge </p>"
+    pure (code == "response_content_type" && "expected JSON, got text/html" `isInfixOf` msg
+          && "body: <p> challenge </p>)" `isInfixOf` msg)
+
+  runTest c "make_response.unreadable_http_failure" $ do
+    (code, msg) <- unreadableErr 503 (Just "text/html") "<p>down</p>"
+    pure (code == "request_status"
+          && "request: 503: ERR (HTTP 503, content-type text/html, user-agent Probe/1.0, body: <p>down</p>)" `isInfixOf` msg)
 
   runTest c "make_result.guard_no_result" $ do
     cl <- client; ctx <- mkCtx cl "load"

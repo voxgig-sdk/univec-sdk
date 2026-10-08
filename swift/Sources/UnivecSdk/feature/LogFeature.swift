@@ -64,6 +64,9 @@ public final class LogFeature: BaseFeature {
     if let op = ctx.op { attrs.entries["op"] = .string(op.name) }
     if let spec = ctx.spec { attrs.entries["spec"] = .string(spec.method + " " + spec.path) }
 
-    logger(level, "hook", attrs)
+    // A log line leaves the pipeline, so it carries the cleaned record: a
+    // path can hold a query credential, and a logger serialises whatever it
+    // is handed.
+    logger(level, "hook", fclean(ctx, attrs))
   }
 }

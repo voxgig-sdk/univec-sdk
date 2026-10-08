@@ -28,11 +28,34 @@ impl TestFeature {
     }
 }
 
+/// The key a list's response transform
+/// ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record under.
+fn item_envelope_key(restf: &Value) -> Option<String> {
+    let spec = restf.as_list()?.borrow();
+    if spec.len() != 3 || spec[0].as_str() != Some("`$EACH`") || spec[1].as_str() != Some("body") {
+        return None;
+    }
+    let merge = vs::get_prop(&spec[2], &Value::str("`$MERGE`"), Value::Noval);
+    let key = merge.as_str()?.strip_prefix("`.")?.strip_suffix('`')?;
+    if key.is_empty() || key.contains(|c: char| c == '.' || c == '`' || c == '$') {
+        return None;
+    }
+    Some(key.to_string())
+}
+
 fn envelope(ctx: &Rc<Context>, data: Value) -> Value {
     if data.is_noval() || data.is_null() {
         return data;
     }
     let restf = crate::core::helpers::getpath(&["transform", "res"], &ctx.point.borrow());
+    if let (Some(key), Value::List(items)) = (item_envelope_key(&restf), &data) {
+        let wrapped: Vec<Value> = items
+            .borrow()
+            .iter()
+            .map(|item| jo(vec![(key.as_str(), item.clone())]))
+            .collect();
+        return Value::list(wrapped);
+    }
     if let Value::Str(spec) = restf {
         // Rebuild whatever nesting the transform unwraps: a GraphQL op unwraps
         // `body.data.<field>`, not just one envelope property.
@@ -238,7 +261,7 @@ fn test_fetch(
             Ok(respond(ctx, 200, vs::clone(&found), vec![]))
         }
 
-        "update" => {
+        "update" | "patch" => {
             let reqdata = ctx.reqdata.borrow().clone();
             let update_match = Value::empty_map();
             if let Value::Map(_) = reqdata {
@@ -269,7 +292,10 @@ fn test_fetch(
                 ));
             }
             if let (Value::Map(_), Value::Map(_)) = (&ent, &reqdata) {
-                vs::merge(&Value::list(vec![ent.clone(), reqdata.clone()]), None);
+                // `$body` travels on the wire alone; the record is the rest.
+                let rec = vs::clone(&reqdata);
+                vs::del_prop(rec.clone(), &Value::str("$body"));
+                vs::merge(&Value::list(vec![ent.clone(), rec]), None);
             }
             vs::del_prop(ent.clone(), &Value::str("$KEY"));
             Ok(respond(ctx, 200, vs::clone(&ent), vec![]))
@@ -304,6 +330,7 @@ fn test_fetch(
 
             let ent = vs::clone(&ctx.reqdata.borrow().clone());
             if let Value::Map(_) = &ent {
+                vs::del_prop(ent.clone(), &Value::str("$body"));
                 setp(&ent, "id", id.clone());
                 if let Value::Str(id_str) = &id {
                     setp(&entmap, id_str, ent.clone());

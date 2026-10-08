@@ -90,13 +90,15 @@ class TelemetryFeature extends BaseFeature {
     span.durationMs = Math.max(0, span.end - span.start)
     span.ok = ok
 
+    const out = ctx.utility.clean(ctx, span)
+
     const client = this._client
     client._telemetry.active--
-    client._telemetry.spans.push(span)
+    client._telemetry.spans.push(out)
 
     const exporter = this._options.exporter
     if ('function' === typeof exporter) {
-      try { exporter(span) } catch (_e) { }
+      try { exporter(out) } catch (_e) { }
     }
   }
 

@@ -38,7 +38,7 @@ function render(spec: {
 }): string {
   const head = `# ${spec.Name} SDK utility: prepare_auth
 require_relative 'struct/voxgig_struct'
-module ${spec.Name}Utilities
+${'cookie' === spec.where ? "require_relative 'prepare_headers'\n" : ''}module ${spec.Name}Utilities
 `
 
   const guard = `  PrepareAuth = ->(ctx) {
@@ -93,12 +93,12 @@ end
     : `    headers = spec.headers
 `
 
-  const dropCookie = !cookie ? '' : `
-    # Our own pair, and only ours: another cookie the caller set survives.
-    drop_cookie = ->(hs) {
+  const setCookie = !cookie ? '' : `
+    # The named pair, and only that one: another cookie the caller set survives.
+    set_cookie = ->(hs, cname, value) {
       cookie = hs[HEADER_COOKIE]
-      return unless cookie.is_a?(String)
-      rest = cookie.split("; ").reject { |pair| pair.start_with?("#{COOKIE_AUTH}=") }
+      rest = cookie.is_a?(String) ? ${spec.Name}Utilities.cookie_keep(cookie, [cname]) : []
+      rest << "#{cname}=#{value}" unless value.nil?
       if rest.empty?
         hs.delete(HEADER_COOKIE)
       else
@@ -107,39 +107,51 @@ end
     }
 `
 
-  const clear = cookie ? 'drop_cookie.call(headers)'
-    : query ? `query.delete(${CRED})`
-      : `headers.delete(${CRED})`
+  const clear = (name: string) => cookie ? `set_cookie.call(headers, ${name}, nil)`
+    : query ? `query.delete(${name})`
+      : `headers.delete(${name})`
 
   const preamble = guard + `
 ` + bag + `    options = ctx.client.options_map
-` + dropCookie + `
+` + setCookie + `
     # Public APIs that need no auth omit the options.auth block entirely.
     if options["auth"].nil?
-      ${clear}
+      ${clear(CRED)}
       return spec, nil
     end
+
+    # The client's auth.name option, when set, replaces the name the API declares.
+    auth_name = VoxgigStruct.getpath(options, "auth.name")
+    name = auth_name.is_a?(String) && !auth_name.empty? ? auth_name${query || cookie ? '' : '.downcase'} : ${CRED}
+
+    # A credential left under the declared name would travel beside the renamed one.
+    ${clear(CRED)} unless name == ${CRED}
 
     apikey = VoxgigStruct.getprop(options, OPTION_APIKEY, NOT_FOUND)
 `
 
   const basicBlock = !basicHere ? '' : `
-    # True HTTP Basic Auth needs TWO credentials, base64-joined - a single
+    # True HTTP Basic Auth joins the two credentials, base64-encoded - a single
     # token in the header (the branch below) can never authenticate against
     # an API that actually checks \`Authorization: Basic base64(user:pass)\`.
+    # The password may be empty (RFC 7617): Lob, for one, documents the key as
+    # the user with a blank password (\`curl -u key:\`).
     if VoxgigStruct.getpath(options, "auth.basic") == true
       secret = VoxgigStruct.getprop(options, OPTION_SECRET, NOT_FOUND)
       no_apikey = apikey.nil? || !apikey.is_a?(String) || apikey == NOT_FOUND || apikey == ""
       no_secret = secret.nil? || !secret.is_a?(String) || secret == NOT_FOUND || secret == ""
 
-      if no_apikey || no_secret
-        headers.delete(HEADER_AUTH)
+      if no_apikey
+        headers.delete(name)
       else
         auth_prefix = VoxgigStruct.getpath(options, "auth.prefix") || ""
         # \`pack("m0")\` rather than \`Base64.strict_encode64\`: base64 left
         # Ruby's default gems in 3.4, and pack is core.
-        b64 = ["#{apikey}:#{secret}"].pack("m0")
-        headers[HEADER_AUTH] =
+        b64 = ["#{apikey}:#{no_secret ? "" : secret}"].pack("m0")
+        # The joined, encoded pair is a wire form neither credential's own
+        # registration covers.
+        ctx.utility.clean_add.call(ctx, b64)
+        headers[name] =
           auth_prefix.empty? ? b64 : "#{auth_prefix} #{b64}"
       end
 
@@ -147,7 +159,7 @@ end
     end
 `
 
-  return head + consts + preamble + basicBlock + place(spec.where, clear) + `
+  return head + consts + preamble + basicBlock + place(spec.where, clear('name')) + `
     return spec, nil
   }
 end
@@ -166,26 +178,21 @@ function place(where: string, clear: string): string {
       apikey_val = apikey.is_a?(String) ? apikey : ""
       # NO PREFIX IN A QUERY STRING: \`?token=Bearer%20abc\` is not a thing
       # any API reads, so options.auth.prefix is dropped rather than joined.
-      query[QUERY_AUTH] = apikey_val
+      query[name] = apikey_val
     end
 `
   }
 
   if ('cookie' === where) {
     return `
-    # Dropped before writing, so a retry cannot accumulate the pair and a
-    # withdrawn credential leaves no stale cookie behind.
-    ${clear}
-
-    unless apikey.nil? || (apikey.is_a?(String) && (apikey == NOT_FOUND || apikey == ""))
+    if apikey.nil? || (apikey.is_a?(String) && (apikey == NOT_FOUND || apikey == ""))
+      ${clear}
+    else
       apikey_val = apikey.is_a?(String) ? apikey : ""
-      # A cookie IS a header, so the pair is appended to the cookie header
-      # rather than clobbering it. No prefix: \`token=Bearer abc\` is not a
-      # cookie value any API reads.
-      existing = headers[HEADER_COOKIE]
-      pair = "#{COOKIE_AUTH}=#{apikey_val}"
-      headers[HEADER_COOKIE] =
-        (existing.is_a?(String) && !existing.empty?) ? "#{existing}; #{pair}" : pair
+      # Spliced in, replacing an earlier pair of the same name, so a retry
+      # cannot accumulate it. No prefix: \`token=Bearer abc\` is not a cookie
+      # value any API reads.
+      set_cookie.call(headers, name, apikey_val)
     end
 `
   }
@@ -197,7 +204,7 @@ function place(where: string, clear: string): string {
       auth_prefix = VoxgigStruct.getpath(options, "auth.prefix") || ""
       apikey_val = apikey.is_a?(String) ? apikey : ""
       # Empty prefix (raw apiKey credential) must not add a leading space.
-      headers[HEADER_AUTH] =
+      headers[name] =
         auth_prefix.empty? ? apikey_val : "#{auth_prefix} #{apikey_val}"
     end
 `

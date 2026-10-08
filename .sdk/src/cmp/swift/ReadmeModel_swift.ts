@@ -23,13 +23,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `(reqmatch, ctrl) throws -> Value` | Load a single entity by match criteria. Throws on error. |',
-    list: '| `list` | `(reqmatch, ctrl) throws -> Value` | List entities matching the criteria (a Value list). Throws on error. |',
-    create: '| `create` | `(reqdata, ctrl) throws -> Value` | Create a new entity. Throws on error. |',
-    update: '| `update` | `(reqdata, ctrl) throws -> Value` | Update an existing entity. Throws on error. |',
-    remove: '| `remove` | `(reqmatch, ctrl) throws -> Value` | Remove an entity. Throws on error. |',
+    load: '| `load` | `(reqmatch, ctrl) throws -> Value` | Load a single entity by match criteria, and return it. Throws on error. |',
+    list: '| `list` | `(reqmatch, ctrl) throws -> Value` | List entities matching the criteria, one per record. Throws on error. |',
+    create: '| `create` | `(reqdata, ctrl) throws -> Value` | Create a new entity, and return it. Throws on error. |',
+    update: '| `update` | `(reqdata, ctrl) throws -> Value` | Update an existing entity, and return it. Throws on error. |',
+    patch: '| `patch` | `(reqdata, ctrl) throws -> Value` | Change part of an existing entity, and return it. Throws on error. |',
+    remove: '| `remove` | `(reqmatch, ctrl) throws -> Value` | Remove an entity, and return it marked as deleted. Throws on error. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -92,9 +93,10 @@ ${opRows}
 
 ### Result shape
 
-Entity operations return the ENTITY (call data() for the record) (a \`Value\` map for
-single-entity ops, a \`Value\` list for \`list\`) and throw on error. Wrap
-calls in \`do\`/\`catch\` to handle failures.
+Entity operations return the entity, and \`list\` a \`Value\` list of entities,
+one per record; each entity comes wrapped in a native \`Value\`, which
+\`asNative as? Entity\` unwraps, and its \`data()\` reads the record. They
+throw on error, so wrap calls in \`do\`/\`catch\` to handle failures.
 
 The \`direct()\` escape hatch never throws — it returns a result \`VMap\` you
 branch on via \`result.entries["ok"]\`:

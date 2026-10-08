@@ -76,7 +76,7 @@ defmodule Univec.Feature.Audit do
       status = if result != nil, do: S.getprop(result, "status"), else: nil
 
       record =
-        S.jm([
+        Feature.clean(ctx, S.jm([
           "seq", seq,
           "ts", Feature.now(f),
           "actor", actor,
@@ -85,7 +85,7 @@ defmodule Univec.Feature.Audit do
           "outcome", outcome,
           "status", status,
           "correlationId", S.getprop(ctx, "id")
-        ])
+        ]))
 
       client = S.getprop(f, "client")
       records = S.getprop(S.getprop(client, "_audit"), "records")

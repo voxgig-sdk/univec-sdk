@@ -1,4 +1,6 @@
 
+const { isRawRequest, rawBody } = require('./MediaUtility')
+
 function prepareBody(ctx) {
   const op = ctx.op
 
@@ -9,6 +11,10 @@ function prepareBody(ctx) {
   let body = undefined
 
   if ('data' === op.input) {
+    if (isRawRequest(ctx.point)) {
+      return rawBody(ctx.reqdata)
+    }
+
     try {
       body = transformRequest(ctx)
     }

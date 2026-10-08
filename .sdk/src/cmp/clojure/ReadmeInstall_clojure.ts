@@ -5,7 +5,7 @@ import { cmp, Content, isPublished, repoInfo } from '@voxgig/sdkgen'
 const ReadmeInstall = cmp(function ReadmeInstall(props: any) {
   const { target, ctx$ } = props
   const { model } = ctx$
-  const { origin, repo, repoUrl, releasesUrl } = repoInfo(model)
+  const { hostName, origin, repo, repoUrl, tagsUrl } = repoInfo(model)
 
   if (isPublished(model, target.name)) {
     // Live on Clojars: add the published coordinate to deps.edn.
@@ -21,9 +21,9 @@ const ReadmeInstall = cmp(function ReadmeInstall(props: any) {
   }
 
   // Publish pending: not yet on Clojars. Depend on the library directly from
-  // the GitHub release tag, or from a local checkout via :local/root.
+  // the release tag, or from a local checkout via :local/root.
   Content(`This package is not yet published to Clojars. Depend on it directly from the
-GitHub release tag (\`${target.name}/vX.Y.Z\`, see [Releases](${releasesUrl})),
+${hostName} release tag (\`${target.name}/vX.Y.Z\`, see [Tags](${tagsUrl})),
 using a \`tools.deps\` git dependency:
 
 \`\`\`clojure

@@ -108,16 +108,21 @@ func (f *LogFeature) loghook(hook string, ctx *core.Context, level string) {
 		level = "info"
 	}
 
+	// A log line leaves the pipeline, so it carries the cleaned record: the
+	// spec after auth holds the credential, and a logger serialises whatever
+	// it is handed.
+	record := fclean(ctx, map[string]any{
+		"hook": hook,
+		"op":   ctx.Op,
+		"spec": ctx.Spec,
+		"ctx":  ctx.Record(),
+	})
+
 	attrs := []any{
 		"hook", hook,
-	}
-
-	if ctx.Op != nil {
-		attrs = append(attrs, "op", ctx.Op.Name)
-	}
-
-	if ctx.Spec != nil {
-		attrs = append(attrs, "spec", ctx.Spec.Method+" "+ctx.Spec.Path)
+		"op", record["op"],
+		"spec", record["spec"],
+		"ctx", record["ctx"],
 	}
 
 	switch level {

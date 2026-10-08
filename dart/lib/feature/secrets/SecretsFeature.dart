@@ -84,6 +84,7 @@ class SecretsFeature extends BaseFeature {
   // The LIVE options map (root ctx options), read for `auth`, `apikey`,
   // `base` and `system.fetch`. NEVER written: see the note above.
   dynamic _liveopts;
+  dynamic _initctx;
 
   Sekreto? _sekreto;
   String _secretname = 'apikey';
@@ -123,6 +124,7 @@ class SecretsFeature extends BaseFeature {
   dynamic init(dynamic ctx, dynamic opts) {
     _client = ctx.client;
     _liveopts = ctx.options;
+    _initctx = ctx;
     options = opts is Map ? Map<String, dynamic>.from(opts) : {};
     active = true == options['active'];
 
@@ -164,6 +166,7 @@ class SecretsFeature extends BaseFeature {
     final providers = <Object?>[];
 
     if (explicit.isNotEmpty) {
+      _register(explicit);
       // `envkey` VALIDATES the name, and a bad one (`Api.Token`, `api..token`)
       // raises. Held rather than thrown: init runs inside the SDK
       // constructor, where a throw is a stack trace from `UnivecSDK(...)`
@@ -306,6 +309,7 @@ class SecretsFeature extends BaseFeature {
     // turns a SYNCHRONOUS provider throw into a failed future rather than
     // an exception escaping resolve()'s caller.
     final found = await sek.tryget(_secretname);
+    _register(found);
 
     if (null == _exchange) {
       // An UNCACHED miss after an earlier hit is a revocation: the chain
@@ -564,7 +568,20 @@ class SecretsFeature extends BaseFeature {
           "${x.response}' field from $url");
     }
 
+    _register(token);
+
     return token;
+  }
+
+  // Every value this feature resolves or buys is a secret the SDK handles:
+  // registered so no diagnostic can carry it.
+  void _register(dynamic value) {
+    final ctx = _initctx;
+    try {
+      if (null != ctx && null != ctx.utility) {
+        ctx.utility.cleanAdd(ctx, value);
+      }
+    } catch (_e) {}
   }
 
   // The raw `auth` option: a Map when auth is configured, null when the

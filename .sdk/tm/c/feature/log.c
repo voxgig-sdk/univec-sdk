@@ -40,10 +40,29 @@ static void loghook(LogFeature* lf, const char* hook, Context* ctx) {
   if (level_num("info") < lf->level) return;
 
   const char* opname = ctx->op->name;
+
+  // A log line leaves the pipeline, so it carries the cleaned record: the
+  // spec after auth holds the credential, and a logger serialises whatever
+  // it is handed.
+  voxgig_value* record = clean_util(ctx, cmap(4,
+    "hook", v_str(hook),
+    "op", cmap(2, "entity", v_str(ctx->op->entity), "name", v_str(opname)),
+    "spec", ctx->spec ? spec_to_value(ctx->spec) : voxgig_new_undef(),
+    "ctx", context_to_value(ctx)));
+
+  voxgig_value* logger = getp(lf->options, "logger");
+  if (voxgig_is_func(logger)) {
+    call_vfn(logger, record);
+    return;
+  }
+
   char specinfo[256];
   specinfo[0] = '\0';
-  if (ctx->spec) {
-    snprintf(specinfo, sizeof(specinfo), "%s %s", ctx->spec->method, ctx->spec->path);
+  voxgig_value* spec = getp(record, "spec");
+  if (voxgig_is_map(spec)) {
+    const char* method = get_str(spec, "method");
+    const char* path = get_str(spec, "path");
+    snprintf(specinfo, sizeof(specinfo), "%s %s", method ? method : "", path ? path : "");
   }
   fprintf(stderr, "name=log hook=%s op=%s spec=%s\n", hook, opname, specinfo);
 }

@@ -114,7 +114,7 @@ class Context {
       final opcfg = vs.getpath(config, ['entity', entname, 'op', opname]);
       var input = 'match';
 
-      if ('update' == opname || 'create' == opname) {
+      if ('update' == opname || 'create' == opname || 'patch' == opname) {
         input = 'data';
       }
 
@@ -135,15 +135,26 @@ class Context {
     return UnivecError(code, msg, this);
   }
 
-  Map<String, dynamic> toJSON() => {
-        'id': id,
-        'op': op,
-        'spec': spec,
-        'entity': entity,
-        'result': result,
-        'response': response,
-        'meta': meta,
-      };
+  // The serialised context leaves the pipeline (a logger, an error dump), so
+  // it is cleaned; the live fields stay raw for the pipeline's own use.
+  Map<String, dynamic> toJSON() {
+    final record = <String, dynamic>{
+      'id': id,
+      'op': op,
+      'spec': spec,
+      'entity': entity,
+      'result': result,
+      'response': response,
+      'meta': meta,
+    };
+    final clean = utility?.clean;
+    final out = clean is Function ? clean(this, record) : record;
+    return out is Map<String, dynamic>
+        ? out
+        : Map<String, dynamic>.from(out as Map);
+  }
+
+  Map<String, dynamic> toJson() => toJSON();
 
   @override
   String toString() => 'Context ' + id;

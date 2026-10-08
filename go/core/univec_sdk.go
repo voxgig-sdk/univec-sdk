@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -84,6 +85,22 @@ func NewUnivecSDK(options map[string]any) *UnivecSDK {
 	return sdk
 }
 
+// The client holds the credential in its options, so a print or a JSON dump
+// carries the name alone. Value receivers: a dereferenced client prints the
+// same way.
+func (sdk UnivecSDK) String() string {
+	return "Univec " + vs.Jsonify(map[string]any{"name": "Univec"},
+		map[string]any{"indent": 0})
+}
+
+func (sdk UnivecSDK) GoString() string {
+	return sdk.String()
+}
+
+func (sdk UnivecSDK) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"name": "Univec"})
+}
+
 func (sdk *UnivecSDK) OptionsMap() map[string]any {
 	out := vs.Clone(sdk.options)
 	if om, ok := out.(map[string]any); ok {
@@ -128,6 +145,14 @@ func (sdk *UnivecSDK) Prepare(fetchargs map[string]any) (map[string]any, error) 
 	method, _ := vs.GetProp(fetchargs, "method").(string)
 	if method == "" {
 		method = "GET"
+	}
+	method = strings.ToUpper(method)
+
+	allowMethodVal := vs.GetPath(options, []any{"allow", "method"})
+	if !Allowed(allowMethodVal, method) {
+		allowMethod, _ := allowMethodVal.(string)
+		return nil, ctx.MakeError("spec_method_allow",
+			"Method \""+method+"\" not allowed by SDK option allow.method value: \""+allowMethod+"\"")
 	}
 
 	params := ToMapAny(vs.GetProp(fetchargs, "params"))
@@ -188,8 +213,7 @@ func (sdk *UnivecSDK) Direct(fetchargs map[string]any) (map[string]any, error) {
 
 // Is this raw-access op permitted by the SDK's allow.op option?
 func (sdk *UnivecSDK) opAllowed(op string) bool {
-	allowOp, _ := vs.GetPath(sdk.options, []any{"allow", "op"}).(string)
-	return strings.Contains(allowOp, op)
+	return Allowed(vs.GetPath(sdk.options, []any{"allow", "op"}), op)
 }
 
 func (sdk *UnivecSDK) opDenied(op string) map[string]any {
@@ -210,7 +234,7 @@ func (sdk *UnivecSDK) rawRequest(fetchargs map[string]any) (map[string]any, erro
 
 	fetchdef, err := sdk.Prepare(fetchargs)
 	if err != nil {
-		return map[string]any{"ok": false, "err": err}, nil
+		return map[string]any{"ok": false, "err": sdk.cleanErr(sdk.rootctx, err)}, nil
 	}
 
 	if fetchargs == nil {
@@ -236,7 +260,7 @@ func (sdk *UnivecSDK) rawRequest(fetchargs map[string]any) (map[string]any, erro
 	fetched, fetchErr := utility.Fetcher(ctx, url, fetchdef)
 
 	if fetchErr != nil {
-		return map[string]any{"ok": false, "err": fetchErr}, nil
+		return map[string]any{"ok": false, "err": sdk.cleanErr(ctx, fetchErr)}, nil
 	}
 
 	if fetched == nil {
@@ -261,23 +285,45 @@ func (sdk *UnivecSDK) rawRequest(fetchargs map[string]any) (map[string]any, erro
 		noBody := status == 204 || status == 304 || contentLength == "0"
 
 		var jsonData any
+		var bodyErr error
 		if !noBody {
 			if jf := vs.GetProp(fm, "json"); jf != nil {
 				if f, ok := jf.(func() any); ok {
 					jsonData = f()
 				}
 			}
+			if unreadable, _ := vs.GetProp(fm, "unreadable").(bool); unreadable {
+				var failed error
+				if status < 200 || status >= 300 {
+					failed = ctx.MakeError("request_status",
+						fmt.Sprintf("request: %d: %v", status, vs.GetProp(fm, "statusText")))
+				}
+				bodyErr = UnreadableBody(ctx, status, headers, vs.GetProp(fm, "body"),
+					fetchdef["headers"], failed)
+			}
 		}
 
-		return map[string]any{
-			"ok":      status >= 200 && status < 300,
+		out := map[string]any{
+			"ok":      bodyErr == nil && status >= 200 && status < 300,
 			"status":  status,
 			"headers": headers,
 			"data":    jsonData,
-		}, nil
+		}
+		if bodyErr != nil {
+			out["err"] = sdk.cleanErr(ctx, bodyErr)
+		}
+		return out, nil
 	}
 
 	return map[string]any{"ok": false, "err": ctx.MakeError("direct_invalid", "invalid response type")}, nil
+}
+
+// A raw request returns its error rather than passing it through MakeError.
+func (sdk *UnivecSDK) cleanErr(ctx *Context, err error) error {
+	if cleaned, ok := sdk.utility.Clean(ctx, err).(error); ok {
+		return cleaned
+	}
+	return err
 }
 
 func (sdk *UnivecSDK) Graphql(

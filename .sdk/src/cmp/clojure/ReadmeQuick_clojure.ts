@@ -6,6 +6,8 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
+import { cljListMatch } from './utility_clojure'
+
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   const { target, ctx$: { model } } = props
@@ -32,6 +34,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   // A type-correct Clojure literal for a param.
   const cljLit = (type: any, placeholder: string = 'example'): string => {
     const k = canonScalarKey(type)
+    if ('NULL' === k) return 'nil'
     if ('INTEGER' === k || 'NUMBER' === k) return '1'
     if ('BOOLEAN' === k) return 'true'
     if ('ARRAY' === k) return '(vs/jt)'
@@ -72,13 +75,13 @@ ${requireLines.join('\n')}
     if (opnames.includes('list')) {
       Content(`### 2. List ${eLow} records
 
-\`list\` returns a vector of records (each a map) and raises on error —
-iterate it directly.
+\`list\` returns a vector of entities, one per record, and raises on error.
+Read each record with \`((:data-get ${eLow}))\`.
 
 \`\`\`clojure
 (try
-  (doseq [${eLow} (e-${eLow}/list (api/${eLow} client nil) nil nil)]
-    (println ${eLow}))
+  (doseq [${eLow} (e-${eLow}/list (api/${eLow} client nil) ${cljListMatch(exampleEntity)} nil)]
+    (println ((:data-get ${eLow}))))
   (catch Exception err
     (println "list failed:" (.getMessage err))))
 \`\`\`
@@ -107,12 +110,13 @@ iterate it directly.
       Content(`### 3. Load ${neArticle} ${neLow}
 
 ${nestedEntity.Name} is nested under ${parentName}, so provide the
-\`${parentParam}\`. \`load\` returns the bare record (a map) and raises on error.
+\`${parentParam}\`. \`load\` returns the entity and raises on error;
+\`((:data-get ${neLow}))\` reads its record.
 
 \`\`\`clojure
 (try
   (let [${neLow} (e-${neLow}/load (api/${neLow} client nil) (vs/jm ${neMatch.join(' ')}) nil)]
-    (println ${neLow}))
+    (println ((:data-get ${neLow}))))
   (catch Exception err
     (println "load failed:" (.getMessage err))))
 \`\`\`
@@ -132,12 +136,13 @@ ${nestedEntity.Name} is nested under ${parentName}, so provide the
 
       Content(`### 3. Load ${article} ${eLow}
 
-\`load\` returns the bare record (a map) and raises on error.
+\`load\` returns the entity and raises on error; \`((:data-get ${eLow}))\` reads
+its record.
 
 \`\`\`clojure
 (try
   (let [${eLow} (e-${eLow}/load (api/${eLow} client nil) ${loadArg} nil)]
-    (println ${eLow}))
+    (println ((:data-get ${eLow}))))
   (catch Exception err
     (println "load failed:" (.getMessage err))))
 \`\`\`
@@ -163,16 +168,17 @@ ${nestedEntity.Name} is nested under ${parentName}, so provide the
       return it && it.type
     }
     const idValueFor = (opname: string): string => (null != dataIdF && opnames.includes('create'))
-      ? `(vs/getprop created "${dataIdF}")`
+      ? `(vs/getprop ((:data-get created)) "${dataIdF}")`
       : cljLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`clojure
 `)
       if (opnames.includes('create')) {
-        Content(`;; Create — returns the bare created record (a map)
+        Content(`;; Create — returns the created entity
 (def created (e-${eLow}/create (api/${eLow} client nil) (vs/jm ${examplePairs('create').join(' ')}) nil))
 
 `)
@@ -180,8 +186,15 @@ ${nestedEntity.Name} is nested under ${parentName}, so provide the
       if (opnames.includes('update')) {
         const updatePairs = (idF ? [`"${idF}" ${idValueFor('update')}`] : []).concat(examplePairs('update'))
         const fromCreated = null != dataIdF && opnames.includes('create')
-        Content(`;; Update${fromCreated ? " — the created record's id is a plain map key" : ''}
+        Content(`;; Update${fromCreated ? " — the created entity's record holds its id" : ''}
 (e-${eLow}/update (api/${eLow} client nil) (vs/jm ${updatePairs.join(' ')}) nil)
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`"${idF}" ${idValueFor('patch')}`] : []).concat(examplePairs('patch'))
+        Content(`;; Patch — sends only the fields given
+(e-${eLow}/patch (api/${eLow} client nil) (vs/jm ${patchPairs.join(' ')}) nil)
 
 `)
       }

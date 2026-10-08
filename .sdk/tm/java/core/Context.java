@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 import JAVAPACKAGE.utility.struct.Struct;
@@ -151,7 +152,7 @@ public class Context {
       this.opmap = basectx.opmap;
     }
     if (this.opmap == null) {
-      this.opmap = new LinkedHashMap<>();
+      this.opmap = new ConcurrentHashMap<>();
     }
 
     // Data
@@ -237,7 +238,7 @@ public class Context {
         List.of("entity", entname, "op", opname));
 
     String input = "match";
-    if ("update".equals(opname) || "create".equals(opname)) {
+    if ("update".equals(opname) || "create".equals(opname) || "patch".equals(opname)) {
       input = "data";
     }
 
@@ -260,11 +261,42 @@ public class Context {
 
     Operation op = new Operation(opdef);
 
-    this.opmap.put(cacheKey, op);
-    return op;
+    // Requests on other threads share this cache; every one of them gets
+    // the Operation stored first.
+    Operation stored = this.opmap.putIfAbsent(cacheKey, op);
+    return null == stored ? op : stored;
   }
 
   public SdkError makeError(String code, String msg) {
     return new SdkError(code, msg, this);
+  }
+
+  /** The raw record a serialiser reads; the live fields stay raw for the pipeline. */
+  public Map<String, Object> record() {
+    Map<String, Object> record = new LinkedHashMap<>();
+    record.put("id", this.id);
+    record.put("op", this.op);
+    record.put("spec", this.spec);
+    record.put("entity", this.entity);
+    record.put("result", this.result);
+    record.put("response", this.response);
+    record.put("meta", this.meta);
+    return record;
+  }
+
+  // The serialised context leaves the pipeline (a logger, an error dump), so
+  // it is cleaned.
+  public Map<String, Object> toMap() {
+    Map<String, Object> record = record();
+    if (this.utility == null || this.utility.clean == null) {
+      return record;
+    }
+    Map<String, Object> cleaned = Helpers.toMapAny(this.utility.clean.apply(this, record));
+    return cleaned == null ? record : cleaned;
+  }
+
+  @Override
+  public String toString() {
+    return "Context " + Struct.jsonify(toMap());
   }
 }

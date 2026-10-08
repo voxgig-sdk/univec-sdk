@@ -22,13 +22,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `(reqmatch: Value, ctrl: Value) -> Result<Value, ' + model.const.Name + 'Error>` | Load a single entity by match criteria. |',
-    list: '| `list` | `(reqmatch: Value, ctrl: Value) -> Result<Value, ' + model.const.Name + 'Error>` | List entities matching the criteria (Ok is a `Value::List`). |',
-    create: '| `create` | `(reqdata: Value, ctrl: Value) -> Result<Value, ' + model.const.Name + 'Error>` | Create a new entity. |',
-    update: '| `update` | `(reqdata: Value, ctrl: Value) -> Result<Value, ' + model.const.Name + 'Error>` | Update an existing entity. |',
-    remove: '| `remove` | `(reqmatch: Value, ctrl: Value) -> Result<Value, ' + model.const.Name + 'Error>` | Remove an entity. |',
+    load: '| `load` | `(reqmatch: Value, ctrl: Value) -> Result<Rc<Self>, ' + model.const.Name + 'Error>` | Load a single entity by match criteria. |',
+    list: '| `list` | `(reqmatch: Value, ctrl: Value) -> Result<Vec<Rc<Self>>, ' + model.const.Name + 'Error>` | List entities matching the criteria, one per record. |',
+    create: '| `create` | `(reqdata: Value, ctrl: Value) -> Result<Rc<Self>, ' + model.const.Name + 'Error>` | Create a new entity. |',
+    update: '| `update` | `(reqdata: Value, ctrl: Value) -> Result<Rc<Self>, ' + model.const.Name + 'Error>` | Update an existing entity. |',
+    patch: '| `patch` | `(reqdata: Value, ctrl: Value) -> Result<Rc<Self>, ' + model.const.Name + 'Error>` | Change part of an existing entity. |',
+    remove: '| `remove` | `(reqmatch: Value, ctrl: Value) -> Result<Rc<Self>, ' + model.const.Name + 'Error>` | Remove an entity, which is returned marked as deleted. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -96,9 +97,11 @@ ${opRows}
 
 ### Result shape
 
-Entity operations return \`Result<Value, ${model.const.Name}Error>\` — the
-bare result data on \`Ok\` (a \`Value::Map\` for single-entity ops, a
-\`Value::List\` for \`list\`) and the branded error on \`Err\`.
+Entity operations return the entity on \`Ok\`, and \`list\` a \`Vec\` of
+entities, one per record; \`data(None)\` reads an entity's record. \`Err\` is
+the branded error. The operations are methods of the
+\`${model.const.Name}Entity\` trait and \`data\` of the \`Entity\` trait, so
+import both.
 
 The \`direct()\` escape hatch resolves to \`Ok\` even on a non-2xx response —
 it returns a result \`Value::Map\` you branch on via \`getp(&result, "ok")\`:

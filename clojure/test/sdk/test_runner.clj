@@ -1,6 +1,6 @@
 ;; Univec SDK test runner (tools.deps main entry point).
 ;; Runs the vendored omni runner's smoke test, the API-agnostic suites
-;; (primary utility, pipeline, features, netsim), the generated API-specific
+;; (primary utility, pipeline, features, netsim, concurrency), the generated API-specific
 ;; suite, and the vendored struct corpus, then reports counts and exits
 ;; non-zero on any failure. `--sdk-only` skips the corpus steps (see -main).
 (ns sdk.test-runner
@@ -10,6 +10,8 @@
             [sdk.test.netsim :as netsim]
             [sdk.test.struct-corpus :as corpus]
             [sdk.test.omni-smoke :as omnismoke]
+            [sdk.test.clean :as clean]
+            [sdk.test.concurrency :as concurrency]
             [sdk.gentest :as gentest]
             [clojure.java.io :as io]))
 
@@ -88,6 +90,14 @@
   (first (filter (fn [p] (.exists (java.io.File. ^String p)))
                  ["../.sdk/test/test.json" ".sdk/test/test.json" "../../.sdk/test/test.json" "test/test.json"])))
 
+;; The agent pool keeps the JVM alive for a minute after the last task, so a
+;; run that passes exits as one that fails does.
+(defn- all-green []
+  (println "ALL GREEN")
+  (flush)
+  (shutdown-agents)
+  (System/exit 0))
+
 ;; `--sdk-only` runs the SDK's OWN suites and skips the three steps that read
 ;; the shared corpus (.sdk/test/test.json): the omni smoke test, the primary
 ;; corpus and the struct corpus. create-sdkgen compiles that corpus into
@@ -110,7 +120,11 @@
     (feature/run rec)
     (run-feature-suites rec)
     (netsim/run rec)
+    (concurrency/run rec)
     (gentest/run rec)
+    ;; The canary sweep (generated: sdk/test/clean.clj) prints its own
+    ;; `clean: swept N surface(s), M leak(s)` line, which sdkgen's lane reads.
+    (clean/run rec)
     (let [fails (filter (complement :ok) @results)
           np (count (filter :ok @results))
           nf (count fails)]
@@ -122,7 +136,7 @@
             (flush)
             (if (pos? nf)
               (System/exit 1)
-              (println "ALL GREEN")))
+              (all-green)))
         (let [cf (find-corpus-file)]
           (if (nil? cf)
             (do (println "STRUCT CORPUS: test.json not found on any candidate path") (flush) (System/exit 1))
@@ -132,4 +146,4 @@
               (flush)
               (if (or (pos? nf) (pos? cfail))
                 (System/exit 1)
-                (println "ALL GREEN")))))))))
+                (all-green)))))))))

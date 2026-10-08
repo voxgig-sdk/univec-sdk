@@ -308,7 +308,10 @@ static void fetcherLive() {
     calls->push_back(vmap({{"url", url}, {"init", fetchdef}}));
     return vmap({{"status", Value(200)}, {"statusText", Value("OK")}});
   };
-  Value opts = fhMap({{"system", fhMap({{"fetch", Value(fetchFn)}})}});
+  // Concrete base: a live construction must satisfy any server variables a
+  // templated base URL declares; a literal base sidesteps the requirement.
+  Value opts = fhMap({{"base", Value("http://localhost:8080")},
+                      {"system", fhMap({{"fetch", Value(fetchFn)}})}});
   auto liveClient = std::make_shared<UnivecSDK>(opts);
   UtilityPtr liveUtility = liveClient->getUtility();
 
@@ -328,7 +331,8 @@ static void fetcherBlockedTestMode() {
   vs::Injector fetchFn = [](vs::Injection&, const Value&, const std::string&, const Value&) -> Value {
     return vmap();
   };
-  Value opts = fhMap({{"system", fhMap({{"fetch", Value(fetchFn)}})}});
+  Value opts = fhMap({{"base", Value("http://localhost:8080")},
+                      {"system", fhMap({{"fetch", Value(fetchFn)}})}});
   auto blockedClient = std::make_shared<UnivecSDK>(opts);
   blockedClient->mode = "test";
 

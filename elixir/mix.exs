@@ -24,8 +24,10 @@ defmodule Univec.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support", "test/vendor"]
   defp elixirc_paths(_), do: ["lib"]
 
+  # Hex ships only these files; its default list leaves REFERENCE.md out.
   defp package do
     [
+      files: ["lib", "mix.exs", "LICENSE", "README.md", "REFERENCE.md"],
       licenses: ["MIT"],
       links: %{"Homepage" => "https://github.com/voxgig-sdk/univec-sdk"}
     ]

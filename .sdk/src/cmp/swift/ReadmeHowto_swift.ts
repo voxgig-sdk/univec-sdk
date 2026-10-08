@@ -1,17 +1,18 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape, requiredItems } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { swiftVarName } from './utility_swift'
+import { swiftVarName, swiftString } from './utility_swift'
 
 
 // A type-correct Swift `Value` literal for a field's canonical type.
 function swiftLit(type: any): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return '.null'
   if ('INTEGER' === k) return '.int(1)'
   if ('NUMBER' === k) return '.double(1.0)'
   if ('BOOLEAN' === k) return '.bool(true)'
@@ -39,23 +40,36 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   let testArg = 'nil'
   if (exampleEntity && isMatchOp) {
     testArg = idF ? `VMap([("${idF}", .string("test01"))])` : 'nil'
-  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp)) {
+  } else if (exampleEntity && 'list' === primaryOp && 0 < requiredItems(exampleEntity, 'list').length) {
+    const chosen = requiredItems(exampleEntity, 'list')
+    testArg = `VMap([${chosen.map((it: any) =>
+      `(${swiftString(it.name)}, ${swiftLit(it.type)})`).join(', ')}])`
+  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp)) {
     const items = opRequestShape(exampleEntity, primaryOp).items
       .filter((it: any) => it.name !== idF && it.name !== 'id')
     const required = items.filter((it: any) => !it.optional)
     const chosen = required.length ? required : items.slice(0, 3)
     testArg = `VMap([${chosen.map((it: any) =>
-      `("${it.name}", ${swiftLit(it.type)})`).join(', ')}])`
+      `(${swiftString(it.name)}, ${swiftLit(it.type)})`).join(', ')}])`
   }
 
   // The op-driven test-mode line, shown only when the SDK has an entity op.
   // A direct()-only SDK (no ops anywhere) shows a direct() call instead.
-  const testModeExample = primaryOp
-    ? `// Entity ops return the ENTITY and throws on error;
-// call data() for the record.
+  const testModeExample = 'list' === primaryOp
+    ? `// list returns a Value list of entities, one per mock record; it throws on error.
+let ${eVar}List = try client.${eName}().list(${testArg}, nil)
+for ${eVar}Item in ${eVar}List.asList?.items ?? [] {
+    if let ${eVar}Entity = ${eVar}Item.asNative as? Entity {
+        print(${eVar}Entity.data())
+    }
+}`
+    : primaryOp
+    ? `// Entity ops return the entity, wrapped in a Value; they throw on error.
 let ${eVar} = try client.${eName}().${primaryOp}(${testArg}, nil)
-// ${eVar} holds the mock response record
-print(${eVar})`
+// data() reads the entity's mock record
+if let ${eVar}Entity = ${eVar}.asNative as? Entity {
+    print(${eVar}Entity.data())
+}`
     : `let result = client.direct(VMap([
     ("path", .string("/api/resource")),
     ("method", .string("GET")),

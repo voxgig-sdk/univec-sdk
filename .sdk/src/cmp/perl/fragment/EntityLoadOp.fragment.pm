@@ -5,8 +5,8 @@
 # reqmatch: match criteria hashref (id/query fields; EntityNameLoadMatch
 # shape); optional - an entity with no id-like key loads with no match
 # (undef is treated as an empty match). ctrl: optional per-call control.
-# Returns the loaded EntityName data (hashref); dies with ProjectNameError
-# on failure.
+# Returns the loaded EntityName entity (data_get reads its record); dies
+# with ProjectNameError on failure.
 sub load {
   my ($self, $reqmatch, $ctrl) = @_;
   my $utility = $self->{_utility};

@@ -60,7 +60,7 @@ Future<void> main() async {
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
-      Content(`  // List all ${eName.toLowerCase()}s (returns a list of entities, throws on error)
+      Content(`  // List all ${eName.toLowerCase()}s (one entity per record, throws on error)
   final ${eVar}s = await client.${eName}().list(${listMatchArg(exampleEntity)});
   for (final item in ${eVar}s) {
     print(item.data());
@@ -82,9 +82,9 @@ Future<void> main() async {
             it.name === idF ? 'example_id' : 'example_' + it.name)}`).join(', ')}}`
         : ''
       Content(`
-  // Load a specific ${eName.toLowerCase()} (returns the record, throws on error)
+  // Load a specific ${eName.toLowerCase()} (returns the entity, throws on error)
   final ${eVar} = await client.${eName}().load(${loadArg});
-  print(${eVar});
+  print(${eVar}.data());
 `)
     }
   }

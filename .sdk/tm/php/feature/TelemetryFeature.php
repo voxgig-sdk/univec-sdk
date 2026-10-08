@@ -119,14 +119,16 @@ class UnivecTelemetryFeature extends UnivecBaseFeature
         $span['durationMs'] = max(0.0, (float)$span['end'] - (float)$span['start']);
         $span['ok'] = $ok;
 
+        $out = ($ctx->utility->clean)($ctx, $span);
+
         $client = $this->client;
         $client->_telemetry['active']--;
-        $client->_telemetry['spans'][] = $span;
+        $client->_telemetry['spans'][] = $out;
 
         $exporter = $this->options['exporter'] ?? null;
         if (is_callable($exporter)) {
             try {
-                $exporter($span);
+                $exporter($out);
             } catch (\Throwable $_e) {
                 // Exporter failures must never break the pipeline.
             }

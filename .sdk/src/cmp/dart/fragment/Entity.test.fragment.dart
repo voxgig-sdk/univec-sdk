@@ -19,6 +19,8 @@ void tests() {
 
     // <[SLOT:stream]>
 
+    // <[SLOT:patch]>
+
     test('basic', (t) async {
       // <[SLOT:basic]>
     });

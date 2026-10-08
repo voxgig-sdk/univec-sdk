@@ -15,6 +15,9 @@ type FetcherFn = (Context, String, JMap[String, Object]) => Object
 // clean(ctx, val) -> val
 type CleanFn = (Context, Object) => Object
 
+// cleanAdd(ctx, value): registers a secret the SDK handles
+type CleanAddFn = (Context, Object) => Unit
+
 // makeError(ctx, err) -> value (throws, or returns fallback)
 type MakeErrorFn = (Context, RuntimeException) => Object
 

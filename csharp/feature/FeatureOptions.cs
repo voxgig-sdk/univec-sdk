@@ -207,4 +207,20 @@ internal static class FeatureOptions
     {
         return int.TryParse(s.Trim(), out var n) ? n : def;
     }
+
+    // Fclean passes a record a feature is about to emit through the SDK's
+    // clean utility: every sink, buffer and logger receives the masked copy.
+    internal static Dictionary<string, object?> Fclean(Context ctx, Dictionary<string, object?> record)
+    {
+        var clean = ctx.Utility?.Clean;
+        return clean == null
+            ? record
+            : clean(ctx, record) as Dictionary<string, object?> ?? record;
+    }
+
+    internal static string FcleanStr(Context ctx, string text)
+    {
+        var clean = ctx.Utility?.Clean;
+        return clean == null ? text : clean(ctx, text) as string ?? text;
+    }
 }

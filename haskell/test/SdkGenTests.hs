@@ -22,7 +22,7 @@ loadFixture entName = do
   -- plain lowercase of the CamelCase entName (createresult) misses the
   -- underscores for multi-word entities. Convert CamelCase -> snake_case.
   let lname = camelToSnake entName
-  raw <- readFile ("../.sdk/test/entity/" ++ lname ++ "/" ++ entName ++ "TestData.json")
+  raw <- readUtf8 ("../.sdk/test/entity/" ++ lname ++ "/" ++ entName ++ "TestData.json")
   jsonRead raw
   where
     toLowerCh ch = if ch >= 'A' && ch <= 'Z' then toEnum (fromEnum ch + 32) else ch

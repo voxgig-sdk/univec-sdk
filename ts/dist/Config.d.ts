@@ -276,6 +276,7 @@ declare class Config {
             };
             optspec: {
                 clearTimer: string;
+                now: string;
                 setTimer: string;
             };
             strict: boolean;
@@ -425,6 +426,10 @@ declare class Config {
                             };
                             credential?: undefined;
                         };
+                        response: {
+                            kind: string;
+                            media: string;
+                        };
                     } | {
                         kind: string;
                         method: string;
@@ -535,6 +540,10 @@ declare class Config {
                                 source_model?: undefined;
                             };
                             credential?: undefined;
+                        };
+                        response: {
+                            kind: string;
+                            media: string;
                         };
                     } | {
                         kind: string;
@@ -653,6 +662,10 @@ declare class Config {
                                 texts?: undefined;
                             };
                         };
+                        response: {
+                            kind: string;
+                            media: string;
+                        };
                     } | {
                         kind: string;
                         method: string;
@@ -767,6 +780,10 @@ declare class Config {
                                 source_model?: undefined;
                             };
                         };
+                        response: {
+                            kind: string;
+                            media: string;
+                        };
                     })[];
                 };
             };
@@ -865,6 +882,10 @@ declare class Config {
                             };
                             credential?: undefined;
                         };
+                        response: {
+                            kind: string;
+                            media: string;
+                        };
                     } | {
                         kind: string;
                         method: string;
@@ -946,6 +967,10 @@ declare class Config {
                                 texts: string[];
                             };
                         };
+                        response: {
+                            kind: string;
+                            media: string;
+                        };
                     })[];
                 };
             };
@@ -997,6 +1022,10 @@ declare class Config {
                             id: string;
                             retention: string;
                         };
+                        response: {
+                            kind: string;
+                            media: string;
+                        };
                     }[];
                 };
             };
@@ -1044,6 +1073,10 @@ declare class Config {
                             };
                             auth: string;
                             id: string;
+                        };
+                        response: {
+                            kind: string;
+                            media: string;
                         };
                     }[];
                 };

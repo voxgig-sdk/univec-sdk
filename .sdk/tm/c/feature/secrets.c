@@ -316,9 +316,14 @@ static void secrets_reauth(SecretsFeature* f, voxgig_value* fetchdef) {
   }
 }
 
+// Every value this feature resolves or buys is a secret the SDK handles,
+// and none arrives under an option key the intake registration saw. The
+// live options map is the client's own, so the registry it carries is the
+// one every context reads.
 static void secrets_setcred(SecretsFeature* f, const char* value) {
   free(f->cred);
   f->cred = strdup(NULL == value ? "" : value);
+  if ('\0' != f->cred[0]) clean_add_opts(f->liveopts, f->cred);
 }
 
 // ---- the exchange -----------------------------------------------------------
@@ -466,6 +471,7 @@ static const char* secrets_resolve(SecretsFeature* f, Context* ctx) {
   // say whether it does.
   free(f->refresh);
   f->refresh = strdup(found ? found : "");
+  if ('\0' != f->refresh[0]) clean_add_opts(f->liveopts, f->refresh);
 
   if ('\0' == f->cred[0]) {
     // A starting access token supplied as the OPTION: read from the frozen
@@ -650,6 +656,7 @@ static void secrets_init(Feature* fb, Context* ctx, voxgig_value* options) {
   } else {
     explicit = get_str(xopts, "refresh");
   }
+  if (NULL != explicit && '\0' != explicit[0]) clean_add_opts(f->liveopts, explicit);
 
   size_t cap = 4;
   size_t count = 0;

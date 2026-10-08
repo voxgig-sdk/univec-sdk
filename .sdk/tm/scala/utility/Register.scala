@@ -6,6 +6,7 @@ import SCALAPACKAGE.core.Utility
 object Register {
   def registerAll(u: Utility): Unit = {
     u.clean = (ctx, v) => Clean.clean(ctx, v)
+    u.cleanAdd = (ctx, v) => Clean.cleanAdd(ctx, v)
     u.done = (ctx) => Done.done(ctx)
     u.makeError = (ctx, err) => MakeError.makeError(ctx, err)
     u.featureAdd = (ctx, f) => FeatureAdd.featureAdd(ctx, f)

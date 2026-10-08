@@ -35,7 +35,7 @@ unless (defined $TEST_JSON && -e $TEST_JSON) {
 # without a listed feature still skips, not fails.
 
 # The standard operation names, in the order the runner prefers them.
-my @FEATURE_CORPUS_OPS = qw(load list create update remove);
+my @FEATURE_CORPUS_OPS = qw(load list create update patch remove);
 
 my $CORPUS = do {
   open my $fh, '<', $TEST_JSON or die "cannot read $TEST_JSON: $!";
@@ -101,10 +101,14 @@ sub scripted_fetcher {
 #
 # The plain constructor, not the test-mode one: the `test` feature is
 # transport: 'base' and REPLACES the transport, so a client in test mode
-# would shadow the script.
+# would shadow the script. The `test` OPTION installs no transport: it says
+# the client is not live, so a required server variable becomes test-<name>.
 sub build_client {
   my ($kase) = @_;
-  my $opts = { 'utility' => { 'fetcher' => scripted_fetcher($kase->{res}) } };
+  my $opts = {
+    'test' => { 'active' => 1 },
+    'utility' => { 'fetcher' => scripted_fetcher($kase->{res}) },
+  };
   $opts->{feature} = $kase->{feature} if defined $kase->{feature};
   return UnivecSDK->new($opts);
 }
@@ -281,6 +285,23 @@ sub record {
   return $client->{"_$name"};
 }
 
+# The first feature a case composes that this SDK does not generate, probed
+# as a section's own feature is. Such a case is skipped rather than failed.
+sub missing_feature {
+  my ($kase, $have) = @_;
+  my $spec = $kase->{feature};
+  my @names = ref $spec eq 'ARRAY' ? map { ref $_ eq 'HASH' ? $_->{name} : undef } @$spec
+    : ref $spec eq 'HASH' ? sort keys %$spec
+    : ();
+  for my $name (@names) {
+    next unless defined $name && !ref $name;
+    $have->{$name} //=
+      present(build_client({ feature => [ { name => $name, active => 1 } ] }), $name) ? 1 : 0;
+    return $name unless $have->{$name};
+  }
+  return undef;
+}
+
 
 my @ops = usable_ops(2);
 
@@ -291,6 +312,8 @@ ok(scalar(@ops) > 0,
   done_testing();
   exit 0;
 };
+
+my %have;
 
 for my $name (sort keys %{ $CORPUS->{feature} || {} }) {
   my $section = ($CORPUS->{feature} || {})->{$name};
@@ -315,53 +338,69 @@ for my $name (sort keys %{ $CORPUS->{feature} || {} }) {
   my $ran = 0;
   for my $raw (@$cases) {
     my $need = tokens_used($raw);
-    next if $need > scalar(@ops);
+    if ($need > scalar(@ops)) {
+      diag(sprintf('skip "%s": needs %d operations, this SDK offers %d',
+        $raw->{name} // '', $need, scalar(@ops)));
+      next;
+    }
+
+    my $missing = missing_feature($raw, \%have);
+    if (defined $missing) {
+      diag(sprintf('skip "%s": needs the %s feature, which this SDK does not generate',
+        $raw->{name} // '', $missing));
+      next;
+    }
 
     my %tokens;
     for my $i (0 .. $need - 1) {
       $tokens{ '#OP' . ($i + 1) } = $ops[$i]{key};
     }
     my $kase = resolve($raw, \%tokens);
-
-    my $client = build_client($kase);
     my $label = $kase->{name} || '';
-
-    for my $step (@{ $kase->{op} || [] }) {
-      my $op = $by_key{ $step->{op} };
-      ok(defined $op, "$label: operation $step->{op} is known") or next;
-      my $ctrl = $step->{ctrl} || {};
-      my $wanterr = $step->{err};
-
-      my $ok = eval { invoke($client, $op, $ctrl); 1 };
-      my $err = $@;
-
-      if (!defined $wanterr) {
-        ok($ok, "$label: $step->{op} succeeded")
-          or diag("failed unexpectedly: $err");
-        next;
-      }
-
-      ok(!$ok, "$label: $step->{op} failed as expected") or next;
-
-      if (!ref $wanterr) {
-        # The CODE, not the message: make_error prefixes and humanises the
-        # text, so matching it would pass on any error mentioning the word.
-        my $code = (Scalar::Util::blessed($err) && $err->can('code'))
-          ? $err->code : undef;
-        is($code, $wanterr, "$label: error code");
-      }
-    }
-
-    subset(record($client, $name), $kase->{out}, "$label: _$name");
     $ran++;
+
+    # Every failing case is reported, not only the first.
+    my $done = eval {
+      my $client = build_client($kase);
+
+      for my $step (@{ $kase->{op} || [] }) {
+        my $op = $by_key{ $step->{op} };
+        ok(defined $op, "$label: operation $step->{op} is known") or next;
+        my $ctrl = $step->{ctrl} || {};
+        my $wanterr = $step->{err};
+
+        my $ok = eval { invoke($client, $op, $ctrl); 1 };
+        my $err = $@;
+
+        if (!defined $wanterr) {
+          ok($ok, "$label: $step->{op} succeeded")
+            or diag("failed unexpectedly: $err");
+          next;
+        }
+
+        ok(!$ok, "$label: $step->{op} failed as expected") or next;
+
+        if (!ref $wanterr) {
+          # The CODE, not the message: make_error prefixes and humanises the
+          # text, so matching it would pass on any error mentioning the word.
+          my $code = (Scalar::Util::blessed($err) && $err->can('code'))
+            ? $err->code : undef;
+          is($code, $wanterr, "$label: error code");
+        }
+      }
+
+      subset(record($client, $name), $kase->{out}, "$label: _$name");
+      1;
+    };
+    fail("$label: $@") unless $done;
   }
 
-  ok($ran > 0, "at least one feature.$name case ran");
   # Say how many ran. A partial run is legitimate (an SDK with one operation
   # skips the cases needing two) but it should be visible rather than
   # inferred from a green tick.
   diag(sprintf('feature.%s: ran %d of %d case(s) against %d operation(s)',
     $name, $ran, scalar(@$cases), scalar(@ops)));
+  ok($ran > 0, "at least one feature.$name case ran");
 }
 
 done_testing();

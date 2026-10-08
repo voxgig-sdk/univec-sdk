@@ -5,6 +5,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 import JAVAPACKAGE.core.Context;
 import JAVAPACKAGE.core.SdkClient;
@@ -52,34 +54,65 @@ public class TimeoutFeature extends BaseFeature {
       return inner.fetch(ctx, url, fetchdef);
     }
 
-    CompletableFuture<Object> fut =
-        CompletableFuture.supplyAsync(() -> inner.fetch(ctx, url, fetchdef));
+    // The deadline runs from here, not from the wait below: a caller paused
+    // between the two would otherwise find a late response complete and take
+    // it. The worker notes when it finished, so a response or a failure after
+    // the deadline is a timeout however late the caller looks.
+    final LongSupplier now = FeatureOptions.foptNow(this.options);
+    final long start = now.getAsLong();
+    final AtomicLong arrived = new AtomicLong(Long.MAX_VALUE);
+    CompletableFuture<Object> fut = CompletableFuture.supplyAsync(() -> {
+      try {
+        return inner.fetch(ctx, url, fetchdef);
+      }
+      finally {
+        arrived.set(now.getAsLong());
+      }
+    });
 
     try {
-      return fut.get(deadline, TimeUnit.MILLISECONDS);
+      long remaining = Math.max(0L, deadline - (now.getAsLong() - start));
+      Object out;
+      try {
+        out = fut.get(remaining, TimeUnit.MILLISECONDS);
+      }
+      catch (java.util.concurrent.ExecutionException e) {
+        if (deadline < arrived.get() - start) {
+          throw timeout(ctx, deadline);
+        }
+        throw unwrap(e);
+      }
+      if (deadline < arrived.get() - start) {
+        throw timeout(ctx, deadline);
+      }
+      return out;
     }
     catch (TimeoutException e) {
-      track(deadline);
-      throw ctx.makeError("timeout",
-          "Request exceeded timeout of " + deadline + "ms");
-    }
-    catch (java.util.concurrent.ExecutionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof CompletionException && cause.getCause() != null) {
-        cause = cause.getCause();
-      }
-      if (cause instanceof RuntimeException) {
-        throw (RuntimeException) cause;
-      }
-      if (cause instanceof Error) {
-        throw (Error) cause;
-      }
-      throw new RuntimeException(cause);
+      throw timeout(ctx, deadline);
     }
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     }
+  }
+
+  private static RuntimeException unwrap(java.util.concurrent.ExecutionException e) {
+    Throwable cause = e.getCause();
+    if (cause instanceof CompletionException && cause.getCause() != null) {
+      cause = cause.getCause();
+    }
+    if (cause instanceof RuntimeException) {
+      return (RuntimeException) cause;
+    }
+    if (cause instanceof Error) {
+      throw (Error) cause;
+    }
+    return new RuntimeException(cause);
+  }
+
+  private RuntimeException timeout(Context ctx, int deadline) {
+    track(deadline);
+    return ctx.makeError("timeout", "Request exceeded timeout of " + deadline + "ms");
   }
 
   private void track(int deadline) {

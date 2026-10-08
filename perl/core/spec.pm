@@ -27,6 +27,9 @@ sub new {
     body    => $specmap->{body},
     url     => $g->('url', ''),
     path    => $g->('path', ''),
+    # The query parameters prepare_auth placed: the credential, which the
+    # request sends and the entity's match leaves out.
+    authquery => $g->('authquery', []),
   }, $class;
 }
 

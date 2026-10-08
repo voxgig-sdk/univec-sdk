@@ -117,6 +117,20 @@ class PipelineTest extends TestCase
         return ($err instanceof UnivecError) ? $err->sdk_code : '';
     }
 
+    // An object is a map to the struct port, so it is a map to a cookie
+    // argument: its properties go out as pairs, read through the port.
+    public function test_prepare_headers_cookie_object(): void
+    {
+        $utility = self::utility();
+        $ctx = self::ctx([
+            'utility' => $utility,
+            'point' => ['args' => ['cookie' => [['name' => 'prefs', 'orig' => 'prefs', 'kind' => 'cookie']]]],
+            'reqmatch' => ['prefs' => (object) ['size' => 2, 'lang' => 'en gb']],
+        ]);
+        $headers = ($utility->prepare_headers)($ctx);
+        $this->assertSame('lang=en%20gb; size=2', $headers['cookie'] ?? null);
+    }
+
 
     // --- feature order (feature #2) -----------------------------------------
     // options['feature'] accepts an ordered LIST (developer add-order) or a map
@@ -750,7 +764,10 @@ class PipelineTest extends TestCase
         if ('' !== $cred['pair']) {
             // A cookie credential is a `<scheme>=<key>` pair, and the scheme
             // name leaves no room for the option's prefix.
-            $this->assertMatchesRegularExpression(self::COOKIE_PAIR, $cred['value']);
+            // preg_match rather than assertMatchesRegularExpression, which
+            // PHPUnit 8 does not have.
+            $this->assertSame(1, preg_match(self::COOKIE_PAIR, (string) $cred['value']),
+                (string) $cred['value']);
             return;
         }
         // A header credential is prefix-joined; a query credential is the raw

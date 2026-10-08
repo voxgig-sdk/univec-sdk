@@ -73,7 +73,9 @@ pub const AuditFeature = struct {
         h.setp(record, "correlationId", h.vstr(ctx.id));
         if (ctx.result) |r| h.setp(record, "status", h.vnum(r.status));
 
-        self.records.append(h.A(), record) catch {};
+        const out = ctx.util().clean(ctx, record);
+
+        self.records.append(h.A(), out) catch {};
         const max: usize = @intCast(@max(sup.fopt_int(self.options, "max", 1000), 0));
         while (self.records.items.len > max) {
             _ = self.records.orderedRemove(0);
@@ -81,7 +83,7 @@ pub const AuditFeature = struct {
 
         const sink = h.getp(self.options, "sink");
         if (sink == .function) {
-            _ = h.call_vfn(sink, record);
+            _ = h.call_vfn(sink, out);
         }
     }
 

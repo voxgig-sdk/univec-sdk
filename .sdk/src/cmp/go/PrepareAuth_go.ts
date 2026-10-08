@@ -87,7 +87,7 @@ func prepareAuthUtil(ctx *core.Context) (*core.Spec, error) {
 import (
 ${withBasic ? `	"encoding/base64"
 
-` : ''}${'cookie' === spec.where ? `	"strings"
+` : ''}${'query' !== spec.where ? `	"strings"
 
 ` : ''}	vs "${spec.gomodule}/utility/struct"
 
@@ -99,6 +99,14 @@ ${'cookie' === spec.where ? `const cookieHeader = "cookie"
 ` : ''}const optionApikey = "apikey"
 ${withBasic ? `const optionSecret = "secret"
 ` : ''}const notFound = "__NOTFOUND__"
+
+// The client's auth.name option, when set, replaces the name the API declares.
+func authName(options map[string]any) string {
+	if name, ok := vs.GetPath(options, []any{"auth", "name"}).(string); ok && name != "" {
+		return ${caseFold(spec.where, 'name')}
+	}
+	return credName
+}
 
 ${cookieHelper(spec.where)}func prepareAuthUtil(ctx *core.Context) (*core.Spec, error) {
 	spec := ctx.Spec
@@ -112,8 +120,15 @@ ${cookieHelper(spec.where)}func prepareAuthUtil(ctx *core.Context) (*core.Spec, 
 
 	// Public APIs that need no auth omit the options.auth block entirely.
 	if options["auth"] == nil {
-		${clear(spec.where)}
+		${clear(spec.where, 'credName')}
 		return spec, nil
+	}
+
+	name := authName(options)
+
+	// A credential left under the declared name would travel beside the renamed one.
+	if name != credName {
+		${clear(spec.where, 'credName')}
 	}
 
 	apikey := vs.GetProp(options, optionApikey, notFound)
@@ -128,26 +143,27 @@ ${cookieHelper(spec.where)}func prepareAuthUtil(ctx *core.Context) (*core.Spec, 
 `
 
   const basicBlock = !withBasic ? '' : `
-	// True HTTP Basic Auth needs TWO credentials, base64-joined - a single
+	// True HTTP Basic Auth joins the two credentials, base64-encoded - a single
 	// token in the header (the branch below) can never authenticate against
 	// an API that actually checks \`Authorization: Basic base64(user:pass)\`.
+	// The password may be empty (RFC 7617): Lob, for one, documents the key as
+	// the user with a blank password (\`curl -u key:\`).
 	if basicAuth, _ := vs.GetPath(options, []any{"auth", "basic"}).(bool); basicAuth {
 		secret := vs.GetProp(options, optionSecret, notFound)
 
-		noSecret := false
-		if secret == nil {
-			noSecret = true
-		} else if secretStr, ok := secret.(string); ok &&
-			(secretStr == notFound || secretStr == "") {
-			noSecret = true
+		secretVal, _ := secret.(string)
+		if secretVal == notFound {
+			secretVal = ""
 		}
 
-		if skip || noSecret {
-			${clear(spec.where)}
+		if skip {
+			${clear(spec.where, 'name')}
 		} else {
 			apikeyVal, _ := apikey.(string)
-			secretVal, _ := secret.(string)
 			b64 := base64.StdEncoding.EncodeToString([]byte(apikeyVal + ":" + secretVal))
+			// The joined, encoded pair is a wire form neither credential's own
+			// registration covers.
+			ctx.Utility.CleanAdd(ctx, b64)
 
 			basicPrefix := ""
 			if ap := vs.GetPath(options, []any{"auth", "prefix"}); ap != nil {
@@ -155,9 +171,9 @@ ${cookieHelper(spec.where)}func prepareAuthUtil(ctx *core.Context) (*core.Spec, 
 			}
 			// Empty prefix (raw apiKey credential) must not add a leading space.
 			if basicPrefix == "" {
-				${bagName(spec.where)}[credName] = b64
+				${bagName(spec.where)}[name] = b64
 			} else {
-				${bagName(spec.where)}[credName] = basicPrefix + " " + b64
+				${bagName(spec.where)}[name] = basicPrefix + " " + b64
 			}
 		}
 
@@ -167,9 +183,9 @@ ${cookieHelper(spec.where)}func prepareAuthUtil(ctx *core.Context) (*core.Spec, 
 
   return head + basicBlock + `
 	if skip {
-		${clear(spec.where)}
+		${clear(spec.where, 'name')}
 	} else {
-${place(spec.where)}
+${place(spec.where, 'name')}
 	}
 
 	return spec, nil
@@ -195,14 +211,20 @@ function bagField(where: string): string {
 }
 
 
+// Header names travel lower-cased; query and cookie names are case-sensitive.
+function caseFold(where: string, expr: string): string {
+  return 'header' === where ? 'strings.ToLower(' + expr + ')' : expr
+}
+
+
 // A cookie has no header of its own: place() writes it into `cookie` as
-// `credName=value`, so clear() must free that slot, not credName.
-function clear(where: string): string {
+// `name=value`, so clear() frees that pair, not a header of that name.
+function clear(where: string, name: string): string {
   if ('cookie' === where) {
-    return `cookieSet(headers, nil)`
+    return `cookieSet(headers, ${name}, nil)`
   }
 
-  return `delete(${bagName(where)}, credName)`
+  return `delete(${bagName(where)}, ${name})`
 }
 
 
@@ -211,23 +233,16 @@ function cookieHelper(where: string): string {
     return ''
   }
 
-  return `func cookieSet(headers map[string]any, value any) {
+  return `func cookieSet(headers map[string]any, name string, value any) {
 	kept := []string{}
 
 	if existing, ok := headers[cookieHeader].(string); ok && existing != "" {
-		for _, part := range strings.Split(existing, ";") {
-			piece := strings.TrimSpace(part)
-			if piece == "" || piece == credName ||
-				strings.HasPrefix(piece, credName+"=") {
-				continue
-			}
-			kept = append(kept, piece)
-		}
+		kept = cookieKeep(existing, map[string]bool{name: true})
 	}
 
 	if value != nil {
 		valStr, _ := value.(string)
-		kept = append(kept, credName+"="+valStr)
+		kept = append(kept, name+"="+valStr)
 	}
 
 	if len(kept) == 0 {
@@ -241,13 +256,13 @@ function cookieHelper(where: string): string {
 }
 
 
-function place(where: string): string {
+function place(where: string, name: string): string {
   if ('query' === where) {
     return `		apikeyVal := ""
 		if av, ok := apikey.(string); ok {
 			apikeyVal = av
 		}
-		query[credName] = apikeyVal`
+		query[${name}] = apikeyVal`
   }
 
   if ('cookie' === where) {
@@ -255,7 +270,7 @@ function place(where: string): string {
 		if av, ok := apikey.(string); ok {
 			apikeyVal = av
 		}
-		cookieSet(headers, apikeyVal)`
+		cookieSet(headers, ${name}, apikeyVal)`
   }
 
   return `		authPrefix := ""
@@ -268,9 +283,9 @@ function place(where: string): string {
 		}
 		// Empty prefix (raw apiKey credential) must not add a leading space.
 		if authPrefix == "" {
-			headers[credName] = apikeyVal
+			headers[${name}] = apikeyVal
 		} else {
-			headers[credName] = authPrefix + " " + apikeyVal
+			headers[${name}] = authPrefix + " " + apikeyVal
 		}`
 }
 

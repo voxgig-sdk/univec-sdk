@@ -123,13 +123,15 @@ function TelemetryFeature:_close(ctx, ok)
   span.durationMs = math.max(0, span["end"] - span.start)
   span.ok = ok
 
+  local out = ctx.utility.clean(ctx, span)
+
   local client = self.client
   client._telemetry.active = client._telemetry.active - 1
-  table.insert(client._telemetry.spans, span)
+  table.insert(client._telemetry.spans, out)
 
   local exporter = self.options["exporter"]
   if type(exporter) == "function" then
-    pcall(exporter, span)
+    pcall(exporter, out)
   end
 end
 

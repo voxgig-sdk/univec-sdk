@@ -1,10 +1,11 @@
 // Univec SDK — debug feature (mirrors java feature/DebugFeature.java).
 // Request/response capture for debugging. Records a bounded ring buffer of
 // per-operation traces — method, URL, redacted headers, response status and
-// timing — on the feature's entries. Sensitive header values (matching
-// `redact`) are masked. An optional `onEntry` callback receives each finished
-// entry. `max` caps the buffer (default 100). The per-context entry marker
-// (java ctx.out) is kept here keyed by ctx.id.
+// timing — on the feature's entries. The SDK's own clean rules apply to the
+// whole entry; the `redact` option ADDS header names on top of them. An
+// optional `onEntry` callback receives each finished entry. `max` caps the
+// buffer (default 100). The per-context entry marker (java ctx.out) is kept
+// here keyed by ctx.id.
 
 #ifndef SDK_FEATURE_DEBUG_HPP
 #define SDK_FEATURE_DEBUG_HPP
@@ -56,7 +57,7 @@ public:
       } else {
         map_put(entry, "url", Value(ctx->spec->path));
       }
-      map_put(entry, "headers", redact(ctx->spec->headers));
+      map_put(entry, "headers", redact(ctx, ctx->spec->headers));
     }
     pending[ctx->id] = entry;
   }
@@ -110,6 +111,11 @@ private:
       map_put(entry, "status", Value(ctx->result->status));
     }
 
+    // The whole entry leaves through the buffer and the callback: the url
+    // and the error message can carry a query credential the header mask
+    // above never saw.
+    entry = ctx->utility->clean(ctx, entry);
+
     entries.as_list()->push_back(entry);
     int max = fopt::foptInt(options, "max", 100);
     while ((int) entries.as_list()->size() > max) {
@@ -123,14 +129,16 @@ private:
     }
   }
 
-  Value redact(const Value& headers) {
+  // The core clean rules apply (clean.keys, every registered value); the
+  // feature's own `redact` list ADDS header names on top of them.
+  Value redact(CtxPtr ctx, const Value& headers) {
     Value out = vmap();
     if (!headers.is_map()) return out;
 
-    std::vector<std::string> patterns = fopt::foptStrList(options, "redact");
-    if (!fopt::foptList(options, "redact").is_list()) {
-      patterns = {"authorization", "cookie", "set-cookie", "api-key",
-                  "apikey", "x-api-key", "idempotency-key"};
+    std::vector<std::string> patterns;
+    for (std::string p : fopt::foptStrList(options, "redact")) {
+      for (auto& c : p) c = static_cast<char>(std::tolower((unsigned char)c));
+      patterns.push_back(p);
     }
     for (const auto& kv : *headers.as_map()) {
       std::string lk = kv.first;
@@ -143,12 +151,12 @@ private:
         }
       }
       if (masked) {
-        map_put(out, kv.first, Value("<redacted>"));
+        map_put(out, kv.first, Value("[redacted]"));
       } else {
         map_put(out, kv.first, kv.second);
       }
     }
-    return out;
+    return ctx->utility->clean(ctx, out);
   }
 };
 

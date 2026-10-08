@@ -100,6 +100,7 @@ public class AuditFeature : BaseFeature
         {
             record["status"] = ctx.Result.Status;
         }
+        record = Fclean(ctx, record);
 
         Records.Add(record);
         var max = FoptInt(_options, "max", 1000);

@@ -6,6 +6,8 @@ import {
   walk,
 } from '@voxgig/struct'
 
+import { canonScalarKey, requiredItems } from '@voxgig/sdkgen'
+
 
 function projectPath(suffix?: string): string {
   return Path.normalize(Path.join(__dirname, '../../..', suffix ?? ''))
@@ -119,7 +121,19 @@ function cljStringChunks(json: string, maxBytes: number = 20000): string[] {
   return 0 === chunks.length ? [''] : chunks
 }
 
+// A list's required route and query parameters, as the match it is called with.
+function cljListMatch(entity: any): string {
+  const lit = (type: any): string =>
+    (({ NULL: 'nil', INTEGER: '1', NUMBER: '1', BOOLEAN: 'true', ARRAY: '(vs/jt)', OBJECT: '(vs/jm)' }) as any)[canonScalarKey(type)] ?? '"example"'
+  const items = requiredItems(entity, 'list')
+  return 0 < items.length
+    ? `(vs/jm ${items.map((it: any) => `${cljString(it.name)} ${lit(it.type)}`).join(' ')})`
+    : 'nil'
+}
+
+
 export {
+  cljListMatch,
   cljStringChunks,
   clean,
   formatCljValue,

@@ -13,12 +13,26 @@
             [voxgig.struct :as vs]
             [clojure.string :as str]))
 
+;; The client prints as its name and its options atom as the cleaned options:
+;; a bare map of atoms prints every slot, credentials included, and a client
+;; is what gets logged.
+(defmethod print-method ::client [_ ^java.io.Writer w]
+  (.write w (str "#sdk/client {\"name\":\"" core/SDK-NAME "\"}")))
+
+(defmethod print-method ::options [a ^java.io.Writer w]
+  (let [opts (deref a)]
+    (.write w (str "#sdk/options "
+                   (vs/jsonify (core/u-clean (atom {:options opts}) opts) (vs/jm "indent" 0))))))
+
 (defn make-sdk [options]
   (let [options (or options (vs/jm))
         utility (core/make-utility)
         cfg (config/make-config)
-        client {:features (atom []) :mode (atom "live") :store (atom {})
-                :options (atom (vs/jm)) :root-ctx (atom nil) :utility utility}
+        client (with-meta
+                 {:features (atom []) :mode (atom "live") :store (atom {})
+                  :options (atom (vs/jm) :meta {:type ::options})
+                  :root-ctx (atom nil) :utility utility}
+                 {:type ::client})
         rootctx (core/make-context
                  (vs/jm "client" client "utility" utility "config" cfg "options" options "shared" (vs/jm)) nil)
         validated ((core/uget rootctx :make-options) rootctx)]
@@ -64,7 +78,13 @@
         path0 (vs/getprop fetchargs "path")
         path (if (string? path0) path0 "")
         method0 (vs/getprop fetchargs "method")
-        method (if (string? method0) method0 "GET")
+        method (.toUpperCase ^String (if (and (string? method0) (not= "" method0)) method0 "GET")
+                             java.util.Locale/ROOT)
+        allow-method (vs/getpath opts "allow.method")
+        _ (when-not (core/allowed? allow-method method)
+            (core/sdk-throw (core/ctx-error ctx "spec_method_allow"
+                                            (str "Method \"" method "\" not allowed by SDK option allow.method value: \""
+                                                 (if (string? allow-method) allow-method "") "\""))))
         params (let [p (core/to-map (vs/getprop fetchargs "params"))] (if p p (vs/jm)))
         query (let [q (core/to-map (vs/getprop fetchargs "query"))] (if q q (vs/jm)))
         headers ((core/uget ctx :prepare-headers) ctx)
@@ -85,8 +105,7 @@
 
 ;; Is this raw-access op permitted by the SDK's allow.op option?
 (defn- op-allowed? [client op]
-  (let [allow (vs/getpath (core/client-options-map client) "allow.op")]
-    (and (string? allow) (str/includes? allow op))))
+  (core/allowed? (vs/getpath (core/client-options-map client) "allow.op") op))
 
 (defn- op-denied [client op]
   (let [allow (vs/getpath (core/client-options-map client) "allow.op")]
@@ -103,15 +122,17 @@
         fetchargs (or fetchargs (vs/jm))
         pr (try {:fd (prepare client fetchargs)}
                 (catch clojure.lang.ExceptionInfo e {:err (core/ex->sdk e)}))]
+    ;; The error is returned rather than passed through make-error, so it is
+    ;; cleaned here.
     (if (:err pr)
-      (vs/jm "ok" false "err" (:err pr))
+      (vs/jm "ok" false "err" (core/ucall (core/client-root-ctx client) :clean (:err pr)))
       (let [fetchdef (:fd pr)
             ctrl (let [c (core/to-map (vs/getprop fetchargs "ctrl"))] (if c c (vs/jm)))
             ctx (core/make-context (vs/jm "opname" "direct" "ctrl" ctrl) (core/client-root-ctx client))
             url (or (vs/getprop fetchdef "url") "")
             [fetched fetch-err] ((core/uget ctx :fetcher) ctx url fetchdef)]
         (cond
-          fetch-err (vs/jm "ok" false "err" fetch-err)
+          fetch-err (vs/jm "ok" false "err" (core/ucall ctx :clean fetch-err))
           (nil? fetched) (vs/jm "ok" false "err" (core/ctx-error ctx "direct_no_response" "response: undefined"))
           (vs/ismap fetched)
           (let [status (core/to-int (vs/getprop fetched "status"))
@@ -120,8 +141,17 @@
                 no-body (or (= status 204) (= status 304) (= (str content-length) "0"))
                 json-data (when-not no-body
                             (let [jf (vs/getprop fetched "json")]
-                              (when (fn? jf) (try (jf) (catch Throwable _ nil)))))]
-            (vs/jm "ok" (and (>= status 200) (< status 300)) "status" status "headers" headers "data" json-data))
+                              (when (fn? jf) (try (jf) (catch Throwable _ nil)))))
+                body-err (when (and (not no-body) (true? (vs/getprop fetched "unreadable")))
+                           (core/unreadable-body
+                             ctx status headers (vs/getprop fetched "body") (vs/getprop fetchdef "headers")
+                             (when-not (and (>= status 200) (< status 300))
+                               (core/ctx-error ctx "request_status"
+                                               (str "request: " status ": " (or (vs/getprop fetched "statusText") ""))))))
+                out (vs/jm "ok" (and (nil? body-err) (>= status 200) (< status 300))
+                           "status" status "headers" headers "data" json-data)]
+            (when body-err (vs/setprop out "err" (core/ucall ctx :clean body-err)))
+            out)
           :else (vs/jm "ok" false "err" (core/ctx-error ctx "direct_invalid" "invalid response type")))))))
 
 ;; Raw endpoint access is operator-controllable, like every entity op.

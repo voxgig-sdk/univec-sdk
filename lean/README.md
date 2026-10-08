@@ -4,7 +4,7 @@
 
 The Lean SDK for the Univec API — an entity-oriented client
 for Lean 4. The API is surfaced as capitalised Entities with a small, uniform
-verb set (`list`, `load`, `create`, `update`, `remove`); every operation is
+verb set (`list`, `load`, `create`, `update`, `patch`, `remove`); every operation is
 driven by the embedded config through the dependency-free vendored voxgig
 `Value` struct model, and runs in struct's `SIO` monad.
 
@@ -61,14 +61,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -77,8 +78,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 

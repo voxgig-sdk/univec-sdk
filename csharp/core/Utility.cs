@@ -7,6 +7,7 @@ namespace UnivecSdk;
 public class Utility
 {
     public Func<Context, object?, object?> Clean = null!;
+    public Action<Context, object?> CleanAdd = null!;
     public Func<Context, object?> Done = null!;
     public Func<Context, Exception?, object?> MakeError = null!;
     public Action<Context, Feature.BaseFeature> FeatureAdd = null!;
@@ -55,6 +56,7 @@ public class Utility
         var u = new Utility(true)
         {
             Clean = src.Clean,
+            CleanAdd = src.CleanAdd,
             Done = src.Done,
             MakeError = src.MakeError,
             FeatureAdd = src.FeatureAdd,

@@ -18,6 +18,7 @@ trait SdkEntity extends Entity {
   def list(reqmatch: JMap[String, Object], ctrl: JMap[String, Object]): Object
   def create(reqdata: JMap[String, Object], ctrl: JMap[String, Object]): Object
   def update(reqdata: JMap[String, Object], ctrl: JMap[String, Object]): Object
+  def patch(reqdata: JMap[String, Object], ctrl: JMap[String, Object]): Object
   def remove(reqmatch: JMap[String, Object], ctrl: JMap[String, Object]): Object
   // Runs `action` through the pipeline and returns an Iterator over result
   // items (the streaming feature's incremental output when active, else the

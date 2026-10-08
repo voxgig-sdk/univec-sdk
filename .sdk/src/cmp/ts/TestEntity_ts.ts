@@ -1,6 +1,6 @@
 import { boundedFacts, pointFacts } from '@voxgig/sdkgen'
 import { buildIdNames } from '@voxgig/sdkgen'
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable, invalidRequest } from '@voxgig/sdkgen'
 
 import * as Path from 'node:path'
 
@@ -40,6 +40,8 @@ import {
   jsKey,
   jsProp,
   hasLiveScenarios,
+  liveStrict,
+  liveStrictNote,
 } from '@voxgig/sdkgen'
 
 
@@ -115,12 +117,22 @@ const TestEntity = cmp(function TestEntity(props: any) {
           return;
         }
 
+        Slot({ name: 'failure' }, () => {
+          if (opReachable((entity.op as any)?.list, [])) {
+            Content(failureTests(model, entity))
+          }
+          Content(validateTest(model, entity))
+        })
+
         const indent = 2
 
         const idlist = buildIdNames(entity, basicflow)
 
         Slot({ name: 'basicSetup' }, () => {
           Content(`
+${liveStrictNote(liveStrict(model, target.name), '//')}
+const LIVE_STRICT = ${liveStrict(model, target.name)}
+
 function basicSetup(extra?: any) {
   // TODO: fix test def options
   const options: any = {} // ${jsonify(basicflow.test, { offset: indent - 2 })}
@@ -228,7 +240,7 @@ function basicSetup(extra?: any) {
     ${hasLiveScenarios(model) ? `if (live) { t.skip('Covered by live operation scenarios'); return }` : ''}
     const setup = basicSetup()
     if (setup.live) {
-      return runLiveEntity(setup, ${JSON.stringify(entity)}, ${JSON.stringify(basicflow)}, '${nom(entity, 'Name')}', ${JSON.stringify(liveFacts)})
+      return runLiveEntity(setup, ${JSON.stringify(entity)}, ${JSON.stringify(basicflow)}, '${nom(entity, 'Name')}', ${JSON.stringify(liveFacts)}, { strict: LIVE_STRICT, t })
     }
     const client = setup.client
     const struct = setup.struct
@@ -562,6 +574,84 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A failed operation rejects a stream as it rejects the operation: a
+// transport failure, and a hook that rejects the call. A throwing hook fires
+// PreUnexpected, and under throw false the call resolves to undefined. The
+// caller's ctrl stays its own.
+function failureTests(model: Model, entity: ModelEntity): string {
+  const SDK = model.Name + 'SDK'
+  const Entity = nom(entity, 'Name')
+  return `
+  class FailHook extends BaseFeature {
+    name = 'failhook'
+    version = '0.0.1'
+    active = true
+    unexpected = 0
+    init() { }
+    PreSpec() { throw new Error('${entity.name} hook failed') }
+    PreUnexpected() { this.unexpected++ }
+  }
+
+  test('stream-error', async () => {
+    const offline = { net: { offline: true } }
+    await assert.rejects(async () => {
+      for await (const _item of ${SDK}.test(offline).${Entity}().stream('list')) { }
+    }, /offline/)
+
+    for await (const _item of ${SDK}.test(offline).${Entity}()
+      .stream('list', undefined, { ctrl: { throw: false } })) { }
+
+    if (null != (config as any).feature?.rbac) {
+      const denied = ${SDK}.test(undefined, { feature: { rbac: { active: true, deny: true } } })
+      await assert.rejects(async () => {
+        for await (const _item of denied.${Entity}().stream('list')) { }
+      }, (err: any) => 'rbac_denied' === err.code)
+    }
+  })
+
+  test('stream-ctrl', async () => {
+    const explain: any = {}
+    const ctrl: any = { explain }
+    for await (const _item of ${SDK}.test().${Entity}().stream('list', undefined, { ctrl })) { }
+    assert.deepStrictEqual(Object.keys(ctrl), ['explain'])
+    assert(explain === ctrl.explain && 0 < Object.keys(explain).length)
+  })
+
+  test('unexpected', async () => {
+    const hook = new FailHook()
+    const client = new ${SDK}({ feature: { test: { active: true } }, extend: [hook] })
+    await assert.rejects(client.${Entity}().list(), /hook failed/)
+    assert(0 < hook.unexpected)
+
+    const fired = hook.unexpected
+    assert.strictEqual(await client.${Entity}().list(undefined, { throw: false }), undefined)
+    assert(fired < hook.unexpected)
+  })
+`
+}
+
+
+// An invalid request fails with validate's own error, before it is sent.
+function validateTest(model: Model, entity: ModelEntity): string {
+  const bad = invalidRequest(entity)
+  if (null == bad) {
+    return ''
+  }
+  const SDK = model.Name + 'SDK'
+  return `
+  test('validate', async (t) => {
+    if (null == (config as any).feature?.validate) {
+      t.skip('feature not present in this SDK: validate')
+      return
+    }
+    const client = ${SDK}.test(undefined, { feature: { validate: { active: true } } })
+    await assert.rejects(client.${nom(entity, 'Name')}().${bad.op}(${JSON.stringify(bad.args)} as any),
+      (err: any) => 'validate_failed' === err.code)
+  })
+`
 }
 
 

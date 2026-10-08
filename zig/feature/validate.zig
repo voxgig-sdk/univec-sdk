@@ -125,6 +125,8 @@ pub const ValidateFeature = struct {
         // custom-action call would be rejected for the one key that made it
         // reachable.
         _ = out.object.fetchOrderedRemove("$action");
+        // Nor is `$body`, the raw request body.
+        _ = out.object.fetchOrderedRemove("$body");
 
         return out;
     }

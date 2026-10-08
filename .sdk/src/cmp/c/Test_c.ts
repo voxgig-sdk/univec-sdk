@@ -8,6 +8,7 @@ import { cmp, each, Folder, File, Content, entityCollection } from '@voxgig/sdkg
 
 import { TestEntity } from './TestEntity_c'
 import { TestDirect } from './TestDirect_c'
+import { TestClean } from './TestClean_c'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_c'
 
 
@@ -41,6 +42,8 @@ int main(void) {
       TestEntity({ target, entity })
       TestDirect({ target, entity })
     })
+
+    TestClean({ target })
 
     // Validate the documented C examples in the READMEs are well-formed.
     ReadmeExamplesTest({ target })

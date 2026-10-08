@@ -14,6 +14,9 @@ final class MakeUrl {
 
   private MakeUrl() {}
 
+  private static final java.util.regex.Pattern PLACEHOLDER =
+      java.util.regex.Pattern.compile("\\{[^{}/]+\\}");
+
   static String makeUrl(Context ctx) {
     Spec spec = ctx.spec;
     Result result = ctx.result;
@@ -34,7 +37,18 @@ final class MakeUrl {
     joinParts.add(spec.suffix);
     String url = Struct.join(joinParts, "/", true);
 
+    // A route the definition ends with a slash keeps it: a server such as a
+    // Django REST one redirects or refuses the route without it.
+    Object orig = ctx.point == null ? null : Struct.getprop(ctx.point, "orig", null);
+    if (orig instanceof String && ((String) orig).endsWith("/") &&
+        (spec.suffix == null || spec.suffix.isEmpty()) && !url.endsWith("/")) {
+      url = url + "/";
+    }
+
     Map<String, Object> resmatch = new LinkedHashMap<>();
+
+    // Sent with the request, never recorded as the entity's match.
+    List<String> authquery = spec.authquery == null ? List.of() : spec.authquery;
 
     Map<String, Object> params = spec.params;
     for (List<Object> item : Struct.items(params)) {
@@ -48,6 +62,20 @@ final class MakeUrl {
       }
     }
 
+    // A placeholder left in the route would send the request to the wrong route.
+    // The base's own placeholders are server variables, resolved with the options.
+    String base = null == spec.base ? "" : spec.base.replaceAll("/+$", "");
+    String route = url.startsWith(base) ? url.substring(base.length()) : url;
+    List<String> unfilled = new ArrayList<>();
+    java.util.regex.Matcher found = PLACEHOLDER.matcher(route);
+    while (found.find()) {
+      unfilled.add(found.group());
+    }
+    if (!unfilled.isEmpty()) {
+      throw ctx.makeError("url_param_missing",
+          "URL path has no value for " + String.join(", ", unfilled) + ".");
+    }
+
     // Append query string from spec.query.
     String qsep = "?";
     for (List<Object> item : Struct.items(spec.query)) {
@@ -56,7 +84,9 @@ final class MakeUrl {
       if (val != null) {
         url += qsep + Struct.escurl(key) + "=" + Struct.escurl(Struct.stringify(val));
         qsep = "&";
-        resmatch.put(key, val);
+        if (!authquery.contains(key)) {
+          resmatch.put(key, val);
+        }
       }
     }
 

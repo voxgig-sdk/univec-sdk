@@ -38,11 +38,11 @@ cd scala && scala-cli compile .
   // dependency-free, plain-source scala-cli project (no sbt/mill build, no
   // third-party runtime deps), so install it from the git release tag or a
   // local source checkout and compile with scala-cli.
-  const { releasesUrl } = repoInfo(model)
+  const { hostName, tagsUrl } = repoInfo(model)
   Content(`This package is not yet published to Maven Central. The generated SDK is a
 plain-source scala-cli project (no build tool, no third-party runtime
-dependencies). Install it from the GitHub release tag
-(\`${target.name}/vX.Y.Z\`, see [Releases](${releasesUrl})) or from a source
+dependencies). Install it from the ${hostName} release tag
+(\`${target.name}/vX.Y.Z\`, see [Tags](${tagsUrl})) or from a source
 checkout — compile it with scala-cli:
 
 \`\`\`bash

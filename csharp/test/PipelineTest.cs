@@ -41,6 +41,34 @@ public class PipelineTest
         return utility.MakeContext(ctxmap, client.GetRootCtx());
     }
 
+    // A typed collection is a list or a map to a cookie argument, as it is to
+    // the rest of the SDK: a List<string> repeats the name, a
+    // Dictionary<string, string> sends its keys.
+    [Fact]
+    public void PrepareHeadersCookieTypedCollections()
+    {
+        var (client, utility) = PlClient(null);
+        var ctx = PlCtx(client, utility, null);
+        ctx.Point = new Dictionary<string, object?>
+        {
+            ["args"] = new Dictionary<string, object?>
+            {
+                ["cookie"] = new List<object?>
+                {
+                    new Dictionary<string, object?> { ["name"] = "theme", ["orig"] = "theme", ["kind"] = "cookie" },
+                    new Dictionary<string, object?> { ["name"] = "prefs", ["orig"] = "prefs", ["kind"] = "cookie" },
+                },
+            },
+        };
+        ctx.Reqmatch = new Dictionary<string, object?>
+        {
+            ["theme"] = new List<string> { "dark", "x y" },
+            ["prefs"] = new Dictionary<string, string> { ["size"] = "2", ["lang"] = "en gb" },
+        };
+        var headers = utility.PrepareHeaders(ctx);
+        Assert.Equal("theme=dark; theme=x%20y; lang=en%20gb; size=2", headers["cookie"]);
+    }
+
     private static string ErrCode(Action act)
     {
         try

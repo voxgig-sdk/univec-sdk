@@ -9,6 +9,7 @@ import { cmp, each, Folder, entityCollection,
 
 import { TestEntity } from './TestEntity_cpp'
 import { TestDirect } from './TestDirect_cpp'
+import { TestClean } from './TestClean_cpp'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_cpp'
 
 
@@ -26,6 +27,7 @@ const Test = cmp(function Test(props: any) {
       TestEntity({ target, entity })
       TestDirect({ target, entity })
     })
+    TestClean({ target })
 
     // Validate the documented C++ examples in the READMEs are well-formed.
     ReadmeExamplesTest({ target })

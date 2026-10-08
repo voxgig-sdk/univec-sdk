@@ -7,6 +7,8 @@ import {
   nom,
 } from '@voxgig/apidef'
 
+import { rbListArgs } from './utility_rb'
+
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   const { target, ctx$: { model } } = props
@@ -56,6 +58,7 @@ client = ${ctor}
     // placeholder would not parse).
     const rbLit = (type: any, placeholder: string = 'example'): string => {
       const k = canonScalarKey(type)
+      if ('NULL' === k) return 'nil'
       if ('INTEGER' === k || 'NUMBER' === k) return '1'
       if ('BOOLEAN' === k) return 'true'
       if ('ARRAY' === k) return '[]'
@@ -71,18 +74,19 @@ client = ${ctor}
       fields.find((f: any) => f && f.n !== 'id' && f.t === '$STRING') ||
       fields.find((f: any) => f && f.n !== 'id') ||
       null
-    const idCol = dataIdF ? `#{item[${JSON.stringify(dataIdF)}]}` : null
-    const dispCol = displayField ? `#{item[${JSON.stringify(displayField.n)}]}` : null
-    const itemPrint = [idCol, dispCol].filter(Boolean).join(' ') || '#{item}'
+    const idCol = dataIdF ? `#{record[${JSON.stringify(dataIdF)}]}` : null
+    const dispCol = displayField ? `#{record[${JSON.stringify(displayField.n)}]}` : null
+    const itemPrint = [idCol, dispCol].filter(Boolean).join(' ') || '#{record}'
 
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
 \`\`\`ruby
 begin
-  # list returns an Array of ${eName} records — iterate directly.
-  ${eVar}s = client.${eName}.list
+  # list returns an Array of ${eName} entities, one per record; data_get reads the record.
+  ${eVar}s = client.${eName}.list${rbListArgs(exampleEntity)}
   ${eVar}s.each do |item|
+    record = item.data_get
     puts "${itemPrint}"
   end
 rescue => err
@@ -121,7 +125,7 @@ ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
 begin
   # load returns the ENTITY — call data_get for the ${neName} record (raises on error).
   ${neVar} = client.${neName}.load({ ${neMatch.join(', ')} })
-  puts ${neVar}
+  puts ${neVar}.data_get
 rescue => err
   warn "load failed: #{err}"
 end
@@ -146,7 +150,7 @@ end
 begin
   # load returns the ENTITY — call data_get for the ${eName} record (raises on error).
   ${eVar} = client.${eName}.load(${loadArg})
-  puts ${eVar}
+  puts ${eVar}.data_get
 rescue => err
   warn "load failed: #{err}"
 end
@@ -175,7 +179,8 @@ end
       ? `created.data_get["${dataIdF}"]`
       : rbLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`ruby
@@ -191,6 +196,13 @@ created = client.${eName}.create({ ${examplePairs('create').join(', ')} })
         const fromCreated = null != dataIdF && opnames.includes('create')
         Content(`# Update${fromCreated ? ` — index the record via data_get (created.data_get["${dataIdF}"]).` : ''}
 client.${eName}.update({ ${updatePairs.join(', ')} })
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`"${idF}" => ${idValueFor('patch')}`] : []).concat(examplePairs('patch'))
+        Content(`# Patch — sends only the fields given
+client.${eName}.patch({ ${patchPairs.join(', ')} })
 
 `)
       }

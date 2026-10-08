@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, opRequestShape, entityIdField, entityOps, goModule , serverVariables} from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, opRequestShape, entityIdField, entityOps, goModule, serverVariables, listMatchArg } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -80,25 +80,25 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
     }
 
     if (opnames.includes('list')) {
-      body.push(`    // List ${eLower} records — the value is the array of records itself.`)
-      body.push(`    ${eLower}s, err := client.${eName}(nil).List(nil, nil)`)
+      body.push(`    // List ${eLower} records — the value is a []any of entities, one per record.`)
+      body.push(`    ${eLower}s, err := client.${eName}(nil).List(${listMatchArg('go', exampleEntity)}, nil)`)
       body.push(`    if err != nil {`)
       body.push(`        panic(err)`)
       body.push(`    }`)
       body.push(`    for _, item := range ${eLower}s.([]any) {`)
-      body.push(`        fmt.Println(item)`)
+      body.push(`        fmt.Println(item.(sdk.Entity).Data())`)
       body.push(`    }`)
       body.push(``)
       usesFmt = true
     }
 
     if (opnames.includes('load')) {
-      body.push(`    // Load a single ${eLower} — the value is the loaded record.`)
+      body.push(`    // Load a single ${eLower} — the value is the entity; Data() reads its record.`)
       body.push(`    ${eLower}, err := client.${eName}(nil).Load(${matchArg('load')}, nil)`)
       body.push(`    if err != nil {`)
       body.push(`        panic(err)`)
       body.push(`    }`)
-      body.push(`    fmt.Println(${eLower})`)
+      body.push(`    fmt.Println(${eLower}.(sdk.Entity).Data())`)
       body.push(``)
       usesFmt = true
     }
@@ -109,7 +109,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
       body.push(`    if err != nil {`)
       body.push(`        panic(err)`)
       body.push(`    }`)
-      body.push(`    fmt.Println(created)`)
+      body.push(`    fmt.Println(created.(sdk.Entity).Data())`)
       body.push(``)
       usesFmt = true
     }
@@ -125,7 +125,21 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
       body.push(`    if err != nil {`)
       body.push(`        panic(err)`)
       body.push(`    }`)
-      body.push(`    fmt.Println(updated)`)
+      body.push(`    fmt.Println(updated.(sdk.Entity).Data())`)
+      body.push(``)
+      usesFmt = true
+    }
+
+    if (opnames.includes('patch')) {
+      const patchMembers = (idF
+        ? [`"${idF}": ${exampleValue(exampleEntity, exampleEntity.op.patch, idF, 'example_id')}`]
+        : []).concat(exampleFields('patch'))
+      body.push(`    // Patch a ${eLower}: only the fields given are sent.`)
+      body.push(`    patched, err := client.${eName}(nil).Patch(map[string]any{${patchMembers.join(', ')}}, nil)`)
+      body.push(`    if err != nil {`)
+      body.push(`        panic(err)`)
+      body.push(`    }`)
+      body.push(`    fmt.Println(patched.(sdk.Entity).Data())`)
       body.push(``)
       usesFmt = true
     }
@@ -136,7 +150,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
       body.push(`    if err != nil {`)
       body.push(`        panic(err)`)
       body.push(`    }`)
-      body.push(`    fmt.Println(removed)`)
+      body.push(`    fmt.Println(removed.(sdk.Entity).Data())`)
       body.push(``)
       usesFmt = true
     }
@@ -171,9 +185,10 @@ func main() {
   Content(`### Quickstart
 
 A complete program: create a client, then call the entity operations.
-Each operation returns \`(value, error)\` — the value is the data itself
-(there is no \`{ok, data}\` wrapper), so check \`err\` and use the value
-directly.
+Each operation returns \`(value, error)\` — the value is the entity, and for
+\`List\` a \`[]any\` of entities, one per record (there is no \`{ok, data}\`
+wrapper), so check \`err\` and read a record through the entity's
+\`Data()\`.
 
 \`\`\`go
 ${program}

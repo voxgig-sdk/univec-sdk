@@ -155,6 +155,15 @@ public final class SecretsFeature: BaseFeature {
     return getcred()
   }
 
+  // Every value this feature resolves or buys is a secret the SDK handles,
+  // and none arrives under an option key the intake registration saw.
+  private func register(_ value: String?) {
+    guard let v = value, let ctx = client?.getRootCtx(), let add = ctx.utility?.cleanAdd else {
+      return
+    }
+    add(ctx, .string(v))
+  }
+
   // Sync by feature contract: build the chain, never look anything up here.
   public override func initFeature(_ ctx: Context, _ options: VMap) {
     client = ctx.client
@@ -221,6 +230,7 @@ public final class SecretsFeature: BaseFeature {
     var chain: [Sekreto.ChainItem] = []
 
     if "" != explicit {
+      register(explicit)
       do {
         let key = try envkey(secretname)
         chain.append(.spec(ProviderSpec(
@@ -353,6 +363,7 @@ public final class SecretsFeature: BaseFeature {
     // A provider ERROR throws out of here and fails the op (via the
     // transport gate); only a MISS (nil) falls through.
     let found = try s.tryget(secretname)
+    register(found)
 
     if nil == exchange {
       // An UNCACHED miss after an earlier hit is a revocation: the chain
@@ -645,6 +656,8 @@ public final class SecretsFeature: BaseFeature {
       throw SekretoError(
         "secrets: token exchange returned no '" + x.response + "' field from " + url)
     }
+
+    register(token)
 
     return token
   }

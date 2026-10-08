@@ -113,6 +113,11 @@ name = "feature"
 srcDir = "test"
 root = "TFeature"
 
+[[lean_exe]]
+name = "pipeline"
+srcDir = "test"
+root = "TPipeline"
+
 # Smoke test for the vendored engine itself: a runner that cannot FAIL a bad
 # entry would turn every corpus suite vacuously green.
 [[lean_exe]]

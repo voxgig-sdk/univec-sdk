@@ -15,10 +15,58 @@
 typedef struct {
   // Activity tracking (mirrors the ts client._proxy record).
   int64_t routed;
-  char* url; // "" when none
+  char* url;     // as it may be shown: userinfo masked; "" when none
+  char* raw_url; // as it is used, kept off the tracking record
   char** no_proxy;
   size_t no_proxy_len;
 } ProxyTrack;
+
+static char* percent_decode(const char* s) {
+  size_t n = strlen(s);
+  char* out = (char*)malloc(n + 1);
+  size_t o = 0;
+  for (size_t i = 0; i < n; i++) {
+    if ('%' == s[i] && i + 2 < n && isxdigit((unsigned char)s[i + 1]) &&
+        isxdigit((unsigned char)s[i + 2])) {
+      char hex[3] = { s[i + 1], s[i + 2], '\0' };
+      out[o++] = (char)strtol(hex, NULL, 16);
+      i += 2;
+    } else {
+      out[o++] = s[i];
+    }
+  }
+  out[o] = '\0';
+  return out;
+}
+
+// A proxy URL may carry credentials as userinfo, from the option or the
+// environment, and neither is under a sensitive key name.
+static void register_userinfo(Context* ctx, const char* url) {
+  const char* rest = url;
+  const char* p = strstr(url, "://");
+  if (p) rest = p + 3;
+  const char* slash = strchr(rest, '/');
+  size_t alen = slash ? (size_t)(slash - rest) : strlen(rest);
+  const char* at = NULL;
+  for (size_t i = 0; i < alen; i++) {
+    if ('@' == rest[i]) at = rest + i;
+  }
+  if (!at) return;
+  char* userinfo = (char*)malloc((size_t)(at - rest) + 1);
+  memcpy(userinfo, rest, (size_t)(at - rest));
+  userinfo[at - rest] = '\0';
+  char* colon = strchr(userinfo, ':');
+  if (colon) *colon = '\0';
+  const char* parts[2] = { userinfo, colon ? colon + 1 : NULL };
+  for (int i = 0; i < 2; i++) {
+    if (!parts[i] || parts[i][0] == '\0') continue;
+    clean_add_util(ctx, parts[i]);
+    char* decoded = percent_decode(parts[i]);
+    clean_add_util(ctx, decoded);
+    free(decoded);
+  }
+  free(userinfo);
+}
 
 typedef struct {
   Feature base;
@@ -117,7 +165,7 @@ static bool bypass(char** no_proxy, size_t n, const char* url) {
 // Annotate fetchdef with the proxy address, unless there is no proxy or the
 // host is bypassed. Returns fetchdef unchanged in those cases.
 static voxgig_value* route(ProxyTrack* track, const char* url, voxgig_value* fetchdef) {
-  const char* proxy_url = track->url;
+  const char* proxy_url = track->raw_url;
   if (proxy_url == NULL || proxy_url[0] == '\0' || bypass(track->no_proxy, track->no_proxy_len, url)) {
     return fetchdef;
   }
@@ -204,7 +252,10 @@ static void proxy_init(Feature* f, Context* ctx, voxgig_value* options) {
   }
   free(raw);
 
-  pf->track->url = url;
+  register_userinfo(ctx, url);
+
+  pf->track->url = clean_str(ctx, url);
+  pf->track->raw_url = url;
   pf->track->no_proxy = final_np;
   pf->track->no_proxy_len = final_len;
 
@@ -243,6 +294,7 @@ Feature* feature_proxy_new(void) {
   pf->track = (ProxyTrack*)calloc(1, sizeof(ProxyTrack));
   pf->track->routed = 0;
   pf->track->url = strdup("");
+  pf->track->raw_url = strdup("");
   pf->track->no_proxy = NULL;
   pf->track->no_proxy_len = 0;
   return (Feature*)pf;

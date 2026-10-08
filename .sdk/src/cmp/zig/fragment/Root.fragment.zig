@@ -22,6 +22,7 @@ pub const test_sdk = sdk.test_sdk;
 
 pub const Value = helpers.Value;
 pub const OpResult = types.OpResult;
+pub const StreamResult = types.StreamResult;
 pub const Feature = types.Feature;
 pub const OutVal = types.OutVal;
 pub const Context = context.Context;

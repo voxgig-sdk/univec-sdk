@@ -17,11 +17,6 @@ type DebugFeature struct {
 
 const debugEntryKey = "debug_entry"
 
-var debugDefaultRedact = []string{
-	"authorization", "cookie", "set-cookie", "api-key", "apikey",
-	"x-api-key", "idempotency-key",
-}
-
 func NewDebugFeature() *DebugFeature {
 	return &DebugFeature{
 		BaseFeature: BaseFeature{
@@ -61,7 +56,7 @@ func (f *DebugFeature) PreRequest(ctx *core.Context) {
 		} else {
 			entry["url"] = ctx.Spec.Path
 		}
-		entry["headers"] = f.redact(ctx.Spec.Headers)
+		entry["headers"] = f.redact(ctx, ctx.Spec.Headers)
 	}
 	ctx.Out[debugEntryKey] = entry
 }
@@ -115,6 +110,11 @@ func (f *DebugFeature) finish(ctx *core.Context, ok bool) {
 		entry["status"] = ctx.Result.Status
 	}
 
+	// The whole entry leaves through the buffer and the callback: the url
+	// and the error message can carry a query credential the header mask
+	// above never saw.
+	entry = fclean(ctx, entry)
+
 	f.Entries = append(f.Entries, entry)
 	max := foptInt(f.options, "max", 100)
 	for len(f.Entries) > max {
@@ -126,14 +126,16 @@ func (f *DebugFeature) finish(ctx *core.Context, ok bool) {
 	}
 }
 
-func (f *DebugFeature) redact(headers map[string]any) map[string]any {
+// The core clean rules apply (clean.keys, every registered value); the
+// feature's own `redact` list ADDS header names on top of them.
+func (f *DebugFeature) redact(ctx *core.Context, headers map[string]any) map[string]any {
 	out := map[string]any{}
 	if headers == nil {
 		return out
 	}
-	patterns := foptStrList(f.options, "redact")
-	if patterns == nil {
-		patterns = debugDefaultRedact
+	patterns := []string{}
+	for _, p := range foptStrList(f.options, "redact") {
+		patterns = append(patterns, strings.ToLower(p))
 	}
 	for k, v := range headers {
 		masked := false
@@ -144,10 +146,10 @@ func (f *DebugFeature) redact(headers map[string]any) map[string]any {
 			}
 		}
 		if masked {
-			out[k] = "<redacted>"
+			out[k] = "[redacted]"
 		} else {
 			out[k] = v
 		}
 	}
-	return out
+	return fclean(ctx, out)
 }

@@ -27,8 +27,8 @@ class LogFeature extends BaseFeature_1.BaseFeature {
                 });
                 let level = this._options.level || 'info';
                 logger = (0, pino_1.default)({ name: 'log', level }, pretty);
-                this._logger = logger;
             }
+            this._logger = logger;
         }
     }
     PostConstruct(ctx) {
@@ -61,15 +61,19 @@ class LogFeature extends BaseFeature_1.BaseFeature {
     PreResult(ctx) {
         this._loghook('PreResult', ctx);
     }
+    // A log line leaves the pipeline, so it carries the cleaned record: the
+    // spec after auth holds the credential, and a logger serialises whatever
+    // it is handed.
     _loghook(hook, ctx, level) {
         level = level || 'info';
         if (this._logger) {
-            this._logger[level]({
+            const clean = ctx.utility.clean;
+            this._logger[level](clean(ctx, {
                 hook,
                 op: ctx.op,
                 spec: ctx.spec,
-                ctx
-            });
+                ctx: 'function' === typeof ctx.toJSON ? ctx.toJSON() : ctx,
+            }));
         }
     }
 }

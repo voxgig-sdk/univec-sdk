@@ -34,7 +34,7 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   let testArgExpr = 'emptyMap'
   if (exampleEntity && isMatchOp) {
     testArgExpr = idF ? `jo [("${idF}", VStr "test01")]` : 'emptyMap'
-  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp)) {
+  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp)) {
     const items = opRequestShape(exampleEntity, primaryOp).items
       .filter((it: any) => it.name !== idF && it.name !== 'id')
     const required = items.filter((it: any) => !it.optional)
@@ -43,16 +43,25 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   }
 
   // The op-driven test-mode line, shown only when the SDK has an entity op.
-  const testModeExample = primaryOp
+  const testModeExample = 'list' === primaryOp
     ? `  ent <- Sdk.${eFn} sdk VNoval
   arg <- ${testArgExpr}
   ctrl <- emptyMap
-  -- Entity ops return the bare record and raise on error.
+  -- eList returns one entity per record and raises on error;
+  -- eDataGet reads each mock record.
+  ${eFn}s <- Sdk.eList ent arg ctrl
+  mapM_ (\\en -> putStrLn =<< stringify =<< Sdk.eDataGet en) ${eFn}s`
+    : primaryOp
+    ? `  ent <- Sdk.${eFn} sdk VNoval
+  arg <- ${testArgExpr}
+  ctrl <- emptyMap
+  -- Entity ops return the entity and raise on error;
+  -- eDataGet reads its mock record.
   ${eFn} <- Sdk.e${primaryOp.charAt(0).toUpperCase() + primaryOp.slice(1)} ent arg ctrl
-  print ${eFn}`
+  putStrLn =<< stringify =<< Sdk.eDataGet ${eFn}`
     : `  args <- jo [("path", VStr "/api/resource"), ("method", VStr "GET")]
   result <- F.direct sdk args
-  print result`
+  putStrLn =<< stringify result`
 
   const apikeyEnvLine = isAuthActive(model)
     ? `\n${envName(model)}_APIKEY=<your-key>`
@@ -66,7 +75,7 @@ raises and returns a result \`Value\` you branch on via its \`ok\` field:
 \`\`\`haskell
 import qualified SdkClient as Sdk
 import qualified SdkFeatures as F
-import VoxgigStruct (Value (..))
+import VoxgigStruct (Value (..), stringify)
 import SdkHelpers (jo, getp)
 
 main :: IO ()
@@ -80,13 +89,15 @@ main = do
     VBool True -> do
       status <- getp result "status"   -- e.g. VNum 200
       body <- getp result "data"       -- the response body
-      print (status, body)
+      putStrLn =<< stringify status
+      putStrLn =<< stringify body
     _ -> do
       -- A non-2xx response carries status + data (the error body); a
       -- transport-level failure carries err instead.
       status <- getp result "status"
       err <- getp result "err"
-      print (status, err)
+      putStrLn =<< stringify status
+      putStrLn =<< stringify err
 \`\`\`
 
 ### Prepare a request without sending it
@@ -94,7 +105,7 @@ main = do
 \`\`\`haskell
 import qualified SdkClient as Sdk
 import qualified SdkFeatures as F
-import VoxgigStruct (Value (..))
+import VoxgigStruct (Value (..), stringify)
 import SdkHelpers (jo, getp)
 
 main :: IO ()
@@ -106,7 +117,8 @@ main = do
   fetchdef <- F.prepare sdk args
   url <- getp fetchdef "url"
   method <- getp fetchdef "method"
-  print (url, method)
+  putStrLn =<< stringify url
+  putStrLn =<< stringify method
 \`\`\`
 
 ### Use test mode
@@ -116,7 +128,7 @@ Create a mock client for unit testing — no server required:
 \`\`\`haskell
 import qualified SdkClient as Sdk
 import qualified SdkFeatures as F
-import VoxgigStruct (Value (..), emptyMap)
+import VoxgigStruct (Value (..), emptyMap, stringify)
 import SdkHelpers (jo)
 
 main :: IO ()

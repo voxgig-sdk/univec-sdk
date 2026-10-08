@@ -21,7 +21,7 @@ The C++ SDK is **header-only** — there is no package to install
 from a registry. Vendor the `cpp/` directory into your project (or add the
 repository as a git submodule) and put it on your compiler's include path.
 Releases are cut as the git tag `cpp/vX.Y.Z` (see
-[Releases](https://github.com/voxgig-sdk/univec-sdk/releases)).
+[Tags](https://github.com/voxgig-sdk/univec-sdk/tags)).
 
 ```bash
 # Add the SDK as a submodule (or copy the cpp/ directory into your tree).
@@ -61,8 +61,8 @@ auto client = std::make_shared<UnivecSDK>(vmap({
 ### 4. Create, update, and remove
 
 ```cpp
-// Create — returns the bare created record.
-Value created = client->convert()->create(vmap({{"embeddings", vlist()}, {"source_model", Value("example_source_model")}, {"target_model", Value("example_target_model")}}), Value::undef());
+// Create — returns the created entity.
+SdkEntityPtr created = client->convert()->create(vmap({{"embeddings", vlist()}, {"source_model", Value("example_source_model")}, {"target_model", Value("example_target_model")}}), Value::undef());
 
 ```
 
@@ -74,14 +74,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -90,8 +91,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -146,10 +147,10 @@ feature installs an in-memory mock transport:
 ```cpp
 auto client = UnivecSDK::testSDK();
 
-// Entity ops return the bare record and throw on error.
-Value model = client->model()->list(Value::undef(), Value::undef());
-// model contains the mock response record
-std::cout << Struct::jsonify(model) << std::endl;
+// list returns one entity per mock record, and throws on error.
+for (const auto& model : client->model()->list(Value::undef(), Value::undef())) {
+  std::cout << Struct::jsonify(model->data()) << std::endl;
+}
 ```
 
 You can seed the mock store by passing test options — see the generated
@@ -223,8 +224,8 @@ All entities share the same interface.
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `list` | `(reqmatch, ctrl) -> Value` | List entities matching the criteria (a Value list). Throws on error. |
-| `create` | `(reqdata, ctrl) -> Value` | Create a new entity. Throws on error. |
+| `list` | `(reqmatch, ctrl) -> std::vector<SdkEntityPtr>` | List entities matching the criteria, one per record. Throws on error. |
+| `create` | `(reqdata, ctrl) -> SdkEntityPtr` | Create a new entity. Throws on error. |
 | `data` | `(arg) -> Value` | Get (no arg) or set (with arg) entity data. |
 | `match` | `(arg) -> Value` | Get (no arg) or set (with arg) entity match criteria. |
 | `make` | `() -> EntityPtr` | Create a new instance with the same options. |
@@ -232,9 +233,9 @@ All entities share the same interface.
 
 ### Result shape
 
-Entity operations return the bare result data (a map `Value` for
-single-entity ops, a list `Value` for `list`) and throw
-`sdk::SdkErrorPtr` on error. Wrap calls in `try`/`catch` to handle
+Entity operations return the entity, and `list` a `std::vector` of
+entities, one per record; `data()` reads an entity's record. They throw
+`sdk::SdkErrorPtr` on error, so wrap calls in `try`/`catch` to handle
 failures.
 
 The `direct()` escape hatch never throws — it returns a result `Value`
@@ -320,7 +321,7 @@ Create an instance: `auto convert = client->convert();`
 
 | Method | Description |
 | --- | --- |
-| `create(data, ctrl)` | Create a new entity with the given data. |
+| `create(data, ctrl) -> SdkEntityPtr` | Create a new entity with the given data. |
 
 #### Fields
 
@@ -333,7 +334,7 @@ Create an instance: `auto convert = client->convert();`
 #### Example: Create
 
 ```cpp
-Value convert = client->convert()->create(vmap({
+SdkEntityPtr convert = client->convert()->create(vmap({
     {"embeddings", vlist()},  // std::vector<Value>
     {"source_model", Value("example_source_model")},  // std::string
     {"target_model", Value("example_target_model")},  // std::string
@@ -349,7 +350,7 @@ Create an instance: `auto embed = client->embed();`
 
 | Method | Description |
 | --- | --- |
-| `create(data, ctrl)` | Create a new entity with the given data. |
+| `create(data, ctrl) -> SdkEntityPtr` | Create a new entity with the given data. |
 
 #### Fields
 
@@ -362,7 +363,7 @@ Create an instance: `auto embed = client->embed();`
 #### Example: Create
 
 ```cpp
-Value embed = client->embed()->create(vmap({
+SdkEntityPtr embed = client->embed()->create(vmap({
     {"embeddings", vlist()},  // std::vector<Value>
     {"model", Value("example_model")},  // std::string
     {"texts", vlist()},  // std::vector<Value>
@@ -378,7 +379,7 @@ Create an instance: `auto ephemeral_key = client->ephemeral_key();`
 
 | Method | Description |
 | --- | --- |
-| `create(data, ctrl)` | Create a new entity with the given data. |
+| `create(data, ctrl) -> SdkEntityPtr` | Create a new entity with the given data. |
 
 #### Fields
 
@@ -392,7 +393,7 @@ Create an instance: `auto ephemeral_key = client->ephemeral_key();`
 #### Example: Create
 
 ```cpp
-Value ephemeral_key = client->ephemeral_key()->create(vmap({
+SdkEntityPtr ephemeral_key = client->ephemeral_key()->create(vmap({
     {"dailyLimit", Value(1)},  // int64_t
     {"dailyUsed", Value(1)},  // int64_t
     {"key", Value("example_key")},  // std::string
@@ -409,7 +410,7 @@ Create an instance: `auto model = client->model();`
 
 | Method | Description |
 | --- | --- |
-| `list(match, ctrl)` | List entities, optionally matching the given criteria. |
+| `list(match, ctrl) -> std::vector<SdkEntityPtr>` | List entities, optionally matching the given criteria: one entity per record. |
 
 #### Fields
 
@@ -429,7 +430,10 @@ Create an instance: `auto model = client->model();`
 #### Example: List
 
 ```cpp
-Value models = client->model()->list(Value::undef(), Value::undef());
+std::vector<SdkEntityPtr> models = client->model()->list(Value::undef(), Value::undef());
+for (const auto& model : models) {
+  std::cout << Struct::jsonify(model->data()) << std::endl;
+}
 ```
 
 ## Features

@@ -92,10 +92,12 @@ function renderHeader(Name: string, cred: string, basic: boolean): string {
     private const string OptionSecret = "secret";` : ''
 
   const basicBlock = basic ? `
-        // True HTTP Basic Auth needs TWO credentials, base64-joined - a
+        // True HTTP Basic Auth joins the two credentials, base64-encoded - a
         // single token in the header (the branch below) can never
         // authenticate against an API that actually checks
-        // \`Authorization: Basic base64(user:pass)\`.
+        // \`Authorization: Basic base64(user:pass)\`. The password may be
+        // empty (RFC 7617): Lob, for one, documents the key as the user with
+        // a blank password (\`curl -u key:\`).
         if (StructUtils.GetPath(options, StructUtils.Jt("auth", "basic")) is bool isBasic &&
             isBasic)
         {
@@ -106,9 +108,9 @@ function renderHeader(Name: string, cred: string, basic: boolean): string {
             var noSecret = secret == null ||
                 (secret is string skStr && (skStr == NotFound || skStr == ""));
 
-            if (noApikey || noSecret)
+            if (noApikey)
             {
-                headers.Remove(HeaderAuth);
+                headers.Remove(name);
             }
             else
             {
@@ -118,8 +120,11 @@ function renderHeader(Name: string, cred: string, basic: boolean): string {
                     basicPrefix = bp;
                 }
                 var b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
-                    (apikey as string ?? "") + ":" + (secret as string ?? "")));
-                headers[HeaderAuth] = basicPrefix == ""
+                    (apikey as string ?? "") + ":" + (noSecret ? "" : secret as string ?? "")));
+                // The joined, encoded pair is a wire form neither credential's
+                // own registration covers.
+                ctx.Utility!.CleanAdd(ctx, b64);
+                headers[name] = basicPrefix == ""
                     ? b64
                     : basicPrefix + " " + b64;
             }
@@ -140,7 +145,7 @@ public static partial class SdkUtility
     private const string HeaderAuth = "${cred}";
     private const string OptionApikey = "apikey";${basicConst}
     private const string NotFound = "__NOTFOUND__";
-
+${authName('HeaderAuth', true)}
     internal static Spec PrepareAuthUtil(Context ctx)
     {
         var spec = ctx.Spec ?? throw ctx.MakeError("auth_no_spec",
@@ -156,6 +161,14 @@ public static partial class SdkUtility
             return spec;
         }
 
+        var name = PrepareAuthName(options);
+
+        // A credential left under the declared name would travel beside the renamed one.
+        if (name != HeaderAuth)
+        {
+            headers.Remove(HeaderAuth);
+        }
+
         var apikey = StructUtils.GetProp(options, OptionApikey, NotFound);
 ${basicBlock}
         var skip = apikey == null ||
@@ -163,7 +176,7 @@ ${basicBlock}
 
         if (skip)
         {
-            headers.Remove(HeaderAuth);
+            headers.Remove(name);
         }
         else
         {
@@ -174,7 +187,7 @@ ${basicBlock}
             }
             var apikeyVal = apikey as string ?? "";
             // Empty prefix (raw apiKey credential) must not add a leading space.
-            headers[HeaderAuth] = authPrefix == ""
+            headers[name] = authPrefix == ""
                 ? apikeyVal
                 : authPrefix + " " + apikeyVal;
         }
@@ -202,7 +215,7 @@ public static partial class SdkUtility
     private const string QueryAuth = "${cred}";
     private const string OptionApikey = "apikey";
     private const string NotFound = "__NOTFOUND__";
-
+${authName('QueryAuth', false)}
     internal static Spec PrepareAuthUtil(Context ctx)
     {
         var spec = ctx.Spec ?? throw ctx.MakeError("auth_no_spec",
@@ -218,6 +231,14 @@ public static partial class SdkUtility
             return spec;
         }
 
+        var name = PrepareAuthName(options);
+
+        // A credential left under the declared name would travel beside the renamed one.
+        if (name != QueryAuth)
+        {
+            query.Remove(QueryAuth);
+        }
+
         var apikey = StructUtils.GetProp(options, OptionApikey, NotFound);
 
         var skip = apikey == null ||
@@ -225,7 +246,7 @@ public static partial class SdkUtility
 
         if (skip)
         {
-            query.Remove(QueryAuth);
+            query.Remove(name);
         }
         else
         {
@@ -234,7 +255,7 @@ public static partial class SdkUtility
             // any API reads; the prefix is a header convention, so
             // options.auth.prefix is dropped here deliberately rather than
             // silently concatenated.
-            query[QueryAuth] = apikeyVal;
+            query[name] = apikeyVal;
         }
 
         return spec;
@@ -258,6 +279,26 @@ public static partial class SdkUtility
     private const string HeaderCookie = "cookie";
     private const string OptionApikey = "apikey";
     private const string NotFound = "__NOTFOUND__";
+${authName('CookieAuth', false)}
+    // Rewrites the cookie header with the named pair removed, then set to the
+    // value when it is not null; every other cookie is kept in order.
+    private static void PrepareAuthCookie(Dictionary<string, object?> headers, string name, string? value)
+    {
+        var existing = headers.TryGetValue(HeaderCookie, out var current) ? current as string : null;
+        var kept = CookieKeep(existing ?? "", new List<string> { name });
+        if (value != null)
+        {
+            kept.Add(name + "=" + value);
+        }
+        if (kept.Count == 0)
+        {
+            headers.Remove(HeaderCookie);
+        }
+        else
+        {
+            headers[HeaderCookie] = string.Join("; ", kept);
+        }
+    }
 
     internal static Spec PrepareAuthUtil(Context ctx)
     {
@@ -270,10 +311,16 @@ public static partial class SdkUtility
         // Public APIs that need no auth omit the options.auth block entirely.
         if (!options.TryGetValue("auth", out var auth) || auth == null)
         {
-            // Nothing of ours to remove: the credential rides INSIDE the
-            // shared cookie header, which this function only ever appends to.
-            // Returning here is what withholds it.
+            PrepareAuthCookie(headers, CookieAuth, null);
             return spec;
+        }
+
+        var name = PrepareAuthName(options);
+
+        // A credential left under the declared name would travel beside the renamed one.
+        if (name != CookieAuth)
+        {
+            PrepareAuthCookie(headers, CookieAuth, null);
         }
 
         var apikey = StructUtils.GetProp(options, OptionApikey, NotFound);
@@ -281,22 +328,26 @@ public static partial class SdkUtility
         var skip = apikey == null ||
             (apikey is string apikeyStr && (apikeyStr == NotFound || apikeyStr == ""));
 
-        if (!skip)
-        {
-            var apikeyVal = apikey as string ?? "";
-            // Append, never assign: a cookie header set by options.headers
-            // would otherwise be clobbered by the credential. No prefix - a
-            // cookie value is the credential itself.
-            var existing = StructUtils.GetProp(headers, HeaderCookie, "") as string ?? "";
-            var pair = CookieAuth + "=" + apikeyVal;
-            headers[HeaderCookie] = existing == ""
-                ? pair
-                : existing + "; " + pair;
-        }
+        // Spliced in, replacing an earlier pair of the same name, beside any
+        // cookie the caller set. No prefix - a cookie value is the credential
+        // itself.
+        PrepareAuthCookie(headers, name, skip ? null : apikey as string ?? "");
 
         return spec;
     }
 }
+`
+}
+
+
+// The client's `auth.name` option, when set, replaces the declared name; a
+// header name travels lower-cased.
+function authName(declared: string, header: boolean): string {
+  return `
+    // The client's auth.name option, when set, replaces the name the API declares.
+    private static string PrepareAuthName(object? options) =>
+        StructUtils.GetPath(options, StructUtils.Jt("auth", "name")) is string name && name != ""
+            ? ${header ? 'name.ToLowerInvariant()' : 'name'} : ${declared};
 `
 }
 

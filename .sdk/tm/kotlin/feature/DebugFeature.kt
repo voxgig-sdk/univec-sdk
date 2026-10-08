@@ -43,7 +43,7 @@ class DebugFeature : BaseFeature("debug", "0.0.1", true) {
       } else {
         entry["url"] = spec.path
       }
-      entry["headers"] = redact(spec.headers)
+      entry["headers"] = redact(ctx, spec.headers)
     }
     ctx.out[DEBUG_ENTRY_KEY] = entry
   }
@@ -77,7 +77,7 @@ class DebugFeature : BaseFeature("debug", "0.0.1", true) {
   }
 
   private fun finish(ctx: Context, ok: Boolean) {
-    val entry = Helpers.toMapAny(ctx.out[DEBUG_ENTRY_KEY]) ?: return
+    var entry = Helpers.toMapAny(ctx.out[DEBUG_ENTRY_KEY]) ?: return
     ctx.out.remove(DEBUG_ENTRY_KEY)
 
     val result = ctx.result
@@ -92,6 +92,11 @@ class DebugFeature : BaseFeature("debug", "0.0.1", true) {
       entry["status"] = result.status
     }
 
+    // The whole entry leaves through the buffer and the callback: the url
+    // and the error message can carry a query credential the header mask
+    // above never saw.
+    entry = Helpers.toMapAny(ctx.utility?.clean?.invoke(ctx, entry)) ?: entry
+
     this.entries.add(entry)
     val max = FeatureOptions.foptInt(this.options, "max", 100)
     while (this.entries.size > max) {
@@ -104,38 +109,26 @@ class DebugFeature : BaseFeature("debug", "0.0.1", true) {
     }
   }
 
-  private fun redact(headers: MutableMap<String, Any?>?): MutableMap<String, Any?> {
+  // The core clean rules apply (clean.keys, every registered value); the
+  // feature's own `redact` list ADDS header names on top of them.
+  private fun redact(ctx: Context, headers: MutableMap<String, Any?>?): MutableMap<String, Any?> {
     val out = linkedMapOf<String, Any?>()
     if (headers == null) {
       return out
     }
-    var patterns: List<String>? = FeatureOptions.foptStrList(this.options, "redact")
-    if (patterns == null) {
-      patterns = DEFAULT_REDACT
-    }
+    val patterns = (FeatureOptions.foptStrList(this.options, "redact") ?: mutableListOf())
+      .map { it.lowercase() }
     for (h in headers.entries) {
-      var masked = false
-      for (p in patterns) {
-        if (h.key.lowercase() == p) {
-          masked = true
-          break
-        }
-      }
-      if (masked) {
-        out[h.key] = "<redacted>"
+      if (patterns.contains(h.key.lowercase())) {
+        out[h.key] = "[redacted]"
       } else {
         out[h.key] = h.value
       }
     }
-    return out
+    return Helpers.toMapAny(ctx.utility?.clean?.invoke(ctx, out)) ?: out
   }
 
   companion object {
     private const val DEBUG_ENTRY_KEY = "debug_entry"
-
-    private val DEFAULT_REDACT: List<String> = listOf(
-      "authorization", "cookie", "set-cookie", "api-key", "apikey",
-      "x-api-key", "idempotency-key",
-    )
   }
 }

@@ -18,6 +18,8 @@ public interface SdkEntity extends Entity {
 
   Object update(Map<String, Object> reqdata, Map<String, Object> ctrl);
 
+  Object patch(Map<String, Object> reqdata, Map<String, Object> ctrl);
+
   Object remove(Map<String, Object> reqmatch, Map<String, Object> ctrl);
 
   // Runs `action` through the pipeline and returns a Stream over result

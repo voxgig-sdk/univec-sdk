@@ -611,7 +611,10 @@ public class PipelineTest {
     Context ctx = plCtx(client, utility, null);
     ctx.spec = authSpec();
     if (cred != null && seed != null) {
-      authBag(ctx.spec, cred.where()).put(cred.name(), seed);
+      // Seed what prepareAuth would have written: cred.pair() is the
+      // `<scheme>=` lead-in for a cookie and "" for a header or query, so an
+      // opaque seed is never mistaken for a stranger's cookie.
+      authBag(ctx.spec, cred.where()).put(cred.name(), cred.pair() + seed);
     }
     utility.prepareAuth.apply(ctx);
     if (cred == null) {

@@ -4,7 +4,7 @@ import {
   walk,
 } from '@voxgig/struct'
 
-import { sdkName } from '@voxgig/sdkgen'
+import { sdkName, canonScalarKey, requiredItems } from '@voxgig/sdkgen'
 
 
 // C reserved keywords illegal as identifiers.
@@ -123,6 +123,12 @@ function clean(o: any, dropDefaults?: boolean): any {
 
 
 
+// A C string literal.
+function cString(s: string): string {
+  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
+}
+
+
 function cStringLiteral(json: string, chunkSize: number = 2000): string {
   const parts: string[] = []
   let i = 0
@@ -136,11 +142,24 @@ function cStringLiteral(json: string, chunkSize: number = 2000): string {
     i = end
   }
   return parts
-    .map((p) => '  "' + p.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"')
+    .map((p) => '  ' + cString(p))
     .join('\n')
 }
 
+// A list's required route and query parameters, as the match it is called with.
+function cListMatch(entity: any): string {
+  const lit = (type: any): string =>
+    (({ NULL: 'v_null()', INTEGER: 'v_num(1)', NUMBER: 'v_num(1)', BOOLEAN: 'v_bool(true)', ARRAY: 'v_list()', OBJECT: 'v_map()' }) as any)[canonScalarKey(type)] ?? 'v_str("example")'
+  const items = requiredItems(entity, 'list')
+  return 0 < items.length
+    ? `cmap(${items.length}, ${items.map((it: any) => `${cString(it.name)}, ${lit(it.type)}`).join(', ')})`
+    : 'NULL'
+}
+
+
 export {
+  cListMatch,
+  cString,
   cStringLiteral,
   clean,
   cIdent,

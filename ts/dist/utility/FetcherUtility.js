@@ -1,6 +1,23 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_USER_AGENT = void 0;
 exports.fetcher = fetcher;
+// Several CDNs refuse a library's own agent, so outside a browser a request
+// without one carries the browser-shaped agent most other targets send.
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; UnivecSDK/1.0)';
+exports.DEFAULT_USER_AGENT = DEFAULT_USER_AGENT;
+function defaultUserAgent(fetchdef) {
+    if (null == globalThis.process?.versions?.node) {
+        return;
+    }
+    const headers = fetchdef.headers = fetchdef.headers || {};
+    for (const name of Object.keys(headers)) {
+        if ('user-agent' === name.toLowerCase()) {
+            return;
+        }
+    }
+    headers['user-agent'] = DEFAULT_USER_AGENT;
+}
 // Make HTTP call using library. Replace this utility for mocking etc.
 async function fetcher(ctx, fullurl, fetchdef) {
     if ('live' !== ctx.client._mode) {
@@ -14,6 +31,7 @@ async function fetcher(ctx, fullurl, fetchdef) {
             ' (URL was: "' + fullurl + '")');
     }
     const fetch = options.system.fetch;
+    defaultUserAgent(fetchdef);
     const response = await fetch(fullurl, fetchdef);
     return response;
 }

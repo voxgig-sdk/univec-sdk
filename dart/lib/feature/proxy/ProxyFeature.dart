@@ -16,6 +16,7 @@ class ProxyFeature extends BaseFeature {
   dynamic _client;
   dynamic _url;
   List<String> _noProxy = [];
+  dynamic _ctx;
 
   ProxyFeature() {
     version = '0.0.1';
@@ -52,6 +53,26 @@ class ProxyFeature extends BaseFeature {
         .where((s) => '' != s)
         .map((s) => s.toString())
         .toList();
+
+    // A proxy URL may carry credentials as userinfo, from the option or the
+    // environment, and neither is under a sensitive key name.
+    _ctx = ctx;
+    if (_url is String) {
+      try {
+        final info = Uri.parse(_url).userInfo;
+        final at = info.indexOf(':');
+        final parts =
+            at < 0 ? [info] : [info.substring(0, at), info.substring(at + 1)];
+        for (final part in parts) {
+          if ('' != part) {
+            ctx.utility.cleanAdd(ctx, part);
+            try {
+              ctx.utility.cleanAdd(ctx, Uri.decodeComponent(part));
+            } catch (_e) {}
+          }
+        }
+      } catch (_e) {}
+    }
 
     final self = this;
     final utility = ctx.utility;
@@ -111,7 +132,10 @@ class ProxyFeature extends BaseFeature {
   void _track(dynamic url) {
     final track = _client.track;
     if (null == track['proxy']) {
-      track['proxy'] = {'routed': 0, 'url': _url};
+      track['proxy'] = {
+        'routed': 0,
+        'url': null == _ctx ? _url : _ctx.utility.clean(_ctx, _url),
+      };
     }
     track['proxy']['routed']++;
   }

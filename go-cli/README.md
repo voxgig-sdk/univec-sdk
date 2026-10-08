@@ -19,6 +19,7 @@ make build
 export UNIVEC_APIKEY=sk_live_xxx
 
 # 4. Each command line is ONE boru expression, run against the API:
+./univec-cli list model
 
 # 5. Override the API base URL for a single call
 UNIVEC_BASE=https://api.example.com ./univec-cli --help

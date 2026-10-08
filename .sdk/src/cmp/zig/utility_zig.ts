@@ -4,6 +4,8 @@ import {
   walk,
 } from '@voxgig/struct'
 
+import { canonScalarKey, requiredItems } from '@voxgig/sdkgen'
+
 
 // Zig keywords that are illegal as a plain identifier.
 const ZIG_RESERVED = new Set<string>([
@@ -138,8 +140,19 @@ function clean(o: any, dropDefaults?: boolean): any {
   return prune(o, true === dropDefaults)
 }
 
+// A list's required route and query parameters, as the match it is called with.
+function zigListMatch(entity: any): string {
+  const lit = (type: any): string =>
+    (({ NULL: 'h.vnull()', INTEGER: 'h.vnum(1)', NUMBER: 'h.vnum(1)', BOOLEAN: 'h.vbool(true)', ARRAY: 'h.olist()', OBJECT: 'h.omap()' }) as any)[canonScalarKey(type)] ?? 'h.vstr("example")'
+  const items = requiredItems(entity, 'list')
+  return 0 < items.length
+    ? `h.jo(&.{${items.map((it: any) => `.{ ${JSON.stringify(it.name)}, ${lit(it.type)} }`).join(', ')}})`
+    : 'h.vnull()'
+}
+
 
 export {
+  zigListMatch,
   clean,
   formatZigValue,
   zigModuleName,

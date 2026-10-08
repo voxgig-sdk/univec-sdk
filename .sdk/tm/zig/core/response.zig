@@ -12,6 +12,8 @@ pub const Response = struct {
     json: Value = .{ .null = {} },
     body: Value = .{ .null = {} },
     err: ?*err.UnivecError = null,
+    // Set by a transport that could not read a non-blank body as JSON.
+    unreadable: bool = false,
 
     pub fn make(resmap: Value) *Response {
         const r = h.A().create(Response) catch unreachable;
@@ -26,6 +28,7 @@ pub const Response = struct {
             .json = h.getp(resmap, "json"),
             .body = h.getp(resmap, "body"),
             .err = null,
+            .unreadable = h.get_bool(resmap, "unreadable") orelse false,
         };
         return r;
     }

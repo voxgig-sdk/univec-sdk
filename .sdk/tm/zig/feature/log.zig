@@ -46,7 +46,9 @@ pub const LogFeature = struct {
         else
             "";
 
-        std.debug.print("name=log hook={s} op={s} spec={s}\n", .{ hook, opname, specinfo });
+        // A log line leaves the pipeline, so it is cleaned like every record.
+        const line = std.fmt.allocPrint(h.A(), "name=log hook={s} op={s} spec={s}", .{ hook, opname, specinfo }) catch "";
+        std.debug.print("{s}\n", .{ctx.util().clean_str(ctx, line)});
     }
 
     fn vname(p: *anyopaque) []const u8 {

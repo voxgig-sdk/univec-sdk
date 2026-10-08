@@ -15,6 +15,7 @@ import { cmp, each, Folder, File, Content, entityCollection,
 
 import { TestEntity } from './TestEntity_scala'
 import { TestDirect } from './TestDirect_scala'
+import { TestClean } from './TestClean_scala'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_scala'
 import { scalaPackage } from './utility_scala'
 
@@ -34,6 +35,8 @@ const Test = cmp(function Test(props: any) {
 
     // Write-once: a project's edited control file survives regeneration.
     TestControl({ target, dir: 'sdktest' })
+
+    TestClean({ target, scalapackage })
 
     const entities: { Name: string; entity: boolean; direct: boolean }[] = []
 

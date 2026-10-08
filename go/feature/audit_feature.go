@@ -88,6 +88,7 @@ func (f *AuditFeature) emit(ctx *core.Context, outcome string) {
 	if ctx.Result != nil {
 		record["status"] = ctx.Result.Status
 	}
+	record = fclean(ctx, record)
 
 	f.Records = append(f.Records, record)
 	max := foptInt(f.options, "max", 1000)

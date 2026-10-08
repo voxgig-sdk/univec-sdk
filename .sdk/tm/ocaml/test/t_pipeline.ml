@@ -40,7 +40,8 @@ let make_factory (cl : sdk_client) (made : value list ref) : entity_obj =
     (* Ops resolve to the ENTITY (see Sdk_types); this fake never runs them. *)
     e_load = (fun _ _ -> failwith "unused"); e_list = (fun _ _ -> []);
     e_create = (fun _ _ -> failwith "unused");
-    e_update = (fun _ _ -> failwith "unused"); e_remove = (fun _ _ -> failwith "unused");
+    e_update = (fun _ _ -> failwith "unused"); e_patch = (fun _ _ -> failwith "unused");
+    e_remove = (fun _ _ -> failwith "unused");
     e_deleted = false; e_mark_deleted = (fun () -> ());
     e_stream = (fun _ _ _ -> Seq.empty);
   } in

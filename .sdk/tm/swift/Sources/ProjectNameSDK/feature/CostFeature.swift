@@ -303,14 +303,16 @@ public final class CostFeature: BaseFeature {
     bump(&actors, actor, amount)
 
     seq += 1
+    // A typed record, so its strings are cleaned one by one rather than the
+    // record as a whole.
     let record = CostRecord()
     record.seq = seq
-    record.entity = entity
-    record.op = opname
-    record.actor = actor
+    record.entity = fcleanStr(ctx, entity)
+    record.op = fcleanStr(ctx, opname)
+    record.actor = fcleanStr(ctx, actor)
     record.amount = amount
-    record.currency = currency
-    record.source = source
+    record.currency = fcleanStr(ctx, currency)
+    record.source = fcleanStr(ctx, source)
     record.attempts = pending.attempts
     last = record
 

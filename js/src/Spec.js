@@ -17,6 +17,9 @@ class Spec {
     this.body = getprop(specmap, 'body')
     this.url = getprop(specmap, 'url')
     this.path = getprop(specmap, 'path')
+    // The query parameters prepareAuth placed: the credential, which the
+    // request sends and the entity's match leaves out.
+    this.authquery = getprop(specmap, 'authquery', [])
   }
 }
 

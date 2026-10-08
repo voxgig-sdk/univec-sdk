@@ -58,6 +58,16 @@ public class TestFeature : BaseFeature
             {
                 if (data == null || ctx2.Point == null) { return data; }
                 var tm = StructUtils.GetProp(ctx2.Point, "transform");
+                var key = ItemEnvelopeKey(StructUtils.GetProp(tm, "res"));
+                if (key != null && data is System.Collections.IList items)
+                {
+                    var wrapped = new List<object?>();
+                    foreach (var item in items)
+                    {
+                        wrapped.Add(new Dictionary<string, object?> { [key] = item });
+                    }
+                    return wrapped;
+                }
                 if (StructUtils.GetProp(tm, "res") is not string spec) { return data; }
                 // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
                 // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
@@ -160,7 +170,7 @@ public class TestFeature : BaseFeature
                 var outval = StructUtils.Clone(found);
                 return Respond(200, outval, null);
             }
-            else if (op.Name == "update")
+            else if (op.Name == "update" || op.Name == "patch")
             {
                 // Match the existing entity by id only (or its alias).
                 // Reqdata also contains the new field values, which would
@@ -198,7 +208,7 @@ public class TestFeature : BaseFeature
                 }
                 if (ent is Dictionary<string, object?> && ctx2.Reqdata != null)
                 {
-                    StructUtils.Merge(new List<object?> { ent, ctx2.Reqdata });
+                    StructUtils.Merge(new List<object?> { ent, Record(ctx2.Reqdata) });
                 }
                 StructUtils.DelProp(ent, "$KEY");
                 var outval = StructUtils.Clone(ent);
@@ -226,7 +236,7 @@ public class TestFeature : BaseFeature
                     Random.Shared.Next(0x10000), Random.Shared.Next(0x10000),
                     Random.Shared.Next(0x10000), Random.Shared.Next(0x10000));
 
-                var ent = StructUtils.Clone(ctx2.Reqdata);
+                var ent = StructUtils.Clone(Record(ctx2.Reqdata));
                 if (ent is Dictionary<string, object?> entm)
                 {
                     entm["id"] = id;
@@ -326,6 +336,34 @@ public class TestFeature : BaseFeature
             SleepMs(PickLatency());
             return inner(ctx, url, fetchdef);
         };
+    }
+
+    // The record the mock keeps: the request data without `$body`, which only the
+    // wire carries.
+    private static Dictionary<string, object?>? Record(Dictionary<string, object?>? reqdata)
+    {
+        if (reqdata == null)
+        {
+            return null;
+        }
+        var rec = new Dictionary<string, object?>(reqdata);
+        rec.Remove("$body");
+        return rec;
+    }
+
+    // The key a list's response transform
+    // ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record under.
+    private static string? ItemEnvelopeKey(object? restf)
+    {
+        if (restf is not System.Collections.IList spec || spec.Count != 3 ||
+            !"`$EACH`".Equals(spec[0]) || !"body".Equals(spec[1]) ||
+            spec[2] is not System.Collections.IDictionary child ||
+            child["`$MERGE`"] is not string merge)
+        {
+            return null;
+        }
+        var m = System.Text.RegularExpressions.Regex.Match(merge, "^`\\.([^.`$]+)`$");
+        return m.Success ? m.Groups[1].Value : null;
     }
 
     private static object BuildArgs(Context ctx, Operation op, Dictionary<string, object?>? args)

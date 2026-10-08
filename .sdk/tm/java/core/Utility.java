@@ -21,6 +21,11 @@ public class Utility {
   }
 
   @FunctionalInterface
+  public interface CleanAddFn {
+    void apply(Context ctx, Object value);
+  }
+
+  @FunctionalInterface
   public interface MakeErrorFn {
     Object apply(Context ctx, RuntimeException err);
   }
@@ -51,6 +56,7 @@ public class Utility {
   }
 
   public CleanFn clean;
+  public CleanAddFn cleanAdd;
   public CtxFn<Object> done;
   public MakeErrorFn makeError;
   public FeatureFn featureAdd;
@@ -94,6 +100,7 @@ public class Utility {
     Utility u = new Utility(true);
 
     u.clean = this.clean;
+    u.cleanAdd = this.cleanAdd;
     u.done = this.done;
     u.makeError = this.makeError;
     u.featureAdd = this.featureAdd;

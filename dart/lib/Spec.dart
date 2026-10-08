@@ -31,6 +31,8 @@ class Spec {
     path = vs.getprop(specmap, 'path');
   }
 
+  Map<String, dynamic> toJson() => toJSON();
+
   Map<String, dynamic> toJSON() => {
         'parts': parts,
         'headers': headers,

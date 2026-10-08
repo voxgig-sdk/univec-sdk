@@ -34,6 +34,11 @@ main: kit: entity: convert: {
       name: "create"
       points: [
         {
+          bf: [
+            "embeddings"
+            "source_model"
+            "target_model"
+          ]
           co: {
             id: "POST /v1/convert"
             source: "openapi3"
@@ -134,6 +139,10 @@ main: kit: entity: convert: {
           }
           m: "POST"
           o: "/v1/convert"
+          rs: {
+            kind: "json"
+            media: "application/json"
+          }
           s: [
             {
               lit: "v1"
@@ -148,6 +157,11 @@ main: kit: entity: convert: {
           }
         }
         {
+          bf: [
+            "bridge_model"
+            "target_model"
+            "texts"
+          ]
           co: {
             id: "POST /v1/embed-bridge"
             source: "openapi3"
@@ -250,6 +264,10 @@ main: kit: entity: convert: {
           q: {
             "$action": "bridge"
           }
+          rs: {
+            kind: "json"
+            media: "application/json"
+          }
           s: [
             {
               lit: "v1"
@@ -264,6 +282,11 @@ main: kit: entity: convert: {
           }
         }
         {
+          bf: [
+            "embeddings"
+            "source_model"
+            "target_model"
+          ]
           co: {
             id: "POST /v1/ephemeral/convert"
             source: "openapi3"
@@ -371,6 +394,10 @@ main: kit: entity: convert: {
           q: {
             "$action": "ephemeral"
           }
+          rs: {
+            kind: "json"
+            media: "application/json"
+          }
           s: [
             {
               lit: "v1"
@@ -388,6 +415,11 @@ main: kit: entity: convert: {
           }
         }
         {
+          bf: [
+            "bridge_model"
+            "target_model"
+            "texts"
+          ]
           co: {
             id: "POST /v1/ephemeral/embed-bridge"
             source: "openapi3"
@@ -493,6 +525,10 @@ main: kit: entity: convert: {
           o: "/v1/ephemeral/embed-bridge"
           q: {
             "$action": "ephemeral_bridge"
+          }
+          rs: {
+            kind: "json"
+            media: "application/json"
           }
           s: [
             {

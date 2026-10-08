@@ -1,7 +1,5 @@
 // Univec SDK utility: makeFetchDef.
 
-using Voxgig.Struct;
-
 namespace UnivecSdk.Util;
 
 public static partial class SdkUtility
@@ -28,9 +26,7 @@ public static partial class SdkUtility
 
         if (spec.Body != null)
         {
-            fetchdef["body"] = spec.Body is Dictionary<string, object?>
-                ? StructUtils.Jsonify(spec.Body)
-                : spec.Body;
+            fetchdef["body"] = RequestBody(ctx.Point, spec.Body);
         }
 
         return fetchdef;

@@ -1,10 +1,13 @@
 package JAVAPACKAGE.utility;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import JAVAPACKAGE.core.Context;
+import JAVAPACKAGE.core.Helpers;
 import JAVAPACKAGE.core.Spec;
 import JAVAPACKAGE.core.Utility;
 import JAVAPACKAGE.utility.struct.Struct;
@@ -16,6 +19,11 @@ final class MakeSpec {
 
   static Spec makeSpec(Context ctx) {
     Object outSpec = ctx.out.get("spec");
+    // A PreSpec hook (validate) rejects the operation by placing its error
+    // here; the pipeline raises it, and ctx.spec stays a request spec.
+    if (outSpec instanceof RuntimeException) {
+      throw (RuntimeException) outSpec;
+    }
     if (outSpec instanceof Spec) {
       ctx.spec = (Spec) outSpec;
       return ctx.spec;
@@ -47,7 +55,7 @@ final class MakeSpec {
     String allowMethod = allowMethodRaw instanceof String ? (String) allowMethodRaw : "";
     // null-safe: an op outside the convention resolves NO method (see
     // PrepareMethod), which the allow list can never contain.
-    if (null == ctx.spec.method || !allowMethod.contains(ctx.spec.method)) {
+    if (!Helpers.allowed(allowMethodRaw, ctx.spec.method)) {
       throw ctx.makeError("spec_method_allow",
           "Method \"" + ctx.spec.method
               + "\" not allowed by SDK option allow.method value: \"" + allowMethod + "\"");
@@ -78,7 +86,24 @@ final class MakeSpec {
       ctx.ctrl.explain.put("spec", ctx.spec);
     }
 
+    // Whatever prepareAuth sets in the query, under whichever name, is the
+    // credential; a key it leaves as it was is the caller's.
+    Map<String, Object> query = new LinkedHashMap<>();
+    if (ctx.spec.query != null) {
+      query.putAll(ctx.spec.query);
+    }
+
     Spec spec = utility.prepareAuth.apply(ctx);
+
+    if (spec != null && spec.query != null) {
+      spec.authquery = new ArrayList<>();
+      for (Map.Entry<String, Object> entry : spec.query.entrySet()) {
+        String key = entry.getKey();
+        if (!query.containsKey(key) || !Objects.equals(query.get(key), entry.getValue())) {
+          spec.authquery.add(key);
+        }
+      }
+    }
 
     ctx.spec = spec;
     return spec;

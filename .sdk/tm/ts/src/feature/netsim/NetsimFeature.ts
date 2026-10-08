@@ -46,7 +46,7 @@ class NetsimFeature extends BaseFeature {
 
     // Total outage: every call fails at the transport level.
     if (true === opts.offline) {
-      await this._sleep(this._pickLatency())
+      await this._sleep(this._pickLatency(), fetchdef?.signal)
       applied.offline = true
       this._track(ctx, applied)
       return ctx.error('netsim_offline', 'Simulated network offline (URL was: "' + url + '")')
@@ -54,7 +54,7 @@ class NetsimFeature extends BaseFeature {
 
     // Connection-level errors for the first N calls (e.g. ECONNRESET).
     if (call <= (opts.errorTimes | 0)) {
-      await this._sleep(this._pickLatency())
+      await this._sleep(this._pickLatency(), fetchdef?.signal)
       applied.error = true
       this._track(ctx, applied)
       return ctx.error('netsim_conn', 'Simulated connection error (call ' + call + ')')
@@ -62,7 +62,7 @@ class NetsimFeature extends BaseFeature {
 
     // Rate-limit responses (HTTP 429 + Retry-After) for the first N calls.
     if (call <= (opts.rateLimitTimes | 0)) {
-      await this._sleep(this._pickLatency())
+      await this._sleep(this._pickLatency(), fetchdef?.signal)
       applied.rateLimited = true
       this._track(ctx, applied)
       return this._respond(ctx, 429, undefined, {
@@ -77,7 +77,7 @@ class NetsimFeature extends BaseFeature {
     const failByEvery = 0 < (opts.failEvery | 0) && 0 === call % opts.failEvery
     const failByRate = 0 < (opts.failRate || 0) && this._rand() < opts.failRate
     if (failByCount || failByEvery || failByRate) {
-      await this._sleep(this._pickLatency())
+      await this._sleep(this._pickLatency(), fetchdef?.signal)
       applied.failStatus = failStatus
       this._track(ctx, applied)
       return this._respond(ctx, failStatus, undefined, { statusText: 'Simulated Failure' })
@@ -87,7 +87,7 @@ class NetsimFeature extends BaseFeature {
     const latency = this._pickLatency()
     applied.latency = latency
     this._track(ctx, applied)
-    await this._sleep(latency)
+    await this._sleep(latency, fetchdef?.signal)
     return inner(ctx, url, fetchdef)
   }
 
@@ -110,15 +110,17 @@ class NetsimFeature extends BaseFeature {
   }
 
 
-  _sleep(this: any, ms: number): Promise<void> {
+  _sleep(this: any, ms: number, signal?: any): Promise<void> {
     if (null == ms || 0 >= ms) {
       return Promise.resolve()
     }
     const sleep = this._options.sleep
     if ('function' === typeof sleep) {
-      return Promise.resolve(sleep(ms))
+      return this._untilAbort(Promise.resolve(sleep(ms)), signal)
     }
-    return new Promise((r) => setTimeout(r, ms))
+    let timer: any
+    return this._untilAbort(new Promise((r) => { timer = setTimeout(r, ms) }), signal,
+      () => clearTimeout(timer))
   }
 
 

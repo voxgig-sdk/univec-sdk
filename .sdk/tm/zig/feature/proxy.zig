@@ -83,12 +83,22 @@ pub const ProxyFeature = struct {
         }
         const no_proxy: []const []const u8 = np_list.toOwnedSlice(h.A()) catch &.{};
 
-        self.track.url = url;
+        const util = ctx.util();
+
+        // A proxy URL may carry credentials as userinfo, from the option or
+        // the environment, and neither is under a sensitive key name.
+        for (userinfo_parts(url)) |part| {
+            util.clean_add(ctx, part);
+            util.clean_add(ctx, percent_decode(part));
+        }
+
+        // The tracked url is what a caller reads back, so it is cleaned; the
+        // wrapper routes with the raw one.
+        self.track.url = util.clean_str(ctx, url);
         self.track.no_proxy = no_proxy;
 
-        const util = ctx.util();
         const w = h.A().create(WrapCtx) catch unreachable;
-        w.* = .{ .inner = util.fetcher, .track = self.track };
+        w.* = .{ .inner = util.fetcher, .track = self.track, .url = url };
         util.fetcher = .{ .ctx = @ptrCast(w), .call = wrapCall };
     }
     fn vdispatch(p: *anyopaque, name: []const u8, ctx: *Context) void {
@@ -113,12 +123,44 @@ pub const ProxyFeature = struct {
 const WrapCtx = struct {
     inner: Fetcher,
     track: *ProxyTrack,
+    url: []const u8,
 };
 
 fn wrapCall(p: *anyopaque, ctx: *Context, url: []const u8, fetchdef: Value) err.E!Value {
     const w: *WrapCtx = @ptrCast(@alignCast(p));
-    const routed = route(w.track, url, fetchdef);
+    const routed = route(w.url, w.track, url, fetchdef);
     return w.inner.invoke(ctx, url, routed);
+}
+
+// The user and password of `scheme://user:pass@host`, raw as written.
+fn userinfo_parts(url: []const u8) []const []const u8 {
+    var out: std.ArrayList([]const u8) = .empty;
+    const start = if (std.mem.indexOf(u8, url, "://")) |i| i + 3 else return &.{};
+    const rest = url[start..];
+    const at = std.mem.indexOfScalar(u8, rest, '@') orelse return &.{};
+    const userinfo = rest[0..at];
+    if (std.mem.indexOfScalar(u8, userinfo, '/') != null) return &.{};
+    var it = std.mem.splitScalar(u8, userinfo, ':');
+    while (it.next()) |part| {
+        if (part.len != 0) out.append(h.A(), part) catch {};
+    }
+    return out.toOwnedSlice(h.A()) catch &.{};
+}
+
+fn percent_decode(s: []const u8) []const u8 {
+    var out: std.ArrayList(u8) = .empty;
+    var i: usize = 0;
+    while (i < s.len) : (i += 1) {
+        if (s[i] == '%' and i + 3 <= s.len) {
+            if (std.fmt.parseInt(u8, s[i + 1 .. i + 3], 16)) |byte| {
+                out.append(h.A(), byte) catch {};
+                i += 2;
+                continue;
+            } else |_| {}
+        }
+        out.append(h.A(), s[i]) catch {};
+    }
+    return out.toOwnedSlice(h.A()) catch s;
 }
 
 // Zig 0.16 has no free-standing environment lookup: the block the process was
@@ -165,8 +207,7 @@ fn bypass(no_proxy: []const []const u8, url: []const u8) bool {
     return false;
 }
 
-fn route(track: *ProxyTrack, url: []const u8, fetchdef: Value) Value {
-    const proxy_url = track.url;
+fn route(proxy_url: []const u8, track: *ProxyTrack, url: []const u8, fetchdef: Value) Value {
     const no_proxy = track.no_proxy;
 
     if (proxy_url.len == 0 or bypass(no_proxy, url)) {

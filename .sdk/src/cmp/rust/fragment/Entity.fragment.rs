@@ -143,10 +143,13 @@ impl EntyClass {
             _ => Value::empty_map(),
         };
 
-        let ctrl = match to_map(&getp(&stream_opts, "ctrl")) {
-            Value::Map(m) => Value::Map(m),
-            _ => Value::empty_map(),
-        };
+        // A copy: the caller's ctrl gains no key, and explain stays its own record.
+        let ctrl = Value::empty_map();
+        if let Value::Map(m) = to_map(&getp(&stream_opts, "ctrl")) {
+            for (k, v) in m.borrow().iter() {
+                setp(&ctrl, k, v.clone());
+            }
+        }
         setp(&ctrl, "stream", stream_opts.clone());
 
         // `args` carries the op's request match (list/load); pass it through
@@ -180,25 +183,42 @@ impl EntyClass {
             *ctx.reqdata.borrow_mut() = reqdata;
         }
 
-        // Run the same pipeline as run_op.
+        // Run the same pipeline as run_op. A failed step leaves through
+        // make_error, as an operation's does.
+        let fail = |e: ProjectNameError| self.utility.make_error(&ctx, Some(e)).map(stream_items);
         self.utility.feature_hook(&ctx, "PrePoint");
-        let point = self.utility.make_point(&ctx)?;
+        let point = match self.utility.make_point(&ctx) {
+            Ok(p) => p,
+            Err(e) => return fail(e),
+        };
         ctx.out_set("point", crate::core::types::OutVal::Val(point));
 
         self.utility.feature_hook(&ctx, "PreSpec");
-        let spec = self.utility.make_spec(&ctx)?;
+        let spec = match self.utility.make_spec(&ctx) {
+            Ok(s) => s,
+            Err(e) => return fail(e),
+        };
         ctx.out_set("spec", crate::core::types::OutVal::Spec(spec));
 
         self.utility.feature_hook(&ctx, "PreRequest");
-        let resp = self.utility.make_request(&ctx)?;
+        let resp = match self.utility.make_request(&ctx) {
+            Ok(r) => r,
+            Err(e) => return fail(e),
+        };
         ctx.out_set("request", crate::core::types::OutVal::Response(resp));
 
         self.utility.feature_hook(&ctx, "PreResponse");
-        let resp2 = self.utility.make_response(&ctx)?;
+        let resp2 = match self.utility.make_response(&ctx) {
+            Ok(r) => r,
+            Err(e) => return fail(e),
+        };
         ctx.out_set("response", crate::core::types::OutVal::Response(resp2));
 
         self.utility.feature_hook(&ctx, "PreResult");
-        let result = self.utility.make_result(&ctx)?;
+        let result = match self.utility.make_result(&ctx) {
+            Ok(r) => r,
+            Err(e) => return fail(e),
+        };
         ctx.out_set("result", crate::core::types::OutVal::Result(result));
 
         self.utility.feature_hook(&ctx, "PreDone");
@@ -209,18 +229,25 @@ impl EntyClass {
         if let Some(res) = &cur {
             let streamfn = res.borrow().stream.clone();
             if let Some(sf) = streamfn {
+                // done() does not run on this path, so its record is cleaned here.
+                self.utility.clean_explain(&ctx);
                 return Ok(sf().into_iter());
             }
         }
 
-        let data = self.utility.done(&ctx)?;
-        let items: Vec<Value> = match data {
-            Value::List(l) => l.borrow().iter().cloned().collect(),
-            Value::Noval | Value::Null => Vec::new(),
-            other => vec![other],
-        };
-        Ok(items.into_iter())
+        self.utility.done(&ctx).map(stream_items)
     }
+}
+
+// The items of what done or make_error hands back: under `throw: false` a
+// failure hands back the data there is.
+fn stream_items(data: Value) -> std::vec::IntoIter<Value> {
+    let items: Vec<Value> = match data {
+        Value::List(l) => l.borrow().iter().cloned().collect(),
+        Value::Noval | Value::Null => Vec::new(),
+        other => vec![other],
+    };
+    items.into_iter()
 }
 
 impl Entity for EntyClass {
@@ -287,6 +314,8 @@ impl ProjectNameEntity for EntyClass {
     // #CreateOp
 
     // #UpdateOp
+
+    // #PatchOp
 
     // #RemoveOp
 }

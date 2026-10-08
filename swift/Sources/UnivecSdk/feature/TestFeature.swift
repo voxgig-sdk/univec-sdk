@@ -5,6 +5,20 @@
 
 import Foundation
 
+// The key a list's response transform
+// ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record under.
+private func testItemEnvelopeKey(_ restf: Value?) -> String? {
+  guard case .list(let spec)? = restf, spec.items.count == 3,
+        case .string(let each) = spec.items[0], each == "`$EACH`",
+        case .string(let body) = spec.items[1], body == "body",
+        case .map(let child) = spec.items[2],
+        case .string(let merge)? = child.entries["`$MERGE`"],
+        merge.count > 3, merge.hasPrefix("`."), merge.hasSuffix("`") else { return nil }
+  let key = String(merge.dropFirst(2).dropLast(1))
+  guard !key.contains(where: { $0 == "." || $0 == "`" || $0 == "$" }) else { return nil }
+  return key
+}
+
 // THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
 // `transform.res: `body.item`` describes an API that answers {"item": {...}},
 // and the response transform unwraps that key on the way back. Returning the
@@ -15,6 +29,13 @@ private func testEnvelope(_ ctx: Context, _ data: Value) -> Value {
   if case .null = data { return data }
   guard let point = ctx.point else { return data }
   guard case .map(let tm)? = point.entries["transform"] else { return data }
+  if let key = testItemEnvelopeKey(tm.entries["res"]), case .list(let items) = data {
+    return .list(VList(items.items.map { item -> Value in
+      let wrapped = VMap()
+      wrapped.entries[key] = item
+      return .map(wrapped)
+    }))
+  }
   guard case .string(let spec)? = tm.entries["res"] else { return data }
   // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
   // GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
@@ -56,6 +77,16 @@ private func testResolveMatch(_ ctx2: Context, _ explicitMatch: VMap) -> VMap {
     }
   }
   return VMap()
+}
+
+// The record the mock keeps: the request data without `$body`, which only the
+// wire carries.
+private func testRecord(_ reqdata: VMap) -> VMap {
+  let out = VMap()
+  for (k, v) in reqdata.entries where k != "$body" {
+    out.entries[k] = v
+  }
+  return out
 }
 
 private func testBuildArgs(_ ctx: Context, _ op: Operation, _ args: VMap?) -> Value {
@@ -197,7 +228,7 @@ public final class TestFeature: BaseFeature {
           for item in fl.items { delprop(item, .string("$KEY")) }
         }
         return testRespond(ctx2, 200, clone(found), nil)
-      } else if op.name == "update" {
+      } else if op.name == "update" || op.name == "patch" {
         var updateMatch = VMap()
         if let idv = ctx2.reqdata.entries["id"] {
           updateMatch.entries["id"] = idv
@@ -219,7 +250,7 @@ public final class TestFeature: BaseFeature {
           return testRespond(ctx2, 404, .noval, extra)
         }
         if ent.isMap {
-          _ = merge(.list(VList([ent, .map(ctx2.reqdata)])))
+          _ = merge(.list(VList([ent, .map(testRecord(ctx2.reqdata))])))
         }
         delprop(ent, .string("$KEY"))
         return testRespond(ctx2, 200, clone(ent), nil)
@@ -241,7 +272,7 @@ public final class TestFeature: BaseFeature {
             Int.random(in: 0..<0x10000), Int.random(in: 0..<0x10000),
             Int.random(in: 0..<0x10000), Int.random(in: 0..<0x10000)))
         }
-        let ent = clone(.map(ctx2.reqdata))
+        let ent = clone(.map(testRecord(ctx2.reqdata)))
         if let entm = ent.asMap {
           entm.entries["id"] = id
           if let idStr = id.asString { entmap.entries[idStr] = .map(entm) }

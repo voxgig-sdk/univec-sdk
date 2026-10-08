@@ -191,6 +191,11 @@
               "points": [
                 {
                   "a": true,
+                  "bf": [
+                    "embeddings",
+                    "source_model",
+                    "target_model"
+                  ],
                   "co": {
                     "id": "POST /v1/convert",
                     "source": "openapi3",
@@ -295,6 +300,10 @@
                   "o": "/v1/convert",
                   "q": {},
                   "r": {},
+                  "rs": {
+                    "kind": "json",
+                    "media": "application/json"
+                  },
                   "s": [
                     {
                       "lit": "v1"
@@ -310,6 +319,11 @@
                 },
                 {
                   "a": true,
+                  "bf": [
+                    "bridge_model",
+                    "target_model",
+                    "texts"
+                  ],
                   "co": {
                     "id": "POST /v1/embed-bridge",
                     "source": "openapi3",
@@ -415,6 +429,10 @@
                     "$action": "bridge"
                   },
                   "r": {},
+                  "rs": {
+                    "kind": "json",
+                    "media": "application/json"
+                  },
                   "s": [
                     {
                       "lit": "v1"
@@ -430,6 +448,11 @@
                 },
                 {
                   "a": true,
+                  "bf": [
+                    "embeddings",
+                    "source_model",
+                    "target_model"
+                  ],
                   "co": {
                     "id": "POST /v1/ephemeral/convert",
                     "source": "openapi3",
@@ -540,6 +563,10 @@
                     "$action": "ephemeral"
                   },
                   "r": {},
+                  "rs": {
+                    "kind": "json",
+                    "media": "application/json"
+                  },
                   "s": [
                     {
                       "lit": "v1"
@@ -558,6 +585,11 @@
                 },
                 {
                   "a": true,
+                  "bf": [
+                    "bridge_model",
+                    "target_model",
+                    "texts"
+                  ],
                   "co": {
                     "id": "POST /v1/ephemeral/embed-bridge",
                     "source": "openapi3",
@@ -667,6 +699,10 @@
                     "$action": "ephemeral_bridge"
                   },
                   "r": {},
+                  "rs": {
+                    "kind": "json",
+                    "media": "application/json"
+                  },
                   "s": [
                     {
                       "lit": "v1"
@@ -729,6 +765,10 @@
               "points": [
                 {
                   "a": true,
+                  "bf": [
+                    "model",
+                    "texts"
+                  ],
                   "co": {
                     "id": "POST /v1/embed",
                     "source": "openapi3",
@@ -802,6 +842,10 @@
                   "o": "/v1/embed",
                   "q": {},
                   "r": {},
+                  "rs": {
+                    "kind": "json",
+                    "media": "application/json"
+                  },
                   "s": [
                     {
                       "lit": "v1"
@@ -817,6 +861,10 @@
                 },
                 {
                   "a": true,
+                  "bf": [
+                    "model",
+                    "texts"
+                  ],
                   "co": {
                     "id": "POST /v1/ephemeral/embed",
                     "source": "openapi3",
@@ -896,6 +944,10 @@
                     "$action": "ephemeral"
                   },
                   "r": {},
+                  "rs": {
+                    "kind": "json",
+                    "media": "application/json"
+                  },
                   "s": [
                     {
                       "lit": "v1"
@@ -967,6 +1019,7 @@
               "points": [
                 {
                   "a": true,
+                  "bf": false,
                   "co": {
                     "id": "POST /v1/ephemeral/key",
                     "source": "openapi3",
@@ -988,6 +1041,10 @@
                   "o": "/v1/ephemeral/key",
                   "q": {},
                   "r": {},
+                  "rs": {
+                    "kind": "json",
+                    "media": "application/json"
+                  },
                   "s": [
                     {
                       "lit": "v1"
@@ -1126,6 +1183,10 @@
                   "o": "/v1/models",
                   "q": {},
                   "r": {},
+                  "rs": {
+                    "kind": "json",
+                    "media": "application/json"
+                  },
                   "s": [
                     {
                       "lit": "v1"
@@ -4931,6 +4992,7 @@
             },
             "optspec": {
               "clearTimer": "`$FUNCTION`",
+              "now": "`$FUNCTION`",
               "setTimer": "`$FUNCTION`"
             },
             "strict": false
@@ -5192,7 +5254,7 @@
       "optspec": {
         "allow": {
           "method": "GET,PUT,POST,PATCH,DELETE,OPTIONS",
-          "op": "create,update,load,list,remove,command,direct,graphql"
+          "op": "create,update,patch,load,list,remove,command,direct,graphql"
         },
         "apikey": "",
         "auth": {
@@ -5203,7 +5265,12 @@
         },
         "base": "http://localhost:8000",
         "clean": {
-          "keys": "key,token,id"
+          "active": true,
+          "hint": "0",
+          "keys": "key,secret,token,password,passwd,authorization,cookie,credential,signature",
+          "mask": "[redacted]",
+          "min": "4",
+          "values": ""
         },
         "entity": {
           "`$CHILD`": {
@@ -5240,6 +5307,11 @@
         "top": {
           "active": true
         }
+      },
+      "publisher": {
+        "name": "",
+        "security": "",
+        "url": ""
       },
       "repo": {
         "host": "github.com",
@@ -5877,7 +5949,10 @@
             "version": "0.1.2"
           },
           "superseded": [],
-          "title": "Go MCP server"
+          "title": "Go MCP server",
+          "tool": {
+            "write": false
+          }
         },
         "haskell": {
           "active": true,
@@ -7117,6 +7192,17 @@
           "base": "",
           "strict": true
         }
+      },
+      "text": {
+        "about_md": "",
+        "docs_url": "",
+        "entity_desc": {},
+        "homepage": "",
+        "meta_source": "",
+        "summary": "",
+        "tagline": "",
+        "title": "",
+        "website": ""
       }
     }
   },

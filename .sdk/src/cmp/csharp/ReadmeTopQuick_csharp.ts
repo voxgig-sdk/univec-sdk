@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { csVarName } from './utility_csharp'
+import { csVarName, csListMatch } from './utility_csharp'
 
 
 // A type-correct C# literal for a param: numeric/boolean/array/object params
@@ -15,6 +15,7 @@ import { csVarName } from './utility_csharp'
 // loose object model means all values live in Dictionary<string, object?>.
 function csLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'null'
   if ('INTEGER' === k) return '1L'
   if ('NUMBER' === k) return '1.0'
   if ('BOOLEAN' === k) return 'true'
@@ -36,9 +37,12 @@ const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
     ? `new ${model.const.Name}SDK(new Dictionary<string, object?>\n{\n    ["apikey"] = Environment.GetEnvironmentVariable("${envName(model)}_APIKEY"),\n})`
     : `new ${model.const.Name}SDK()`
 
+  const shown = null != exampleEntity &&
+    ['list', 'load'].some((op: string) => Object.keys(exampleEntity.op || {}).includes(op))
+
   Content(`\`\`\`csharp
 using ${model.const.Name}Sdk;
-
+${shown ? 'using Voxgig.Struct;\n' : ''}
 var client = ${ctor};
 
 `)
@@ -52,9 +56,12 @@ var client = ${ctor};
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
-      Content(`// List all ${eName.toLowerCase()}s (returns object?, an aggregate list; raises on error)
-var ${eVar}List = client.${eName}().List(null);
-Console.WriteLine(${eVar}List);
+      Content(`// List all ${eName.toLowerCase()}s (a list of entities, one per record, as object?; raises on error)
+var ${eVar}List = (List<object?>)client.${eName}().List(${csListMatch(exampleEntity)})!;
+foreach (var ${eVar}Item in ${eVar}List)
+{
+    Console.WriteLine(StructUtils.Jsonify(((IEntity)${eVar}Item!).Data()));
+}
 `)
     }
 
@@ -72,9 +79,9 @@ Console.WriteLine(${eVar}List);
             it.name === idF ? 'example_id' : 'example_' + it.name)}`).join(',')} }`
         : 'null'
       Content(`
-// Load a specific ${eName.toLowerCase()} (returns the record, raises on error)
-var ${eVar} = client.${eName}().Load(${loadArg});
-Console.WriteLine(${eVar});
+// Load a specific ${eName.toLowerCase()} (returns the entity, raises on error)
+var ${eVar} = (IEntity)client.${eName}().Load(${loadArg})!;
+Console.WriteLine(StructUtils.Jsonify(${eVar}.Data()));
 `)
     }
   }

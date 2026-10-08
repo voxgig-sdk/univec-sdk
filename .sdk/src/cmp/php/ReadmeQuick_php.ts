@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps, phpEntityAccessor } from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps, phpEntityAccessor, listMatchArg } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -55,6 +55,7 @@ $client = ${ctor};
     // placeholder would not parse).
     const phpLit = (type: any, placeholder: string = 'example'): string => {
       const k = canonScalarKey(type)
+      if ('NULL' === k) return 'null'
       if ('INTEGER' === k || 'NUMBER' === k) return '1'
       if ('BOOLEAN' === k) return 'true'
       if ('ARRAY' === k || 'OBJECT' === k) return '[]'
@@ -79,7 +80,7 @@ $client = ${ctor};
 \`\`\`php
 try {
     // list() returns entity instances; data_get() reads each record.
-    $${eName.toLowerCase()}s = $client->${phpEntityAccessor(eName)}()->list();
+    $${eName.toLowerCase()}s = $client->${phpEntityAccessor(eName)}()->list(${listMatchArg('php', exampleEntity)});
     foreach ($${eName.toLowerCase()}s as $record) {
         $item = $record->data_get();
         echo ${itemPrint} . "\\n";
@@ -174,7 +175,8 @@ try {
       ? `$created->data_get()["${dataIdF}"]`
       : phpLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`php
@@ -190,6 +192,13 @@ $created = $client->${phpEntityAccessor(eName)}()->create([${examplePairs('creat
         const fromCreated = null != dataIdF && opnames.includes('create')
         Content(`// Update${fromCreated ? ` — index the record via data_get() ($created->data_get()["${dataIdF}"]).` : ''}
 $client->${phpEntityAccessor(eName)}()->update([${updatePairs.join(', ')}]);
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`"${idF}" => ${idValueFor('patch')}`] : []).concat(examplePairs('patch'))
+        Content(`// Patch — sends only the fields given
+$client->${phpEntityAccessor(eName)}()->patch([${patchPairs.join(', ')}]);
 
 `)
       }

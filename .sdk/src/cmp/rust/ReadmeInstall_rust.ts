@@ -26,9 +26,9 @@ ${crateName(model)} = { path = "../${target.name}" }
 
   // Publish pending: not yet on crates.io. Depend on the git release tag or
   // on a local source checkout via a path dependency.
-  const { releasesUrl } = repoInfo(model)
-  Content(`This crate is not yet published to crates.io. Depend on it from the GitHub
-release tag (\`${target.name}/vX.Y.Z\`, see [Releases](${releasesUrl})) or
+  const { hostName, tagsUrl } = repoInfo(model)
+  Content(`This crate is not yet published to crates.io. Depend on it from the ${hostName}
+release tag (\`${target.name}/vX.Y.Z\`, see [Tags](${tagsUrl})) or
 from a source checkout by adding it to your \`Cargo.toml\`:
 
 \`\`\`toml

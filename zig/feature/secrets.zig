@@ -300,6 +300,10 @@ pub const SecretsFeature = struct {
         var specs: std.ArrayList(sekreto.ProviderSpec) = .empty;
 
         if (0 != explicit.len) {
+            // Every value this feature resolves or buys is a secret the SDK
+            // handles, and none arrives under an option key the intake
+            // registration saw.
+            util.clean_add(ctx, explicit);
             const keyed = sekreto.envkey(alloc, st.secretname, "") catch
                 sekreto.Answer([]const u8){ .err = "secrets: out of memory" };
             switch (keyed) {
@@ -572,6 +576,7 @@ fn resolve_once(st: *State, ctx: *Context) E!void {
         .err => |message| return ctx.fail(ERRCODE, h.A().dupe(u8, message) catch message),
         .ok => |v| v,
     };
+    if (value) |v| ctx.util().clean_add(ctx, v);
 
     if (st.exchange == null) {
         // An UNCACHED miss after an earlier hit is a revocation: the chain
@@ -792,6 +797,8 @@ fn buy(st: *State, ctx: *Context) E![]const u8 {
             .{ x.response, url },
         ) catch "secrets: token exchange returned no token");
     }
+
+    ctx.util().clean_add(ctx, token);
 
     st.cred = token;
     return token;

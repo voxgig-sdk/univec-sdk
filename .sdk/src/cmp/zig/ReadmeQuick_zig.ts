@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { zigVarName } from './utility_zig'
+import { zigVarName, zigListMatch } from './utility_zig'
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -36,6 +36,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   // A type-correct zig expression constructing a voxgig struct Value.
   const zigLit = (type: any, placeholder: string = 'example'): string => {
     const k = canonScalarKey(type)
+    if ('NULL' === k) return 'h.vnull()'
     if ('INTEGER' === k || 'NUMBER' === k) return 'h.vnum(1)'
     if ('BOOLEAN' === k) return 'h.vbool(true)'
     if ('ARRAY' === k) return 'h.olist()'
@@ -66,12 +67,16 @@ const client = ${ctor};
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`list()\` returns an \`OpResult\` whose \`.ok\` is a \`Value\` array —
-\`switch\` on it.
+\`list()\`'s \`.ok\` is a slice of entities, one per record — \`switch\` on
+it. \`asEntity().data(null)\` reads an entity's record.
 
 \`\`\`zig
-switch (client.${method}(h.vnull()).list(h.vnull(), h.vnull())) {
-    .ok => |${eVar}s| std.debug.print("{s}\\n", .{h.stringify(${eVar}s)}),
+switch (client.${method}(h.vnull()).list(${zigListMatch(exampleEntity)}, h.vnull())) {
+    .ok => |${eVar}s| {
+        for (${eVar}s) |${eVar}| {
+            std.debug.print("{s}\\n", .{h.stringify(${eVar}.asEntity().data(null))});
+        }
+    },
     .err => |e| std.debug.print("list failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
@@ -100,11 +105,12 @@ switch (client.${method}(h.vnull()).list(h.vnull(), h.vnull())) {
       Content(`### 3. Load ${neArticle} ${neName.toLowerCase()}
 
 ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
-\`load()\`'s \`.ok\` carries the bare record.
+\`load()\`'s \`.ok\` carries the entity; \`asEntity().data(null)\` reads its
+record.
 
 \`\`\`zig
 switch (client.${neMethod}(h.vnull()).load(h.jo(&.{${neMatch.join(', ')}}), h.vnull())) {
-    .ok => |${neVar}| std.debug.print("{s}\\n", .{h.stringify(${neVar})}),
+    .ok => |${neVar}| std.debug.print("{s}\\n", .{h.stringify(${neVar}.asEntity().data(null))}),
     .err => |e| std.debug.print("load failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
@@ -124,11 +130,12 @@ switch (client.${neMethod}(h.vnull()).load(h.jo(&.{${neMatch.join(', ')}}), h.vn
 
       Content(`### 3. Load ${article} ${eName.toLowerCase()}
 
-\`load()\`'s \`.ok\` carries the bare record.
+\`load()\`'s \`.ok\` carries the entity; \`asEntity().data(null)\` reads its
+record.
 
 \`\`\`zig
 switch (client.${method}(h.vnull()).load(${loadArg}, h.vnull())) {
-    .ok => |${eVar}| std.debug.print("{s}\\n", .{h.stringify(${eVar})}),
+    .ok => |${eVar}| std.debug.print("{s}\\n", .{h.stringify(${eVar}.asEntity().data(null))}),
     .err => |e| std.debug.print("load failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
@@ -156,15 +163,16 @@ switch (client.${method}(h.vnull()).load(${loadArg}, h.vnull())) {
     }
     const idValueFor = (opname: string): string => zigLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`zig
 `)
       if (opnames.includes('create')) {
-        Content(`// Create — .ok carries the created record
+        Content(`// Create — .ok carries the created entity
 switch (client.${method}(h.vnull()).create(h.jo(&.{${examplePairs('create').join(', ')}}), h.vnull())) {
-    .ok => |created| std.debug.print("{s}\\n", .{h.stringify(created)}),
+    .ok => |created| std.debug.print("{s}\\n", .{h.stringify(created.asEntity().data(null))}),
     .err => |e| std.debug.print("create failed: {s}\\n", .{e.msg}),
 }
 
@@ -174,8 +182,18 @@ switch (client.${method}(h.vnull()).create(h.jo(&.{${examplePairs('create').join
         const updatePairs = (idF ? [`.{ "${idF}", ${idValueFor('update')} }`] : []).concat(examplePairs('update'))
         Content(`// Update
 switch (client.${method}(h.vnull()).update(h.jo(&.{${updatePairs.join(', ')}}), h.vnull())) {
-    .ok => |updated| std.debug.print("{s}\\n", .{h.stringify(updated)}),
+    .ok => |updated| std.debug.print("{s}\\n", .{h.stringify(updated.asEntity().data(null))}),
     .err => |e| std.debug.print("update failed: {s}\\n", .{e.msg}),
+}
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`.{ "${idF}", ${idValueFor('patch')} }`] : []).concat(examplePairs('patch'))
+        Content(`// Patch — sends only the fields given
+switch (client.${method}(h.vnull()).patch(h.jo(&.{${patchPairs.join(', ')}}), h.vnull())) {
+    .ok => |patched| std.debug.print("{s}\\n", .{h.stringify(patched.asEntity().data(null))}),
+    .err => |e| std.debug.print("patch failed: {s}\\n", .{e.msg}),
 }
 
 `)
@@ -190,7 +208,7 @@ switch (client.${method}(h.vnull()).update(h.jo(&.{${updatePairs.join(', ')}}), 
             : `.{ "${it.name}", ${zigLit(it.type, 'example_' + it.name)} }`)
         Content(`// Remove
 switch (client.${method}(h.vnull()).remove(${removePairs.length ? `h.jo(&.{${removePairs.join(', ')}})` : 'h.vnull()'}, h.vnull())) {
-    .ok => |_| std.debug.print("removed\\n", .{}),
+    .ok => std.debug.print("removed\\n", .{}),
     .err => |e| std.debug.print("remove failed: {s}\\n", .{e.msg}),
 }
 `)

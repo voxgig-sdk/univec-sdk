@@ -58,7 +58,7 @@ class UnivecAuditFeature < UnivecBaseFeature
     @seen[ctx] = true
     @seq += 1
 
-    record = {
+    record = ctx.utility.clean.call(ctx, {
       "seq" => @seq,
       "ts" => _now,
       "actor" => _actor(ctx),
@@ -67,7 +67,7 @@ class UnivecAuditFeature < UnivecBaseFeature
       "outcome" => outcome,
       "status" => ctx.result ? ctx.result.status : nil,
       "correlationId" => ctx.id,
-    }
+    })
 
     track = @client.instance_variable_get(:@_audit)
     if track.nil?

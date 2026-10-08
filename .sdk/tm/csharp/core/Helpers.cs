@@ -17,6 +17,23 @@ public static class Helpers
             $"operation '{opname}' not supported by entity '{entityname}'");
     }
 
+    // Whether a comma-separated allow option names the item: whole names, any case.
+    public static bool Allowed(object? names, string? item)
+    {
+        if (names is not string list || string.IsNullOrEmpty(item))
+        {
+            return false;
+        }
+        foreach (var name in list.Split(','))
+        {
+            if (string.Equals(name.Trim(), item, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static Dictionary<string, object?>? ToMapAny(object? v)
     {
         return v as Dictionary<string, object?>;

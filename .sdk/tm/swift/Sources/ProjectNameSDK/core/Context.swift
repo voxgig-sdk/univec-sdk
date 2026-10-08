@@ -137,7 +137,7 @@ public final class Context {
     let store: Value = config == nil ? .noval : .map(config!)
     let opcfg = getpath(store, jtp("entity", entname, "op", opname))
 
-    let input = (opname == "update" || opname == "create") ? "data" : "match"
+    let input = (opname == "update" || opname == "create" || opname == "patch") ? "data" : "match"
 
     var points: VList = VList()
     if let ocm = opcfg.asMap, let tl = ocm.entries["points"]?.asList {
@@ -150,6 +150,8 @@ public final class Context {
     opm.entries["input"] = .string(input)
     opm.entries["points"] = .list(points)
 
+    // Each context holds its own copy of the cache, so a request racing
+    // another builds its own Operation, a read-only descriptor.
     let op = Operation(opm)
     opmap[cacheKey] = op
     return op
@@ -158,4 +160,33 @@ public final class Context {
   public func makeError(_ code: String, _ msg: String) -> UnivecError {
     return UnivecError(code, msg, self)
   }
+
+  // The record form: what the context says about the operation, never its
+  // client, options or config.
+  func rawRecord() -> VMap {
+    let record = VMap()
+    record.entries["id"] = .string(id)
+    record.entries["op"] = op == nil ? .noval : .nat(op!)
+    record.entries["spec"] = spec == nil ? .noval : .nat(spec!)
+    record.entries["entity"] = entity == nil ? .noval : .string(entity!.getName())
+    record.entries["result"] = result == nil ? .noval : .nat(result!)
+    record.entries["response"] = response == nil ? .noval : .nat(response!)
+    record.entries["meta"] = .map(meta)
+    return record
+  }
+
+  // The serialised context leaves the pipeline (a logger, an error dump), so
+  // it is cleaned; the live fields stay raw for the pipeline's own use.
+  public func record() -> VMap {
+    let record = rawRecord()
+    guard let clean = utility?.clean else { return record }
+    return clean(self, .map(record)).asMap ?? record
+  }
+}
+
+// Every default print of a context is the cleaned record, `dump` included.
+extension Context: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+  public var description: String { "Context " + jsonify(.map(record()), indent: 0) }
+  public var debugDescription: String { description }
+  public var customMirror: Mirror { Mirror(self, children: ["record": jsonify(.map(record()), indent: 0)]) }
 }

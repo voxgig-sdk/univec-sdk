@@ -17,6 +17,19 @@ public final class Helpers {
         "operation '" + opname + "' not supported by entity '" + entityname + "'", null);
   }
 
+  // Whether a comma-separated allow option names the item: whole names, any case.
+  public static boolean allowed(Object names, String item) {
+    if (!(names instanceof String) || null == item || item.isEmpty()) {
+      return false;
+    }
+    for (String name : ((String) names).split(",", -1)) {
+      if (name.trim().equalsIgnoreCase(item)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public static Map<String, Object> toMapAny(Object v) {
     if (v == null) {
       return null;

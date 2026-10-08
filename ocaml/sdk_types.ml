@@ -17,6 +17,8 @@
 
 open Voxgig_struct
 
+module OpMap = Map.Make (String)
+
 (* Branded SDK error. Raised as `Sdk_error_exc` on the throwing path; carried
  * as `sdk_error option` on the (value, err) pipeline return tuples. *)
 type sdk_error = {
@@ -68,6 +70,9 @@ and spec = {
   mutable sp_body : value;
   mutable sp_url : string;
   mutable sp_path : string;
+  (* The query parameters prepare_auth placed: the credential, which the
+   * request sends and the entity's match leaves out. *)
+  mutable sp_authquery : string list;
 }
 
 and response = {
@@ -77,6 +82,8 @@ and response = {
   mutable rs_json : value;        (* Func thunk or Noval *)
   mutable rs_body : value;
   mutable rs_err : sdk_error option;
+  (* Set by a transport that could not read a non-blank body as JSON. *)
+  mutable rs_unreadable : bool;
 }
 
 and result = {
@@ -130,6 +137,7 @@ and utility = {
   mutable u_struct : struct_api;
   mutable u_fetcher : ctx -> string -> value -> (value * sdk_error option);
   mutable u_clean : ctx -> value -> value;
+  mutable u_clean_add : ctx -> string -> unit;
   mutable u_done : ctx -> value;
   mutable u_make_error : ctx -> sdk_error option -> value;
   mutable u_feature_add : ctx -> feature -> unit;
@@ -207,6 +215,7 @@ and entity_obj = {
   mutable e_list : value -> value -> entity_obj list;
   mutable e_create : value -> value -> entity_obj;
   mutable e_update : value -> value -> entity_obj;
+  mutable e_patch : value -> value -> entity_obj;
   mutable e_remove : value -> value -> entity_obj;
   (* e_remove resolves to the entity, marked. The instance KEEPS the data it
    * held - a caller can still read what was deleted - but it is no longer a
@@ -231,7 +240,7 @@ and ctxspec = {
   mutable cs_options : value option;
   mutable cs_entity : entity_obj option;
   mutable cs_shared : value option;
-  mutable cs_opmap : (string, operation) Hashtbl.t option;
+  mutable cs_opmap : operation OpMap.t Atomic.t option;
   mutable cs_data : value option;
   mutable cs_reqdata : value option;
   mutable cs_match : value option;
@@ -254,7 +263,9 @@ and ctx = {
   mutable c_config : value;
   mutable c_entopts : value;
   mutable c_options : value;
-  mutable c_opmap : (string, operation) Hashtbl.t;
+  (* Shared by every context of one client, so by requests on other domains:
+   * a map replaced whole, never changed in place. *)
+  mutable c_opmap : operation OpMap.t Atomic.t;
   mutable c_response : response option;
   mutable c_result : result option;
   mutable c_spec : spec option;

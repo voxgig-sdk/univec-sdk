@@ -84,10 +84,29 @@ let base_feature () : feature =
   { f_name = "base"; f_version = "0.0.1"; f_active = true; f_options = Noval;
     f_init = (fun _ _ -> ()); f_hook = (fun _ _ -> ()) }
 
+let log_hooks = ["PostConstruct"; "PostConstructEntity"; "SetData"; "GetData"; "SetMatch";
+                 "GetMatch"; "PrePoint"; "PreSpec"; "PreRequest"; "PreResponse"; "PreResult"]
+
 let log_feature () : feature =
+  let options = ref (empty_map ()) in
   let f = { f_name = "log"; f_version = "0.0.1"; f_active = true; f_options = Noval;
             f_init = (fun _ _ -> ()); f_hook = (fun _ _ -> ()) } in
-  f.f_init <- (fun _ctx opts -> f.f_active <- opt_active opts);
+  (* A log line leaves the pipeline, so it carries the cleaned record: the
+     spec after auth holds the credential, and a logger serialises whatever
+     it is handed. `logger` is a Func of the record; otherwise stderr. *)
+  let loghook hook ctx =
+    let record = (cu ctx).u_clean ctx (jo [
+        ("hook", Str hook); ("op", Str ctx.c_op.op_name);
+        ("spec", (match ctx.c_spec with Some s -> spec_to_value s | None -> Noval));
+        ("ctx", ctx_to_value ctx)]) in
+    match getp !options "logger" with
+    | Func _ as fn -> ignore (call_vfn fn record)
+    | _ -> prerr_endline ("[INFO] hook=" ^ hook ^ " op=" ^ ctx.c_op.op_name ^ " "
+                          ^ jsonify ~flags:(jo [("indent", Num 0.)]) record) in
+  f.f_init <- (fun _ctx opts ->
+      options := (match to_map opts with Map _ -> opts | _ -> empty_map ());
+      f.f_active <- opt_active opts);
+  f.f_hook <- (fun name ctx -> if f.f_active && List.mem name log_hooks then loghook name ctx);
   f
 
 (* ------------------------------------------------------------------ *)
@@ -458,6 +477,8 @@ let validate_feature () : feature =
      * and under `strict` every custom-action call would be rejected for the
      * one key that made it reachable. *)
     ignore (delprop out (Str "$action"));
+    (* Nor is `$body`, the raw request body. *)
+    ignore (delprop out (Str "$body"));
     out in
 
   (* One validate call. Errors are COLLECTED, never raised: validate raises on
@@ -620,10 +641,11 @@ let telemetry_feature () : feature =
       setp span "end" (Num end_);
       setp span "durationMs" (Num (Float.max 0. (end_ -. (match getp span "start" with Num n -> n | _ -> 0.))));
       setp span "ok" (Bool ok);
+      let out = (cu ctx).u_clean ctx span in
       let t = telemetry ctx in
       bump_num t "active" (-1.);
-      (match getp t "spans" with List r -> r := !r @ [span] | _ -> ());
-      (match getp !options "exporter" with Func _ as fn -> (try ignore (call_vfn fn span) with _ -> ()) | _ -> ())
+      (match getp t "spans" with List r -> r := !r @ [out] | _ -> ());
+      (match getp !options "exporter" with Func _ as fn -> (try ignore (call_vfn fn out) with _ -> ()) | _ -> ())
     | _ -> () in
   f.f_init <- (fun ctx opts ->
       options := (match to_map opts with Map _ -> opts | _ -> empty_map ());
@@ -666,14 +688,15 @@ let debug_feature () : feature =
   let f = { f_name = "debug"; f_version = "0.0.1"; f_active = true; f_options = Noval;
             f_init = (fun _ _ -> ()); f_hook = (fun _ _ -> ()) } in
   let debug ctx = track_bucket (cc ctx) "debug" (fun () -> jo [("entries", empty_list ())]) in
-  let redact headers =
+  (* The core clean rules apply (clean.keys, every registered value); the
+     feature's own `redact` list ADDS header names on top of them. *)
+  let redact ctx headers =
     match headers with
     | Map _ ->
-      let patterns = opt_str_list !options "redact"
-          ~default:["authorization"; "cookie"; "set-cookie"; "api-key"; "apikey"; "x-api-key"; "idempotency-key"] in
+      let patterns = List.map string_lower (opt_str_list !options "redact" ~default:[]) in
       let out = empty_map () in
-      List.iter (fun k -> if List.mem (string_lower k) patterns then setp out k (Str "<redacted>") else setp out k (getp headers k)) (keysof headers);
-      out
+      List.iter (fun k -> if List.mem (string_lower k) patterns then setp out k (Str "[redacted]") else setp out k (getp headers k)) (keysof headers);
+      (cu ctx).u_clean ctx out
     | _ -> empty_map () in
   let finish ctx ok =
     match scratch_get ctx "debug_entry" with
@@ -683,6 +706,10 @@ let debug_feature () : feature =
       setp entry "ok" (Bool (ok && result_ok));
       setp entry "durationMs" (Num (Float.max 0. (now_of !options -. (match getp entry "start" with Num n -> n | _ -> 0.))));
       (if getp entry "status" = Noval then match ctx.c_result with Some r -> setp entry "status" (vint_of r.rt_status) | None -> ());
+      (* The whole entry leaves through the buffer and the callback: the url
+         and the error message can carry a query credential the header mask
+         never saw. *)
+      let entry = (cu ctx).u_clean ctx entry in
       let buf = getp (debug ctx) "entries" in
       (match buf with List r -> r := !r @ [entry] | _ -> ());
       let mx = opt_int !options "max" ~default:100 in
@@ -701,7 +728,7 @@ let debug_feature () : feature =
             ("op", Str opname);
             ("method", (match ctx.c_spec with Some s -> Str s.sp_method | None -> Noval));
             ("url", (match ctx.c_spec with Some s -> Str (if s.sp_url <> "" then s.sp_url else s.sp_path) | None -> Noval));
-            ("headers", redact (match ctx.c_spec with Some s -> s.sp_headers | None -> Noval));
+            ("headers", redact ctx (match ctx.c_spec with Some s -> s.sp_headers | None -> Noval));
             ("start", Num (now_of !options)); ("status", Noval); ("ok", Noval);
             ("durationMs", Noval); ("error", Noval) ] in
           scratch_set ctx "debug_entry" entry
@@ -740,13 +767,13 @@ let audit_feature () : feature =
       let actor = match ctx.c_ctrl.ctrl_actor with
         | Noval | Null -> (match getp !options "actor" with Noval | Null -> Str "anonymous" | a -> a)
         | a -> a in
-      let record = jo [
+      let record = (cu ctx).u_clean ctx (jo [
         ("seq", vint_of !seq); ("ts", Num (now_of !options)); ("actor", actor);
         ("entity", Str (if ctx.c_op.op_entity <> "" then ctx.c_op.op_entity else "_"));
         ("op", Str (if ctx.c_op.op_name <> "" then ctx.c_op.op_name else "_"));
         ("outcome", Str outcome);
         ("status", (match ctx.c_result with Some r -> vint_of r.rt_status | None -> Noval));
-        ("correlationId", Str ctx.c_id) ] in
+        ("correlationId", Str ctx.c_id) ]) in
       let records = getp (audit ctx) "records" in
       (match records with List r -> r := !r @ [record] | _ -> ());
       let mx = opt_int !options "max" ~default:1000 in
@@ -905,11 +932,13 @@ let cost_feature () : feature =
     bump (getp rec_ "actors") actor !amount;
 
     incr seq;
-    setp rec_ "last"
-      (jo [("seq", Num (float_of_int !seq)); ("entity", Str entity); ("op", Str opname);
-           ("actor", Str actor); ("amount", Num !amount);
-           ("currency", getp rec_ "currency"); ("source", Str !source);
-           ("attempts", getp p "attempts")]) in
+    let last = (cu ctx).u_clean ctx
+        (jo [("seq", Num (float_of_int !seq)); ("entity", Str entity); ("op", Str opname);
+             ("actor", Str actor); ("amount", Num !amount);
+             ("currency", getp rec_ "currency"); ("source", Str !source);
+             ("attempts", getp p "attempts")]) in
+    setp rec_ "last" last;
+    (match getp !options "sink" with Func _ as fn -> (try ignore (call_vfn fn last) with _ -> ()) | _ -> ()) in
 
   let finish ctx done_ =
     if f.f_active then
@@ -1265,9 +1294,35 @@ let streaming_feature () : feature =
 (* proxy                                                               *)
 (* ------------------------------------------------------------------ *)
 
+(* The userinfo of a URL, as its colon-separated parts (empty when none). *)
+let url_userinfo (url : string) : string list =
+  match String.index_opt url '@' with
+  | None -> []
+  | Some at ->
+    let n = String.length url in
+    let rec scheme_end i = if i + 3 > n then 0 else if String.sub url i 3 = "://" then i + 3 else scheme_end (i + 1) in
+    let start = scheme_end 0 in
+    if at <= start then []
+    else
+      let ui = String.sub url start (at - start) in
+      if String.contains ui '/' then []
+      else List.filter (fun s -> s <> "") (String.split_on_char ':' ui)
+
+let pct_decode (s : string) : string =
+  let n = String.length s in
+  let b = Buffer.create n in
+  let i = ref 0 in
+  while !i < n do
+    (match s.[!i], (if !i + 2 < n then int_of_string_opt ("0x" ^ String.sub s (!i + 1) 2) else None) with
+     | '%', Some c -> Buffer.add_char b (Char.chr (c land 0xff)); i := !i + 3
+     | c, _ -> Buffer.add_char b c; incr i)
+  done;
+  Buffer.contents b
+
 let proxy_feature () : feature =
   let options = ref (empty_map ()) in
   let purl = ref Noval and noproxy = ref [] in
+  let clean_url = ref Noval in
   let f = { f_name = "proxy"; f_version = "0.0.1"; f_active = true; f_options = Noval;
             f_init = (fun _ _ -> ()); f_hook = (fun _ _ -> ()) } in
   let env k = match Sys.getenv_opt k with Some v when v <> "" -> Some v | _ -> None in
@@ -1279,7 +1334,7 @@ let proxy_feature () : feature =
     end in
   let track ctx =
     let cl = cc ctx in
-    let bucket = track_bucket cl "proxy" (fun () -> jo [("routed", Num 0.); ("url", !purl)]) in
+    let bucket = track_bucket cl "proxy" (fun () -> jo [("routed", Num 0.); ("url", !clean_url)]) in
     bump_num bucket "routed" 1. in
   let route ctx url fetchdef =
     if is_nullish !purl || bypass url then fetchdef
@@ -1314,6 +1369,13 @@ let proxy_feature () : feature =
          end);
         noproxy := !np_list;
         let u = cu ctx in
+        (* A proxy URL may carry credentials as userinfo, from the option or
+           the environment, and neither is under a sensitive key name. *)
+        (match !purl with
+         | Str s ->
+           List.iter (fun part -> u.u_clean_add ctx part; u.u_clean_add ctx (pct_decode part)) (url_userinfo s);
+           clean_url := u.u_clean ctx (Str s)
+         | v -> clean_url := v);
         let inner = u.u_fetcher in
         u.u_fetcher <- (fun fctx url fd -> inner fctx url (route fctx url fd))
       end);
@@ -1408,16 +1470,37 @@ let netsim_feature () : feature =
 let test_feature () : feature =
   let f = { f_name = "test"; f_version = "0.0.1"; f_active = true; f_options = Noval;
             f_init = (fun _ _ -> ()); f_hook = (fun _ _ -> ()) } in
+  (* The key a list's response transform
+     ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record
+     under. *)
+  let item_envelope_key restf =
+    match restf with
+    | List r ->
+      (match !r with
+       | [Str "`$EACH`"; Str "body"; merge] ->
+         (match getp merge "`$MERGE`" with
+          | Str m ->
+            let n = String.length m in
+            if n >= 4 && String.sub m 0 2 = "`." && m.[n - 1] = '`' then
+              let key = String.sub m 2 (n - 3) in
+              if String.contains key '.' || String.contains key '`' || String.contains key '$'
+              then None else Some key
+            else None
+          | _ -> None)
+       | _ -> None)
+    | _ -> None in
   (* THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
      `transform.res: `body.item`` describes an API that answers {"item": {...}}
      and the response transform unwraps that key on the way back. Returning the
      bare payload means the transform unwraps a property that is not there and
      the caller gets nothing. Mirrors the go/ts/lua/php mocks. *)
   let envelope ctx data =
+    let restf = getp (getp ctx.c_point "transform") "res" in
     if is_nullish data then data
     else
-      match getp (getp ctx.c_point "transform") "res" with
-      | Str spec ->
+      match item_envelope_key restf, restf, data with
+      | Some key, _, List items -> ja (List.map (fun item -> jo [(key, item)]) !items)
+      | _, Str spec, _ ->
         let n = String.length spec in
         (* Rebuild whatever nesting the transform unwraps. Multi-segment on
            purpose: GraphQL ops unwrap `body.data.<field>`. *)
@@ -1508,7 +1591,7 @@ let test_feature () : feature =
            (match found with List r -> List.iter (fun item -> ignore (delprop item (Str "$KEY"))) !r | _ -> ());
            respond fctx 200 (clone found) None
          end
-       | "update" ->
+       | "update" | "patch" ->
          let update_match = empty_map () in
          (match fctx.c_reqdata with
           | Map _ ->
@@ -1523,7 +1606,13 @@ let test_feature () : feature =
          (* update miss: 404, never another record *)
          if is_nullish ent then respond fctx 404 Noval (Some (jo [("statusText", Str "Not found")]))
          else begin
-           (match ent, fctx.c_reqdata with Map _, Map _ -> ignore (merge (ja [ent; fctx.c_reqdata])) | _ -> ());
+           (* `$body` travels on the wire alone; the record is the rest. *)
+           (match ent, fctx.c_reqdata with
+            | Map _, Map _ ->
+              let rest = clone fctx.c_reqdata in
+              ignore (delprop rest (Str "$body"));
+              ignore (merge (ja [ent; rest]))
+            | _ -> ());
            ignore (delprop ent (Str "$KEY"));
            respond fctx 200 (clone ent) None
          end
@@ -1538,6 +1627,7 @@ let test_feature () : feature =
          let ent = clone fctx.c_reqdata in
          (match ent with
           | Map _ ->
+            ignore (delprop ent (Str "$body"));
             setp ent "id" eid;
             (match eid with Str s -> setp entmap s ent | _ -> ());
             ignore (delprop ent (Str "$KEY"));
@@ -1626,7 +1716,13 @@ let prepare (client : sdk_client) (fetchargs : value) : value =
   let ctx = u.u_make_context { (default_ctxspec ()) with cs_opname = Some "prepare"; cs_ctrl = Some ctrl } client.cl_rootctx in
   let options = client.cl_options in
   let path = match getp fetchargs "path" with Str s -> s | _ -> "" in
-  let method_ = match getp fetchargs "method" with Str s -> s | _ -> "GET" in
+  let method_ = String.uppercase_ascii
+      (match getp fetchargs "method" with Str s when s <> "" -> s | _ -> "GET") in
+  let allow_method = getpath_s options "allow.method" in
+  if not (allow_list_has allow_method method_) then
+    raise (Sdk_error_exc (ctx_make_error ctx "spec_method_allow"
+      ("Method \"" ^ method_ ^ "\" not allowed by SDK option allow.method value: \"" ^
+       (match allow_method with Str s -> s | _ -> "") ^ "\"")));
   let params = match to_map (getp fetchargs "params") with Map _ as m -> m | _ -> empty_map () in
   let query = match to_map (getp fetchargs "query") with Map _ as m -> m | _ -> empty_map () in
   let headers = u.u_prepare_headers ctx in
@@ -1644,9 +1740,7 @@ let prepare (client : sdk_client) (fetchargs : value) : value =
 
 (* Is this raw-access op permitted by the SDK's allow.op option? *)
 let op_allowed (client : sdk_client) (op : string) : bool =
-  match getpath_s client.cl_options "allow.op" with
-  | Str allow -> substr_contains allow op
-  | _ -> false
+  allow_list_has (getpath_s client.cl_options "allow.op") op
 
 let op_denied (client : sdk_client) (op : string) : value =
   let allow = match getpath_s client.cl_options "allow.op" with
@@ -1670,7 +1764,7 @@ let raw_request (client : sdk_client) (fetchargs : value) : value =
     let url = match getp fetchdef "url" with Str s -> s | _ -> "" in
     let (fetched, fetch_err) = u.u_fetcher ctx url fetchdef in
     (match fetch_err with
-     | Some fe -> jo [("ok", Bool false); ("err", err_to_value fe)]
+     | Some fe -> jo [("ok", Bool false); ("err", u.u_clean ctx (err_to_value fe))]
      | None ->
        if is_noval fetched || fetched = Null then
          jo [("ok", Bool false); ("err", err_to_value (ctx_make_error ctx "direct_no_response" "response: undefined"))]
@@ -1682,8 +1776,20 @@ let raw_request (client : sdk_client) (fetchargs : value) : value =
            let no_body = status = 204 || status = 304 || content_length = "0" in
            let json_data = if no_body then Noval
              else (match getp fetched "json" with Func _ as jf -> (try call_json jf with _ -> Noval) | _ -> Noval) in
-           jo [("ok", Bool (status >= 200 && status < 300)); ("status", vint_of status);
-               ("headers", headers); ("data", json_data)]
+           let body_err =
+             if not no_body && getp fetched "unreadable" = Bool true then begin
+               let failed = if status >= 200 && status < 300 then None
+                 else Some (ctx_make_error ctx "request_status"
+                              ("request: " ^ string_of_int status ^ ": " ^ vstring (getp fetched "statusText"))) in
+               Some (unreadable_body ctx status headers (getp fetched "body") (getp fetchdef "headers") failed)
+             end else None in
+           (match body_err with
+            | Some e ->
+              jo [("ok", Bool false); ("status", vint_of status); ("headers", headers);
+                  ("data", json_data); ("err", u.u_clean ctx (err_to_value e))]
+            | None ->
+              jo [("ok", Bool (status >= 200 && status < 300)); ("status", vint_of status);
+                  ("headers", headers); ("data", json_data)])
          | _ -> jo [("ok", Bool false); ("err", err_to_value (ctx_make_error ctx "direct_invalid" "invalid response type"))]))
 
 (* Raw endpoint access is operator-controllable, like every entity op.

@@ -806,6 +806,43 @@ func (f *testInitFeature) Init(ctx *sdk.Context, options map[string]any) {
 	}
 }
 
+// A typed slice in the call's match is a list to the struct port, so a cookie
+// argument repeats its name for each item rather than sending the slice's
+// text.
+func TestPrepareHeadersCookieTypedSlice(t *testing.T) {
+	client := sdk.TestSDK(nil, nil)
+	utility := client.GetUtility()
+	ctx := makeTestCtx(client, utility, nil)
+	ctx.Point = map[string]any{
+		"args": map[string]any{"cookie": []any{
+			map[string]any{"name": "theme", "orig": "theme", "kind": "cookie"},
+		}},
+	}
+	ctx.Reqmatch = map[string]any{"theme": []string{"dark", "x y"}}
+	headers := utility.PrepareHeaders(ctx)
+	if "theme=dark; theme=x%20y" != headers["cookie"] {
+		t.Errorf("expected the slice as repeated pairs, got %v", headers["cookie"])
+	}
+}
+
+// A typed map is a map to a cookie argument as a typed slice is a list: its
+// keys go out as pairs, and replace the caller's cookies of those names.
+func TestPrepareHeadersCookieTypedMap(t *testing.T) {
+	client := sdk.TestSDK(nil, map[string]any{"headers": map[string]any{"Cookie": "lang=old; theme=dark"}})
+	utility := client.GetUtility()
+	ctx := makeTestCtx(client, utility, nil)
+	ctx.Point = map[string]any{
+		"args": map[string]any{"cookie": []any{
+			map[string]any{"name": "prefs", "orig": "prefs", "kind": "cookie"},
+		}},
+	}
+	ctx.Reqmatch = map[string]any{"prefs": map[string]string{"size": "2", "lang": "en gb"}}
+	headers := utility.PrepareHeaders(ctx)
+	if "theme=dark; lang=en%20gb; size=2" != headers["cookie"] {
+		t.Errorf("expected the map as its pairs, got %v", headers["cookie"])
+	}
+}
+
 // Helper: create basic test context
 func makeTestCtx(client *sdk.UnivecSDK, utility *sdk.Utility, overrides map[string]any) *sdk.Context {
 	ctxmap := map[string]any{
@@ -840,7 +877,6 @@ func makeTestFullCtx(client *sdk.UnivecSDK, utility *sdk.Utility) *sdk.Context {
 
 // useVS prevents unused import error
 var _ = vs.Clone
-
 
 // retargetAuth rewrites the corpus's `headers` bag to the container this
 // SDK's PrepareAuth writes to, and the `authorization` key inside it to the

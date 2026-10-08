@@ -138,6 +138,14 @@ public abstract class SdkClient {
     if ("".equals(method)) {
       method = "GET";
     }
+    method = method.toUpperCase(java.util.Locale.ROOT);
+
+    Object allowMethod = Struct.getpath(options, List.of("allow", "method"));
+    if (!Helpers.allowed(allowMethod, method)) {
+      throw ctx.makeError("spec_method_allow",
+          "Method \"" + method + "\" not allowed by SDK option allow.method value: \""
+              + (allowMethod instanceof String ? allowMethod : "") + "\"");
+    }
 
     Map<String, Object> params = Helpers.toMapAny(Struct.getprop(fetchargs, "params"));
     if (params == null) {
@@ -193,8 +201,7 @@ public abstract class SdkClient {
 
   /** Is this raw-access op permitted by the SDK's allow.op option? */
   private boolean opAllowed(String op) {
-    Object allow = Struct.getpath(this.options, List.of("allow", "op"));
-    return allow instanceof String && ((String) allow).contains(op);
+    return Helpers.allowed(Struct.getpath(this.options, List.of("allow", "op")), op);
   }
 
   private Map<String, Object> opDenied(String op) {
@@ -290,13 +297,15 @@ public abstract class SdkClient {
 
     Map<String, Object> out = new LinkedHashMap<>();
 
+    // A raw request returns its failure rather than passing it through
+    // makeError, so it is cleaned here.
     Map<String, Object> fetchdef;
     try {
       fetchdef = this.prepare(fetchargs);
     }
     catch (RuntimeException err) {
       out.put("ok", false);
-      out.put("err", err);
+      out.put("err", utility.clean.apply(ctx, err));
       return out;
     }
 
@@ -308,7 +317,7 @@ public abstract class SdkClient {
     }
     catch (RuntimeException err) {
       out.put("ok", false);
-      out.put("err", err);
+      out.put("err", utility.clean.apply(ctx, err));
       return out;
     }
 
@@ -335,18 +344,29 @@ public abstract class SdkClient {
       boolean noBody = status == 204 || status == 304 || "0".equals(contentLength);
 
       Object jsonData = null;
+      RuntimeException bodyErr = null;
       if (!noBody) {
         Object jf = Struct.getprop(fm, "json");
         if (jf instanceof Supplier) {
           // The supplier returns null on parse error in our fetcher.
           jsonData = ((Supplier<Object>) jf).get();
         }
+        if (Boolean.TRUE.equals(Struct.getprop(fm, "unreadable"))) {
+          RuntimeException failed = status >= 200 && status < 300 ? null
+              : ctx.makeError("request_status",
+                  "request: " + status + ": " + Struct.getprop(fm, "statusText"));
+          bodyErr = Response.unreadableBody(ctx, status, headers, Struct.getprop(fm, "body"),
+              fetchdef.get("headers"), failed);
+        }
       }
 
-      out.put("ok", status >= 200 && status < 300);
+      out.put("ok", bodyErr == null && status >= 200 && status < 300);
       out.put("status", status);
       out.put("headers", headers);
       out.put("data", jsonData);
+      if (bodyErr != null) {
+        out.put("err", utility.clean.apply(ctx, bodyErr));
+      }
       return out;
     }
 

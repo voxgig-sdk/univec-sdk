@@ -2,20 +2,45 @@ import '../UnivecError.dart';
 
 import 'voxgig_struct.dart' as vs;
 
+import 'CleanUtility.dart';
+import 'ErrUtility.dart';
 import 'FetcherUtility.dart';
 
 dynamic makeOptions(dynamic ctx) {
   final utility = ctx.utility;
   final options = ctx.options;
 
+  final config = ctx.config ?? {};
+  final cfgopts = vs.getprop(config, 'options') ?? {};
+
+  // The secret registry exists BEFORE validation, fed from the raw input, so
+  // the constructor's own rejection of a mistyped credential is clean too.
+  final cfgclean = vs.getprop(cfgopts, 'clean');
+  final rawclean = vs.getprop(options, 'clean');
+  final cleancfg = makeCleanConfig(vs.merge([
+    {},
+    vs.clone(CLEAN_OPTSPEC),
+    cfgclean is Map ? vs.clone(cfgclean) : {},
+    rawclean is Map ? vs.clone(rawclean) : {},
+  ]));
+  final cleanctx = {
+    'options': {
+      '__derived__': {'clean': cleancfg}
+    }
+  };
+  _addSensitiveOptions(cleanctx, options, ['clean']);
+  for (final raw in [
+    ...splitvalues(cfgclean is Map ? cfgclean['values'] : null),
+    ...splitvalues(rawclean is Map ? rawclean['values'] : null),
+  ]) {
+    cleanAdd(cleanctx, raw);
+  }
+
   // Custom utility overrides.
   final customUtils = vs.getprop(options, 'utility') ?? {};
   for (final item in vs.items(customUtils)) {
     utility.setUtility(item[0], item[1]);
   }
-
-  final config = ctx.config ?? {};
-  final cfgopts = vs.getprop(config, 'options') ?? {};
 
   // Standard SDK option values.
   final optspec = {
@@ -35,7 +60,7 @@ dynamic makeOptions(dynamic ctx) {
     },
     'allow': {
       'method': 'GET,PUT,POST,PATCH,DELETE,OPTIONS',
-      'op': 'create,update,load,list,remove,command,direct,graphql',
+      'op': 'create,update,patch,load,list,remove,command,direct,graphql',
     },
     'entity': {
       '`\$CHILD`': {
@@ -64,9 +89,7 @@ dynamic makeOptions(dynamic ctx) {
         '`\$OPEN`': true,
       },
     },
-    'clean': {
-      'keys': 'key,token,id',
-    },
+    'clean': CLEAN_OPTSPEC,
     // Server-variable values for a templated base URL (OpenAPI server
     // variables): {name} placeholders in "base" are substituted from this
     // map at construction. Spec defaults arrive via the generated config;
@@ -120,14 +143,26 @@ dynamic makeOptions(dynamic ctx) {
       options is Map && options.containsKey('auth') && null == options['auth'];
 
   // User option maps are cloned first — their (possibly narrow) literal
-  // types must not constrain the merged structures.
-  dynamic opts = vs.merge([{}, cfgopts, vs.clone(mergeOptions)]);
+  // types must not constrain the merged structures. The config side is the
+  // module-level Config's own maps, which merge writes back into: uncloned,
+  // one client's headers reach every client constructed after it.
+  dynamic opts = vs.merge([{}, vs.clone(cfgopts), vs.clone(mergeOptions)]);
 
   if (authSuppressed && opts is Map) {
     opts.remove('auth');
   }
 
-  opts = vs.validate(opts, optspec);
+  try {
+    opts = vs.validate(opts, optspec);
+  } catch (err) {
+    // The rejection quotes the offending value. StructError's message is
+    // final, so the cleaned one is rebuilt rather than edited.
+    final msg = clean(cleanctx, errmsg(err));
+    if (err is vs.StructError) {
+      throw vs.StructError(msg);
+    }
+    throw UnivecError('options_invalid', msg, ctx);
+  }
 
   // Restore the suppression the optspec default would otherwise erase.
   if (authSuppressed && opts is Map) {
@@ -177,18 +212,6 @@ dynamic makeOptions(dynamic ctx) {
     opts['system'] = {'fetch': sysFetch};
   }
 
-  final cleanKeys =
-      (vs.getpath(opts, 'clean.keys') ?? 'key,token,id').toString();
-
-  final parts = <String>[];
-  for (final part in cleanKeys.split(',')) {
-    final trimmed = part.trim();
-    if ('' != trimmed) {
-      parts.add(vs.escre(trimmed));
-    }
-  }
-  final keyre = parts.join('|');
-
   // Resolve the feature add-order: an explicit List order (above) wins;
   // otherwise order the map test-first, then the remaining names sorted, so
   // the outcome is deterministic and `test` is always the base transport.
@@ -223,11 +246,50 @@ dynamic makeOptions(dynamic ctx) {
   }
 
   opts['__derived__'] = {
-    'clean': {
-      'keyre': '' == keyre ? null : keyre,
-    },
+    'clean': cleancfg,
     'featureorder': featureorder,
   };
 
+  // Again over the merged result: the config's own defaults can carry one.
+  _addSensitiveOptions({'options': opts}, opts, ['clean', '__derived__']);
+
   return opts;
+}
+
+// The keys directly under `feature` name features, not fields: `secrets` is
+// a feature, and its settings are not secrets for sitting under its name.
+// Entity blocks hold per-entity settings and seeded records, never a credential.
+void _addSensitiveOptions(dynamic ctx, dynamic options, List<String> skip) {
+  final rest = _without(options, [...skip, 'feature', 'entity']);
+  final test = vs.getprop(options, 'test');
+  if (rest is Map && test is Map) {
+    rest['test'] = _without(test, ['entity']);
+  }
+  cleanAddSensitive(ctx, rest);
+  final feature = vs.getprop(options, 'feature');
+  if (feature is Map) {
+    for (final fopts in feature.values) {
+      cleanAddSensitive(ctx, _without(fopts, ['entity']));
+    }
+  } else if (feature is List) {
+    for (final fopts in feature) {
+      cleanAddSensitive(ctx, _without(fopts, ['entity']));
+    }
+  } else {
+    cleanAddSensitive(ctx, feature);
+  }
+}
+
+// A shallow copy without the named keys; the values are shared, not cloned.
+dynamic _without(dynamic map, List<String> keys) {
+  if (map is! Map) {
+    return map;
+  }
+  final out = <dynamic, dynamic>{};
+  map.forEach((k, v) {
+    if (!keys.contains(k)) {
+      out[k] = v;
+    }
+  });
+  return out;
 }

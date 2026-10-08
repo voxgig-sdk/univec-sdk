@@ -37,6 +37,8 @@ require_once __DIR__ . '/TransformResponse.php';
 
 UnivecUtility::setRegistrar(function (UnivecUtility $u): void {
     $u->clean = [UnivecClean::class, 'call'];
+    $u->clean_add = [UnivecClean::class, 'add'];
+    $u->clean_explain = [UnivecDone::class, 'clean_explain'];
     $u->done = [UnivecDone::class, 'call'];
     $u->make_error = [UnivecMakeError::class, 'call'];
     $u->feature_add = [UnivecFeatureAdd::class, 'call'];

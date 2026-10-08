@@ -94,3 +94,19 @@ func fresHeader(_ res: Value, _ name: String) -> (String, Bool) {
 func fparseInt(_ s: String, _ def: Int) -> Int {
   Int(s.trimmingCharacters(in: .whitespaces)) ?? def
 }
+
+// fclean passes a record a feature is about to emit through the SDK's clean
+// utility: every sink, buffer and logger receives the masked copy.
+func fclean(_ ctx: Context, _ record: VMap) -> VMap {
+  guard let clean = ctx.utility?.clean, let out = clean(ctx, .map(record)).asMap else {
+    return record
+  }
+  return out
+}
+
+func fcleanStr(_ ctx: Context, _ text: String) -> String {
+  guard let clean = ctx.utility?.clean, let out = clean(ctx, .string(text)).asString else {
+    return text
+  }
+  return out
+}

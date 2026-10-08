@@ -39,6 +39,41 @@ final class MakePoint {
     return last instanceof String && ((String) last).startsWith("{");
   }
 
+  private static final java.util.regex.Pattern PATH_PARAM =
+      java.util.regex.Pattern.compile("\\{([^{}/]+)\\}");
+
+  // The path parameters of a point that neither the call nor the entity gives
+  // a value for, looked up as prepareParams looks them up.
+  private static List<String> unfilled(Context ctx, Map<String, Object> point) {
+    List<String> missing = new ArrayList<>();
+    Object parts = Struct.getprop(point, "parts");
+    if (parts instanceof List) {
+      for (Object part : (List<Object>) parts) {
+        java.util.regex.Matcher found = PATH_PARAM.matcher(String.valueOf(part));
+        if (found.matches() && Param.paramValue(ctx, point, found.group(1)) == null) {
+          missing.add(found.group(1));
+        }
+      }
+    }
+    return missing;
+  }
+
+  private static Map<String, Object> ownPoint(List<Map<String, Object>> points) {
+    Map<String, Object> best = points.get(0);
+    for (Map<String, Object> cand : points) {
+      boolean candTerm = terminalParam(cand);
+      boolean bestTerm = terminalParam(best);
+      if (candTerm != bestTerm) {
+        if (candTerm) {
+          best = cand;
+        }
+      } else if (partsLen(cand) < partsLen(best)) {
+        best = cand;
+      }
+    }
+    return best;
+  }
+
   static Map<String, Object> makePoint(Context ctx) {
     Object outPoint = ctx.out.get("point");
     if (outPoint != null) {
@@ -59,7 +94,7 @@ final class MakePoint {
 
     Object allowOpRaw = Struct.getpath(options, List.of("allow", "op"));
     String allowOp = allowOpRaw instanceof String ? (String) allowOpRaw : "";
-    if (!allowOp.contains(op.name)) {
+    if (!Helpers.allowed(allowOpRaw, op.name)) {
       throw ctx.makeError("point_op_allow",
           "Operation \"" + op.name
               + "\" not allowed by SDK option allow.op value: \"" + allowOp + "\"");
@@ -141,18 +176,35 @@ final class MakePoint {
                   + "\" action \"" + Struct.stringify(unmatchedAction) + "\" is not valid.");
         }
 
-        point = op.points.get(0);
+        // A call without an action falls back to a point without one, as
+        // generation does, and only to a route the call can fill.
+        List<Map<String, Object>> plain = new ArrayList<>();
         for (Map<String, Object> cand : op.points) {
-          boolean candTerm = terminalParam(cand);
-          boolean bestTerm = terminalParam(point);
-          if (candTerm != bestTerm) {
-            if (candTerm) {
-              point = cand;
-            }
-          } else if (partsLen(cand) < partsLen(point)) {
-            point = cand;
+          Map<String, Object> candSelect = Helpers.toMapAny(Struct.getprop(cand, "select"));
+          if (Struct.getprop(candSelect, "$action", null) == null) {
+            plain.add(cand);
           }
         }
+        if (plain.isEmpty()) {
+          throw ctx.makeError("point_action_required",
+              "Operation \"" + op.name
+                  + "\" has only action endpoints; pass $action to choose one.");
+        }
+        List<Map<String, Object>> fillable = new ArrayList<>();
+        for (Map<String, Object> cand : plain) {
+          if (unfilled(ctx, cand).isEmpty()) {
+            fillable.add(cand);
+          }
+        }
+
+        if (fillable.isEmpty()) {
+          throw ctx.makeError("point_no_match",
+              "Operation \"" + op.name
+                  + "\" has no endpoint whose path parameters are all given (missing: "
+                  + String.join(", ", unfilled(ctx, ownPoint(plain))) + ").");
+        }
+
+        point = ownPoint(fillable);
       }
 
       if (reqselector != null) {

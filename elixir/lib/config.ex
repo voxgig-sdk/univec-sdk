@@ -314,6 +314,7 @@ defmodule Univec.Config do
           },
           "optspec" => %{
             "clearTimer" => "`$FUNCTION`",
+            "now" => "`$FUNCTION`",
             "setTimer" => "`$FUNCTION`"
           },
           "strict" => false,
@@ -481,6 +482,10 @@ defmodule Univec.Config do
                         }
                       }
                     }
+                  },
+                  "response" => %{
+                    "kind" => "json",
+                    "media" => "application/json"
                   }
                 },
                 %{
@@ -599,6 +604,10 @@ defmodule Univec.Config do
                         "SDK live coverage test."
                       ]
                     }
+                  },
+                  "response" => %{
+                    "kind" => "json",
+                    "media" => "application/json"
                   }
                 },
                 %{
@@ -726,6 +735,10 @@ defmodule Univec.Config do
                         }
                       }
                     }
+                  },
+                  "response" => %{
+                    "kind" => "json",
+                    "media" => "application/json"
                   }
                 },
                 %{
@@ -852,6 +865,10 @@ defmodule Univec.Config do
                         "SDK live coverage test."
                       ]
                     }
+                  },
+                  "response" => %{
+                    "kind" => "json",
+                    "media" => "application/json"
                   }
                 }
               ]
@@ -975,6 +992,10 @@ defmodule Univec.Config do
                         "SDK live coverage test."
                       ]
                     }
+                  },
+                  "response" => %{
+                    "kind" => "json",
+                    "media" => "application/json"
                   }
                 },
                 %{
@@ -1071,6 +1092,10 @@ defmodule Univec.Config do
                         "SDK live coverage test."
                       ]
                     }
+                  },
+                  "response" => %{
+                    "kind" => "json",
+                    "media" => "application/json"
                   }
                 }
               ]
@@ -1154,6 +1179,10 @@ defmodule Univec.Config do
                     "auth" => "public",
                     "id" => "key",
                     "retention" => "No deletion endpoint; issued key is subject to the service daily allowance"
+                  },
+                  "response" => %{
+                    "kind" => "json",
+                    "media" => "application/json"
                   }
                 }
               ]
@@ -1267,6 +1296,10 @@ defmodule Univec.Config do
                     },
                     "auth" => "public",
                     "id" => "models"
+                  },
+                  "response" => %{
+                    "kind" => "json",
+                    "media" => "application/json"
                   }
                 }
               ]

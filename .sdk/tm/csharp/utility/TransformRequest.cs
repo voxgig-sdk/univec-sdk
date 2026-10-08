@@ -17,21 +17,23 @@ public static partial class SdkUtility
             spec.Step = "reqform";
         }
 
+        var data = OmitKeys(ctx.Reqdata, RoutedArgNames(ctx));
+
         var transform = Helpers.ToMapAny(StructUtils.GetProp(point, "transform"));
         if (transform == null)
         {
-            return StripAction(ctx.Reqdata);
+            return StripAction(data);
         }
 
         var reqform = StructUtils.GetProp(transform, "req");
         if (reqform == null)
         {
-            return StripAction(ctx.Reqdata);
+            return StripAction(data);
         }
 
         var reqdata = StructUtils.Transform(new Dictionary<string, object?>
         {
-            ["reqdata"] = ctx.Reqdata,
+            ["reqdata"] = data,
         }, reqform);
 
         return StripAction(reqdata);
@@ -42,14 +44,46 @@ public static partial class SdkUtility
     // untouched.
     private static object? StripAction(object? reqdata)
     {
-        if (reqdata is not IDictionary<string, object?> src || !src.ContainsKey("$action"))
+        return OmitKeys(reqdata, new List<string> { "$action" });
+    }
+
+    // A header, cookie or query argument travels where PrepareHeadersUtil or
+    // PrepareQueryUtil sends it, so the body is built from the request data
+    // without it, unless the point marks it as a field the body keeps.
+    private static List<string> RoutedArgNames(Context ctx)
+    {
+        return CallArgs(ctx, "header").Concat(CallArgs(ctx, "cookie")).Concat(CallArgs(ctx, "query"))
+            .Select(arg => arg.Name).Where(name => !FieldArg(ctx, name)).ToList();
+    }
+
+    private static bool FieldArg(Context ctx, string name)
+    {
+        if (ctx.Point == null)
+        {
+            return false;
+        }
+        foreach (var kind in new[] { "header", "cookie", "query" })
+        {
+            if (StructUtils.GetPath(ctx.Point, StructUtils.Jt("args", kind)) is List<object?> defs &&
+                defs.Any(ad => name == StructUtils.GetProp(ad, "name") as string &&
+                    StructUtils.GetProp(ad, "field") is true))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static object? OmitKeys(object? reqdata, List<string> names)
+    {
+        if (reqdata is not IDictionary<string, object?> src || !names.Exists(src.ContainsKey))
         {
             return reqdata;
         }
         var body = new Dictionary<string, object?>();
         foreach (var kv in src)
         {
-            if ("$action" != kv.Key)
+            if (!names.Contains(kv.Key))
             {
                 body[kv.Key] = kv.Value;
             }

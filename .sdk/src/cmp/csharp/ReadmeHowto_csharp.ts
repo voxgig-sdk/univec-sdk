@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape, requiredItems } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -7,12 +7,13 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { csVarName } from './utility_csharp'
+import { csVarName, csStringLiteral } from './utility_csharp'
 
 
 // A type-correct C# literal for a field's canonical type.
 function csLit(type: any): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'null'
   if ('INTEGER' === k) return '1L'
   if ('NUMBER' === k) return '1.0'
   if ('BOOLEAN' === k) return 'true'
@@ -39,22 +40,33 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   let testArg = 'null'
   if (exampleEntity && isMatchOp) {
     testArg = idF ? `new Dictionary<string, object?> { ["${idF}"] = "test01" }` : 'null'
-  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp)) {
+  } else if (exampleEntity && 'list' === primaryOp && 0 < requiredItems(exampleEntity, 'list').length) {
+    const chosen = requiredItems(exampleEntity, 'list')
+    testArg = `new Dictionary<string, object?> {${chosen.map((it: any) =>
+      ` [${csStringLiteral(it.name)}] = ${csLit(it.type)}`).join(',')} }`
+  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp)) {
     const items = opRequestShape(exampleEntity, primaryOp).items
       .filter((it: any) => it.name !== idF && it.name !== 'id')
     const required = items.filter((it: any) => !it.optional)
     const chosen = required.length ? required : items.slice(0, 3)
     testArg = `new Dictionary<string, object?> {${chosen.map((it: any) =>
-      ` ["${it.name}"] = ${csLit(it.type)}`).join(',')} }`
+      ` [${csStringLiteral(it.name)}] = ${csLit(it.type)}`).join(',')} }`
   }
 
   // The op-driven test-mode line, shown only when the SDK has an entity op.
   // A direct()-only SDK (no ops anywhere) shows a direct() call instead.
-  const testModeExample = primaryOp
-    ? `// Entity ops return the bare record and raise on error.
-var ${eVar} = client.${eName}().${opMethod}(${testArg});
-// ${eVar} holds the mock response record
-Console.WriteLine(${eVar});`
+  const testModeExample = 'list' === primaryOp
+    ? `// List returns a list of entities, one per mock record; it raises on error.
+var ${eVar}List = (List<object?>)client.${eName}().List(${testArg})!;
+foreach (var ${eVar}Item in ${eVar}List)
+{
+    Console.WriteLine(StructUtils.Jsonify(((IEntity)${eVar}Item!).Data()));
+}`
+    : primaryOp
+    ? `// Entity ops return the entity; they raise on error.
+var ${eVar} = (IEntity)client.${eName}().${opMethod}(${testArg})!;
+// Data() reads the entity's mock record
+Console.WriteLine(StructUtils.Jsonify(${eVar}.Data()));`
     : `var result = client.Direct(new Dictionary<string, object?>
 {
     ["path"] = "/api/resource",

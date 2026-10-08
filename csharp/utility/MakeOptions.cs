@@ -1,6 +1,7 @@
 // Univec SDK utility: makeOptions - merge, validate and derive the
 // client options.
 
+using System.Collections;
 using System.Text.RegularExpressions;
 
 using Voxgig.Struct;
@@ -134,6 +135,40 @@ public static partial class SdkUtility
             opts.Remove("auth");
         }
 
+        var config = ctx.Config ?? new Dictionary<string, object?>();
+        var cfgopts = config.TryGetValue("options", out var co) &&
+            co is Dictionary<string, object?> cm
+            ? cm : new Dictionary<string, object?>();
+
+        // The secret registry exists BEFORE validation, fed from the raw
+        // input, so the constructor's own rejection of a mistyped credential
+        // is clean too.
+        var cleanlayers = new List<object?>
+        {
+            new Dictionary<string, object?>(),
+            StructUtils.Clone(StructUtils.GetProp(SdkSchema.Optspec, "clean")),
+            StructUtils.Clone(StructUtils.GetProp(cfgopts, "clean")) ?? new Dictionary<string, object?>(),
+        };
+        if (opts.TryGetValue("clean", out var cleanraw) && cleanraw != null)
+        {
+            cleanlayers.Add(cleanraw);
+        }
+        var cleancfg = MakeCleanConfig(StructUtils.Merge(cleanlayers));
+        var cleanctx = new Context(new Dictionary<string, object?>
+        {
+            ["options"] = new Dictionary<string, object?>
+            {
+                ["__derived__"] = new Dictionary<string, object?> { ["clean"] = cleancfg },
+            },
+        }, null);
+        CleanAddOptions(cleanctx, opts, "clean");
+        foreach (var raw in CleanSplitValues(
+                StructUtils.GetPath(cfgopts, StructUtils.Jt("clean", "values")))
+            .Concat(CleanSplitValues(StructUtils.GetPath(opts, StructUtils.Jt("clean", "values")))))
+        {
+            CleanAddUtil(cleanctx, raw);
+        }
+
         // Feature add-order. options.feature may be given as an ordered LIST of
         // { name, active, ...opts } entries (the list position IS the order in
         // which features are added), or as a { name: {opts} } map. Normalize a
@@ -158,11 +193,6 @@ public static partial class SdkUtility
             }
             opts["feature"] = fmap;
         }
-
-        var config = ctx.Config ?? new Dictionary<string, object?>();
-        var cfgopts = config.TryGetValue("options", out var co) &&
-            co is Dictionary<string, object?> cm
-            ? cm : new Dictionary<string, object?>();
 
         // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
         //
@@ -192,7 +222,24 @@ public static partial class SdkUtility
             StructUtils.Clone(cfgopts),
             opts,
         });
-        var validated = StructUtils.Validate(merged, optspec);
+        object? validated;
+        try
+        {
+            validated = StructUtils.Validate(merged, optspec);
+        }
+        catch (Exception verr)
+        {
+            // The struct port's message quotes the offending value, which is
+            // the credential when that is what was mistyped. Exception's
+            // message is read-only, so a changed message travels as the SDK's
+            // own error; an unchanged one is the original, rethrown.
+            var cleaned = CleanUtil(cleanctx, verr.Message) as string ?? verr.Message;
+            if (cleaned == verr.Message)
+            {
+                throw;
+            }
+            throw new UnivecError("options_invalid", cleaned, null);
+        }
         opts = validated as Dictionary<string, object?> ?? new Dictionary<string, object?>();
 
         // Restore the suppression the optspec default would otherwise erase.
@@ -263,20 +310,6 @@ public static partial class SdkUtility
             }
         }
 
-        // Derived clean config.
-        var cleanKeys = "key,token,id";
-        if (StructUtils.GetPath(opts, StructUtils.Jt("clean", "keys")) is string cks)
-        {
-            cleanKeys = cks;
-        }
-
-        var filtered = cleanKeys.Split(',')
-            .Select(p => p.Trim())
-            .Where(p => p != "")
-            .Select(StructUtils.EscRe)
-            .ToList();
-        var keyre = string.Join("|", filtered);
-
         // Resolve the feature add-order: an explicit list order (above) wins;
         // otherwise order the map test-first, then the remaining names sorted,
         // so the outcome is deterministic and `test` is always the base
@@ -319,20 +352,79 @@ public static partial class SdkUtility
             }
         }
 
-        var derived = new Dictionary<string, object?>
+        opts["__derived__"] = new Dictionary<string, object?>
         {
-            ["clean"] = new Dictionary<string, object?>(),
+            ["clean"] = cleancfg,
+            ["featureorder"] = featureorder,
         };
-        if (keyre != "")
-        {
-            derived["clean"] = new Dictionary<string, object?>
-            {
-                ["keyre"] = keyre,
-            };
-        }
-        derived["featureorder"] = featureorder;
-        opts["__derived__"] = derived;
+
+        // Again over the merged result: the config's own defaults can carry one.
+        CleanAddOptions(cleanctx, opts, "clean", "__derived__");
 
         return opts;
+    }
+
+    // A feature's name is not a field name: a feature called `secrets` does
+    // not make every one of its options a secret. Entity blocks (entity
+    // settings, seeded records) hold no credential, and nor do rbac's rules,
+    // keyed by entity and operation names.
+    private static void CleanAddOptions(Context cleanctx, Dictionary<string, object?> opts,
+        params string[] omit)
+    {
+        var top = CleanOmit(opts, omit.Append("feature").Append("entity").ToArray());
+        if (top.ContainsKey("test"))
+        {
+            top["test"] = CleanPlain(top["test"], null);
+        }
+        CleanAddSensitive(cleanctx, top);
+        var feature = opts.GetValueOrDefault("feature");
+        if (feature is IDictionary fmap)
+        {
+            foreach (DictionaryEntry kv in fmap)
+            {
+                CleanAddSensitive(cleanctx, CleanPlain(kv.Value, Convert.ToString(kv.Key)));
+            }
+        }
+        else if (feature is IList flist)
+        {
+            foreach (var entry in flist)
+            {
+                var name = entry is IDictionary e && e.Contains("name") ? e["name"] as string : null;
+                CleanAddSensitive(cleanctx, CleanPlain(entry, name));
+            }
+        }
+        else
+        {
+            CleanAddSensitive(cleanctx, feature);
+        }
+    }
+
+    private static object? CleanPlain(object? block, string? name)
+    {
+        if (block is not IDictionary dict)
+        {
+            return block;
+        }
+        var out_ = new Dictionary<string, object?>();
+        foreach (DictionaryEntry kv in dict)
+        {
+            var key = Convert.ToString(kv.Key) ?? "";
+            if (key != "entity" && !("rbac" == name && key == "rules"))
+            {
+                out_[key] = kv.Value;
+            }
+        }
+        return out_;
+    }
+
+    private static Dictionary<string, object?> CleanOmit(Dictionary<string, object?> opts,
+        params string[] keys)
+    {
+        var out_ = new Dictionary<string, object?>(opts);
+        foreach (var key in keys)
+        {
+            out_.Remove(key);
+        }
+        return out_;
     }
 }

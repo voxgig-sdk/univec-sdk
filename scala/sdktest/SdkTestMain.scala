@@ -130,7 +130,7 @@ object SdkTestMain {
   }
 
   def fhDefaultMethod(op: String): String = op match {
-    case "create" => "POST"; case "update" => "PATCH"; case "remove" => "DELETE"; case _ => "GET"
+    case "create" => "POST"; case "update" | "patch" => "PATCH"; case "remove" => "DELETE"; case _ => "GET"
   }
 
   def fhBuildUrl(spec: Spec): String = {
@@ -348,6 +348,21 @@ object SdkTestMain {
     { val f = new TimeoutFeature()
       val h = fhMake((c, u, fd) => { Thread.sleep(60); fhResponse(200, om("ok" -> B(true)), null) }, fhF(f, om("ms" -> I(10))))
       val r = h.op(fhOp("load")); eq("timeout.err", "timeout", fhErrCode(r.err)); eqI("timeout.count", 1, f.count) }
+    // A clock standing at 0 for the calling thread and at `later` for any other.
+    def workerClock(later: Long): LongSupplier = {
+      val caller = Thread.currentThread()
+      () => if (Thread.currentThread() eq caller) 0L else later
+    }
+    // The deadline runs from the request's start, not from the wait: the
+    // clock stands at the start for the caller and 300 ms later for the worker.
+    { val f = new TimeoutFeature()
+      val h = fhMake(null, fhF(f, om("ms" -> I(20), "now" -> f0(workerClock(300L)))))
+      val r = h.op(fhOp("load")); eq("timeout.late", "timeout", fhErrCode(r.err)); eqI("timeout.late.count", 1, f.count) }
+    // A transport failure after the deadline is a timeout too, not the failure.
+    { val f = new TimeoutFeature()
+      val h = fhMake((c, u, fd) => throw new IllegalStateException("socket closed"),
+        fhF(f, om("ms" -> I(20), "now" -> f0(workerClock(300L)))))
+      val r = h.op(fhOp("load")); eq("timeout.latefail", "timeout", fhErrCode(r.err)); eqI("timeout.latefail.count", 1, f.count) }
     { val h = fhMake(null, fhF(new TimeoutFeature(), om("ms" -> I(1000))))
       check("timeout.fast", h.op(fhOp("load")).ok, "expected ok") }
     { val h = fhMake(null, fhF(new TimeoutFeature(), om("ms" -> I(0))))
@@ -471,7 +486,7 @@ object SdkTestMain {
       val h = fhMake(null, fhF(f, om("max" -> I(1), "onEntry" -> oe)))
       h.op(fhOp("load").withHeaders(om("authorization" -> "Bearer secret"))); h.op(fhOp("list"))
       eqI("debug.ring", 1, f.entries.size()); eqI("debug.onEntry", 2, seen.size())
-      eq("debug.redacted", "<redacted>", Helpers.toMapAny(seen.get(0).get("headers")).get("authorization")) }
+      eq("debug.redacted", "[redacted]", Helpers.toMapAny(seen.get(0).get("headers")).get("authorization")) }
     { val f = new DebugFeature()
       val h = fhMake(null, fhF(new NetsimFeature(), om("failTimes" -> I(1), "failStatus" -> I(500))), fhF(f, null))
       h.op(fhOp("load")); eqI("debug.fail.n", 1, f.entries.size()); eq("debug.fail.ok", B(false), f.entries.get(0).get("ok")) }
@@ -479,7 +494,7 @@ object SdkTestMain {
       val h = fhMake(null, fhF(f, om("now" -> f0(clk.nowFn), "redact" -> jl("x-secret"))))
       h.op(fhOp("load").withHeaders(om("x-secret" -> "hide", "x-ok" -> "show")))
       val dh = Helpers.toMapAny(f.entries.get(0).get("headers"))
-      eq("debug.redact.secret", "<redacted>", dh.get("x-secret")); eq("debug.redact.ok", "show", dh.get("x-ok")) }
+      eq("debug.redact.secret", "[redacted]", dh.get("x-secret")); eq("debug.redact.ok", "show", dh.get("x-ok")) }
     { val f = new DebugFeature()
       val h = fhMake(null, fhF(f, om("active" -> B(false))))
       h.op(fhOp("load")); eqI("debug.inactive", 0, f.entries.size()) }

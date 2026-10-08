@@ -1,9 +1,10 @@
 // Request/response capture for debugging. Records a bounded ring buffer of
 // per-operation traces - method, URL, redacted headers, response status and
-// timing - on the feature's Entries. Sensitive header values (matching
-// `redact`, default authorization/cookie/api-key style names) are masked.
-// An optional `onEntry` callback receives each finished entry (e.g. to
-// stream to a console). `max` caps the buffer (default 100).
+// timing - on the feature's Entries. Every entry passes through the SDK's
+// clean utility (clean.keys and every registered secret value); the
+// `redact` option ADDS header names on top of that. An optional `onEntry`
+// callback receives each finished entry (e.g. to stream to a console).
+// `max` caps the buffer (default 100).
 
 using static UnivecSdk.Feature.FeatureOptions;
 
@@ -18,12 +19,6 @@ public class DebugFeature : BaseFeature
     public List<Dictionary<string, object?>> Entries = new();
 
     private const string EntryKey = "debug_entry";
-
-    private static readonly List<string> DefaultRedact = new()
-    {
-        "authorization", "cookie", "set-cookie", "api-key", "apikey",
-        "x-api-key", "idempotency-key",
-    };
 
     public DebugFeature()
     {
@@ -58,7 +53,7 @@ public class DebugFeature : BaseFeature
         {
             entry["method"] = ctx.Spec.Method;
             entry["url"] = ctx.Spec.Url != "" ? ctx.Spec.Url : ctx.Spec.Path;
-            entry["headers"] = Redact(ctx.Spec.Headers);
+            entry["headers"] = Redact(ctx, ctx.Spec.Headers);
         }
         ctx.Out[EntryKey] = entry;
     }
@@ -126,6 +121,11 @@ public class DebugFeature : BaseFeature
             entry["status"] = ctx.Result.Status;
         }
 
+        // The whole entry leaves through the buffer and the callback: the url
+        // and the error message can carry a query credential the header mask
+        // above never saw.
+        entry = Fclean(ctx, entry);
+
         Entries.Add(entry);
         var max = FoptInt(_options, "max", 100);
         while (Entries.Count > max)
@@ -139,19 +139,22 @@ public class DebugFeature : BaseFeature
         }
     }
 
-    private Dictionary<string, object?> Redact(Dictionary<string, object?>? headers)
+    // The core clean rules apply (clean.keys, every registered value); the
+    // feature's own `redact` list ADDS header names on top of them.
+    private Dictionary<string, object?> Redact(Context ctx, Dictionary<string, object?>? headers)
     {
         var redacted = new Dictionary<string, object?>();
         if (headers == null)
         {
             return redacted;
         }
-        var patterns = FoptStrList(_options, "redact") ?? DefaultRedact;
+        var patterns = (FoptStrList(_options, "redact") ?? new List<string>())
+            .Select(p => p.ToLowerInvariant()).ToList();
         foreach (var kv in headers)
         {
-            var masked = patterns.Any(p => kv.Key.ToLowerInvariant() == p);
-            redacted[kv.Key] = masked ? "<redacted>" : kv.Value;
+            var masked = patterns.Contains(kv.Key.ToLowerInvariant());
+            redacted[kv.Key] = masked ? "[redacted]" : kv.Value;
         }
-        return redacted;
+        return Fclean(ctx, redacted);
     }
 }

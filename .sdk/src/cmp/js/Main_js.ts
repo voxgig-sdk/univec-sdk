@@ -4,6 +4,7 @@ import * as Path from 'node:path'
 import {
   cmp, each, names, cmap,
   List, File, Content, Copy, Folder, Fragment, Line, FeatureHook,
+  inactiveFeatureExcludes,
   entityClassName, entityCollection, srcFeatureExcludes, pluginExcludes,
   stationLibrary,
   targetFeatures,
@@ -57,6 +58,7 @@ const Main = cmp(async function Main(props: any) {
     from: 'tm/' + target.name,
     exclude: [
       ...srcFeatureExcludes(model),
+      ...inactiveFeatureExcludes(props.ctx$, target),
       ...pluginExcludes(model),
       TEST_CONTROL_EXCLUDE,
     ],

@@ -9,6 +9,7 @@ import { cmp, each, Folder, File, Content, entityCollection,
 
 import { TestEntity } from './TestEntity_perl'
 import { TestDirect } from './TestDirect_perl'
+import { TestClean } from './TestClean_perl'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_perl'
 
 
@@ -48,6 +49,8 @@ done_testing();
       TestEntity({ target, entity })
       TestDirect({ target, entity })
     })
+
+    TestClean({ target })
 
     // README example snippet gate (syntax + offline test-mode run).
     ReadmeExamplesTest({ target })

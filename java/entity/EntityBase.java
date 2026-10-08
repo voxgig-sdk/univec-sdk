@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.BooleanSupplier;
@@ -157,13 +158,29 @@ utility.featureHook.apply(ctx, "PreDone");
       return out;
     }
     catch (RuntimeException err) {
-      // An error already finalised by makeError (e.g. via done) must not
-      // be wrapped a second time.
-      if (err == ctx.ctrl.err) {
-        throw err;
-      }
-      return utility.makeError.apply(ctx, err);
+      return unexpected(ctx, err);
     }
+  }
+
+  // The catch path. An error already finalised by makeError (e.g. via done)
+  // must not be wrapped a second time.
+  private Object unexpected(Context ctx, RuntimeException err) {
+    if (err == ctx.ctrl.err) {
+      throw err;
+    }
+    try {
+      return this.utility.makeError.apply(ctx, err);
+    }
+    catch (RuntimeException thrown) {
+      throw thrown == ctx.ctrl.err ? thrown : cleanError(ctx, thrown);
+    }
+  }
+
+  // makeError fires PreUnexpected; an error a hook throws there escapes it,
+  // even under throw false, so it is cleaned here.
+  private RuntimeException cleanError(Context ctx, RuntimeException err) {
+    Object cleaned = this.utility.clean.apply(ctx, err);
+    return cleaned instanceof RuntimeException ? (RuntimeException) cleaned : err;
   }
 
   /**
@@ -191,9 +208,11 @@ utility.featureHook.apply(ctx, "PreDone");
     final BooleanSupplier signal =
         signalObj instanceof BooleanSupplier ? (BooleanSupplier) signalObj : null;
 
-    Map<String, Object> ctrl = Helpers.toMapAny(callopts.get("ctrl"));
-    if (ctrl == null) {
-      ctrl = new LinkedHashMap<>();
+    // A copy: the caller's ctrl gains no key, and explain stays its own record.
+    Map<String, Object> ctrl = new LinkedHashMap<>();
+    Map<String, Object> callerCtrl = Helpers.toMapAny(callopts.get("ctrl"));
+    if (callerCtrl != null) {
+      ctrl.putAll(callerCtrl);
     }
     ctrl.put("stream", callopts);
 
@@ -221,9 +240,14 @@ utility.featureHook.apply(ctx, "PreDone");
 
     // Inbound: prefer the streaming feature's incremental iterator; else fall
     // back to the materialised items so `stream` always yields.
-    Iterator<Object> source;
+    Iterator<Object> source = null;
     if (ctx.result != null && ctx.result.stream != null) {
-      source = ctx.result.stream.get();
+      try {
+        source = ctx.result.stream.get();
+      }
+      catch (RuntimeException err) {
+        unexpected(ctx, err);
+      }
     }
     else {
       List<Object> items;
@@ -240,19 +264,42 @@ utility.featureHook.apply(ctx, "PreDone");
       source = items.iterator();
     }
 
+    // The caller iterates after runOp has returned, so a failing source takes
+    // the catch path here. Both source calls sit in hasNext: under throw
+    // false the stream then ends rather than failing in next.
     final Iterator<Object> src = source;
     Iterator<Object> guarded = new Iterator<Object>() {
+      private boolean ended = src == null;
+      private boolean ready = false;
+      private Object item;
+
       @Override
       public boolean hasNext() {
-        if (signal != null && signal.getAsBoolean()) {
+        if (ended || (signal != null && signal.getAsBoolean())) {
           return false;
         }
-        return src.hasNext();
+        if (!ready) {
+          try {
+            ready = src.hasNext();
+            ended = !ready;
+            item = ready ? src.next() : null;
+          }
+          catch (RuntimeException err) {
+            ended = true;
+            ready = false;
+            unexpected(ctx, err);
+          }
+        }
+        return ready;
       }
 
       @Override
       public Object next() {
-        return src.next();
+        if (!hasNext()) {
+          throw new NoSuchElementException();
+        }
+        ready = false;
+        return item;
       }
     };
 

@@ -55,7 +55,8 @@ function LogFeature:_loghook(hook, ctx, level)
     opname = ctx.op.name
   end
 
-  local msg = "hook=" .. hook .. " op=" .. opname
+  -- A log line leaves the pipeline, so it is cleaned like every record.
+  local msg = ctx.utility.clean(ctx, "hook=" .. hook .. " op=" .. opname)
 
   local log_fn = self.logger[level]
   if type(log_fn) == "function" then

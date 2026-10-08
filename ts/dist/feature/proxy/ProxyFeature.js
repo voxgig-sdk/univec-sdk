@@ -10,6 +10,7 @@ class ProxyFeature extends BaseFeature_1.BaseFeature {
     _options = {};
     _url;
     _noProxy = [];
+    _ctx;
     init(ctx, options) {
         this._client = ctx.client;
         this._options = options || {};
@@ -26,6 +27,24 @@ class ProxyFeature extends BaseFeature_1.BaseFeature {
         }
         this._noProxy = ('string' === typeof noProxy ? noProxy.split(/\s*,\s*/) : (noProxy || []))
             .filter((s) => null != s && '' !== s);
+        // A proxy URL may carry credentials as userinfo, from the option or the
+        // environment, and neither is under a sensitive key name.
+        this._ctx = ctx;
+        if ('string' === typeof this._url) {
+            try {
+                const parsed = new URL(this._url);
+                for (const part of [parsed.username, parsed.password]) {
+                    if ('' !== part) {
+                        ctx.utility.cleanAdd(ctx, part);
+                        try {
+                            ctx.utility.cleanAdd(ctx, decodeURIComponent(part));
+                        }
+                        catch (_e) { }
+                    }
+                }
+            }
+            catch (_e) { }
+        }
         const self = this;
         const utility = ctx.utility;
         const inner = utility.fetcher;
@@ -71,7 +90,8 @@ class ProxyFeature extends BaseFeature_1.BaseFeature {
     _track(url) {
         const client = this._client;
         if (null == client._proxy) {
-            client._proxy = { routed: 0, url: this._url };
+            const ctx = this._ctx;
+            client._proxy = { routed: 0, url: null == ctx ? this._url : ctx.utility.clean(ctx, this._url) };
         }
         client._proxy.routed++;
     }

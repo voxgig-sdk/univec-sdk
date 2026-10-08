@@ -340,15 +340,17 @@ public class CostFeature : BaseFeature
         Bump(Actors, actor, amount);
 
         _seq++;
+        // A typed record, so its strings are cleaned one by one rather than
+        // the record as a whole.
         Last = new CostRecord
         {
             Seq = _seq,
-            Entity = entity,
-            Op = opname,
-            Actor = actor,
+            Entity = FcleanStr(ctx, entity),
+            Op = FcleanStr(ctx, opname),
+            Actor = FcleanStr(ctx, actor),
             Amount = amount,
-            Currency = Currency,
-            Source = source,
+            Currency = FcleanStr(ctx, Currency),
+            Source = FcleanStr(ctx, source),
             Attempts = pending.Attempts,
         };
 

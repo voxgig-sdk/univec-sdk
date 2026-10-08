@@ -63,16 +63,23 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_test_1 = require("node:test");
 const node_assert_1 = __importDefault(require("node:assert"));
 const Fs = __importStar(require("node:fs"));
+const Os = __importStar(require("node:os"));
 const Path = __importStar(require("node:path"));
 const node_module_1 = require("node:module");
 const node_child_process_1 = require("node:child_process");
 const __1 = require("..");
 const SDK_NAME = 'UnivecSDK';
+// The package root, by absolute path: the snippets compile outside the SDK.
+const SDK_ROOT = Path.join(__dirname, '..').split(Path.sep).join('/');
 // A fixture for every entity, so list()/load() resolve offline with no
 // network. Snippet client construction is rewritten to seed this.
 const TEST_SEED = { "entity": { "convert": { "test01": { "id": "test01" } }, "embed": { "test01": { "id": "test01" } }, "ephemeral_key": { "test01": { "id": "test01" } }, "model": { "test01": { "id": "test01" } } } };
 const SEED_ARG = JSON.stringify(TEST_SEED);
 const SEEDED_CTOR = SDK_NAME + '.test(' + SEED_ARG + ')';
+// The client VARIABLE, not the word: a package name carries the word between
+// hyphens (@voxgig-sdk/multifon-client-sdk).
+const CLIENT = /(?<![\w$.\-\/'"`])client(?![\w$\-\/'"`])/;
+const CLIENT_CALL = new RegExp(CLIENT.source + '\\s*\\.');
 // The three docs this gate covers, resolved relative to dist-test/.
 const DOCS = [
     { label: 'root README.md', key: 'root_readme', path: Path.join(__dirname, '..', '..', 'README.md') },
@@ -127,14 +134,14 @@ function isIllustrationShape(code) {
 function isRunnable(code) {
     return (/new\s+UnivecSDK\b/.test(code) ||
         /\bUnivecSDK\.test\b/.test(code) ||
-        /\bclient\s*\./.test(code));
+        CLIENT_CALL.test(code));
 }
 // Wrap ONE block as a self-contained temp module: the block goes in its own
 // scope inside an async function with a shared seeded `client`.
 function buildSnippetModule(block) {
     const inner = stripImports(block).split('\n').map((l) => '    ' + l).join('\n');
     return [
-        "import { " + SDK_NAME + " } from '..'",
+        'import { ' + SDK_NAME + ' } from ' + JSON.stringify(SDK_ROOT),
         '',
         'async function __ex() {',
         // Shared client for snippets that reference `client` without constructing
@@ -157,18 +164,21 @@ function buildSnippetModule(block) {
 // and recompiles the rest until a pass is clean.
 function compileBatch(indices, blocks, key) {
     const tsDir = Path.join(__dirname, '..');
-    const testDir = Path.join(tsDir, 'test');
-    // Leading dot: TypeScript wildcard includes skip dot-files, so these temp
-    // files are never swept into the normal build.
+    // Outside the SDK's tree, so a run leaves nothing there even when it is
+    // interrupted. `.cts` keeps them CommonJS whatever package.json is above.
+    const dir = Fs.mkdtempSync(Path.join(Os.tmpdir(), 'readme-examples-'));
     const files = [];
     try {
         for (const i of indices) {
-            const f = Path.join(testDir, '.examples_' + key + '_snippet' + i + '.gen.ts');
+            const f = Path.join(dir, 'examples_' + key + '_snippet' + i + '.gen.cts');
             Fs.writeFileSync(f, buildSnippetModule(blocks[i]), 'utf8');
             files.push(f);
         }
         const requireFrom = (0, node_module_1.createRequire)(__filename);
-        const tsc = requireFrom.resolve('typescript/bin/tsc');
+        // Every TypeScript exports its package.json; TypeScript 7 exports no
+        // ./bin/tsc, so the binary is found through the manifest's bin.
+        const tsPackage = requireFrom.resolve('typescript/package.json');
+        const tsc = Path.join(Path.dirname(tsPackage), requireFrom(tsPackage).bin.tsc);
         const res = (0, node_child_process_1.spawnSync)(process.execPath, [
             tsc,
             '--noEmit',
@@ -188,7 +198,7 @@ function compileBatch(indices, blocks, key) {
         let unattributed = false;
         if (0 !== res.status) {
             for (const line of raw.split('\n')) {
-                const m = /_snippet(\d+)\.gen\.ts\(\d+,\d+\):\s*error/.exec(line);
+                const m = /_snippet(\d+)\.gen\.cts\(\d+,\d+\):\s*error/.exec(line);
                 if (null == m) {
                     // A genuine error diagnostic not attributable to a snippet file
                     // (e.g. inside the SDK itself) is an anomaly.
@@ -203,9 +213,7 @@ function compileBatch(indices, blocks, key) {
         return { errored, raw, unattributed };
     }
     finally {
-        for (const f of files) {
-            Fs.rmSync(f, { force: true });
-        }
+        Fs.rmSync(dir, { recursive: true, force: true });
     }
 }
 // Determine, robustly, which of a doc's blocks fail to type-check. Because
@@ -245,7 +253,7 @@ function rewriteForRun(code) {
     let out = stripImports(code);
     out = out.replace(/new\s+UnivecSDK\s*\([^)]*\)/g, () => SEEDED_CTOR);
     out = out.replace(/UnivecSDK\.test\s*\([^)]*\)/g, () => SEEDED_CTOR);
-    if (/\bclient\b/.test(out) && !/\b(?:const|let|var)\s+client\b/.test(out)) {
+    if (CLIENT.test(out) && !/\b(?:const|let|var)\s+client\b/.test(out)) {
         out = 'const client = ' + SEEDED_CTOR + '\n' + out;
     }
     return out;
@@ -254,7 +262,13 @@ function rewriteForRun(code) {
 // test mode. Returns a list of failure descriptions (empty === all passed).
 async function executeBlocks(blocks) {
     const requireFrom = (0, node_module_1.createRequire)(__filename);
-    const ts = requireFrom('typescript');
+    // Node strips a snippet's types itself from 22.13; before that TypeScript 5
+    // does, through an API TypeScript 7 no longer ships.
+    const strip = requireFrom('node:module').stripTypeScriptTypes;
+    const ts = 'function' === typeof strip ? null : requireFrom('typescript');
+    if (null == strip && 'function' !== typeof ts.transpileModule) {
+        throw new Error('running the examples needs node 22.13 or TypeScript 5 to strip their types');
+    }
     const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
     const silentConsole = { log() { }, error() { }, warn() { }, info() { } };
     const failures = [];
@@ -267,14 +281,16 @@ async function executeBlocks(blocks) {
         if ('' === src.trim()) {
             continue;
         }
-        // Compile the snippet to JS (strips type annotations) so it runs under
-        // node exactly as a real caller would.
-        const js = ts.transpileModule(src, {
-            compilerOptions: {
-                target: ts.ScriptTarget.ES2020,
-                module: ts.ModuleKind.ESNext,
-            },
-        }).outputText;
+        // Strip the snippet's types so it runs under node exactly as a real
+        // caller would.
+        const js = null != strip
+            ? strip(src, { mode: 'transform' })
+            : ts.transpileModule(src, {
+                compilerOptions: {
+                    target: ts.ScriptTarget.ES2020,
+                    module: ts.ModuleKind.ESNext,
+                },
+            }).outputText;
         let runner;
         try {
             runner = new AsyncFunction(SDK_NAME, 'console', js);

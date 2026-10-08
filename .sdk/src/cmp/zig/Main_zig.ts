@@ -4,6 +4,7 @@ import * as Path from 'node:path'
 import {
   cmp, each,
   File, Content, Copy, Folder, Fragment,
+  inactiveFeatureExcludes,
   pluginExcludes,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -76,38 +77,20 @@ const Main = cmp(async function Main(props: any) {
   // helpers/applicability.
   const feature = targetFeatures(model, target)
 
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const allfeature = getModelPath(model, `main.${KIT}.feature`,
-    { required: false, only_active: false }) || {}
-  const inactivePluginExcludes: RegExp[] = []
-  for (const fname of Object.keys(allfeature)) {
-    if (null != (feature as any)[fname]) continue
-    const groups = getModelPath(model, `main.${KIT}.feature.${fname}.plugin`,
-      { required: false, only_active: false }) || {}
-    for (const gname of Object.keys(groups)) {
-      for (const one of (groups[gname].path || [])) {
-        const pat = esc(String(one))
-        inactivePluginExcludes.push(new RegExp('(^|/)' +
-          pat.replace(/\\\/$/, '') + (/\/$/.test(String(one)) ? '/' : '$')))
-      }
-    }
-  }
-
   Package({ target })
 
   Gitignore({})
 
   Copy({
     from: 'tm/' + target.name,
-    // pluginExcludes: the generate-time plugin trim for an ACTIVE feature's
-    // inactive groups (the model's `path` entries are target-root-relative,
-    // which is this Copy's root); inactivePluginExcludes (above) for the
-    // groups of a feature that is itself off.
+    // pluginExcludes: the generate-time plugin trim, every group of a feature
+    // that is off included (the model's `path` entries are relative to this
+    // Copy's root).
     exclude: [
       /src\//,
       /build\.zig\.zon$/,
+      ...inactiveFeatureExcludes(props.ctx$, target),
       ...pluginExcludes(model),
-      ...inactivePluginExcludes,
     ],
     replace: {
       ...props.ctx$.stdrep,

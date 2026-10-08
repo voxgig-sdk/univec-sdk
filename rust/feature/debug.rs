@@ -9,16 +9,6 @@ use crate::utility::voxgigstruct::Value;
 
 const DEBUG_ENTRY_KEY: &str = "debug_entry";
 
-const DEBUG_DEFAULT_REDACT: [&str; 7] = [
-    "authorization",
-    "cookie",
-    "set-cookie",
-    "api-key",
-    "apikey",
-    "x-api-key",
-    "idempotency-key",
-];
-
 pub struct DebugFeature {
     pub name: String,
     pub active: bool,
@@ -40,21 +30,26 @@ impl DebugFeature {
         }
     }
 
-    fn redact(&self, headers: &Value) -> Value {
+    // The core clean rules apply (clean.keys, every registered value); the
+    // feature's own `redact` list ADDS header names on top of them.
+    fn redact(&self, ctx: &Rc<Context>, headers: &Value) -> Value {
         let out = Value::empty_map();
-        let patterns = fopt_str_list(&self.options, "redact")
-            .unwrap_or_else(|| DEBUG_DEFAULT_REDACT.iter().map(|s| s.to_string()).collect());
+        let patterns: Vec<String> = fopt_str_list(&self.options, "redact")
+            .unwrap_or_default()
+            .iter()
+            .map(|p| p.to_lowercase())
+            .collect();
         if let Value::Map(m) = headers {
             for (k, v) in m.borrow().iter() {
                 let masked = patterns.iter().any(|p| k.to_lowercase() == *p);
                 if masked {
-                    setp(&out, k, Value::str("<redacted>"));
+                    setp(&out, k, Value::str("[redacted]"));
                 } else {
                     setp(&out, k, v.clone());
                 }
             }
         }
-        out
+        ctx.util().clean(ctx, &out)
     }
 
     fn finish(&mut self, ctx: &Rc<Context>, ok: bool) {
@@ -77,6 +72,11 @@ impl DebugFeature {
                 setp(&entry, "status", Value::Num(r.borrow().status as f64));
             }
         }
+
+        // The whole entry leaves through the buffer and the callback: the url
+        // and the error message can carry a query credential the header mask
+        // above never saw.
+        let entry = ctx.util().clean(ctx, &entry);
 
         self.entries.push(entry.clone());
         let max = fopt_int(&self.options, "max", 100) as usize;
@@ -132,7 +132,7 @@ impl Feature for DebugFeature {
             } else {
                 setp(&entry, "url", Value::str(s.path.clone()));
             }
-            setp(&entry, "headers", self.redact(&s.headers));
+            setp(&entry, "headers", self.redact(ctx, &s.headers));
         }
         ctx.out_set(DEBUG_ENTRY_KEY, OutVal::Val(entry));
     }

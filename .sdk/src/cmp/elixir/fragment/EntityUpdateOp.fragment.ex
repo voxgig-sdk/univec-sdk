@@ -1,8 +1,9 @@
 # EJECT-START
 
-  # Returns the updated entityname entity map (ProjectName.Types.entityname/0)
-  # on success; pipeline errors surface as the error value built by
-  # Utility.make_error (shape is utility-configurable), hence term().
+  # Returns the updated entityname entity, whose data_get/1 reads its record
+  # (ProjectName.Types.entityname/0), on success; pipeline errors surface as
+  # the error value built by Utility.make_error (shape is
+  # utility-configurable), hence term().
   @spec update(map(), ProjectName.Types.entityname_update_data() | nil, map() | nil) :: term()
   def update(ent, reqdata, ctrl \\ nil) do
     ctx =

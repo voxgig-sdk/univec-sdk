@@ -94,6 +94,35 @@ const TestEntity = cmp(function TestEntity(props: any) {
         }
       }, () => {
 
+        const entops = Object.keys(entity.op || {})
+        Slot({ name: 'patch' }, () => {
+          if (!entops.includes('create') || !entops.includes('patch')) {
+            return
+          }
+          const field = Object.keys((entity as any).fields || {})
+            .find((k) => k !== 'id' && !k.endsWith('$')) || 'name'
+          Content(`    test('patch', (t) async {
+      final fixture = jsonDecode(File(resolveTestPath(
+              '../.sdk/test/entity/${entity.name}/${nom(entity, 'Name')}TestData.json'))
+          .readAsStringSync());
+      final news = (fixture['new']?['${entity.name}'] ?? <String, dynamic>{}) as Map;
+      final ent = ${model.Name}SDK.test(<String, dynamic>{'entity': fixture['existing']})
+          .${nom(entity, 'Name')}();
+      final created = (await ent.create(
+              news.isEmpty ? <String, dynamic>{} : news.values.first))
+          .data();
+      final patched = await ent.patch(<String, dynamic>{
+        'id': created['id'],
+        '${field}': 'PatchedMark',
+      });
+      final data = patched.data();
+      ok(data is Map);
+      equal('PatchedMark', data['${field}']);
+      equal(created['id'], patched.match()['id']);
+    });
+`)
+        })
+
         const basicflow = getModelPath(model, `main.${KIT}.flow.Basic${nom(entity, 'Name')}Flow`)
 
         const dobasic = basicflow && true === basicflow.active

@@ -391,6 +391,7 @@ class Config {
       },
       'optspec': <String, dynamic>{
         'clearTimer': '`\$FUNCTION`',
+        'now': '`\$FUNCTION`',
         'setTimer': '`\$FUNCTION`',
       },
       'strict': false,
@@ -567,6 +568,10 @@ class Config {
                   },
                 },
               },
+              'response': <String, dynamic>{
+                'kind': 'json',
+                'media': 'application/json',
+              },
             },
             <String, dynamic>{
               'kind': 'http',
@@ -684,6 +689,10 @@ class Config {
                     'SDK live coverage test.',
                   ],
                 },
+              },
+              'response': <String, dynamic>{
+                'kind': 'json',
+                'media': 'application/json',
               },
             },
             <String, dynamic>{
@@ -812,6 +821,10 @@ class Config {
                   },
                 },
               },
+              'response': <String, dynamic>{
+                'kind': 'json',
+                'media': 'application/json',
+              },
             },
             <String, dynamic>{
               'kind': 'http',
@@ -938,6 +951,10 @@ class Config {
                   ],
                 },
               },
+              'response': <String, dynamic>{
+                'kind': 'json',
+                'media': 'application/json',
+              },
             },
           ],
         },
@@ -1061,6 +1078,10 @@ class Config {
                   ],
                 },
               },
+              'response': <String, dynamic>{
+                'kind': 'json',
+                'media': 'application/json',
+              },
             },
             <String, dynamic>{
               'kind': 'http',
@@ -1157,6 +1178,10 @@ class Config {
                   ],
                 },
               },
+              'response': <String, dynamic>{
+                'kind': 'json',
+                'media': 'application/json',
+              },
             },
           ],
         },
@@ -1239,6 +1264,10 @@ class Config {
                 'auth': 'public',
                 'id': 'key',
                 'retention': 'No deletion endpoint; issued key is subject to the service daily allowance',
+              },
+              'response': <String, dynamic>{
+                'kind': 'json',
+                'media': 'application/json',
               },
             },
           ],
@@ -1352,6 +1381,10 @@ class Config {
                 },
                 'auth': 'public',
                 'id': 'models',
+              },
+              'response': <String, dynamic>{
+                'kind': 'json',
+                'media': 'application/json',
               },
             },
           ],

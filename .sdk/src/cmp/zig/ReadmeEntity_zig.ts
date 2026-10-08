@@ -1,12 +1,12 @@
 
-import { cmp, each, Content, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, entityIdField, opRequestShape, opNeedsAction } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { zigVarName } from './utility_zig'
+import { zigVarName, zigListMatch } from './utility_zig'
 
 
 // Canonical type sentinel -> a zig type name for the field/param tables.
@@ -27,6 +27,7 @@ function zigType(type: any): string {
 // A type-correct zig expression constructing a voxgig struct Value.
 function zigLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'h.vnull()'
   if ('INTEGER' === k || 'NUMBER' === k) return 'h.vnum(1)'
   if ('BOOLEAN' === k) return 'h.vbool(true)'
   if ('ARRAY' === k) return 'h.olist()'
@@ -41,6 +42,7 @@ const OP_DESC: Record<string, { method: string, desc: string }> = {
   list:   { method: 'list(reqmatch, ctrl)',   desc: 'List entities, optionally matching the given criteria.' },
   create: { method: 'create(reqdata, ctrl)',  desc: 'Create a new entity with the given data.' },
   update: { method: 'update(reqdata, ctrl)',  desc: 'Update an existing entity.' },
+  patch:  { method: 'patch(reqdata, ctrl)',   desc: 'Change part of an existing entity.' },
   remove: { method: 'remove(reqmatch, ctrl)', desc: 'Remove the matching entity.' },
 }
 
@@ -66,6 +68,8 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
+    // An op that needs an action has no plain call to show.
+    const callable = opnames.filter((o: string) => !opNeedsAction(entity.op[o]))
     const fields = Object.values(entity.fields || {})
     const idF = entityIdField(entity)
     const eVar = zigVarName(entity.name)
@@ -101,8 +105,9 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
       })
 
       Content(`
-Each operation returns an \`OpResult\` — \`switch\` on it: \`.ok => |data|\`
-carries the result \`Value\`, \`.err => |e|\` carries the branded error.
+Each operation returns a result union — \`switch\` on it: \`.ok\` carries the
+entity (for \`list\`, a slice of entities, one per record), whose record
+\`asEntity().data(null)\` reads, and \`.err => |e|\` the branded error.
 
 `)
     }
@@ -124,7 +129,7 @@ carries the result \`Value\`, \`.err => |e|\` carries the branded error.
 `)
     }
 
-    if (opnames.includes('load')) {
+    if (callable.includes('load')) {
       const loadItems = opRequestShape(entity, 'load').items
         .filter((it: any) => !it.optional || it.name === idF)
         .sort((a: any, b: any) =>
@@ -138,7 +143,7 @@ carries the result \`Value\`, \`.err => |e|\` carries the branded error.
 
 \`\`\`zig
 switch (client.${method}(h.vnull()).load(${loadArg}, h.vnull())) {
-    .ok => |${eVar}| std.debug.print("{s}\\n", .{h.stringify(${eVar})}),
+    .ok => |${eVar}| std.debug.print("{s}\\n", .{h.stringify(${eVar}.asEntity().data(null))}),
     .err => |e| std.debug.print("load failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
@@ -146,12 +151,16 @@ switch (client.${method}(h.vnull()).load(${loadArg}, h.vnull())) {
 `)
     }
 
-    if (opnames.includes('list')) {
+    if (callable.includes('list')) {
       Content(`#### Example: List
 
 \`\`\`zig
-switch (client.${method}(h.vnull()).list(h.vnull(), h.vnull())) {
-    .ok => |${eVar}s| std.debug.print("{s}\\n", .{h.stringify(${eVar}s)}),
+switch (client.${method}(h.vnull()).list(${zigListMatch(entity)}, h.vnull())) {
+    .ok => |${eVar}s| {
+        for (${eVar}s) |${eVar}| {
+            std.debug.print("{s}\\n", .{h.stringify(${eVar}.asEntity().data(null))});
+        }
+    },
     .err => |e| std.debug.print("list failed: {s}\\n", .{e.msg}),
 }
 \`\`\`
@@ -159,7 +168,7 @@ switch (client.${method}(h.vnull()).list(h.vnull(), h.vnull())) {
 `)
     }
 
-    if (opnames.includes('create')) {
+    if (callable.includes('create')) {
       const createItems = opRequestShape(entity, 'create').items
         .filter((it: any) => !it.optional)
       Content(`#### Example: Create
@@ -172,7 +181,7 @@ switch (client.${method}(h.vnull()).create(h.jo(&.{
 `)
       })
       Content(`}), h.vnull())) {
-    .ok => |${eVar}| std.debug.print("{s}\\n", .{h.stringify(${eVar})}),
+    .ok => |${eVar}| std.debug.print("{s}\\n", .{h.stringify(${eVar}.asEntity().data(null))}),
     .err => |e| std.debug.print("create failed: {s}\\n", .{e.msg}),
 }
 \`\`\`

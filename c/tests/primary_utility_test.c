@@ -481,10 +481,14 @@ static void test_primary_feature_init_inactive(void) {
   CHECK(!init_called, "feature_init skips inactive feature");
 }
 
+// Concrete base: a live construction must satisfy any server variables a
+// templated base URL declares; a literal base sidesteps the requirement.
+#define PU_LIVE_BASE "http://localhost:8080"
+
 static void test_primary_fetcher_live(void) {
   voxgig_value* calls = v_list();
-  UnivecSDK* live = univec_sdk_new(
-      cmap(1, "system", cmap(1, "fetch", vfn(pu_sysfetch, calls))));
+  UnivecSDK* live = univec_sdk_new(cmap(2, "base", v_str(PU_LIVE_BASE),
+      "system", cmap(1, "fetch", vfn(pu_sysfetch, calls))));
   Utility* util = sdk_get_utility(live);
   CtxSpec cs;
   memset(&cs, 0, sizeof(cs));
@@ -503,8 +507,8 @@ static void test_primary_fetcher_live(void) {
 }
 
 static void test_primary_fetcher_blocked_test_mode(void) {
-  UnivecSDK* blocked = univec_sdk_new(
-      cmap(1, "system", cmap(1, "fetch", vfn(pu_sysfetch, v_list()))));
+  UnivecSDK* blocked = univec_sdk_new(cmap(2, "base", v_str(PU_LIVE_BASE),
+      "system", cmap(1, "fetch", vfn(pu_sysfetch, v_list()))));
   free(blocked->mode);
   blocked->mode = strdup("test");
   Utility* util = sdk_get_utility(blocked);
@@ -524,7 +528,7 @@ static void test_primary_fetcher_blocked_test_mode(void) {
 }
 
 static void test_primary_new_sdk_smoke(void) {
-  UnivecSDK* client = univec_sdk_new(v_undef());
+  UnivecSDK* client = univec_sdk_new(cmap(1, "base", v_str(PU_LIVE_BASE)));
   CHECK_STR_EQ(client->mode, "live", "new sdk mode live");
 }
 

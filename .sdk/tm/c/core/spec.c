@@ -38,6 +38,7 @@ Spec* spec_new(voxgig_value* specmap) {
   s->body = voxgig_new_undef();
   s->url = dup_str("");
   s->path = dup_str("");
+  s->authquery = voxgig_new_list();
 
   if (!voxgig_is_map(specmap)) return s;
 
@@ -91,4 +92,13 @@ voxgig_value* spec_to_value(Spec* s) {
   if (!v_is_noval(s->body)) setp(out, "body", v_share(s->body));
   if (s->url[0] != '\0') setp(out, "url", v_str(s->url));
   return out;
+}
+
+bool spec_authquery_has(Spec* s, const char* key) {
+  if (!s || !v_is_list(s->authquery)) return false;
+  voxgig_list* names = voxgig_as_list(s->authquery);
+  for (size_t i = 0; i < names->len; i++) {
+    if (v_str_eq(names->items[i], key)) return true;
+  }
+  return false;
 }

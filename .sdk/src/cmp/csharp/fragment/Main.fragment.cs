@@ -133,6 +133,15 @@ public class ProjectNameSDK
         {
             method = "GET";
         }
+        method = method.ToUpperInvariant();
+
+        var allowMethod = global::Voxgig.Struct.StructUtils.GetPath(options, global::Voxgig.Struct.StructUtils.Jt("allow", "method"));
+        if (!global::ProjectNameSdk.Helpers.Allowed(allowMethod, method))
+        {
+            throw ctx.MakeError("spec_method_allow",
+                "Method \"" + method + "\" not allowed by SDK option allow.method value: \"" +
+                (allowMethod as string ?? "") + "\"");
+        }
 
         var pathParams = global::ProjectNameSdk.Helpers.ToMapAny(global::Voxgig.Struct.StructUtils.GetProp(fetchargs, "params"))
             ?? new Dictionary<string, object?>();
@@ -189,8 +198,8 @@ public class ProjectNameSDK
     // Is this raw-access op permitted by the SDK's allow.op option?
     private bool OpAllowed(string op)
     {
-        return global::Voxgig.Struct.StructUtils.GetPath(_options, global::Voxgig.Struct.StructUtils.Jt("allow", "op"))
-            is string allow && allow.Contains(op);
+        return global::ProjectNameSdk.Helpers.Allowed(
+            global::Voxgig.Struct.StructUtils.GetPath(_options, global::Voxgig.Struct.StructUtils.Jt("allow", "op")), op);
     }
 
     private Dictionary<string, object?> OpDenied(string op)
@@ -224,7 +233,7 @@ public class ProjectNameSDK
             return new Dictionary<string, object?>
             {
                 ["ok"] = false,
-                ["err"] = err,
+                ["err"] = CleanErr(_rootctx, err),
             };
         }
 
@@ -251,7 +260,7 @@ public class ProjectNameSDK
             return new Dictionary<string, object?>
             {
                 ["ok"] = false,
-                ["err"] = fetchErr,
+                ["err"] = CleanErr(ctx, fetchErr),
             };
         }
 
@@ -286,13 +295,28 @@ public class ProjectNameSDK
                 jsonData = jf();
             }
 
-            return new Dictionary<string, object?>
+            Exception? bodyErr = null;
+            if (!noBody && global::Voxgig.Struct.StructUtils.GetProp(fm, "unreadable") is true)
             {
-                ["ok"] = status >= 200 && status < 300,
+                var failed = status >= 200 && status < 300 ? null : ctx.MakeError("request_status",
+                    "request: " + status + ": " + global::Voxgig.Struct.StructUtils.GetProp(fm, "statusText"));
+                bodyErr = global::ProjectNameSdk.Response.UnreadableBody(ctx, status, headers,
+                    global::Voxgig.Struct.StructUtils.GetProp(fm, "body"),
+                    fetchdef.TryGetValue("headers", out var sent) ? sent : null, failed);
+            }
+
+            var direct = new Dictionary<string, object?>
+            {
+                ["ok"] = bodyErr == null && status >= 200 && status < 300,
                 ["status"] = status,
                 ["headers"] = headers,
                 ["data"] = jsonData,
             };
+            if (bodyErr != null)
+            {
+                direct["err"] = CleanErr(ctx, bodyErr);
+            }
+            return direct;
         }
 
         return new Dictionary<string, object?>
@@ -300,6 +324,12 @@ public class ProjectNameSDK
             ["ok"] = false,
             ["err"] = ctx.MakeError("direct_invalid", "invalid response type"),
         };
+    }
+
+    // A raw request returns its error rather than passing it through MakeError.
+    private Exception CleanErr(Context ctx, Exception err)
+    {
+        return _utility.Clean(ctx, err) as Exception ?? err;
     }
 
     // Raw GraphQL access: the pressure valve that makes the generated

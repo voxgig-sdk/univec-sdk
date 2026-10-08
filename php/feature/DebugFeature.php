@@ -7,9 +7,9 @@ require_once __DIR__ . '/BaseFeature.php';
 
 // Request/response capture for debugging. Records a bounded ring buffer of
 // per-operation traces — method, URL, redacted headers, response status and
-// timing — on `client->_debug['entries']`. Sensitive header values
-// (matching `redact`, default authorization/cookie/api-key style names) are
-// masked. An optional `onEntry` callback receives each finished entry (e.g.
+// timing — on `client->_debug['entries']`. The SDK's own clean rules apply
+// to the whole entry, and header names in `redact` are masked on top of
+// them. An optional `onEntry` callback receives each finished entry (e.g.
 // to stream to a console). `max` caps the buffer (default 100). Mirrors
 // ts/src/feature/debug/DebugFeature.ts.
 class UnivecDebugFeature extends UnivecBaseFeature
@@ -57,7 +57,7 @@ class UnivecDebugFeature extends UnivecBaseFeature
                 . '.' . ($ctx->op->name !== '' ? $ctx->op->name : '_'),
             'method' => $spec !== null ? $spec->method : null,
             'url' => $spec !== null ? ($spec->url !== '' ? $spec->url : $spec->path) : null,
-            'headers' => $this->_redact($spec !== null ? $spec->headers : null),
+            'headers' => $this->_redact($ctx, $spec !== null ? $spec->headers : null),
             'start' => $this->_now(),
             'status' => null,
             'ok' => null,
@@ -122,6 +122,11 @@ class UnivecDebugFeature extends UnivecBaseFeature
             $entry['status'] = $ctx->result->status;
         }
 
+        // The whole entry leaves through the buffer and the callback: the url
+        // and the error message can carry a query credential the header mask
+        // above never saw.
+        $entry = ($ctx->utility->clean)($ctx, $entry);
+
         $client = $this->client;
         $client->_debug['entries'][] = $entry;
         $max = is_numeric($this->options['max'] ?? null) ? (int)$this->options['max'] : 100;
@@ -139,21 +144,25 @@ class UnivecDebugFeature extends UnivecBaseFeature
         }
     }
 
-    private function _redact(mixed $headers): array
+    // The core clean rules apply (clean.keys, every registered value); the
+    // feature's own `redact` list ADDS header names on top of them.
+    private function _redact(UnivecContext $ctx, mixed $headers): array
     {
         if (!is_array($headers)) {
             return [];
         }
-        $patterns = $this->options['redact'] ??
-            ['authorization', 'cookie', 'set-cookie', 'api-key', 'apikey', 'x-api-key', 'idempotency-key'];
+        $patterns = $this->options['redact'] ?? [];
         if (!is_array($patterns)) {
             $patterns = [];
         }
+        $patterns = array_map(function (mixed $n): string {
+            return strtolower((string)$n);
+        }, $patterns);
         $out = [];
         foreach ($headers as $k => $v) {
-            $out[$k] = in_array(strtolower((string)$k), $patterns, true) ? '<redacted>' : $v;
+            $out[$k] = in_array(strtolower((string)$k), $patterns, true) ? '[redacted]' : $v;
         }
-        return $out;
+        return ($ctx->utility->clean)($ctx, $out);
     }
 
     private function _now(): float

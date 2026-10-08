@@ -316,6 +316,7 @@ pub fn make_config() -> Value {
                 ])),
                 ("optspec".to_string(), Value::map_of([
                     ("clearTimer".to_string(), Value::str("`$FUNCTION`")),
+                    ("now".to_string(), Value::str("`$FUNCTION`")),
                     ("setTimer".to_string(), Value::str("`$FUNCTION`")),
                 ])),
                 ("strict".to_string(), Value::Bool(false)),
@@ -484,6 +485,10 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                                ("response".to_string(), Value::map_of([
+                                    ("kind".to_string(), Value::str("json")),
+                                    ("media".to_string(), Value::str("application/json")),
+                                ])),
                             ]),
                             Value::map_of([
                                 ("kind".to_string(), Value::str("http")),
@@ -601,6 +606,10 @@ pub fn make_config() -> Value {
                                             Value::str("SDK live coverage test."),
                                         ])),
                                     ])),
+                                ])),
+                                ("response".to_string(), Value::map_of([
+                                    ("kind".to_string(), Value::str("json")),
+                                    ("media".to_string(), Value::str("application/json")),
                                 ])),
                             ]),
                             Value::map_of([
@@ -729,6 +738,10 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                                ("response".to_string(), Value::map_of([
+                                    ("kind".to_string(), Value::str("json")),
+                                    ("media".to_string(), Value::str("application/json")),
+                                ])),
                             ]),
                             Value::map_of([
                                 ("kind".to_string(), Value::str("http")),
@@ -855,6 +868,10 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                                ("response".to_string(), Value::map_of([
+                                    ("kind".to_string(), Value::str("json")),
+                                    ("media".to_string(), Value::str("application/json")),
+                                ])),
                             ]),
                         ])),
                     ])),
@@ -978,6 +995,10 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                                ("response".to_string(), Value::map_of([
+                                    ("kind".to_string(), Value::str("json")),
+                                    ("media".to_string(), Value::str("application/json")),
+                                ])),
                             ]),
                             Value::map_of([
                                 ("kind".to_string(), Value::str("http")),
@@ -1074,6 +1095,10 @@ pub fn make_config() -> Value {
                                         ])),
                                     ])),
                                 ])),
+                                ("response".to_string(), Value::map_of([
+                                    ("kind".to_string(), Value::str("json")),
+                                    ("media".to_string(), Value::str("application/json")),
+                                ])),
                             ]),
                         ])),
                     ])),
@@ -1156,6 +1181,10 @@ pub fn make_config() -> Value {
                                     ("auth".to_string(), Value::str("public")),
                                     ("id".to_string(), Value::str("key")),
                                     ("retention".to_string(), Value::str("No deletion endpoint; issued key is subject to the service daily allowance")),
+                                ])),
+                                ("response".to_string(), Value::map_of([
+                                    ("kind".to_string(), Value::str("json")),
+                                    ("media".to_string(), Value::str("application/json")),
                                 ])),
                             ]),
                         ])),
@@ -1269,6 +1298,10 @@ pub fn make_config() -> Value {
                                     ])),
                                     ("auth".to_string(), Value::str("public")),
                                     ("id".to_string(), Value::str("models")),
+                                ])),
+                                ("response".to_string(), Value::map_of([
+                                    ("kind".to_string(), Value::str("json")),
+                                    ("media".to_string(), Value::str("application/json")),
                                 ])),
                             ]),
                         ])),

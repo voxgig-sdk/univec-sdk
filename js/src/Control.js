@@ -7,6 +7,7 @@ class Control {
     this.throw = getprop(ctrlmap, 'throw')
     this.err = getprop(ctrlmap, 'err')
     this.explain = getprop(ctrlmap, 'explain')
+    this.signal = getprop(ctrlmap, 'signal')
   }
 }
 

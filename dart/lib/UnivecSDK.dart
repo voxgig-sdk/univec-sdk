@@ -23,6 +23,8 @@ import 'Spec.dart';
 // a Dart `export` needs no matching `import`, so importing them here too is an
 // unused_import. Keep only the imports actually referenced in this file.
 import 'utility/ErrUtility.dart';
+import 'utility/PrepareMethodUtility.dart' show allowed;
+import 'utility/ResultBodyUtility.dart' show unreadableBody;
 // PREFIXED, and deliberately not re-exported. The runtime helper class is
 // named `Utility`, and so is the generated data class for an entity named
 // `utility` (UnivecTypes.dart) — exporting both from this library makes
@@ -159,13 +161,24 @@ class UnivecSDK {
 
     final options = _options;
 
+    final given = fetchargs['method'];
+    final method =
+        (null == given || '' == given ? 'GET' : given.toString()).toUpperCase();
+    final allowmethod = _utility.struct.getpath(options, 'allow.method');
+    if (!allowed(allowmethod, method)) {
+      return ctx.error(
+          'spec_method_allow',
+          'Method "$method" not allowed by SDK option allow.method value: '
+              '"${allowmethod ?? ''}"');
+    }
+
     // Build spec directly from SDK options + user-provided fetch args.
     final spec = Spec({
       'base': options['base'],
       'prefix': options['prefix'],
       'suffix': options['suffix'],
       'path': fetchargs['path'] ?? '',
-      'method': fetchargs['method'] ?? 'GET',
+      'method': method,
       'params': fetchargs['params'] ?? {},
       'query': fetchargs['query'] ?? {},
       'body': fetchargs['body'],
@@ -205,8 +218,7 @@ class UnivecSDK {
 
   // Is this raw-access op permitted by the SDK's allow.op option?
   bool _opAllowed(String op) {
-    final allow = _utility.struct.getpath(_options, 'allow.op');
-    return allow is String && allow.contains(op);
+    return allowed(_utility.struct.getpath(_options, 'allow.op'), op);
   }
 
   dynamic _opDenied(String op) {
@@ -229,7 +241,7 @@ class UnivecSDK {
 
     final fetchdef = await prepare(fetchargs);
     if (iserr(fetchdef)) {
-      return fetchdef;
+      return {'ok': false, 'err': fetchdef};
     }
 
     final ctx = makeContext({
@@ -247,7 +259,7 @@ class UnivecSDK {
           'err': ctx.error('direct_no_response', 'response: undefined')
         };
       } else if (iserr(fetched)) {
-        return {'ok': false, 'err': fetched};
+        return {'ok': false, 'err': utility.clean(ctx, sdkerror(fetched, ctx))};
       }
 
       final status = fetched['status'];
@@ -262,6 +274,7 @@ class UnivecSDK {
           '0' == (null == contentLength ? null : contentLength.toString());
 
       dynamic json;
+      dynamic bodyErr;
       if (!noBody) {
         try {
           final jsonFn = fetched['json'];
@@ -273,16 +286,25 @@ class UnivecSDK {
           // throwing. data stays null; callers can inspect status/headers.
           json = null;
         }
+        if (true == fetched['unreadable']) {
+          final failed = status is num && status >= 200 && status < 300
+              ? null
+              : ctx.error('request_status',
+                  'request: $status: ${fetched['statusText'] ?? ''}');
+          bodyErr = unreadableBody(ctx, status, headers, fetched['body'],
+              fetchdef['headers'], failed);
+        }
       }
 
       return {
-        'ok': status is num && status >= 200 && status < 300,
+        'ok': null == bodyErr && status is num && status >= 200 && status < 300,
         'status': status,
         'headers': fetched['headers'],
         'data': json,
+        if (null != bodyErr) 'err': utility.clean(ctx, bodyErr),
       };
     } catch (err) {
-      return {'ok': false, 'err': err};
+      return {'ok': false, 'err': utility.clean(ctx, sdkerror(err, ctx))};
     }
   }
 

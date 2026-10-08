@@ -34,6 +34,8 @@ public:
 
   // #UpdateOp
 
+  // #PatchOp
+
   // #RemoveOp
 };
 

@@ -54,11 +54,16 @@ class LogFeature extends BaseFeature("log", "0.0.1", true) {
     if (ctx.op != null) msg.append(" op=").append(ctx.op.name)
     if (ctx.spec != null) msg.append(" spec=").append(ctx.spec.method).append(" ").append(ctx.spec.path)
 
+    // A log line leaves the pipeline, so it carries the cleaned text.
+    val line =
+      if (ctx.utility == null || ctx.utility.clean == null) msg.toString
+      else String.valueOf(ctx.utility.clean(ctx, msg.toString))
+
     level match {
-      case "debug" => this.logger.fine(msg.toString)
-      case "warn" => this.logger.warning(msg.toString)
-      case "error" => this.logger.severe(msg.toString)
-      case _ => this.logger.info(msg.toString)
+      case "debug" => this.logger.fine(line)
+      case "warn" => this.logger.warning(line)
+      case "error" => this.logger.severe(line)
+      case _ => this.logger.info(line)
     }
   }
 }

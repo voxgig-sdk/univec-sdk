@@ -8,7 +8,10 @@
 #ifndef SDK_FEATURE_TIMEOUT_HPP
 #define SDK_FEATURE_TIMEOUT_HPP
 
+#include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <climits>
 #include <exception>
 #include <future>
 #include <memory>
@@ -53,14 +56,24 @@ private:
       return inner(ctx, url, fetchdef);
     }
 
-    // Run inner on a detached thread; the shared promise keeps the future's
-    // shared state alive even after the loser resolves unobserved.
+    // The deadline runs from here, not from the wait below: a caller paused
+    // between the two would otherwise find a late response complete and take
+    // it. The worker notes when it finished, so a response or a failure after
+    // the deadline is a timeout however late the caller looks. The shared
+    // promise keeps the future's state alive after the loser resolves
+    // unobserved on its detached thread.
+    fopt::NowFn now = fopt::foptNow(options);
+    const long long start = now();
+    auto arrived = std::make_shared<std::atomic<long long>>(LLONG_MAX);
     auto prom = std::make_shared<std::promise<Value>>();
     std::future<Value> fut = prom->get_future();
-    std::thread([ctx, url, fetchdef, inner, prom]() {
+    std::thread([ctx, url, fetchdef, inner, prom, now, arrived]() {
       try {
-        prom->set_value(inner(ctx, url, fetchdef));
+        Value out = inner(ctx, url, fetchdef);
+        arrived->store(now());
+        prom->set_value(out);
       } catch (...) {
+        arrived->store(now());
         try {
           prom->set_exception(std::current_exception());
         } catch (...) {
@@ -68,13 +81,20 @@ private:
       }
     }).detach();
 
-    if (fut.wait_for(std::chrono::milliseconds(deadline)) == std::future_status::timeout) {
-      track(deadline);
-      throw ctx->makeError("timeout",
-          "Request exceeded timeout of " + std::to_string(deadline) + "ms");
+    long long remaining = std::max(0LL, static_cast<long long>(deadline) - (now() - start));
+    if (fut.wait_for(std::chrono::milliseconds(remaining)) == std::future_status::timeout) {
+      throw timeout(ctx, deadline);
     }
-
+    if (deadline < arrived->load() - start) {
+      throw timeout(ctx, deadline);
+    }
     return fut.get();
+  }
+
+  SdkErrorPtr timeout(CtxPtr ctx, int deadline) {
+    track(deadline);
+    return ctx->makeError("timeout",
+        "Request exceeded timeout of " + std::to_string(deadline) + "ms");
   }
 
   void track(int deadline) {

@@ -72,6 +72,10 @@ const Config = cmp(async function Config(props: any) {
   const options: Record<string, any> = {
     base: baseUrl,
   }
+  // The declared defaults makeOptions fills a templated base URL from.
+  if (null != configDef.options.server) {
+    options.server = configDef.options.server
+  }
   if (authActive) {
     const auth: Record<string, any> = { prefix: authPrefix }
     // `basic` joins them for the same reason: the generated prepareAuth

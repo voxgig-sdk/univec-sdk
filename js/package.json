@@ -22,14 +22,15 @@
   "type": "commonjs",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "REFERENCE.md"
   ],
   "scripts": {
-    "test:live": "UNIVEC_TEST_LIVE=TRUE node --test test/live.test.js",
-    "test": "node --test 'test/**/*.test.js'",
-    "test-some": "node --experimental-test-isolation=none --test-name-pattern=\"$TEST_PATTERN\" --test 'test/**/*.test.js'",
-    "test-utility": "node --test test/utility/*.test.js",
-    "clean": "rm -rf node_modules yarn.lock package-lock.json",
+    "test:live": "node --import \"data:text/javascript,process.env.UNIVEC_TEST_LIVE='TRUE'\" --test test/live.test.js",
+    "test": "node --test \"test/**/*.test.js\"",
+    "test-some": "node -e \"const p = process.env.npm_config_pattern || process.env.TEST_PATTERN; const r = require('child_process').spawnSync(process.execPath, ['--experimental-test-isolation=none', ...(p ? ['--test-name-pattern=' + p] : []), '--test', 'test/**/*.test.js'], { stdio: 'inherit' }); process.exit(r.status ?? 1)\"",
+    "test-utility": "node --test \"test/utility/*.test.js\"",
+    "clean": "node -e \"for (const p of process.argv.slice(1)) require('fs').rmSync(p, { recursive: true, force: true })\" node_modules yarn.lock package-lock.json",
     "reset": "npm run clean && npm i && npm test"
   },
   "author": {

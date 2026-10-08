@@ -120,6 +120,7 @@ func (f *SecretsFeature) Init(ctx *core.Context, options map[string]any) {
 	specs := []*sekreto.ProviderSpec{}
 
 	if "" != explicit {
+		f.register(explicit)
 		key, err := sekreto.EnvKey(f.secretname, "")
 		if nil == err {
 			specs = append(specs, &sekreto.ProviderSpec{
@@ -183,6 +184,18 @@ func (f *SecretsFeature) Init(ctx *core.Context, options map[string]any) {
 	}
 }
 
+// Every value this feature resolves or buys is a secret the SDK handles,
+// and none arrives under an option key the intake registration saw.
+func (f *SecretsFeature) register(value string) {
+	if "" == value || nil == f.client {
+		return
+	}
+	ctx := f.client.GetRootCtx()
+	if nil != ctx && nil != ctx.Utility && nil != ctx.Utility.CleanAdd {
+		ctx.Utility.CleanAdd(ctx, value)
+	}
+}
+
 func (f *SecretsFeature) resolve() error {
 	if nil != f.initerr {
 		return f.initerr
@@ -222,6 +235,9 @@ func (f *SecretsFeature) resolveonce() (bool, error) {
 	found, has, err := f.sek.Try(f.secretname)
 	if nil != err {
 		return false, err
+	}
+	if has {
+		f.register(found)
 	}
 
 	if nil == f.exchange {
@@ -391,6 +407,7 @@ func (f *SecretsFeature) reauth(fetchdef map[string]any, token string) {
 func (f *SecretsFeature) buy() (string, error) {
 	if "live" != f.client.Mode {
 		token := "test-" + f.exchange.response
+		f.register(token)
 		f.mu.Lock()
 		f.cred = token
 		f.mu.Unlock()
@@ -483,6 +500,8 @@ func (f *SecretsFeature) buyonce() (string, error) {
 		return "", sekreto.Fail(
 			"secrets: token exchange returned no '" + x.response + "' field from " + url)
 	}
+
+	f.register(token)
 
 	return token, nil
 }

@@ -1,5 +1,6 @@
 package JAVAPACKAGE.core;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,9 @@ public class Spec {
   public Object body;
   public String url = "";
   public String path = "";
+  // The query parameters prepareAuth placed: the credential, which the
+  // request sends and the entity's match leaves out.
+  public List<String> authquery = new ArrayList<>();
 
   public Spec() {}
 

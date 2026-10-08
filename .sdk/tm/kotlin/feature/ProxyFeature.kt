@@ -1,5 +1,6 @@
 package KOTLINPACKAGE.feature
 
+import java.net.URI
 import java.util.regex.Pattern
 
 import KOTLINPACKAGE.core.Context
@@ -19,6 +20,8 @@ class ProxyFeature : BaseFeature("proxy", "0.0.1", true) {
   // Activity tracking (mirrors the ts client._proxy record).
   var routed = 0
   var url = ""
+
+  private var target = ""
 
   override fun init(ctx: Context, options: MutableMap<String, Any?>) {
     this.client = ctx.client
@@ -54,18 +57,39 @@ class ProxyFeature : BaseFeature("proxy", "0.0.1", true) {
       }
     }
 
+    // A proxy URL may carry credentials as userinfo, from the option or the
+    // environment, and neither is under a sensitive key name. The transport
+    // is handed the raw target; the activity record shows the cleaned one.
+    this.target = this.url
+    if ("" != this.url) {
+      try {
+        val parsed = URI(this.url)
+        for (info in listOf(parsed.rawUserInfo, parsed.userInfo)) {
+          if (info != null && "" != info) {
+            for (part in info.split(":", limit = 2)) {
+              if ("" != part) {
+                ctx.utility!!.cleanAdd(ctx, part)
+              }
+            }
+          }
+        }
+      } catch (e: RuntimeException) {
+      }
+      this.url = ctx.utility!!.clean(ctx, this.url).toString()
+    }
+
     val inner: FetcherFn = ctx.utility!!.fetcher
 
     ctx.utility!!.fetcher = { ctx2, u, fetchdef -> inner(ctx2, u, route(u, fetchdef)) }
   }
 
   private fun route(u: String, fetchdef: MutableMap<String, Any?>): MutableMap<String, Any?> {
-    if ("" == this.url || bypass(u)) {
+    if ("" == this.target || bypass(u)) {
       return fetchdef
     }
 
     val out = LinkedHashMap(fetchdef)
-    out["proxy"] = this.url
+    out["proxy"] = this.target
 
     this.routed++
     return out

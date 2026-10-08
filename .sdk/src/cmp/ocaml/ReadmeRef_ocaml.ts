@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures, opNeedsAction, bodyNote } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -7,12 +7,13 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { ocamlVarName } from './utility_ocaml'
+import { ocamlVarName, ocamlListMatch } from './utility_ocaml'
 
 
 // A type-correct OCaml `value` literal. Strings render the quoted placeholder.
 function ocamlLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Null'
   if ('INTEGER' === k || 'NUMBER' === k) return '(Num 1.)'
   if ('BOOLEAN' === k) return '(Bool true)'
   if ('ARRAY' === k) return '(empty_list ())'
@@ -39,27 +40,32 @@ const OP_SIGNATURES: Record<string, { sig: string, returns: string, desc: string
   load: {
     sig: 'e_load reqmatch ctrl : entity_obj',
     returns: 'the entity',
-    desc: 'Load a single entity matching the given criteria. Resolves to the ENTITY (read the record with `e_data_get`) and raises on error.',
+    desc: 'Load a single entity matching the given criteria. Resolves to the entity, whose record `e_data_get` reads, and raises on error.',
   },
   list: {
     sig: 'e_list reqmatch ctrl : entity_obj list',
     returns: 'one entity per record',
-    desc: 'List entities matching the given criteria. The match is optional \u2014 pass `(empty_map ())` to list all records. Resolves to one ENTITY per record and raises on error.',
+    desc: 'List entities matching the given criteria. The match is optional \u2014 pass `(empty_map ())` to list all records. Resolves to one entity per record and raises on error.',
   },
   create: {
     sig: 'e_create reqdata ctrl : entity_obj',
     returns: 'the created entity',
-    desc: 'Create a new entity with the given data. Resolves to the ENTITY (read the record with `e_data_get`) and raises on error.',
+    desc: 'Create a new entity with the given data. Resolves to the created entity and raises on error.',
   },
   update: {
     sig: 'e_update reqdata ctrl : entity_obj',
     returns: 'the updated entity',
-    desc: 'Update an existing entity. The data must include the entity `id`. Resolves to the ENTITY (read the record with `e_data_get`) and raises on error.',
+    desc: 'Update an existing entity. The data must include the entity `id`. Resolves to the updated entity and raises on error.',
+  },
+  patch: {
+    sig: 'e_patch reqdata ctrl : entity_obj',
+    returns: 'the patched entity',
+    desc: 'Change part of an existing entity: only the fields given are sent. The data must include the entity `id`. Resolves to the patched entity and raises on error.',
   },
   remove: {
     sig: 'e_remove reqmatch ctrl : entity_obj',
     returns: 'the removed entity',
-    desc: 'Remove the entity matching the given criteria. Resolves to the ENTITY, marked deleted (`e_deleted`); it keeps the data it held. Raises on error.',
+    desc: 'Remove the entity matching the given criteria. Resolves to the entity, marked as deleted (`e_deleted`); it keeps the data it held. Raises on error.',
   },
 }
 
@@ -90,6 +96,7 @@ Complete API reference for the ${model.Name} ${target.title} SDK.
     Content(`\`\`\`ocaml
 open Voxgig_struct
 open Sdk_helpers
+open Sdk_types
 
 let client = Sdk_client.make options
 \`\`\`
@@ -221,7 +228,7 @@ let ${fn} = Sdk_client.${fn} client Noval
         // Field operations breakdown
         const hasFieldOps = fields.some((f: any) => f.op && Object.keys(f.op).length > 0)
         if (hasFieldOps) {
-          const opcols = ['load', 'list', 'create', 'update', 'remove']
+          const opcols = ['load', 'list', 'create', 'update', 'patch', 'remove']
             .filter((op: string) => opnames.includes(op) && ent.op[op]?.active !== false)
           Content(`### Field Usage by Operation
 
@@ -262,6 +269,10 @@ ${info.desc}
 
 `)
 
+          if (opNeedsAction(ent.op[opname])) {
+            return
+          }
+
           if ('load' === opname || 'remove' === opname) {
             const matchItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
@@ -282,7 +293,7 @@ let result_data = result.e_data_get ()
           else if ('list' === opname) {
             Content(`\`\`\`ocaml
 (* One ENTITY per record; the record is reached with e_data_get. *)
-let results = (Sdk_client.${fn} client Noval).e_list (empty_map ()) Noval in
+let results = (Sdk_client.${fn} client Noval).e_list ${ocamlListMatch(ent)} Noval in
 List.iter (fun e -> print_endline (stringify (e.e_data_get ()))) results
 \`\`\`
 
@@ -304,8 +315,8 @@ let result_data = result.e_data_get ()
 
 `)
           }
-          else if ('update' === opname) {
-            const updateItems = opRequestShape(ent, 'update').items
+          else if ('update' === opname || 'patch' === opname) {
+            const updateItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
               .sort((a: any, b: any) =>
                 (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
@@ -313,13 +324,20 @@ let result_data = result.e_data_get ()
               `    ("${it.name}", ${ocamlLit(it.type,
                 it.name === idF ? ent.name + '_id' : it.name)});\n`).join('')
             Content(`\`\`\`ocaml
-let result = (Sdk_client.${fn} client Noval).e_update (jo [
-${updateLines}    (* Fields to update *)
+let result = (Sdk_client.${fn} client Noval).e_${opname} (jo [
+${updateLines}    (* ${'patch' === opname ? 'Only the fields to change' : 'Fields to update'} *)
 ]) Noval
 let result_data = result.e_data_get ()
 \`\`\`
 
 `)
+          }
+
+          if ('create' === opname || 'update' === opname || 'patch' === opname) {
+            const note = bodyNote(ent.op[opname], {
+              values: 'a `Str` holding the bytes',
+            })
+            if ('' !== note) Content(note)
           }
         })
       }

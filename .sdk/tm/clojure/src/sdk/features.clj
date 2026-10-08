@@ -69,11 +69,24 @@
 
 (defn log-feature []
   (let [fa (new-feature "log" true "0.0.1")
+        ;; A log line leaves the pipeline, so it carries the cleaned record:
+        ;; the spec after auth holds the credential, and a logger serialises
+        ;; whatever it is handed. `logger` is a fn of the record, a map with
+        ;; an "info" fn, or anything else for the stderr default.
         loghook (fn [ctx hook]
-                  (when (:logger @fa)
-                    (let [opname (if (core/oget ctx :op) (core/op-name (core/oget ctx :op)) "")]
-                      (binding [*out* *err*]
-                        (println (str "[INFO] hook=" hook " op=" opname))))))]
+                  (when-let [logger (:logger @fa)]
+                    (let [opname (if (core/oget ctx :op) (core/op-name (core/oget ctx :op)) "")
+                          record (core/ucall ctx :clean
+                                             (vs/jm "hook" hook "op" opname
+                                                    "spec" (core/oget ctx :spec)
+                                                    "ctx" (core/ctx->data ctx)))]
+                      (cond
+                        (fn? logger) (logger record)
+                        (and (vs/ismap logger) (fn? (mget logger "info"))) ((mget logger "info") record)
+                        :else
+                        (binding [*out* *err*]
+                          (println (str "[INFO] hook=" hook " op=" opname " "
+                                        (vs/jsonify record (vs/jm "indent" 0)))))))))]
     (swap! fa assoc
            "init" (fn [ctx options]
                     (swap! fa assoc :client (core/oget ctx :client) :options options
@@ -99,6 +112,16 @@
 
 (declare test-build-args make-netsim)
 
+;; The key a list's response transform
+;; ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record under.
+(defn- item-envelope-key [spec]
+  (when (and (vs/islist spec) (= 3 (count spec))
+             (= "`$EACH`" (first spec)) (= "body" (second spec))
+             (vs/ismap (nth spec 2)))
+    (let [merge (vs/getprop (nth spec 2) "`$MERGE`")]
+      (when (string? merge)
+        (second (re-matches #"`\.([^.`$]+)`" merge))))))
+
 (defn test-feature []
   (let [fa (new-feature "test" true "0.0.1")]
     (swap! fa assoc
@@ -123,16 +146,20 @@
                        ;; scope here, so the point is the one being served.
                        (let [envelope (fn [data]
                                         (let [tm (vs/getprop (core/oget fctx :point) "transform")
-                                              spec (vs/getprop tm "res")]
-                                          ;; Rebuild whatever nesting the transform unwraps;
-                                          ;; GraphQL ops unwrap `body.data.<field>`.
-                                          (if (and (some? data) (string? spec))
+                                              spec (vs/getprop tm "res")
+                                              ikey (item-envelope-key spec)]
+                                          (cond
+                                            (and (some? ikey) (vs/islist data))
+                                            (apply vs/jt (map (fn [item] (vs/jm ikey item)) data))
+                                            ;; Rebuild whatever nesting the transform unwraps;
+                                            ;; GraphQL ops unwrap `body.data.<field>`.
+                                            (and (some? data) (string? spec))
                                             (if-let [m (re-matches #"`body\.(.+)`" spec)]
                                               (reduce (fn [out seg] (vs/jm seg out))
                                                       data
                                                       (reverse (str/split (second m) #"\." -1)))
                                               data)
-                                            data)))
+                                            :else data)))
                              respond (fn [status data extra]
                                        (let [payload (envelope data)
                                              out (vs/jm "status" status "statusText" "OK"
@@ -164,7 +191,7 @@
                              (if (nil? found) (respond 404 nil (vs/jm "statusText" "Not found"))
                                  (do (when (vs/islist found) (doseq [item (vec found)] (vs/delprop item "$KEY")))
                                      (respond 200 (vs/clone found) nil))))
-                           (= opn "update")
+                           (or (= opn "update") (= opn "patch"))
                            (let [update-match (vs/jm)
                                  reqdata (core/oget fctx :reqdata)]
                              (when (vs/ismap reqdata)
@@ -181,7 +208,8 @@
                                ;; update miss: 404, never another record
                                (if (nil? ent) (respond 404 nil (vs/jm "statusText" "Not found"))
                                    (do (when (and (vs/ismap ent) (vs/ismap reqdata))
-                                         (vs/merge (vs/jt ent reqdata)))
+                                         ;; `$body` travels on the wire alone; the record is the rest.
+                                         (vs/merge (vs/jt ent (doto (vs/clone reqdata) (vs/delprop "$body")))))
                                        (vs/delprop ent "$KEY")
                                        (respond 200 (vs/clone ent) nil)))))
                            (= opn "remove")
@@ -196,7 +224,8 @@
                                             (format "%04x%04x%04x%04x" (rand-int 0x10000) (rand-int 0x10000) (rand-int 0x10000) (rand-int 0x10000)))
                                      ent (vs/clone (core/oget fctx :reqdata))]
                                  (if (vs/ismap ent)
-                                   (do (.put ^java.util.Map ent "id" id)
+                                   (do (vs/delprop ent "$body")
+                                       (.put ^java.util.Map ent "id" id)
                                        (when (string? id) (.put ^java.util.Map entmap (str id) ent))
                                        (vs/delprop ent "$KEY")
                                        (respond 200 (vs/clone ent) nil))
@@ -367,18 +396,24 @@
         (fn [ctx url fetchdef inner]
           (let [ms (opt fa "ms" 30000)]
             (if (<= ms 0) (inner ctx url fetchdef)
-                (let [now (opt fa "now")]
-                  (if (fn? now)
-                    (let [start (now) r (inner ctx url fetchdef)]
-                      (if (> (- (now) start) ms)
-                        (do (track! ms) [nil (core/ctx-error ctx "timeout" (str "Request exceeded timeout of " ms "ms"))])
-                        r))
-                    (let [fut (future (inner ctx url fetchdef))
-                          r (deref fut (long ms) ::timeout)]
-                      (if (= r ::timeout)
-                        (do (future-cancel fut) (track! ms)
-                            [nil (core/ctx-error ctx "timeout" (str "Request exceeded timeout of " ms "ms"))])
-                        r)))))))]
+                ;; The deadline runs from here, not from the deref below: a
+                ;; caller paused between the two would otherwise find a late
+                ;; response complete and take it. The future notes when it
+                ;; finished, so a response or a failure after the deadline is
+                ;; a timeout however late the caller looks.
+                (let [now (let [n (opt fa "now")] (if (fn? n) n #(System/currentTimeMillis)))
+                      start (now)
+                      arrived (atom Long/MAX_VALUE)
+                      fut (future (try (inner ctx url fetchdef) (finally (reset! arrived (now)))))
+                      remaining (max 0 (- ms (- (now) start)))
+                      late? (fn [] (< ms (- @arrived start)))
+                      r (try (deref fut (long remaining) ::timeout)
+                             (catch java.util.concurrent.ExecutionException e
+                               (if (late?) ::timeout (throw (or (.getCause e) e)))))]
+                  (if (or (= r ::timeout) (late?))
+                    (do (future-cancel fut) (track! ms)
+                        [nil (core/ctx-error ctx "timeout" (str "Request exceeded timeout of " ms "ms"))])
+                    r)))))]
     (swap! fa assoc
            "init" (fn [ctx options]
                     (swap! fa assoc :client (core/oget ctx :client)
@@ -779,10 +814,13 @@
                     (bump-bucket! (mget rec "ops") (str entity "." opname) amount)
                     (bump-bucket! (mget rec "actors") (str actor) amount)
                     (swap! fa update :seq (fnil inc 0))
-                    (.put ^java.util.Map rec "last"
-                          (vs/jm "seq" (:seq @fa) "entity" entity "op" opname "actor" (str actor)
-                                 "amount" amount "currency" (mget rec "currency")
-                                 "source" source "attempts" (mget p "attempts")))))
+                    (let [last (core/ucall ctx :clean
+                                           (vs/jm "seq" (:seq @fa) "entity" entity "op" opname "actor" (str actor)
+                                                  "amount" amount "currency" (mget rec "currency")
+                                                  "source" source "attempts" (mget p "attempts")))]
+                      (.put ^java.util.Map rec "last" last)
+                      (let [sink (opt fa "sink")]
+                        (when (fn? sink) (try (sink last) (catch Throwable _ nil)))))))
         finish! (fn [ctx done]
                   (when (active? fa)
                     (let [id (core/oget ctx :id) p (get (:pending @fa) id)]
@@ -910,9 +948,22 @@
                           (let [made (agent (:url @fa) url)]
                             (.put ^java.util.Map out "dispatcher" made)
                             (.put ^java.util.Map out "agent" made))))
-                      (let [t (track-ensure! fa "_proxy" (vs/jm "routed" 0 "url" (:url @fa)))]
+                      (let [t (track-ensure! fa "_proxy" (vs/jm "routed" 0 "url" (:clean-url @fa)))]
                         (.put ^java.util.Map t "routed" (inc (long (mget t "routed")))))
-                      out)))]
+                      out)))
+        ;; A proxy URL may carry credentials as userinfo, from the option or
+        ;; the environment, and neither is under a sensitive key name.
+        register-userinfo! (fn [ctx url]
+                             (when (string? url)
+                               (try
+                                 (let [ui (.getRawUserInfo (java.net.URI. ^String url))]
+                                   (when (and ui (seq ui))
+                                     (doseq [part (str/split ui #":" 2)]
+                                       (when (seq part)
+                                         (core/ucall ctx :clean-add part)
+                                         (try (core/ucall ctx :clean-add (java.net.URLDecoder/decode ^String part "UTF-8"))
+                                              (catch Throwable _ nil))))))
+                                 (catch Throwable _ nil))))]
     (swap! fa assoc
            "init" (fn [ctx options]
                     (swap! fa assoc :client (core/oget ctx :client)
@@ -928,7 +979,9 @@
                                                 (vs/islist no-proxy1) (vec no-proxy1)
                                                 :else [])
                                           (remove (fn [s] (or (nil? s) (= s "")))))]
-                        (swap! fa assoc :url url :no-proxy (vec no-proxy)))
+                        (register-userinfo! ctx url)
+                        (swap! fa assoc :url url :no-proxy (vec no-proxy)
+                               :clean-url (if (string? url) (core/ucall ctx :clean url) url)))
                       (wrap-fetcher! ctx (fn [fctx url fd inner] (inner fctx url (route url fd)))))))
     fa))
 
@@ -954,11 +1007,12 @@
                     (.put ^java.util.Map span "end" (now-ms fa))
                     (.put ^java.util.Map span "durationMs" (max 0 (- (mget span "end") (mget span "start"))))
                     (.put ^java.util.Map span "ok" ok)
-                    (when-let [t (telem)]
-                      (.put ^java.util.Map t "active" (dec (long (mget t "active"))))
-                      (.add ^java.util.List (mget t "spans") span))
-                    (let [exporter (opt fa "exporter")]
-                      (when (fn? exporter) (try (exporter span) (catch Throwable _ nil)))))))]
+                    (let [out (core/ucall ctx :clean span)]
+                      (when-let [t (telem)]
+                        (.put ^java.util.Map t "active" (dec (long (mget t "active"))))
+                        (.add ^java.util.List (mget t "spans") out))
+                      (let [exporter (opt fa "exporter")]
+                        (when (fn? exporter) (try (exporter out) (catch Throwable _ nil))))))))]
     (swap! fa assoc :spans {} :seq 0)
     (swap! fa assoc
            "init" (fn [ctx options]
@@ -1043,19 +1097,18 @@
 ;; debug
 ;; ---------------------------------------------------------------------------
 
-(def REDACT-DEFAULT ["authorization" "cookie" "set-cookie" "api-key" "apikey" "x-api-key" "idempotency-key"])
-
 (defn debug-feature []
   (let [fa (new-feature "debug" false "0.0.1")
-        redact (fn [headers]
+        ;; The core clean rules apply (clean.keys, every registered value);
+        ;; the feature's own `redact` list ADDS header names on top of them.
+        redact (fn [ctx headers]
                  (if (nil? headers) (vs/jm)
-                     (let [patterns (or (opt fa "redact") REDACT-DEFAULT)
-                           pset (into #{} (map str (vec patterns)))
+                     (let [pset (into #{} (map (fn [p] (str/lower-case (str p))) (vec (or (opt fa "redact") []))))
                            out (vs/jm)]
                        (doseq [item (or (vs/items headers) [])]
                          (let [k (vs/getprop item 0) v (vs/getprop item 1)]
-                           (.put ^java.util.Map out k (if (contains? pset (str/lower-case (str k))) "<redacted>" v))))
-                       out)))
+                           (.put ^java.util.Map out k (if (contains? pset (str/lower-case (str k))) "[redacted]" v))))
+                       (core/ucall ctx :clean out))))
         finish (fn [ctx ok]
                  (let [entry (get (:entries @fa) ctx)]
                    (when entry
@@ -1065,12 +1118,18 @@
                        (.put ^java.util.Map entry "durationMs" (max 0 (- (now-ms fa) (mget entry "start"))))
                        (when (and (nil? (mget entry "status")) result)
                          (.put ^java.util.Map entry "status" (core/oget result :status)))
-                       (let [track (track-ensure! fa "_debug" (vs/jm "entries" (vs/jt)))
+                       ;; The whole entry leaves through the buffer and the
+                       ;; callback: the url and the error message can carry a
+                       ;; query credential the header mask above never saw.
+                       (let [entry (core/ucall ctx :clean entry)
+                             track (track-ensure! fa "_debug" (vs/jm "entries" (vs/jt)))
                              buf (mget track "entries")
                              max (opt fa "max" 100)]
                          (.add ^java.util.List buf entry)
                          (while (> (.size ^java.util.List buf) max) (.remove ^java.util.List buf 0))
-                         (let [on-entry (opt fa "on_entry")]
+                         ;; `onEntry` is the option spec's spelling; the
+                         ;; older `on_entry` is kept for callers that used it.
+                         (let [on-entry (or (opt fa "onEntry") (opt fa "on_entry"))]
                            (when (fn? on-entry) (try (on-entry entry) (catch Throwable _ nil)))))))))]
     (swap! fa assoc :entries {})
     (swap! fa assoc
@@ -1088,7 +1147,7 @@
                      method (when spec (core/oget spec :method))
                      headers (when spec (core/oget spec :headers))
                      entry (vs/jm "op" (str (if op (core/op-entity op) "_") "." (if op (core/op-name op) "_"))
-                                  "method" method "url" url "headers" (redact headers) "start" (now-ms fa)
+                                  "method" method "url" url "headers" (redact ctx headers) "start" (now-ms fa)
                                   "status" nil "ok" nil "durationMs" nil "error" nil)]
                  (swap! fa update :entries assoc ctx entry))))
            "PreResponse"
@@ -1125,10 +1184,11 @@
                  (swap! fa update :seq inc)
                  (let [op (core/oget ctx :op)
                        result (core/oget ctx :result)
-                       record (vs/jm "seq" (:seq @fa) "ts" (now-ms fa) "actor" (actor ctx)
-                                     "entity" (if op (core/op-entity op) "_") "op" (if op (core/op-name op) "_")
-                                     "outcome" outcome "status" (when result (core/oget result :status))
-                                     "correlationId" (core/oget ctx :id))
+                       record (core/ucall ctx :clean
+                                          (vs/jm "seq" (:seq @fa) "ts" (now-ms fa) "actor" (actor ctx)
+                                                 "entity" (if op (core/op-entity op) "_") "op" (if op (core/op-name op) "_")
+                                                 "outcome" outcome "status" (when result (core/oget result :status))
+                                                 "correlationId" (core/oget ctx :id)))
                        track (track-ensure! fa "_audit" (vs/jm "records" (vs/jt)))
                        recs (mget track "records")
                        max (opt fa "max" 1000)]
@@ -1433,6 +1493,8 @@
                     ;; call would be rejected for the one key that made it
                     ;; reachable.
                     (.remove ^java.util.Map out "$action")
+                    ;; Nor is `$body`, the raw request body.
+                    (.remove ^java.util.Map out "$body")
                     out))]
     (swap! fa assoc :spec (vs/jm) :request true :response false :mode "throw")
     (swap! fa assoc

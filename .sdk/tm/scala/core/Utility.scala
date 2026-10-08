@@ -8,6 +8,7 @@ import java.util.{LinkedHashMap, Map => JMap}
 class Utility private (noregister: Boolean) {
 
   var clean: CleanFn = null
+  var cleanAdd: CleanAddFn = null
   var done: CtxFn[Object] = null
   var makeError: MakeErrorFn = null
   var featureAdd: FeatureFn = null
@@ -53,6 +54,7 @@ class Utility private (noregister: Boolean) {
   def copy(): Utility = {
     val u = new Utility(true)
     u.clean = this.clean
+    u.cleanAdd = this.cleanAdd
     u.done = this.done
     u.makeError = this.makeError
     u.featureAdd = this.featureAdd

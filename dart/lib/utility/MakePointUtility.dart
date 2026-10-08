@@ -1,5 +1,7 @@
 import 'voxgig_struct.dart' as vs;
 
+import 'PrepareMethodUtility.dart' show allowed;
+
 dynamic makePoint(dynamic ctx) {
   if (null != ctx.out['point']) {
     return ctx.point = ctx.out['point'];
@@ -8,14 +10,14 @@ dynamic makePoint(dynamic ctx) {
   final op = ctx.op;
   final options = ctx.options;
 
-  final allowop = (vs.getpath(options, 'allow.op') ?? '').toString();
-  if (!allowop.contains(op.name.toString())) {
+  final allowop = vs.getpath(options, 'allow.op');
+  if (!allowed(allowop, op.name)) {
     return ctx.error(
         'point_op_allow',
         'Operation "' +
             op.name.toString() +
             '" not allowed by SDK option allow.op value: "' +
-            allowop +
+            (allowop ?? '').toString() +
             '"');
   }
 

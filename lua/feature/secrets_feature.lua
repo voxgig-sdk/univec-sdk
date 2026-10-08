@@ -153,7 +153,20 @@ function SecretsFeature.new()
   self._resolved = false
   self._initerr = nil
 
+  -- The context this feature was initialised against: where clean_add is.
+  self._rootctx = nil
+
   return self
+end
+
+
+-- Every value this feature resolves or buys is a secret the SDK handles,
+-- and none arrives under an option key the intake registration saw.
+function SecretsFeature:_register(value)
+  local ctx = self._rootctx
+  if ctx ~= nil and ctx.utility ~= nil and type(ctx.utility.clean_add) == "function" then
+    ctx.utility.clean_add(ctx, value)
+  end
 end
 
 
@@ -163,6 +176,7 @@ function SecretsFeature:init(ctx, options)
   self.client = ctx.client
   self.options = options or {}
   self._liveopts = ctx.options or {}
+  self._rootctx = ctx
   self.active = (self.options["active"] == true)
 
   if not self.active then
@@ -227,6 +241,7 @@ function SecretsFeature:init(ctx, options)
   local specs = {}
 
   if type(explicit) == "string" and explicit ~= "" then
+    self:_register(explicit)
     local ok, key = pcall(sekreto.envkey, self._secretname, "")
     if ok then
       specs[#specs + 1] = {
@@ -358,6 +373,7 @@ function SecretsFeature:_resolve_once()
   if not ok then
     return found
   end
+  self:_register(found)
 
   if self._exchange == nil then
     -- A hit is the credential. An UNCACHED miss after an earlier hit is a
@@ -682,6 +698,8 @@ function SecretsFeature:_buy_once()
     return nil, sekreto.SekretoError(
       "secrets: token exchange returned no '" .. x.response .. "' field from " .. url)
   end
+
+  self:_register(token)
 
   return token, nil
 end

@@ -6,7 +6,7 @@ import {
   File, Folder, Content,
 } from '@voxgig/sdkgen'
 
-import { opRequestShape, OP_SUFFIX, warnEntityTypeCollisions, deriveEntityNames } from '@voxgig/sdkgen'
+import { opRequestShape, OP_SUFFIX, warnEntityTypeCollisions, deriveEntityNames, elixirTypeName, entityCollection } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -92,13 +92,13 @@ defmodule ${Name}.Types do
           .filter((f: any) => f.a !== false)
 
         emitType(
-          ename,
+          elixirTypeName(ent, entityCollection(model)),
           `${EName} entity data model.`,
           fields.map((f: any) => ({ name: f.n, type: f.t, optional: false === f.r })),
         )
 
         const ops = ent.op || {}
-        ;['load', 'list', 'create', 'update', 'remove'].forEach((opname: string) => {
+        ;['load', 'list', 'create', 'update', 'patch', 'remove'].forEach((opname: string) => {
           if (null == ops[opname]) {
             return
           }

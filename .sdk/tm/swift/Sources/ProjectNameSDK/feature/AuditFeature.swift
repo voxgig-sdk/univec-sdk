@@ -74,17 +74,18 @@ public final class AuditFeature: BaseFeature {
     let entity = ctx.op?.entity ?? "_"
     let opname = ctx.op?.name ?? "_"
 
-    let record = VMap()
-    record.entries["seq"] = .int(Int64(seq))
-    record.entries["ts"] = .int(foptNow(options)())
-    record.entries["actor"] = .string(actor)
-    record.entries["entity"] = .string(entity)
-    record.entries["op"] = .string(opname)
-    record.entries["outcome"] = .string(outcome)
-    record.entries["correlationId"] = .string(ctx.id)
+    let raw = VMap()
+    raw.entries["seq"] = .int(Int64(seq))
+    raw.entries["ts"] = .int(foptNow(options)())
+    raw.entries["actor"] = .string(actor)
+    raw.entries["entity"] = .string(entity)
+    raw.entries["op"] = .string(opname)
+    raw.entries["outcome"] = .string(outcome)
+    raw.entries["correlationId"] = .string(ctx.id)
     if let result = ctx.result {
-      record.entries["status"] = .int(Int64(result.status))
+      raw.entries["status"] = .int(Int64(result.status))
     }
+    let record = fclean(ctx, raw)
 
     records.append(record)
     let max = foptInt(options, "max", 1000)

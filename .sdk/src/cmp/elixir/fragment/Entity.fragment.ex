@@ -1,13 +1,11 @@
 # ProjectName SDK EntityName entity
 #
 # Per-entity module. Generic construction/data/match operations delegate to
-# EntityBase; each active op (load/list/create/update/remove) builds a ctx
+# EntityBase; each active op (load/list/create/update/patch/remove) builds a ctx
 # and drives it through ProjectName.Pipeline.run_op.
 
 defmodule ProjectName.Entity.EntityName do
-  alias Voxgig.Struct, as: S
-  alias ProjectName.Helpers, as: H
-  alias ProjectName.{EntityBase, Context, Pipeline}
+  # #Aliases
 
   def new(client, entopts \\ nil) do
     EntityBase.construct(__MODULE__, client, "entityname", entopts)
@@ -32,6 +30,8 @@ defmodule ProjectName.Entity.EntityName do
   # #CreateOp
 
   # #UpdateOp
+
+  # #PatchOp
 
   # #RemoveOp
 end

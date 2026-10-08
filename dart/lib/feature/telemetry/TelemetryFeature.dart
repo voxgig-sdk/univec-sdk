@@ -101,14 +101,16 @@ class TelemetryFeature extends BaseFeature {
     span['durationMs'] = dur < 0 ? 0 : dur;
     span['ok'] = ok;
 
+    final out = ctx.utility.clean(ctx, span);
+
     final telemetry = _client.track['telemetry'];
     telemetry['active']--;
-    telemetry['spans'].add(span);
+    telemetry['spans'].add(out);
 
     final exporter = options['exporter'];
     if (exporter is Function) {
       try {
-        exporter(span);
+        exporter(out);
       } catch (_e) {
         // Exporter failures are swallowed.
       }

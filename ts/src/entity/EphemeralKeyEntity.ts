@@ -129,9 +129,15 @@ class EphemeralKeyEntity extends UnivecEntityBase<EphemeralKey> {
       return (ctx.result && ctx.result.ok) ? this : out
     }
     catch (err: any) {
+      // What a hook throws here must not escape the cleaning below.
+      try {
 
-      fres = featureHook(ctx, 'PreUnexpected')
-      if (fres instanceof Promise) { await fres }
+        fres = featureHook(ctx, 'PreUnexpected')
+        if (fres instanceof Promise) { await fres }
+      }
+      catch (hookerr: any) {
+        err = hookerr
+      }
 
       err = this._unexpected(ctx, err)
 
@@ -140,11 +146,12 @@ class EphemeralKeyEntity extends UnivecEntityBase<EphemeralKey> {
       }
       else {
         // Off-happy-path (throw disabled): typed as any so the method's
-        // Promise<EphemeralKey> return stays clean under strict null checks.
+        // Promise<EphemeralKeyEntity> return stays clean under strict null checks.
         return undefined as any
       }
     }
   }
+
 
 
 

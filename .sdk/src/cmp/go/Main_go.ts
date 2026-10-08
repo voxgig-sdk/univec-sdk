@@ -4,6 +4,7 @@ import * as Path from 'node:path'
 import {
   cmp, each, names, cmap,
   List, File, Content, Copy, Folder, Fragment, Line, FeatureHook,
+  inactiveFeatureExcludes,
   entityClassName, entityCollection, goModule, goPackageIdent, pluginExcludes,
   targetFeatures,
   TEST_CONTROL_EXCLUDE
@@ -55,13 +56,10 @@ const Main = cmp(async function Main(props: any) {
 
   Copy({
     from: 'tm/' + target.name,
-    // pluginExcludes: the generate-time plugin trim (an INACTIVE plugin
-    // group's declared files stay out of the tree - the model's `path`
-    // entries are target-root-relative, which is this Copy's root). The
-    // FEATURE-level trim for go stays an add-time concern (vendor-tag
-    // rollout, Decision 5).
+    // The generate-time trim: a declared feature that is off, and an inactive
+    // plugin group, whose `path` entries are relative to this Copy's root.
     exclude: [/src\//, /utility\/struct\/go\.mod$/, TEST_CONTROL_EXCLUDE,
-      ...pluginExcludes(model)],
+      ...inactiveFeatureExcludes(props.ctx$, target), ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
       GOMODULE: gomodule,
@@ -156,6 +154,7 @@ type Utility = core.Utility
 type Feature = core.Feature
 type Entity = core.Entity
 type ${model.const.Name}Entity = core.${model.const.Name}Entity
+type StreamItem = core.StreamItem
 type FetcherFunc = core.FetcherFunc
 type Spec = core.Spec
 type Result = core.Result

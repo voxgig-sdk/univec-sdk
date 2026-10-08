@@ -72,10 +72,15 @@ class UnivecEntityBase {
     }
     async *stream(action, args, callopts) {
         const utility = this._utility;
-        const { makeContext, done, featureHook, makePoint, makeSpec, makeRequest, makeResponse, makeResult, } = utility;
+        const { makeContext, done, featureHook, 
+        // The registry name is `makeError`; `error` is the local alias.
+        makeError: error, } = utility;
         callopts = callopts || {};
-        const signal = callopts.signal;
         const ctrl = { ...(callopts.ctrl || {}), stream: callopts };
+        if (null != callopts.signal) {
+            ctrl.signal = callopts.signal;
+        }
+        const signal = ctrl.signal;
         const ctx = makeContext({
             opname: action,
             ctrl,
@@ -91,55 +96,13 @@ class UnivecEntityBase {
             ctx.stream_out = callopts.body;
         }
         try {
-            let fres;
-            fres = featureHook(ctx, 'PrePoint');
-            if (fres instanceof Promise) {
-                await fres;
-            }
-            ctx.out.point = makePoint(ctx);
-            if (ctx.out.point instanceof Error) {
-                throw ctx.out.point;
-            }
-            fres = featureHook(ctx, 'PreSpec');
-            if (fres instanceof Promise) {
-                await fres;
-            }
-            ctx.out.spec = makeSpec(ctx);
-            if (ctx.out.spec instanceof Error) {
-                throw ctx.out.spec;
-            }
-            fres = featureHook(ctx, 'PreRequest');
-            if (fres instanceof Promise) {
-                await fres;
-            }
-            ctx.out.request = await makeRequest(ctx);
-            if (ctx.out.request instanceof Error) {
-                throw ctx.out.request;
-            }
-            fres = featureHook(ctx, 'PreResponse');
-            if (fres instanceof Promise) {
-                await fres;
-            }
-            ctx.out.response = await makeResponse(ctx);
-            if (ctx.out.response instanceof Error) {
-                throw ctx.out.response;
-            }
-            fres = featureHook(ctx, 'PreResult');
-            if (fres instanceof Promise) {
-                await fres;
-            }
-            ctx.out.result = await makeResult(ctx);
-            if (ctx.out.result instanceof Error) {
-                throw ctx.out.result;
-            }
-            fres = featureHook(ctx, 'PreDone');
-            if (fres instanceof Promise) {
-                await fres;
-            }
+            const failed = await this._streamSteps(ctx);
             const result = ctx.result;
             // Inbound: prefer the streaming feature's incremental iterator; else
             // fall back to the materialised items so `stream` always yields.
-            if (result && 'function' === typeof result.stream) {
+            if (null == failed && result && 'function' === typeof result.stream) {
+                // done() does not run on this path, so its record is cleaned here.
+                utility.cleanExplain(ctx);
                 for await (const item of result.stream()) {
                     if (signal && signal.aborted) {
                         return;
@@ -148,7 +111,8 @@ class UnivecEntityBase {
                 }
             }
             else {
-                const data = done(ctx);
+                // A failed step leaves through makeError, as an operation's does.
+                const data = null == failed ? done(ctx) : error(ctx, failed);
                 const items = Array.isArray(data) ? data : (null == data ? [] : [data]);
                 for (const item of items) {
                     if (signal && signal.aborted) {
@@ -159,10 +123,71 @@ class UnivecEntityBase {
             }
         }
         catch (err) {
+            // What a hook throws here must not escape the cleaning below.
+            try {
+                const fres = featureHook(ctx, 'PreUnexpected');
+                if (fres instanceof Promise) {
+                    await fres;
+                }
+            }
+            catch (hookerr) {
+                err = hookerr;
+            }
+            // An abort ends the stream quietly, whenever it lands.
             const e = this._unexpected(ctx, err);
-            if (e) {
+            if (e && true !== signal?.aborted) {
                 throw e;
             }
+        }
+    }
+    // The steps an operation runs, with their hooks; the first that fails
+    // hands back its error.
+    async _streamSteps(ctx) {
+        const { featureHook, makePoint, makeSpec, makeRequest, makeResponse, makeResult, } = this._utility;
+        let fres;
+        fres = featureHook(ctx, 'PrePoint');
+        if (fres instanceof Promise) {
+            await fres;
+        }
+        ctx.out.point = makePoint(ctx);
+        if (ctx.out.point instanceof Error) {
+            return ctx.out.point;
+        }
+        fres = featureHook(ctx, 'PreSpec');
+        if (fres instanceof Promise) {
+            await fres;
+        }
+        ctx.out.spec = makeSpec(ctx);
+        if (ctx.out.spec instanceof Error) {
+            return ctx.out.spec;
+        }
+        fres = featureHook(ctx, 'PreRequest');
+        if (fres instanceof Promise) {
+            await fres;
+        }
+        ctx.out.request = await makeRequest(ctx);
+        if (ctx.out.request instanceof Error) {
+            return ctx.out.request;
+        }
+        fres = featureHook(ctx, 'PreResponse');
+        if (fres instanceof Promise) {
+            await fres;
+        }
+        ctx.out.response = await makeResponse(ctx);
+        if (ctx.out.response instanceof Error) {
+            return ctx.out.response;
+        }
+        fres = featureHook(ctx, 'PreResult');
+        if (fres instanceof Promise) {
+            await fres;
+        }
+        ctx.out.result = await makeResult(ctx);
+        if (ctx.out.result instanceof Error) {
+            return ctx.out.result;
+        }
+        fres = featureHook(ctx, 'PreDone');
+        if (fres instanceof Promise) {
+            await fres;
         }
     }
     toJSON() {
@@ -178,14 +203,12 @@ class UnivecEntityBase {
     _unexpected(ctx, err) {
         const clean = this._utility.clean;
         const struct = this._utility.struct;
-        const delprop = struct.delprop;
         const clone = struct.clone;
         const merge = struct.merge;
         const ctrl = ctx.ctrl;
         ctrl.err = err;
         if (ctrl.explain) {
-            ctx.ctrl.explain = clean(ctx, ctx.ctrl.explain);
-            delprop(ctx.ctrl.explain.result, 'err');
+            this._utility.cleanExplain(ctx);
             if (null != ctx.result && null != ctx.result.err) {
                 ctrl.explain.err = clean(ctx, merge([
                     clone({ err: ctx.result.err }).err,
@@ -212,7 +235,8 @@ class UnivecEntityBase {
         if (false === ctrl.throw) {
             return undefined;
         }
-        return err;
+        // An error a hook threw never passed through makeError.
+        return clean(ctx, err);
     }
 }
 exports.UnivecEntityBase = UnivecEntityBase;

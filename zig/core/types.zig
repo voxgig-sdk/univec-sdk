@@ -91,6 +91,12 @@ pub const OpResult = union(enum) {
     err: *err.UnivecError,
 };
 
+// The public result of a stream: its items, or the error that failed it.
+pub const StreamResult = union(enum) {
+    ok: []Value,
+    err: *err.UnivecError,
+};
+
 // Pipeline stage products staged on ctx.out.
 pub const OutVal = union(enum) {
     val: Value,

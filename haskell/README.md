@@ -41,7 +41,7 @@ loading a specific record.
 ```haskell
 import System.Environment (lookupEnv)
 import qualified SdkClient as Sdk
-import VoxgigStruct (Value (..), emptyMap)
+import VoxgigStruct (Value (..), emptyMap, stringify)
 import SdkHelpers (jo)
 
 main :: IO ()
@@ -51,9 +51,9 @@ main = do
   sdk <- Sdk.newSdk opts
 ```
 
-Entity operations raise on error (via `Control.Exception.throwIO`) and
-return the bare result `Value`. Wrap a call in `Control.Exception.try`
-to recover from failures.
+Entity operations return the entity, whose record `eDataGet` reads, and
+raise on error (via `Control.Exception.throwIO`). Wrap a call in
+`Control.Exception.try` to recover from failures.
 
 ### 4. Create, update, and remove
 
@@ -62,7 +62,7 @@ to recover from failures.
   d <- jo [("embeddings", VNoval), ("source_model", VStr "example_source_model"), ("target_model", VStr "example_target_model")]
   cctrl <- emptyMap
   created <- Sdk.eCreate createEnt d cctrl
-  print =<< Sdk.eDataGet created
+  putStrLn =<< stringify =<< Sdk.eDataGet created
 ```
 
 
@@ -73,14 +73,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -89,8 +90,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -105,7 +106,7 @@ raises and returns a result `Value` you branch on via its `ok` field:
 ```haskell
 import qualified SdkClient as Sdk
 import qualified SdkFeatures as F
-import VoxgigStruct (Value (..))
+import VoxgigStruct (Value (..), stringify)
 import SdkHelpers (jo, getp)
 
 main :: IO ()
@@ -119,13 +120,15 @@ main = do
     VBool True -> do
       status <- getp result "status"   -- e.g. VNum 200
       body <- getp result "data"       -- the response body
-      print (status, body)
+      putStrLn =<< stringify status
+      putStrLn =<< stringify body
     _ -> do
       -- A non-2xx response carries status + data (the error body); a
       -- transport-level failure carries err instead.
       status <- getp result "status"
       err <- getp result "err"
-      print (status, err)
+      putStrLn =<< stringify status
+      putStrLn =<< stringify err
 ```
 
 ### Prepare a request without sending it
@@ -133,7 +136,7 @@ main = do
 ```haskell
 import qualified SdkClient as Sdk
 import qualified SdkFeatures as F
-import VoxgigStruct (Value (..))
+import VoxgigStruct (Value (..), stringify)
 import SdkHelpers (jo, getp)
 
 main :: IO ()
@@ -145,7 +148,8 @@ main = do
   fetchdef <- F.prepare sdk args
   url <- getp fetchdef "url"
   method <- getp fetchdef "method"
-  print (url, method)
+  putStrLn =<< stringify url
+  putStrLn =<< stringify method
 ```
 
 ### Use test mode
@@ -155,7 +159,7 @@ Create a mock client for unit testing — no server required:
 ```haskell
 import qualified SdkClient as Sdk
 import qualified SdkFeatures as F
-import VoxgigStruct (Value (..), emptyMap)
+import VoxgigStruct (Value (..), emptyMap, stringify)
 import SdkHelpers (jo)
 
 main :: IO ()
@@ -164,9 +168,10 @@ main = do
   ent <- Sdk.model sdk VNoval
   arg <- emptyMap
   ctrl <- emptyMap
-  -- Entity ops return the bare record and raise on error.
-  model <- Sdk.eList ent arg ctrl
-  print model
+  -- eList returns one entity per record and raises on error;
+  -- eDataGet reads each mock record.
+  models <- Sdk.eList ent arg ctrl
+  mapM_ (\en -> putStrLn =<< stringify =<< Sdk.eDataGet en) models
 ```
 
 ### Use a custom fetch function
@@ -275,7 +280,7 @@ All entities share the same record interface (fields of the `Entity` type).
 Entity operations resolve to the ENTITY, not the raw record — `eList` to
 one entity per record — and raise on error. The record is reached through
 `eDataGet`, which returns the entity's data container. `eRemove` resolves to
-the entity marked deleted (`eDeleted`); it keeps the data it held. Wrap calls
+the entity marked as deleted (`eDeleted`); it keeps the data it held. Wrap calls
 in `Control.Exception.try` to handle failures.
 
 The `direct` escape hatch never raises — it returns a result `Value`

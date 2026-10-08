@@ -30,6 +30,16 @@ pub fn getp(val: &Value, key: &str) -> Value {
     vs::get_prop(val, &Value::str(key), Value::Noval)
 }
 
+// Whether a comma-separated allow option names the item: whole names, any case.
+pub fn allowed(names: &Value, item: &str) -> bool {
+    match names {
+        Value::Str(list) if !item.is_empty() => list
+            .split(',')
+            .any(|name| name.trim().eq_ignore_ascii_case(item)),
+        _ => false,
+    }
+}
+
 pub fn getpath(path: &[&str], store: &Value) -> Value {
     let p = Value::list(path.iter().map(|s| Value::str(*s)).collect());
     vs::get_path(store, &p, None)

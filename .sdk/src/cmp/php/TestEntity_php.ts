@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable } from '@voxgig/sdkgen'
 
 import {
   flatten,
@@ -29,9 +29,50 @@ import {
   serverVariables,
   entityDataIdField, envName, envToken,
   phpEntityAccessor,
+  invalidRequest,
+  liveFlowNeeds, liveStrict, liveStrictNote,
 } from '@voxgig/sdkgen'
 
 import { formatPhpValue } from './utility_php'
+
+
+// The live prologue of a flow built from offline fixtures: blocked without
+// the ids it binds, a create-less load reading the first listed record, and
+// a lenient run observing its checks rather than failing on them.
+function liveFlowGate(entity: any, needs: any, entidEnv: string, accessor: string,
+  strict: boolean): string {
+  let out = ''
+  if (0 < needs.keys.length) {
+    out += `        if (!empty($setup["live"])) {
+            foreach ([${needs.keys.map((k: string) => JSON.stringify(k)).join(', ')}] as $_liveKey) {
+                if (!empty($setup["synthetic_only"]) || null === ($setup["idmap"][$_liveKey] ?? null)) {
+                    Runner::live_miss(self::LIVE_STRICT, "Live entity test blocked: needs " . $_liveKey . " via ${entidEnv}");
+                }
+            }
+        }
+`
+  }
+  if (null != needs.blocked) {
+    out += `        if (!empty($setup["live"])) {
+            Runner::live_miss(self::LIVE_STRICT, "Live entity test blocked: " . ${JSON.stringify(needs.blocked)});
+        }
+`
+  }
+  out += '        $client = $setup["client"];\n'
+  if (null != needs.discover) {
+    const match = Object.entries(needs.discover)
+      .map(([k, v]: any) => `${JSON.stringify(k)} => $setup["idmap"][${JSON.stringify(v)}] ?? null`).join(', ')
+    out += `        if (!empty($setup["live"])) {
+            Runner::live_existing($setup, self::LIVE_STRICT, ${JSON.stringify(entity.name)},
+                fn() => $client->${accessor}(null)->list([${match}], null));
+        }
+`
+  }
+  if (!strict) {
+    out += '        try {\n'
+  }
+  return out
+}
 
 
 type GenCtx = {
@@ -52,11 +93,11 @@ const TestEntity = cmp(function TestEntity(props: any) {
   const target = props.target
   const entity: ModelEntity = props.entity
 
-  // The stream test streams the "list" op and asserts a 3-item collection, so
-  // it only applies to entities that declare a list op. Others (e.g. Batch =
-  // create/load) have no list endpoint — make_point errors and the stream
-  // yields nothing — so skip the stream test for them.
-  const hasList = !!(entity.op && (entity.op as any)?.list)
+  // The stream test streams the "list" op with no match and asserts a 3-item
+  // collection, so it only applies to an entity whose list a bare call can
+  // reach: not one without a list (e.g. Batch = create/load), not a nested
+  // list needing its parent's id, and not one whose routes all need an action.
+  const hasList = opReachable((entity.op as any)?.list, [])
 
   const basicflow: ModelEntityFlow | undefined =
     getModelPath(model, `main.${KIT}.flow.Basic${nom(entity, 'Name')}Flow`)
@@ -102,6 +143,10 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const genCtx: GenCtx = { model, entity, flow: basicflow, PROJUPPER, accessor }
 
+  const strict = liveStrict(model, target.name)
+  const needs = liveFlowNeeds(entity, basicflow)
+  const entidEnv = PROJUPPER + '_TEST_' + envToken(entity.name) + '_ENTID'
+
   File({ name: entity.Name + 'EntityTest.' + target.ext }, () => {
 
     Content(`<?php
@@ -114,9 +159,12 @@ require_once __DIR__ . '/Runner.php';
 
 use PHPUnit\\Framework\\TestCase;
 use Voxgig\\Struct\\Struct as Vs;
-
+${hasList ? failHookClass(model, entity) : ''}
 class ${entity.Name}EntityTest extends TestCase
 {
+${liveStrictNote(strict, '//', '    ')}
+    private const LIVE_STRICT = ${strict};
+
     public function test_create_instance(): void
     {
         $testsdk = ${model.const.Name}SDK::test(null, null);
@@ -162,7 +210,7 @@ ${hasList ? `
             $this->assertCount(3, $got);
         }
     }
-` : ''}
+${failureTests(model, entity, accessor)}` : ''}${validateTest(model, entity, accessor)}
     public function test_basic_flow(): void
     {
         $setup = ${entity.name}_basic_setup(null);
@@ -175,14 +223,7 @@ ${hasList ? `
                 return;
             }
         }
-        // The basic flow consumes synthetic IDs from the fixture. In live mode
-        // without an *_ENTID env override, those IDs hit the live API and 4xx.
-        if (!empty($setup["synthetic_only"])) {
-            $this->markTestSkipped("live entity test uses synthetic IDs from fixture — set ${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID JSON to run live");
-            return;
-        }
-        $client = $setup["client"];
-
+${liveFlowGate(entity, needs, entidEnv, accessor, strict)}
 `)
 
     // Check if the flow has a create step
@@ -216,7 +257,10 @@ ${hasList ? `
       }
     })
 
-    Content(`    }
+    Content(`${strict ? '' : `        } catch (\\Throwable $e) {
+            Runner::live_observe($e, $setup, self::LIVE_STRICT);
+        }
+`}    }
 }
 
 `)
@@ -246,9 +290,8 @@ ${hasList ? `
 
 `)
 
-    Content(`    // Detect ENTID env override before envOverride consumes it. When live
-    // mode is on without a real override, the basic test runs against synthetic
-    // IDs from the fixture and 4xx's. Surface this so the test can skip.
+    Content(`    // Whether *_ENTID supplied the idmap, read before env_override consumes
+    // it: without it, the ids a live flow binds are the fixture's synthetic ones.
     $entid_env_raw = getenv("${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID");
     $idmap_overridden = $entid_env_raw !== false && str_starts_with(trim($entid_env_raw), "{");
 
@@ -607,6 +650,162 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A feature whose PreSpec hook throws, counting the PreUnexpected calls it sees.
+function failHookClass(model: Model, entity: ModelEntity): string {
+  const Name = model.const.Name
+  return `
+class ${entity.Name}EntityTestFailHook extends ${Name}BaseFeature
+{
+    public int $unexpected = 0;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->name = 'failhook';
+    }
+
+    public function init(${Name}Context $ctx, array $options): void
+    {
+    }
+
+    public function PreSpec(${Name}Context $ctx): void
+    {
+        throw new \\RuntimeException('${entity.name} hook failed');
+    }
+
+    public function PreUnexpected(${Name}Context $ctx): void
+    {
+        $this->unexpected++;
+    }
+}
+`
+}
+
+
+// A failed operation raises from a stream as it does from the operation: a
+// transport failure, and a hook that rejects the call. A throwing hook fires
+// PreUnexpected, and under throw false the call returns null. The caller's
+// ctrl stays its own.
+function failureTests(model: Model, entity: ModelEntity, accessor: string): string {
+  const Name = model.const.Name
+  return `
+    public function test_stream_error(): void
+    {
+        $offline = ["net" => ["offline" => true]];
+        $streamerr = null;
+        try {
+            iterator_to_array(${Name}SDK::test($offline, null)->${accessor}(null)
+                ->stream("list", null, null), false);
+        } catch (\\Throwable $e) {
+            $streamerr = $e;
+        }
+        $this->assertNotNull($streamerr, 'the stream should raise the transport failure');
+        $this->assertStringContainsString('offline', $streamerr->getMessage());
+
+        iterator_to_array(${Name}SDK::test($offline, null)->${accessor}(null)
+            ->stream("list", null, ["ctrl" => ["throw" => false]]), false);
+
+        $cfg = ${Name}Config::shared_config();
+        if (isset($cfg["feature"]["rbac"])) {
+            $denied = ${Name}SDK::test(null, ["feature" => ["rbac" => ["active" => true, "deny" => true]]]);
+            $denyerr = null;
+            try {
+                iterator_to_array($denied->${accessor}(null)->stream("list", null, null), false);
+            } catch (\\Throwable $e) {
+                $denyerr = $e;
+            }
+            $this->assertSame('rbac_denied', $denyerr->sdk_code ?? null);
+        }
+    }
+
+    public function test_stream_ctrl(): void
+    {
+        $ctrl = ["explain" => []];
+        iterator_to_array(${Name}SDK::test(null, null)->${accessor}(null)
+            ->stream("list", null, ["ctrl" => $ctrl]), false);
+        $this->assertSame(["explain"], array_keys($ctrl));
+    }
+
+    public function test_unexpected(): void
+    {
+        $hook = new ${entity.Name}EntityTestFailHook();
+        $client = new ${Name}SDK(["feature" => ["test" => ["active" => true]], "extend" => [$hook]]);
+
+        $err = null;
+        try {
+            $client->${accessor}(null)->list(null, null);
+        } catch (\\Throwable $e) {
+            $err = $e;
+        }
+        $this->assertNotNull($err, 'the throwing hook should fail the operation');
+        $this->assertStringContainsString('hook failed', $err->getMessage());
+        $this->assertGreaterThan(0, $hook->unexpected, 'PreUnexpected did not fire');
+
+        $fired = $hook->unexpected;
+        $this->assertNull($client->${accessor}(null)->list(null, ["throw" => false]));
+        $this->assertGreaterThan($fired, $hook->unexpected, 'PreUnexpected did not fire');
+    }
+
+    public function test_cost_commits_a_throwing_transport(): void
+    {
+        $cfg = ${Name}Config::shared_config();
+        if (!isset($cfg["feature"]["cost"])) {
+            $this->markTestSkipped('feature not present in this SDK: cost');
+        }
+        $client = new ${Name}SDK([
+            "test" => ["active" => true],
+            "feature" => ["cost" => ["active" => true, "unit" => 1]],
+            "utility" => ["fetcher" => function ($ctx, $url, $fetchdef) {
+                throw new \\RuntimeException('${entity.name} transport failed');
+            }],
+        ]);
+
+        $err = null;
+        try {
+            $client->${accessor}(null)->list(null, null);
+        } catch (\\Throwable $e) {
+            $err = $e;
+        }
+        $this->assertInstanceOf(${Name}Error::class, $err);
+        $this->assertStringContainsString('transport failed', $err->getMessage());
+
+        $client->${accessor}(null)->list(null, ["throw" => false]);
+        $this->assertSame(2, $client->_cost["total"]["calls"]);
+        $this->assertSame(2, $client->_cost["total"]["attempts"]);
+    }
+`
+}
+
+
+// An invalid request fails with validate's own error, before it is sent.
+function validateTest(model: Model, entity: ModelEntity, accessor: string): string {
+  const bad = invalidRequest(entity)
+  if (null == bad) {
+    return ''
+  }
+  const Name = model.const.Name
+  const args = Object.entries(bad.args)
+    .map(([k, v]) => JSON.stringify(k) + ' => ' + formatPhpValue(v)).join(', ')
+  return `
+    public function test_validate(): void
+    {
+        $cfg = ${Name}Config::shared_config();
+        if (!isset($cfg["feature"]["validate"])) {
+            $this->markTestSkipped('feature not present in this SDK: validate');
+        }
+        $client = ${Name}SDK::test(null, ["feature" => ["validate" => ["active" => true]]]);
+        $err = null;
+        try {
+            $client->${accessor}(null)->${bad.op}([${args}], null);
+        } catch (\\Throwable $e) {
+            $err = $e;
+        }
+        $this->assertSame('validate_failed', $err->sdk_code ?? null);
+    }
+`
 }
 
 

@@ -72,9 +72,20 @@ public static partial class SdkUtility
 
         using var req = new HttpRequestMessage(new HttpMethod(method), fullurl);
 
-        if (fetchdef.TryGetValue("body", out var braw) && braw is string body && body != "")
+        if (fetchdef.TryGetValue("body", out var braw))
         {
-            req.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            if (braw is string body && body != "")
+            {
+                req.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            }
+            else if (braw is byte[] bytes)
+            {
+                req.Content = new ByteArrayContent(bytes);
+            }
+            else if (braw is Stream stream)
+            {
+                req.Content = new StreamContent(stream);
+            }
         }
 
         var hasUA = false;
@@ -102,11 +113,16 @@ public static partial class SdkUtility
             }
         }
         // Default User-Agent - some CDNs block requests without one. Use a
-        // Mozilla-shaped UA unless the caller already set one.
+        // Mozilla-shaped UA unless the caller already set one, and record it
+        // with the headers the request sent.
         if (!hasUA)
         {
-            req.Headers.TryAddWithoutValidation("User-Agent",
-                "Mozilla/5.0 (compatible; UnivecSDK/1.0)");
+            var agent = "Mozilla/5.0 (compatible; UnivecSDK/1.0)";
+            req.Headers.TryAddWithoutValidation("User-Agent", agent);
+            if (hraw is Dictionary<string, object?> sent)
+            {
+                sent["user-agent"] = agent;
+            }
         }
 
         using var resp = ClientFor(fetchdef).Send(req, HttpCompletionOption.ResponseContentRead);
@@ -122,7 +138,8 @@ public static partial class SdkUtility
         }
 
         object? jsonBody = null;
-        if (bodyText.Length > 0)
+        var unreadable = false;
+        if (!string.IsNullOrWhiteSpace(bodyText))
         {
             try
             {
@@ -131,7 +148,7 @@ public static partial class SdkUtility
             }
             catch (JsonException)
             {
-                jsonBody = null;
+                unreadable = true;
             }
         }
 
@@ -144,6 +161,7 @@ public static partial class SdkUtility
             ["headers"] = resheaders,
             ["json"] = (Func<object?>)(() => jsonBody),
             ["body"] = bodyText,
+            ["unreadable"] = unreadable,
         };
     }
 

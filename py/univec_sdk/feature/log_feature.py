@@ -44,7 +44,8 @@ class UnivecLogFeature(UnivecBaseFeature):
         if ctx.op is not None:
             opname = ctx.op.name
 
-        msg = "hook=" + hook + " op=" + opname
+        # A log line leaves the pipeline, so it is cleaned like any record.
+        msg = ctx.utility.clean(ctx, "hook=" + hook + " op=" + opname)
 
         log_fn = self.logger.get(level)
         if callable(log_fn):

@@ -6,6 +6,7 @@ use warnings;
 use File::Basename ();
 use Cwd ();
 use HTTP::Tiny ();
+use Scalar::Util ();
 
 my $__dir;
 BEGIN { $__dir = File::Basename::dirname(Cwd::abs_path(__FILE__)) }
@@ -43,11 +44,26 @@ our $DefaultHttpFetch = sub {
     $hdrs{$k} = "$v";
   }
   # Default User-Agent - some CDNs block library defaults. Use a
-  # Mozilla-shaped UA unless the caller already set one.
-  $hdrs{'User-Agent'} = 'Mozilla/5.0 (compatible; UnivecSDK/1.0)' unless $has_ua;
+  # Mozilla-shaped UA unless the caller already set one, and record it with
+  # the headers the request sent.
+  unless ($has_ua) {
+    $hdrs{'User-Agent'} = 'Mozilla/5.0 (compatible; UnivecSDK/1.0)';
+    $headers->{'user-agent'} = $hdrs{'User-Agent'};
+  }
 
+  # HTTP::Tiny sends bytes: a character string goes out as UTF-8, and a
+  # filehandle is read.
+  if (ref $body eq 'GLOB' || (Scalar::Util::blessed($body) && $body->can('read'))) {
+    local $/;
+    my $fh = $body;
+    $body = <$fh>;
+  }
   my $opts = { headers => \%hdrs };
-  $opts->{content} = "$body" if defined $body && !ref $body;
+  if (defined $body && !ref $body) {
+    my $content = "$body";
+    utf8::encode($content) if utf8::is_utf8($content);
+    $opts->{content} = $content;
+  }
 
   # fetchdef.redirect 'manual' (the ts fetch vocabulary): return a 3xx
   # as-is instead of following it. HTTP::Tiny follows redirects by
@@ -62,27 +78,21 @@ our $DefaultHttpFetch = sub {
     if defined $fetchdef->{proxy} && !ref $fetchdef->{proxy}
       && length $fetchdef->{proxy};
 
+  # A request that got no answer fails the operation.
   my $res = eval { _http_client(%new_args)->request($method, $fullurl, $opts) };
   if (!$res) {
-    my $e = defined $@ ? "$@" : 'request failed';
+    my $e = (defined $@ && length $@) ? "$@" : 'request failed';
     $e =~ s/\s+\z//;
-    return ({
-      'status' => 0, 'statusText' => $e, 'headers' => {},
-      'json' => sub { undef }, 'body' => undef,
-    }, undef);
+    return (undef, $e);
   }
 
-  # Network-level failures (DNS, TCP, TLS, timeouts) - HTTP::Tiny signals
-  # these with a synthesized 599 + the error text as content. Return a
-  # status-0 response so callers can branch on result.ok like any other
-  # failed request, instead of seeing an unhandled exception.
+  # HTTP::Tiny reports a network failure (DNS, TCP, TLS, a timeout) as a
+  # synthesized 599 carrying the error text.
   if (599 == ($res->{status} || 0) && !$res->{success}) {
-    my $reason = defined $res->{content} ? "$res->{content}" : 'network error';
+    my $reason = (defined $res->{content} && length $res->{content})
+      ? "$res->{content}" : 'network error';
     $reason =~ s/\s+\z//;
-    return ({
-      'status' => 0, 'statusText' => $reason, 'headers' => {},
-      'json' => sub { undef }, 'body' => undef,
-    }, undef);
+    return (undef, $reason);
   }
 
   my $resp_headers = {};
@@ -94,8 +104,10 @@ our $DefaultHttpFetch = sub {
   }
 
   my $json_body;
-  if (defined $res->{content} && length $res->{content}) {
-    $json_body = eval { Voxgig::Struct::parse_json($res->{content}) };
+  my $unreadable = 0;
+  if (defined $res->{content} && $res->{content} =~ /\S/) {
+    my $parsed = eval { $json_body = Voxgig::Struct::parse_json($res->{content}); 1 };
+    $unreadable = 1 unless $parsed;
   }
   my $captured = $json_body;
 
@@ -105,6 +117,7 @@ our $DefaultHttpFetch = sub {
     'headers' => $resp_headers,
     'json' => sub { $captured },
     'body' => $res->{content},
+    'unreadable' => $unreadable,
   }, undef);
 };
 

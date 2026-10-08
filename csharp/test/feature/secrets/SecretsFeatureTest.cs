@@ -1391,8 +1391,9 @@ public class SecretsFeatureTest
                 ["feature"] = ExchangeOpts(null),
             });
 
+            var results = new Dictionary<string, object?>[4];
             Parallel.For(0, 4, i =>
-                client.Direct(new Dictionary<string, object?> { ["path"] = "/p" + i }));
+                results[i] = client.Direct(new Dictionary<string, object?> { ["path"] = "/p" + i }));
 
             // REPORTS WHAT WENT OUT, not just how many. This assertion failed
             // once in CI and passed on re-run, and the count alone could not
@@ -1400,10 +1401,14 @@ public class SecretsFeatureTest
             // purchases (the coalescing missed) or none (the exchange never
             // ran). By the time anyone looked, the re-run had replaced the
             // job log and the number was gone. Report() exists for exactly
-            // this, and the sibling assertions already use it.
+            // this, and the sibling assertions already use it. The results
+            // ride along because Direct returns its error: a purchase that
+            // never ran leaves nothing on the wire, and only they say why.
             Assert.True(1 == w.Token().Count,
                 "four operations at once must open exactly ONE token request, saw " +
-                w.Token().Count + " — calls: " + w.Report());
+                w.Token().Count + " — calls: " + w.Report() + " — results: " +
+                string.Join(", ", Array.ConvertAll(results,
+                    r => "ok=" + r["ok"] + " err=" + ErrMessage(r))));
         }
         finally
         {

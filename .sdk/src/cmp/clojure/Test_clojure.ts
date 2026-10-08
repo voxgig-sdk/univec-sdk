@@ -7,6 +7,7 @@ import { cmp, each, File, Content, Folder, entityCollection } from '@voxgig/sdkg
 
 import { TestEntity } from './TestEntity_clojure'
 import { TestDirect } from './TestDirect_clojure'
+import { TestClean } from './TestClean_clojure'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_clojure'
 
 
@@ -53,6 +54,11 @@ const Test = cmp(function Test(props: any) {
 
         Content(`  nil)
 `)
+      })
+
+      // The canary sweep, required by test_runner.clj as sdk.test.clean.
+      Folder({ name: 'test' }, () => {
+        TestClean({ target, entity })
       })
     })
   })

@@ -16,6 +16,11 @@ final class ResultBody {
       if (response != null && response.jsonFunc != null && response.body != null) {
         result.body = response.jsonFunc.get();
       }
+      if (response != null && response.unreadable) {
+        Object sent = ctx.spec == null ? null : ctx.spec.headers;
+        result.err = Response.unreadableBody(ctx, result.status, result.headers, response.body,
+            sent, result.err);
+      }
     }
 
     return result;

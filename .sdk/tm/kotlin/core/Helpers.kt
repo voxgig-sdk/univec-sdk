@@ -15,6 +15,14 @@ object Helpers {
     )
   }
 
+  // Whether a comma-separated allow option names the item: whole names, any case.
+  fun allowed(names: Any?, item: String?): Boolean {
+    if (names !is String || item.isNullOrEmpty()) {
+      return false
+    }
+    return names.split(",").any { it.trim().equals(item, ignoreCase = true) }
+  }
+
   @Suppress("UNCHECKED_CAST")
   fun toMapAny(v: Any?): MutableMap<String, Any?>? {
     if (v == null) {

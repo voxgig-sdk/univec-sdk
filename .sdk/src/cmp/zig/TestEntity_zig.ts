@@ -1,5 +1,5 @@
 
-import { cmp, Content } from '@voxgig/sdkgen'
+import { cmp, Content, invalidRequest, opReachable } from '@voxgig/sdkgen'
 
 import { zigVarName } from './utility_zig'
 
@@ -10,7 +10,9 @@ const TestEntity = cmp(function TestEntity(props: any) {
   const method = zigVarName(entity.name)
   const ops = entity.op || {}
 
-  if (ops.load) {
+  // Each smoke test calls with only what it shows, so a bare call must reach
+  // a route: an id for load, nothing for list.
+  if (opReachable(ops.load, ['id'])) {
     Content(`
 test "${method}_load_smoke" {
     const fixture = h.jo(&.{.{ "${entity.name}", h.jo(&.{.{ "t01", h.jo(&.{.{ "id", h.vstr("t01") }}) }}) }});
@@ -37,7 +39,7 @@ test "${method}_load_smoke" {
 `)
   }
 
-  if (ops.list) {
+  if (opReachable(ops.list, [])) {
     Content(`
 test "${method}_list_smoke" {
     const fixture = h.jo(&.{.{ "${entity.name}", h.jo(&.{.{ "t01", h.jo(&.{.{ "id", h.vstr("t01") }}) }}) }});
@@ -60,13 +62,60 @@ test "${method}_stream_smoke" {
     const testsdk = sdk.test_sdk(h.jo(&.{.{ "entity", fixture }}), sdkopts);
     const e = testsdk.${method}(vnull());
     const items = e.stream("list", vnull(), vnull());
-    try std.testing.expect(items.len == 2);
+    try std.testing.expect(items == .ok and items.ok.len == 2);
 
     // Fallback: streaming inactive still yields both materialised items.
     const plainsdk = sdk.test_sdk(h.jo(&.{.{ "entity", fixture }}), vnull());
     const pe = plainsdk.${method}(vnull());
     const pitems = pe.stream("list", vnull(), vnull());
-    try std.testing.expect(pitems.len == 2);
+    try std.testing.expect(pitems == .ok and pitems.ok.len == 2);
+}
+
+test "${method}_stream_error" {
+    const offline = h.jo(&.{.{ "net", h.jo(&.{.{ "offline", h.vbool(true) }}) }});
+    switch (sdk.test_sdk(offline, vnull()).${method}(vnull()).stream("list", vnull(), vnull())) {
+        .err => |er| try std.testing.expect(std.mem.indexOf(u8, er.msg, "offline") != null),
+        .ok => try std.testing.expect(false),
+    }
+
+    const quiet = h.jo(&.{.{ "ctrl", h.jo(&.{.{ "throw", h.vbool(false) }}) }});
+    try std.testing.expect(sdk.test_sdk(offline, vnull()).${method}(vnull()).stream("list", vnull(), quiet) == .ok);
+
+    if (fh.fh_has_feature("rbac")) {
+        const deny = h.jo(&.{.{ "feature", h.jo(&.{.{ "rbac", h.jo(&.{
+            .{ "active", h.vbool(true) },
+            .{ "deny", h.vbool(true) },
+        }) }}) }});
+        switch (sdk.test_sdk(vnull(), deny).${method}(vnull()).stream("list", vnull(), vnull())) {
+            .err => |er| try std.testing.expect(std.mem.eql(u8, er.code, "rbac_denied")),
+            .ok => try std.testing.expect(false),
+        }
+    }
+}
+
+test "${method}_stream_ctrl" {
+    const explain = h.omap();
+    const ctrl = h.jo(&.{.{ "explain", explain }});
+    _ = sdk.test_sdk(vnull(), vnull()).${method}(vnull()).stream("list", vnull(), h.jo(&.{.{ "ctrl", ctrl }}));
+    try std.testing.expect(h.is_noval(h.getp(ctrl, "stream")));
+    try std.testing.expect(0 < explain.object.count());
+}
+`)
+  }
+
+  const bad = invalidRequest(entity)
+  if (null != bad) {
+    const args = Object.entries(bad.args).map(([k, v]) => `.{ ${JSON.stringify(k)}, ` +
+      ('number' === typeof v ? `h.vnum(${v})` : 'boolean' === typeof v ? `h.vbool(${v})` :
+        `h.vstr(${JSON.stringify(v)})`) + ' }').join(', ')
+    Content(`
+test "${method}_validate" {
+    if (!fh.fh_has_feature("validate")) return error.SkipZigTest;
+    const opts = h.jo(&.{.{ "feature", h.jo(&.{.{ "validate", h.jo(&.{.{ "active", h.vbool(true) }}) }}) }});
+    switch (sdk.test_sdk(vnull(), opts).${method}(vnull()).${bad.op}(h.jo(&.{ ${args} }), vnull())) {
+        .err => |er| try std.testing.expect(std.mem.eql(u8, er.code, "validate_failed")),
+        .ok => try std.testing.expect(false),
+    }
 }
 `)
   }

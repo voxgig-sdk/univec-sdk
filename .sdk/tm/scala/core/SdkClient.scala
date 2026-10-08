@@ -2,6 +2,7 @@ package SCALAPACKAGE.core
 
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
 import java.util.function.Supplier
+import scala.util.control.NonFatal
 import SCALAPACKAGE.utility.struct.Struct
 
 // Shared client runtime for the Univec SDK. The generated
@@ -76,6 +77,9 @@ abstract class SdkClient(options0: JMap[String, Object]) {
     this.utility.featureHook(this.rootctx, "PostConstruct")
   }
 
+  // The options hold the credential; a printed client shows only its name.
+  override def toString: String = this.getClass.getSimpleName + "(mode=" + this.mode + ")"
+
   def optionsMap(): JMap[String, Object] = Struct.clone(this.options) match {
     case m: JMap[_, _] => m.asInstanceOf[JMap[String, Object]]
     case _ => new LinkedHashMap[String, Object]()
@@ -102,6 +106,14 @@ abstract class SdkClient(options0: JMap[String, Object]) {
     val path = Struct.getprop(fetchargs, "path") match { case s: String => s; case _ => "" }
     var method = Struct.getprop(fetchargs, "method") match { case s: String => s; case _ => "" }
     if ("" == method) method = "GET"
+    method = method.toUpperCase(java.util.Locale.ROOT)
+
+    val allowMethod = Struct.getpath(opts, java.util.List.of("allow", "method"))
+    if (!Helpers.allowed(allowMethod, method)) {
+      throw ctx.makeError("spec_method_allow",
+        "Method \"" + method + "\" not allowed by SDK option allow.method value: \"" +
+          (allowMethod match { case s: String => s; case _ => "" }) + "\"")
+    }
 
     var params = Helpers.toMapAny(Struct.getprop(fetchargs, "params"))
     if (params == null) params = new LinkedHashMap[String, Object]()
@@ -145,10 +157,7 @@ abstract class SdkClient(options0: JMap[String, Object]) {
 
   // Is this raw-access op permitted by the SDK's allow.op option?
   private def opAllowed(op: String): Boolean =
-    Struct.getpath(this.options, java.util.List.of("allow", "op")) match {
-      case s: String => s.contains(op)
-      case _ => false
-    }
+    Helpers.allowed(Struct.getpath(this.options, java.util.List.of("allow", "op")), op)
 
   private def opDenied(op: String): JMap[String, Object] = {
     val allow = Struct.getpath(this.options, java.util.List.of("allow", "op")) match {
@@ -241,15 +250,15 @@ abstract class SdkClient(options0: JMap[String, Object]) {
 
     val fetchdef =
       try this.prepare(fetchargs)
-      catch { case err: RuntimeException =>
-        out.put("ok", java.lang.Boolean.FALSE); out.put("err", err); return out
+      catch { case NonFatal(err) =>
+        out.put("ok", java.lang.Boolean.FALSE); out.put("err", cleanErr(ctx, err)); return out
       }
 
     val url = fetchdef.get("url")
     val fetched =
       try utility.fetcher(ctx, url match { case s: String => s; case _ => "" }, fetchdef)
-      catch { case err: RuntimeException =>
-        out.put("ok", java.lang.Boolean.FALSE); out.put("err", err); return out
+      catch { case NonFatal(err) =>
+        out.put("ok", java.lang.Boolean.FALSE); out.put("err", cleanErr(ctx, err)); return out
       }
 
     if (fetched == null) {
@@ -274,23 +283,37 @@ abstract class SdkClient(options0: JMap[String, Object]) {
         val noBody = status == 204 || status == 304 || "0" == contentLength
 
         var jsonData: Object = null
+        var bodyErr: RuntimeException = null
         if (!noBody) {
           Struct.getprop(fm, "json") match {
             case jf: Supplier[_] => jsonData = jf.asInstanceOf[Supplier[Object]].get()
             case _ =>
           }
+          if (java.lang.Boolean.TRUE == Struct.getprop(fm, "unreadable")) {
+            val failed = if (status >= 200 && status < 300) null else ctx.makeError(
+              "request_status", "request: " + status + ": " + Struct.getprop(fm, "statusText"))
+            bodyErr = Response.unreadableBody(ctx, status, headers, Struct.getprop(fm, "body"),
+              fetchdef.get("headers"), failed)
+          }
         }
 
-        out.put("ok", java.lang.Boolean.valueOf(status >= 200 && status < 300))
+        out.put("ok", java.lang.Boolean.valueOf(bodyErr == null && status >= 200 && status < 300))
         out.put("status", java.lang.Integer.valueOf(status))
         out.put("headers", headers)
         out.put("data", jsonData)
+        if (bodyErr != null) out.put("err", cleanErr(ctx, bodyErr))
         out
       case _ =>
         out.put("ok", java.lang.Boolean.FALSE)
         out.put("err", ctx.makeError("direct_invalid", "invalid response type"))
         out
     }
+  }
+
+  // A raw request returns its error rather than passing it through makeError.
+  private def cleanErr(ctx: Context, err: Throwable): Object = this.utility.clean(ctx, err) match {
+    case t: Throwable => t
+    case _ => err
   }
 }
 

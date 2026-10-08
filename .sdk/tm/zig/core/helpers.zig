@@ -132,6 +132,20 @@ pub fn setp(val: Value, key: []const u8, newval: Value) void {
     }
 }
 
+// Whether a comma-separated allow option names the item: whole names, any case.
+pub fn allow_list_has(names: Value, item: []const u8) bool {
+    const list: []const u8 = switch (names) {
+        .string => |text| text,
+        else => return false,
+    };
+    if (item.len == 0) return false;
+    var it = std.mem.splitScalar(u8, list, ',');
+    while (it.next()) |name| {
+        if (std.ascii.eqlIgnoreCase(std.mem.trim(u8, name, " \t\r\n"), item)) return true;
+    }
+    return false;
+}
+
 // Path read on a Value store.
 pub fn getpath(path: []const []const u8, store: Value) Value {
     const pl = Value.makeList(A()) catch unreachable;
@@ -364,4 +378,23 @@ pub fn json_thunk(data: Value) Value {
 pub fn unsupported_op(opname: []const u8, entityname: []const u8) *SdkError {
     const msg = std.fmt.allocPrint(A(), "operation '{s}' not supported by entity '{s}'", .{ opname, entityname }) catch "unsupported op";
     return SdkError.make("unsupported_op", msg);
+}
+
+// The caller's cookie pieces with the named cookies removed: a cookie is one
+// ;-delimited piece, whatever its value holds.
+pub fn cookie_keep(header: []const u8, names: []const []const u8) []const []const u8 {
+    var kept: std.ArrayList([]const u8) = .empty;
+    var pieces = std.mem.splitScalar(u8, header, ';');
+    while (pieces.next()) |piece| {
+        const cookie = std.mem.trim(u8, piece, " \t");
+        if (0 == cookie.len) continue;
+        const eq = std.mem.indexOfScalar(u8, cookie, '=') orelse cookie.len;
+        const name = std.mem.trim(u8, cookie[0..eq], " \t");
+        var owned = false;
+        for (names) |n| {
+            if (std.mem.eql(u8, n, name)) owned = true;
+        }
+        if (!owned) kept.append(A(), cookie) catch {};
+    }
+    return kept.items;
 }

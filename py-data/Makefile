@@ -10,8 +10,8 @@ dev:
 test:
 	python3 -m pytest test/
 
-# Execute the generated quickstart notebook end to end. A quickstart that
-# does not run is a broken product, so this is part of `make test` in CI.
+# Execute the generated quickstart notebook end to end. `make test` does not
+# run it: that target runs pytest alone. This one needs jupyter installed.
 notebook:
 	python3 -m jupyter nbconvert --to notebook --execute \
 	  --stdout notebooks/quickstart.ipynb > /dev/null && echo "quickstart.ipynb OK"

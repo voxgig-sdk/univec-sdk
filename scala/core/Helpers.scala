@@ -10,6 +10,13 @@ object Helpers {
   // underlying API spec doesn't define. The static SdkEntity contract
   // requires every CRUD method on every entity, so absent ops must still be
   // callable — they error at runtime instead of failing to compile.
+  // Whether a comma-separated allow option names the item: whole names, any case.
+  def allowed(names: Object, item: String): Boolean = names match {
+    case list: String if null != item && item.nonEmpty =>
+      list.split(",", -1).exists(_.trim.equalsIgnoreCase(item))
+    case _ => false
+  }
+
   def unsupportedOp(opname: String, entityname: String): SdkError =
     new SdkError("op_unsupported",
       "operation '" + opname + "' not supported by entity '" + entityname + "'", null)

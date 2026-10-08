@@ -257,6 +257,7 @@ def secretsFeature : SIO Feature := do
       if (← gpS client "mode") != "live" then
         let token := "test-" ++ x.response
         credR.set token
+        SdkUtility.cleanAddOptions (← gp client "options") (.str token)
         bumpNum (← bucket client) "purchases" 1.0
         return .ok token
       let refresh ← refreshR.get
@@ -291,6 +292,7 @@ def secretsFeature : SIO Feature := do
           return .error ("secrets: token exchange returned no '" ++ x.response ++
             "' field from " ++ url)
         credR.set token
+        SdkUtility.cleanAddOptions (← gp client "options") (.str token)
         return .ok token
 
   -- One resolution. A provider ERROR answers `some message` and the
@@ -306,6 +308,10 @@ def secretsFeature : SIO Feature := do
       match found with
       | .error msg => return some msg
       | .ok found =>
+        -- Every value this feature resolves or buys is a secret the SDK
+        -- handles: registered so no diagnostic can carry it.
+        if let some f := found then
+          SdkUtility.cleanAddOptions (← gp client "options") (.str f)
         match ← exchangeR.get with
         | none =>
           -- An UNCACHED miss after an earlier hit is a revocation: the
@@ -418,6 +424,7 @@ def secretsFeature : SIO Feature := do
            let explicit ← if xactive then gpS xopts "refresh" else gpS options "apikey"
            let mut specs : List Sekreto.ProviderSpec := []
            if explicit != "" then
+             SdkUtility.cleanAddOptions options (.str explicit)
              match Sekreto.envkey name with
              | .ok key =>
                specs := specs ++ [{ kind := "memory", name := "options", values := [(key, explicit)] }]

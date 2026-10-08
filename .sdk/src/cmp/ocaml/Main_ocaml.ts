@@ -3,6 +3,7 @@ import {
   cmp, each,
   File, Content, Copy, Folder,
   entityClassName,
+  inactiveFeatureExcludes,
   pluginExcludes,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -58,7 +59,7 @@ const Main = cmp(async function Main(props: any) {
     from: 'tm/' + target.name,
     exclude: [/src\//, /\.(cmi|cmo|cmx|cma|cmxa|o|a)$/, /a\.out$/,
       /run_sdk_test$/, /run_omni_smoke$/, /run_struct_corpus$/, /run_primary_corpus$/,
-      ...containerExcludes, ...pluginExcludes(model)],
+      ...containerExcludes, ...inactiveFeatureExcludes(props.ctx$, target), ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
     }

@@ -42,6 +42,28 @@ defmodule Univec.Feature do
 
   def active?(f), do: S.getprop(f, "active") == true
 
+  # The utility's clean, or the shipped one when a caller-built utility (the
+  # test harness) carries no such member. What a feature emits, it cleans.
+  def clean(ctx, v) do
+    case util_member(ctx, "clean") do
+      nil -> Univec.Utility.clean_impl(ctx, v)
+      f -> f.(ctx, v)
+    end
+  end
+
+  def clean_add(ctx, v) do
+    case util_member(ctx, "clean_add") do
+      nil -> Univec.Utility.clean_add_impl(ctx, v)
+      f -> f.(ctx, v)
+    end
+  end
+
+  defp util_member(ctx, name) do
+    u = if S.ismap(ctx), do: S.getprop(ctx, "utility"), else: nil
+    f = if S.ismap(u), do: S.getprop(u, name), else: nil
+    if S.isfunc(f), do: f, else: nil
+  end
+
   # Injectable clock (ms) — options.now() when a function, else wall clock.
   def now(f) do
     n = S.getprop(opts(f), "now")

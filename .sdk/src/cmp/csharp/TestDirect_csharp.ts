@@ -15,6 +15,8 @@ import {
   serverVarEnv,
   serverVariables,
   pointParts,
+  liveStrict,
+  liveStrictNote,
 } from '@voxgig/sdkgen'
 
 import { formatCsValue } from './utility_csharp'
@@ -162,6 +164,9 @@ namespace ${Name}Sdk.Test;
 
 public class ${entity.Name}DirectTest
 {
+${liveStrictNote(liveStrict(model, target.name), '//', '    ')}
+    private const bool LIVE_STRICT = ${liveStrict(model, target.name)};
+
 `)
 
     // Generate list test first (load needs list results in live mode)
@@ -184,7 +189,8 @@ public class ${entity.Name}DirectTest
             {
                 if (StructUtils.GetProp(setup.Idmap, _liveKey) == null)
                 {
-                    return; // live test needs *_ENTID env var (synthetic IDs only)
+                    TestRunner.LiveMiss(LIVE_STRICT, "Live test blocked: needs " + _liveKey + " via ${entidEnvVar}");
+                    return;
                 }
             }
         }
@@ -246,16 +252,14 @@ ${listSkipBlock}        var client = setup.Client;
 
       Content(`        if (setup.Live)
         {
-            // Live mode is lenient: synthetic IDs frequently 4xx and the
-            // list-response shape varies wildly across public APIs. Bail
-            // rather than fail when the call doesn't return a usable list.
-            if (!Equals(result["ok"], true))
+            if (!TestRunner.LiveOk(result))
             {
+                TestRunner.LiveMiss(LIVE_STRICT, "Live list failed: " + TestRunner.LiveDescribe(result));
                 return;
             }
-            var status = Helpers.ToInt(result["status"]);
-            if (status < 200 || status >= 300)
+            if (TestRunner.LiveList(result["data"]) == null)
             {
+                TestRunner.LiveMiss(LIVE_STRICT, "Live list returned no list: " + TestRunner.LiveDescribe(result));
                 return;
             }
         }
@@ -299,17 +303,11 @@ ${listSkipBlock}        var client = setup.Client;
       // Identify ancestor params (not 'id') for live mode
       const ancestorParams = loadParams.filter((p: any) => p.n !== 'id')
 
+      const liveKey = (p: any) => p.n === 'id' ? entity.name + '01' : p.n.replace(/_id$/, '') + '01'
       let loadLiveIdKeys: string[] = []
       if (loadParams.length > 0 && !loadAllHaveExamples) {
-        if (hasList) {
-          loadLiveIdKeys = listParams.map((p: any) => {
-            return p.n === 'id'
-              ? entity.name + '01'
-              : p.n.replace(/_id$/, '') + '01'
-          })
-        } else {
-          loadLiveIdKeys = loadParams.map((p: any) => p.n + '01')
-        }
+        loadLiveIdKeys = [...new Set((hasList ?
+          [...listParams, ...loadParams.filter((p: any) => p.n !== 'id')] : loadParams).map(liveKey))]
       }
       const loadSkipBlock = loadLiveIdKeys.length > 0
         ? `        if (setup.Live)
@@ -318,7 +316,8 @@ ${listSkipBlock}        var client = setup.Client;
             {
                 if (StructUtils.GetProp(setup.Idmap, _liveKey) == null)
                 {
-                    return; // live test needs *_ENTID env var (synthetic IDs only)
+                    TestRunner.LiveMiss(LIVE_STRICT, "Live test blocked: needs " + _liveKey + " via ${entidEnvVar}");
+                    return;
                 }
             }
         }
@@ -375,23 +374,38 @@ ${loadSkipBlock}        var client = setup.Client;
                 ["method"] = "GET",
                 ["params"] = listParams,
             });
-            if (!Equals(listResult["ok"], true))
+            if (!TestRunner.LiveOk(listResult))
             {
-                return; // list call not ok (likely synthetic IDs)
+                TestRunner.LiveMiss(LIVE_STRICT, "Live list discovery failed: " + TestRunner.LiveDescribe(listResult));
+                return;
             }
-
-            // Get first entity ID from list
-            var listData = listResult["data"] as List<object?>;
-            if (listData == null || listData.Count == 0)
+            var listData = TestRunner.LiveList(listResult["data"]);
+            if (listData == null)
             {
-                return; // no entities to load in live mode
+                TestRunner.LiveMiss(LIVE_STRICT, "Live list discovery returned no list: " + TestRunner.LiveDescribe(listResult));
+                return;
+            }
+            if (listData.Count == 0)
+            {
+                TestRunner.LiveEmpty("The account has no ${entity.name} record to load");
+                return;
             }
             var firstEnt = Helpers.ToMapAny(listData[0]);
-            pathParams["id"] = firstEnt?["id"];
+            if (firstEnt == null || !firstEnt.TryGetValue("id", out var firstId) || firstId == null)
+            {
+                TestRunner.LiveMiss(LIVE_STRICT, "Live load blocked: discovery returned no usable identity");
+                return;
+            }
+            pathParams["id"] = firstId;
 `)
           for (const p of ancestorParams) {
             const key = p.n.replace(/_id$/, '') + '01'
             Content(`            pathParams["${p.n}"] = setup.Idmap["${key}"];
+`)
+          }
+        } else if (loadParams.length > 0) {
+          for (const p of loadParams) {
+            Content(`            pathParams["${p.n}"] = StructUtils.GetProp(setup.Idmap, "${liveKey(p)}");
 `)
           }
         }
@@ -427,18 +441,16 @@ ${loadSkipBlock}        var client = setup.Client;
       Content(`        });
         if (setup.Live)
         {
-            // Live mode is lenient: synthetic IDs frequently 4xx. Bail
-            // rather than fail when the load endpoint isn't reachable.
-            if (!Equals(result["ok"], true))
+            if (!TestRunner.LiveOk(result))
             {
+                TestRunner.LiveMiss(LIVE_STRICT, "Live load failed: " + TestRunner.LiveDescribe(result));
                 return;
             }
-            var status = Helpers.ToInt(result["status"]);
-            if (status < 200 || status >= 300)
+            if (result["data"] == null)
             {
+                TestRunner.LiveMiss(LIVE_STRICT, "Live load returned no data: " + TestRunner.LiveDescribe(result));
                 return;
             }
-            Assert.NotNull(result["data"]);
         }
         else
         {

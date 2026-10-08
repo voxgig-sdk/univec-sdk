@@ -1,8 +1,9 @@
 # EJECT-START
 
-  # Returns a list of entityname entity maps (ProjectName.Types.entityname/0)
-  # on success; pipeline errors surface as the error value built by
-  # Utility.make_error (shape is utility-configurable), hence term().
+  # Returns a list of entityname entities, one per record, whose data_get/1
+  # reads each record (ProjectName.Types.entityname/0), on success; pipeline
+  # errors surface as the error value built by Utility.make_error (shape is
+  # utility-configurable), hence term().
   @spec list(map(), ProjectName.Types.entityname_list_match() | nil, map() | nil) :: term()
   def list(ent, reqmatch \\ nil, ctrl \\ nil) do
     reqmatch = if reqmatch == nil, do: S.jm([]), else: reqmatch

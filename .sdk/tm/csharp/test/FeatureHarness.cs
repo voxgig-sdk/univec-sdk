@@ -111,7 +111,7 @@ internal class FhHarness
         return op switch
         {
             "create" => "POST",
-            "update" => "PATCH",
+            "update" or "patch" => "PATCH",
             "remove" => "DELETE",
             _ => "GET",
         };

@@ -35,21 +35,31 @@ public static partial class SdkUtility
 
         spec.Step = "response";
 
-        utility.ResultBasic(ctx);
-        utility.ResultHeaders(ctx);
-        utility.ResultBody(ctx);
-
-        // GraphQL reports failures as a top-level `errors` array under HTTP
-        // 200, so ResultBasic's status check never sees them. Lift them
-        // here, before the response transform tries to unwrap data that is
-        // not there.
-        utility.GraphqlErrors(ctx);
-
-        utility.TransformResponse(ctx);
-
-        if (result.Err == null)
+        // A shaping failure (a body that is not JSON) is the operation's
+        // result, as in ts: carried on result.Err so the pipeline still
+        // reaches Done, which is what cleans the explain record.
+        try
         {
-            result.Ok = true;
+            utility.ResultBasic(ctx);
+            utility.ResultHeaders(ctx);
+            utility.ResultBody(ctx);
+
+            // GraphQL reports failures as a top-level `errors` array under HTTP
+            // 200, so ResultBasic's status check never sees them. Lift them
+            // here, before the response transform tries to unwrap data that is
+            // not there.
+            utility.GraphqlErrors(ctx);
+
+            utility.TransformResponse(ctx);
+
+            if (result.Err == null)
+            {
+                result.Ok = true;
+            }
+        }
+        catch (Exception err)
+        {
+            result.Err = err;
         }
 
         if (ctx.Ctrl.Explain != null)

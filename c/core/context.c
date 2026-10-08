@@ -22,6 +22,31 @@ PNError* context_make_error(Context* ctx, const char* code, const char* msg) {
 
 Utility* context_util(Context* ctx) { return ctx->utility; }
 
+voxgig_value* context_to_value(Context* ctx) {
+  if (!ctx) return voxgig_new_undef();
+  voxgig_value* response = voxgig_new_undef();
+  if (ctx->response) {
+    response = cmap(3,
+      "status", v_num((double)ctx->response->status),
+      "statusText", v_str(ctx->response->status_text),
+      "headers", ctx->response->headers ? v_share(ctx->response->headers) : voxgig_new_undef());
+  }
+  voxgig_value* record = cmap(6,
+    "id", v_str(ctx->id),
+    "op", cmap(2,
+      "entity", v_str(ctx->op ? ctx->op->entity : ""),
+      "name", v_str(ctx->op ? ctx->op->name : "")),
+    "spec", ctx->spec ? spec_to_value(ctx->spec) : voxgig_new_undef(),
+    "result", ctx->result ? result_to_value(ctx->result) : voxgig_new_undef(),
+    "response", response,
+    "meta", ctx->meta ? v_share(ctx->meta) : voxgig_new_undef());
+  return clean_util(ctx, record);
+}
+
+char* context_str(Context* ctx) {
+  return voxgig_jsonify(context_to_value(ctx), NULL);
+}
+
 void ctx_out_set_point_val(Context* ctx, voxgig_value* v) {
   ctx->out_point_kind = OUT_VAL;
   ctx->out_point_val = v;
@@ -56,7 +81,8 @@ static Operation* resolve_op(Context* ctx, const char* opname) {
   }
 
   const char* input =
-      (strcmp(opname, "update") == 0 || strcmp(opname, "create") == 0) ? "data" : "match";
+      (strcmp(opname, "update") == 0 || strcmp(opname, "create") == 0 ||
+       strcmp(opname, "patch") == 0) ? "data" : "match";
 
   voxgig_value* targets = getp(opcfg, "points");
   if (!voxgig_is_list(targets)) targets = voxgig_new_list();

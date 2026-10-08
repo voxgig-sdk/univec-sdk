@@ -106,13 +106,15 @@ private:
     map_put(span, "durationMs", Value(dur));
     map_put(span, "ok", Value(ok));
 
+    Value out = ctx->utility->clean(ctx, span);
+
     activeSpans--;
-    spans.as_list()->push_back(span);
+    spans.as_list()->push_back(out);
 
     Value exporter = getp(options, "exporter");
     if (exporter.is_injector()) {
       vs::Injection inj(Value::undef(), Value::undef());
-      exporter.as_injector()(inj, vlist({span}), std::string(""), Value::undef());
+      exporter.as_injector()(inj, vlist({out}), std::string(""), Value::undef());
     }
   }
 

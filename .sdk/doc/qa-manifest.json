@@ -62,5 +62,55 @@
   "config": ".sdk/doc/qa/vale.ini",
   "routes": {
     "docs/slidev/index.html": "docs/slidev/dist/index.html"
+  },
+  "quoted": {
+    "SUMMARY.md": [
+      "> UniVec embedding interoperability API. Translate embeddings between model spaces without rebuilding a vector index, generate embeddings with open-source models, and bridge text into a target model space.\n>\n> Unofficial definition authored by Voxgig from UniVec&#39;s public web application and verified against the live public API. Not an official UniVec document.",
+      "Calls already used today.",
+      "Calls permitted per day.",
+      "Convert models only: training provenance and architecture detail.",
+      "Generated embeddings",
+      "Hardware backend, for example `cpu`.",
+      "Issued key",
+      "Model identifier used in requests.",
+      "Model list",
+      "Model space the supplied vectors are currently in.",
+      "Model space to translate into.",
+      "Model that produced the vectors.",
+      "One vector per input text, in input order.",
+      "Production",
+      "Retrieval-fidelity metrics for a convert model.",
+      "Texts to embed.",
+      "The ephemeral API key, prefixed `eph_`.",
+      "Translated embeddings",
+      "Translated vectors, in the target model&#39;s dimension.",
+      "UniVec API key, sent as `Authorization: Bearer uv_...`. Ephemeral keys use the `eph_` prefix and are restricted to the /v1/ephemeral/* routes.",
+      "When the daily allowance resets.",
+      "`embed` for text-to-vector models, `convert` for space-translation models."
+    ],
+    "docs/api/convert.html": [
+      "Error",
+      "Translated embeddings"
+    ],
+    "docs/api/embed.html": [
+      "Error",
+      "Generated embeddings"
+    ],
+    "docs/api/ephemeral_key.html": [
+      "Issued key"
+    ],
+    "docs/api/index.html": [
+      "Production",
+      "UniVec embedding interoperability API."
+    ],
+    "docs/api/model.html": [
+      "Model list"
+    ],
+    "docs/index.html": [
+      "> UniVec embedding interoperability API. Translate embeddings between model spaces without rebuilding a vector index, generate embeddings with open-source models, and bridge text into a target model space.\n>\n> Unofficial definition authored by Voxgig from UniVec&#39;s public web application and verified against the live public API. Not an official UniVec document."
+    ],
+    "docs/slidev/slides.md": [
+      "UniVec embedding interoperability API."
+    ]
   }
 }

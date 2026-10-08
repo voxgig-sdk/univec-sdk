@@ -345,6 +345,7 @@ def make_config():
         },
         "optspec": {
           "clearTimer": "`$FUNCTION`",
+          "now": "`$FUNCTION`",
           "setTimer": "`$FUNCTION`",
         },
         "strict": False,
@@ -513,6 +514,10 @@ def make_config():
                     },
                   },
                 },
+                "response": {
+                  "kind": "json",
+                  "media": "application/json",
+                },
               },
               {
                 "kind": "http",
@@ -630,6 +635,10 @@ def make_config():
                       "SDK live coverage test.",
                     ],
                   },
+                },
+                "response": {
+                  "kind": "json",
+                  "media": "application/json",
                 },
               },
               {
@@ -758,6 +767,10 @@ def make_config():
                     },
                   },
                 },
+                "response": {
+                  "kind": "json",
+                  "media": "application/json",
+                },
               },
               {
                 "kind": "http",
@@ -884,6 +897,10 @@ def make_config():
                     ],
                   },
                 },
+                "response": {
+                  "kind": "json",
+                  "media": "application/json",
+                },
               },
             ],
           },
@@ -1007,6 +1024,10 @@ def make_config():
                     ],
                   },
                 },
+                "response": {
+                  "kind": "json",
+                  "media": "application/json",
+                },
               },
               {
                 "kind": "http",
@@ -1103,6 +1124,10 @@ def make_config():
                     ],
                   },
                 },
+                "response": {
+                  "kind": "json",
+                  "media": "application/json",
+                },
               },
             ],
           },
@@ -1185,6 +1210,10 @@ def make_config():
                   "auth": "public",
                   "id": "key",
                   "retention": "No deletion endpoint; issued key is subject to the service daily allowance",
+                },
+                "response": {
+                  "kind": "json",
+                  "media": "application/json",
                 },
               },
             ],
@@ -1298,6 +1327,10 @@ def make_config():
                   },
                   "auth": "public",
                   "id": "models",
+                },
+                "response": {
+                  "kind": "json",
+                  "media": "application/json",
                 },
               },
             ],

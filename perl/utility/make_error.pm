@@ -13,6 +13,7 @@ require(Cwd::abs_path("$__dir/../core/context.pm"));
 require(Cwd::abs_path("$__dir/../core/operation.pm"));
 require(Cwd::abs_path("$__dir/../core/result.pm"));
 require(Cwd::abs_path("$__dir/../core/error.pm"));
+require(Cwd::abs_path("$__dir/clean.pm"));
 
 package UnivecUtilities;
 
@@ -33,11 +34,14 @@ $REGISTRY{make_error} = sub {
   $err = $result->{err} if !defined $err;
   $err = $ctx->make_error('unknown', 'unknown error') if !defined $err;
 
+  # A bare context (no client, no utility) still cleans, through the
+  # schema defaults.
+  my $clean = ($ctx->{utility} && $ctx->{utility}{clean}) || $REGISTRY{clean};
+
   my $errmsg = (Scalar::Util::blessed($err) && $err->isa('UnivecError'))
     ? $err->{msg} : "$err";
   $errmsg =~ s/\s+\z//;
-  my $msg = "UnivecSDK: $opname: $errmsg";
-  $msg = $ctx->{utility}{clean}->($ctx, $msg);
+  my $msg = $clean->($ctx, "UnivecSDK: $opname: $errmsg");
 
   $result->{err} = undef;
   my $spec = $ctx->{spec};
@@ -46,11 +50,20 @@ $REGISTRY{make_error} = sub {
     $ctx->{ctrl}{explain}{err} = { 'message' => $msg };
   }
 
+  # The context stays reachable for a debugger (`$err->ctx`) and is part of
+  # no dump of the error; result and spec are cleaned COPIES, so masking
+  # them never masks the pipeline's own objects.
   my $sdk_err = UnivecError->new('', $msg, $ctx);
-  $sdk_err->{result} = $ctx->{utility}{clean}->($ctx, $result);
-  $sdk_err->{spec} = $ctx->{utility}{clean}->($ctx, $spec);
+  $sdk_err->{result} = $clean->($ctx, $result);
+  $sdk_err->{spec} = $clean->($ctx, $spec);
   $sdk_err->{code} = $err->{code}
     if Scalar::Util::blessed($err) && $err->isa('UnivecError');
+
+  # Promote the HTTP status to the top level, so a consumer can branch on
+  # `$err->{status}` instead of reaching into `$err->{result}`.
+  $sdk_err->{status} = defined $result->{status} ? $result->{status} : -1;
+
+  $clean->($ctx, $sdk_err);
 
   $ctx->{ctrl}{err} = $sdk_err;
 

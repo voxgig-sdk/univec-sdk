@@ -49,16 +49,44 @@ public class TimeoutFeature : BaseFeature
             return inner(ctx, url, fetchdef);
         }
 
-        var task = Task.Run(() => inner(ctx, url, fetchdef));
-
-        if (task == Task.WhenAny(task, Task.Delay(ms)).GetAwaiter().GetResult())
+        // The deadline runs from here, not from the wait below: a caller paused
+        // between the two would otherwise find a late response complete and
+        // take it. The worker notes when it finished, so a response or a
+        // failure after the deadline is a timeout however late the caller looks.
+        var now = FoptNow(_options);
+        var start = now();
+        long arrived = long.MaxValue;
+        var task = Task.Run(() =>
         {
+            try
+            {
+                return inner(ctx, url, fetchdef);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref arrived, now());
+            }
+        });
+
+        var remaining = Math.Max(0L, ms - (now() - start));
+        if (task == Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(remaining)))
+            .GetAwaiter().GetResult())
+        {
+            if (ms < Interlocked.Read(ref arrived) - start)
+            {
+                throw TimedOut(ctx, ms);
+            }
             // Unwraps any inner exception.
             return task.GetAwaiter().GetResult();
         }
 
+        throw TimedOut(ctx, ms);
+    }
+
+    private Exception TimedOut(Context ctx, int ms)
+    {
         Track(ms);
-        throw ctx.MakeError("timeout", $"Request exceeded timeout of {ms}ms");
+        return ctx.MakeError("timeout", $"Request exceeded timeout of {ms}ms");
     }
 
     private void Track(int ms)

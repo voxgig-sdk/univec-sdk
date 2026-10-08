@@ -46,7 +46,7 @@ const Entity = cmp(function Entity(props: any) {
       // ProjectNameEntity interface (so the package compiles) but errors
       // at runtime if the caller invokes an unsupported op.
       const opfrags =
-        (['load', 'list', 'create', 'update', 'remove']
+        (['load', 'list', 'create', 'update', 'patch', 'remove']
           .reduce((a: any, opname: string) =>
           (a['// #' + camelify(opname) + 'Op'] =
             !opnames.includes(opname) ?

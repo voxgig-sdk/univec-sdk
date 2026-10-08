@@ -37,7 +37,7 @@ const Entity = cmp(function Entity(props: any) {
           // defined — callers of an unsupported op get an undefined-var error,
           // matching the dynamic-language donors).
           const opfrags =
-            (['load', 'list', 'create', 'update', 'remove']
+            (['load', 'list', 'create', 'update', 'patch', 'remove']
               .reduce((a: any, opname: string) =>
               (a['; #' + camelify(opname) + 'Op'] =
                 !opnames.includes(opname) ? '' : ({ indent }: any) => {

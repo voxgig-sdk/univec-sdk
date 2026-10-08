@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, isAuthActive, isHttpBasicAuth, packageName, envName, serverVariables, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, jsKey, matchArg, idLiteral } from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, isHttpBasicAuth, packageName, envName, serverVariables, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, jsKey, listMatchArg } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -8,12 +8,6 @@ import {
 } from '@voxgig/apidef'
 
 import { exampleValue } from './utility_ts'
-
-
-function listMatchArg(ent: any): string {
-  const idF = entityIdField(ent)
-  return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))
-}
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -80,10 +74,10 @@ resolves to entities, not raw records. Iterate them directly, and call
 \`.data()\` on one for the record it holds:
 
 \`\`\`ts
-const ${eVar}s = await client.${eName}().list(${listMatchArg(exampleEntity)})
+const ${eVar}s = await client.${eName}().list(${listMatchArg('ts', exampleEntity)})
 
 for (const ${eVar} of ${eVar}s) {
-  console.log(${eVar})
+  console.log(${eVar}.data())
 }
 \`\`\`
 
@@ -111,14 +105,14 @@ for (const ${eVar} of ${eVar}s) {
       Content(`### 3. Load ${neArticle} ${neName.toLowerCase()}
 
 ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
-\`load()\` returns the entity directly and throws on failure:
+\`load()\` returns the entity and throws on failure; \`.data()\` reads its record:
 
 \`\`\`ts
 try {
   const ${neVar} = await client.${neName}().load({
 ${neMatchLines.join('\n')}
   })
-  console.log(${neVar})
+  console.log(${neVar}.data())
 } catch (err) {
   console.error('load failed:', err)
 }
@@ -139,12 +133,12 @@ ${neMatchLines.join('\n')}
 
       Content(`### 3. Load ${article} ${eName.toLowerCase()}
 
-\`load()\` returns the entity directly and throws on failure:
+\`load()\` returns the entity and throws on failure; \`.data()\` reads its record:
 
 \`\`\`ts
 try {
   const ${eVar} = await client.${eName}().load(${loadArg})
-  console.log(${eVar})
+  console.log(${eVar}.data())
 } catch (err) {
   console.error('load failed:', err)
 }
@@ -158,7 +152,8 @@ try {
     // (opRequestShape), so the snippet always type-checks. Prefer writable
     // non-id fields and render a type-correct literal per field via
     // exampleValue — never a hardcoded field the entity may not have.
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       const exampleFields = (opname: string): string[] => {
         const items = opRequestShape(exampleEntity, opname).items
           .filter((it: any) => (it.name !== idF && it.name !== 'id') ||
@@ -213,6 +208,14 @@ const created = await client.${eName}().create({${createBody}})
         const updateBody = updateLines.length ? '\n' + updateLines.join('\n') + '\n' : ''
         Content(`// Update${usesCreatedId('update') ? ' — the id comes off the returned entity\'s data()' : ''}
 const updated = await client.${eName}().update({${updateBody}})
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchLines = (idF ? [`  ${idF}: ${idValueFor('patch')},`] : []).concat(exampleFields('patch'))
+        const patchBody = patchLines.length ? '\n' + patchLines.join('\n') + '\n' : ''
+        Content(`// Patch — sends only the fields given${usesCreatedId('patch') ? '; the id comes off the returned entity\'s data()' : ''}
+const patched = await client.${eName}().patch({${patchBody}})
 
 `)
       }

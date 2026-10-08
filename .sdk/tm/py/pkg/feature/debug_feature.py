@@ -8,10 +8,11 @@ from projectname_sdk.feature.base_feature import UnivecBaseFeature
 
 # Request/response capture for debugging. Records a bounded ring buffer of
 # per-operation traces — method, URL, redacted headers, response status and
-# timing — on `client._debug["entries"]`. Sensitive header values (matching
-# `redact`, default authorization/cookie/api-key style names) are masked.
-# An optional `onEntry` callback receives each finished entry (e.g. to
-# stream to a console). `max` caps the buffer (default 100).
+# timing — on `client._debug["entries"]`. Every entry passes through the
+# SDK's clean rules (clean.keys and every registered secret value); the
+# `redact` option ADDS header names on top of them. An optional `onEntry`
+# callback receives each finished entry (e.g. to stream to a console).
+# `max` caps the buffer (default 100).
 class UnivecDebugFeature(UnivecBaseFeature):
     def __init__(self):
         super().__init__()
@@ -47,7 +48,7 @@ class UnivecDebugFeature(UnivecBaseFeature):
             "op": opname,
             "method": spec.method if spec is not None else None,
             "url": (spec.url or spec.path) if spec is not None else None,
-            "headers": self._redact(spec.headers if spec is not None else None),
+            "headers": self._redact(ctx, spec.headers if spec is not None else None),
             "start": self._now(),
             "status": None,
             "ok": None,
@@ -99,6 +100,11 @@ class UnivecDebugFeature(UnivecBaseFeature):
         if entry["status"] is None and result is not None:
             entry["status"] = result.status
 
+        # The whole entry leaves through the buffer and the callback: the url
+        # and the error message can carry a query credential the header mask
+        # above never saw.
+        entry = ctx.utility.clean(ctx, entry)
+
         buf = self.client._debug["entries"]
         buf.append(entry)
         mx = 100 if self.options.get("max") is None else self.options.get("max")
@@ -112,20 +118,19 @@ class UnivecDebugFeature(UnivecBaseFeature):
             except Exception:
                 pass
 
-    def _redact(self, headers):
+    # The core clean rules apply (clean.keys, every registered value); the
+    # feature's own `redact` list ADDS header names on top of them.
+    def _redact(self, ctx, headers):
         if headers is None:
             return {}
-        patterns = self.options.get("redact") or [
-            "authorization", "cookie", "set-cookie", "api-key",
-            "apikey", "x-api-key", "idempotency-key",
-        ]
+        patterns = [str(n).lower() for n in (self.options.get("redact") or [])]
         out = {}
         for key in headers:
             if str(key).lower() in patterns:
-                out[key] = "<redacted>"
+                out[key] = "[redacted]"
             else:
                 out[key] = headers[key]
-        return out
+        return ctx.utility.clean(ctx, out)
 
     def _now(self):
         now = self.options.get("now")

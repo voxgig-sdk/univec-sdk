@@ -161,8 +161,21 @@ pub const ProjectNameSDK = struct {
         const path = h.get_str(fetchargs, "path") orelse "";
         const method: []const u8 = blk: {
             const m = h.get_str(fetchargs, "method");
-            break :blk if (m) |mm| (if (mm.len == 0) "GET" else mm) else "GET";
+            const given = if (m) |mm| (if (mm.len == 0) "GET" else mm) else "GET";
+            break :blk std.ascii.allocUpperString(h.A(), given) catch given;
         };
+
+        // The root context holds the failure, where direct() reads it.
+        const allow_method = h.getpath(&.{ "allow", "method" }, options);
+        if (!h.allow_list_has(allow_method, method)) {
+            const shown: []const u8 = switch (allow_method) {
+                .string => |text| text,
+                else => "",
+            };
+            return self.get_root_ctx().fail("spec_method_allow", std.fmt.allocPrint(h.A(),
+                "Method \"{s}\" not allowed by SDK option allow.method value: \"{s}\"",
+                .{ method, shown }) catch "");
+        }
 
         const params: Value = switch (h.to_map(h.getp(fetchargs, "params"))) {
             .object => h.to_map(h.getp(fetchargs, "params")),
@@ -213,11 +226,7 @@ pub const ProjectNameSDK = struct {
 
     // Is this raw-access op permitted by the SDK's allow.op option?
     fn op_allowed(self: *ProjectNameSDK, op: []const u8) bool {
-        const allow: []const u8 = switch (h.getpath(&.{ "allow", "op" }, self.options)) {
-            .string => |s| s,
-            else => "",
-        };
-        return std.mem.indexOf(u8, allow, op) != null;
+        return h.allow_list_has(h.getpath(&.{ "allow", "op" }, self.options), op);
     }
 
     fn op_denied(self: *ProjectNameSDK, op: []const u8) Value {
@@ -265,7 +274,7 @@ pub const ProjectNameSDK = struct {
         const fetched = self.sdkUtility.fetch(ctx, url, fetchdef) catch {
             return h.jo(&.{
                 .{ "ok", h.vbool(false) },
-                .{ "err", h.vstr(if (ctx.pending_err) |e| e.msg else "fetch failed") },
+                .{ "err", h.vstr(if (ctx.pending_err) |e| self.sdkUtility.clean_str(ctx, e.msg) else "fetch failed") },
             });
         };
 
@@ -291,6 +300,21 @@ pub const ProjectNameSDK = struct {
                 const jf = h.getp(fetched, "json");
                 break :blk if (jf == .function) h.call_json(jf) else h.vnull();
             };
+
+            if (!no_body and (h.get_bool(fetched, "unreadable") orelse false)) {
+                const failed: ?*errmod.ProjectNameError = if (200 <= status and status < 300) null else ctx.make_error(
+                    "request_status",
+                    std.fmt.allocPrint(h.A(), "request: {d}: {s}", .{ status, h.get_str(fetched, "statusText") orelse "" }) catch "",
+                );
+                const body_err = utility_mod.unreadable_body(ctx, status, headers, h.getp(fetched, "body"), h.getp(fetchdef, "headers"), failed);
+                return h.jo(&.{
+                    .{ "ok", h.vbool(false) },
+                    .{ "status", h.vnum(status) },
+                    .{ "headers", headers },
+                    .{ "data", json_data },
+                    .{ "err", h.vstr(self.sdkUtility.clean_str(ctx, body_err.msg)) },
+                });
+            }
 
             return h.jo(&.{
                 .{ "ok", h.vbool(200 <= status and status < 300) },

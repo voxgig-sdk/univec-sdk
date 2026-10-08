@@ -99,6 +99,10 @@ main: kit: entity: model: {
           }
           m: "GET"
           o: "/v1/models"
+          rs: {
+            kind: "json"
+            media: "application/json"
+          }
           s: [
             {
               lit: "v1"

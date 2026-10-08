@@ -19,7 +19,7 @@ class ModelEntity extends UnivecEntityBase {
 
 
   /// List Model entities by match (see ModelListMatch in
-  /// UnivecTypes.dart). Returns a list of Model entity instances.
+  /// UnivecTypes.dart). Returns a list of entities, one per record.
   Future<dynamic> list([dynamic reqmatch, dynamic ctrl]) async {
     final utility = this.utility;
 
@@ -113,13 +113,19 @@ class ModelEntity extends UnivecEntityBase {
 
       return done(ctx);
     } catch (err) {
+      // What a hook throws here must not escape the cleaning below.
+      dynamic failure = err;
+      try {
 
-      fres = featureHook(ctx, 'PreUnexpected');
-      if (fres is Future) {
-        await fres;
+        fres = featureHook(ctx, 'PreUnexpected');
+        if (fres is Future) {
+          await fres;
+        }
+      } catch (hookerr) {
+        failure = hookerr;
       }
 
-      final uerr = unexpected(ctx, err);
+      final uerr = unexpected(ctx, failure);
 
       if (null != uerr) {
         throw uerr;
@@ -129,6 +135,7 @@ class ModelEntity extends UnivecEntityBase {
       }
     }
   }
+
 
 
 

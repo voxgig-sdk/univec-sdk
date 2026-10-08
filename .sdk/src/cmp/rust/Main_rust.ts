@@ -5,6 +5,7 @@ import {
   cmp, each,
   File, Content, Copy, Folder, Fragment,
   entityClassName,
+  inactiveFeatureExcludes,
   pluginExcludes,
   targetFeatures,
   TEST_CONTROL_EXCLUDE
@@ -56,11 +57,10 @@ const Main = cmp(async function Main(props: any) {
   // here exactly like the go target.
   Copy({
     from: 'tm/' + target.name,
-    // pluginExcludes: the generate-time plugin trim (an INACTIVE plugin
-    // group's declared files stay out of the tree - the model's `path`
-    // entries are target-root-relative, which is this Copy's root). The
-    // FEATURE-level trim for rust stays an add-time concern, as go's does.
-    exclude: [/src\//, TEST_CONTROL_EXCLUDE, ...pluginExcludes(model)],
+    // The generate-time trim: a declared feature that is off, and an inactive
+    // plugin group, whose `path` entries are relative to this Copy's root.
+    exclude: [/src\//, TEST_CONTROL_EXCLUDE,
+      ...inactiveFeatureExcludes(props.ctx$, target), ...pluginExcludes(model)],
     replace: {
       ...props.ctx$.stdrep,
       RUSTCRATE: rustcrate,
@@ -198,7 +198,7 @@ pub use crate::core::context::{Context, CtxSpec, OpMap};
 pub use crate::core::control::Control;
 pub use crate::core::error::${model.const.Name}Error;
 pub use crate::core::helpers::{
-    call_json, call_vfn, ja, jo, json_thunk, unsupported_op, vfn,
+    call_json, call_vfn, getp, ja, jo, json_thunk, to_map, unsupported_op, vfn,
 };
 pub use crate::core::operation::Operation;
 pub use crate::core::point::Point;
@@ -212,6 +212,7 @@ pub use crate::core::types::{
 pub use crate::core::utility_type::Utility;
 pub use crate::feature::base::BaseFeature;
 pub use crate::utility::jsonparse::json_parse;
+pub use crate::utility::media::bytes_value;
 pub use crate::utility::voxgigstruct::Value;
 
 // No-argument convenience constructors: \`${rustcrate}::new()\` /

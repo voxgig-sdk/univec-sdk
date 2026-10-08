@@ -24,7 +24,7 @@ public enum SdkSchema {
 {
   "allow": {
     "method": "GET,PUT,POST,PATCH,DELETE,OPTIONS",
-    "op": "create,update,load,list,remove,command,direct,graphql"
+    "op": "create,update,patch,load,list,remove,command,direct,graphql"
   },
   "apikey": "",
   "auth": {
@@ -35,7 +35,12 @@ public enum SdkSchema {
   },
   "base": "http://localhost:8000",
   "clean": {
-    "keys": "key,token,id"
+    "active": true,
+    "hint": "0",
+    "keys": "key,secret,token,password,passwd,authorization,cookie,credential,signature",
+    "mask": "[redacted]",
+    "min": "4",
+    "values": ""
   },
   "entity": {
     "`$CHILD`": {
@@ -774,6 +779,11 @@ public enum SdkSchema {
           "`$NIL`"
         ],
         "clearTimer": [
+          "`$ONE`",
+          "`$FUNCTION`",
+          "`$NIL`"
+        ],
+        "now": [
           "`$ONE`",
           "`$FUNCTION`",
           "`$NIL`"

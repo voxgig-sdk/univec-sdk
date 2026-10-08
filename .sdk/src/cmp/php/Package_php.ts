@@ -44,7 +44,7 @@ const Package = cmp(async function Package(props: any) {
   "homepage": "${repoUrl}",
   "license": "MIT",
   "authors": [
-    { "name": "${author.name}"${'' === author.url ? '' : `, "homepage": "${author.url}"`} }
+    { "name": ${JSON.stringify(author.name)}${'' === author.url ? '' : `, "homepage": ${JSON.stringify(author.url)}`} }
   ],
   "support": {
     "issues": "${issuesUrl}",

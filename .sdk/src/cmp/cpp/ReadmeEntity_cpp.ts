@@ -1,12 +1,12 @@
 
-import { cmp, each, Content, canonToType, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, canonScalarKey, entityIdField, opRequestShape, opNeedsAction } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { cppVarName } from './utility_cpp'
+import { cppVarName, cppListMatch } from './utility_cpp'
 
 
 // Type names come from the shared canonToType 'cpp' column (single source of truth).
@@ -14,6 +14,7 @@ import { cppVarName } from './utility_cpp'
 // A type-correct C++ literal for a field's canonical type.
 function cppLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Value(nullptr)'
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value(1)'
   if ('BOOLEAN' === k) return 'Value(true)'
   if ('ARRAY' === k) return 'vlist()'
@@ -25,11 +26,12 @@ function cppLit(type: any, placeholder: string = 'example'): string {
 // Operation method spellings for the C++ target: lowercase methods that take a
 // request Value plus the ctrl Value, returning sdk::Value.
 const OP_DESC: Record<string, { method: string, desc: string }> = {
-  load:   { method: 'load(match, ctrl)',   desc: 'Load a single entity by match criteria.' },
-  list:   { method: 'list(match, ctrl)',   desc: 'List entities, optionally matching the given criteria.' },
-  create: { method: 'create(data, ctrl)',  desc: 'Create a new entity with the given data.' },
-  update: { method: 'update(data, ctrl)',  desc: 'Update an existing entity.' },
-  remove: { method: 'remove(match, ctrl)', desc: 'Remove the matching entity.' },
+  load:   { method: 'load(match, ctrl) -> SdkEntityPtr',   desc: 'Load a single entity by match criteria.' },
+  list:   { method: 'list(match, ctrl) -> std::vector<SdkEntityPtr>', desc: 'List entities, optionally matching the given criteria: one entity per record.' },
+  create: { method: 'create(data, ctrl) -> SdkEntityPtr',  desc: 'Create a new entity with the given data.' },
+  update: { method: 'update(data, ctrl) -> SdkEntityPtr',  desc: 'Update an existing entity.' },
+  patch:  { method: 'patch(data, ctrl) -> SdkEntityPtr',  desc: 'Change part of an existing entity.' },
+  remove: { method: 'remove(match, ctrl) -> SdkEntityPtr', desc: 'Remove the matching entity, which is returned marked as deleted.' },
 }
 
 
@@ -54,6 +56,8 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
+    // An op that needs an action has no plain call to show.
+    const callable = opnames.filter((o: string) => !opNeedsAction(entity.op[o]))
     const fields = Object.values(entity.fields || {})
     // Model-driven id key: null when this entity has no id-like field.
     const idF = entityIdField(entity)
@@ -111,7 +115,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 `)
     }
 
-    if (opnames.includes('load')) {
+    if (callable.includes('load')) {
       // The id key plus every REQUIRED match key (parent path params like
       // page_id) — the same shape the runtime resolves path params from.
       const loadItems = opRequestShape(entity, 'load').items
@@ -126,23 +130,27 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
       Content(`#### Example: Load
 
 \`\`\`cpp
-Value ${eVar} = client->${acc}()->load(${loadArg}, Value::undef());
+SdkEntityPtr ${eVar} = client->${acc}()->load(${loadArg}, Value::undef());
+std::cout << Struct::jsonify(${eVar}->data()) << std::endl;
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('list')) {
+    if (callable.includes('list')) {
       Content(`#### Example: List
 
 \`\`\`cpp
-Value ${eVar}s = client->${acc}()->list(Value::undef(), Value::undef());
+std::vector<SdkEntityPtr> ${eVar}s = client->${acc}()->list(${cppListMatch(entity)}, Value::undef());
+for (const auto& ${eVar} : ${eVar}s) {
+  std::cout << Struct::jsonify(${eVar}->data()) << std::endl;
+}
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('create')) {
+    if (callable.includes('create')) {
       // Members come from the SAME shape the runtime validates
       // (opRequestShape): every required member must appear.
       const createItems = opRequestShape(entity, 'create').items
@@ -150,7 +158,7 @@ Value ${eVar}s = client->${acc}()->list(Value::undef(), Value::undef());
       Content(`#### Example: Create
 
 \`\`\`cpp
-Value ${eVar} = client->${acc}()->create(vmap({
+SdkEntityPtr ${eVar} = client->${acc}()->create(vmap({
 `)
       createItems.map((it: any) => {
         Content(`    {"${it.name}", ${cppLit(it.type, 'example_' + it.name)}},  // ${canonToType(it.type, target.name)}

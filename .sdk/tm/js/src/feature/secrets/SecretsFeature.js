@@ -111,6 +111,7 @@ class SecretsFeature extends BaseFeature {
       (null == xopts ? undefined : xopts.refresh)
 
     if ('string' === typeof explicit && '' !== explicit) {
+      this._register(explicit)
       providers.push({
         kind: 'memory',
         name: 'options',
@@ -160,6 +161,16 @@ class SecretsFeature extends BaseFeature {
   // that has to stay live to be worth anything.
   sekreto() {
     return this._sekreto
+  }
+
+
+  // Every value this feature resolves or buys is a secret the SDK handles,
+  // and none arrives under an option key the intake registration saw.
+  _register(value) {
+    const ctx = this._client._rootctx
+    if (null != ctx && null != ctx.utility && 'function' === typeof ctx.utility.cleanAdd) {
+      ctx.utility.cleanAdd(ctx, value)
+    }
   }
 
 
@@ -217,6 +228,7 @@ class SecretsFeature extends BaseFeature {
     }
 
     const found = await this._sekreto.try(this._secretname)
+    this._register(found)
 
     if (null == this._exchange) {
       if (undefined !== found) {
@@ -345,6 +357,8 @@ class SecretsFeature extends BaseFeature {
       throw new Error(
         "secrets: token exchange returned no '" + x.response + "' field from " + url)
     }
+
+    this._register(token)
 
     return token
   }

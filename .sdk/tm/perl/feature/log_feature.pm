@@ -45,12 +45,14 @@ sub init {
   return;
 }
 
+# A log line leaves the pipeline, so it is cleaned before the logger sees
+# it, as every emitted record is.
 sub _loghook {
   my ($self, $hook, $ctx, $level) = @_;
   return unless $self->{logger};
   $level = 'info' unless defined $level;
   my $opname = $ctx->{op} ? $ctx->{op}{name} : '';
-  my $msg = "hook=$hook op=$opname";
+  my $msg = $ctx->{utility}{clean}->($ctx, "hook=$hook op=$opname");
   my $line = '[' . uc($level) . "] $msg";
   my $logger = $self->{logger};
   if (ref $logger eq 'CODE') {

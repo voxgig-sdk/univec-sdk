@@ -1,5 +1,6 @@
 package JAVAPACKAGE.feature;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,38 @@ public class TestFeature extends BaseFeature {
   // parameter — the rule makePoint uses to tell the entity's own route from a
   // cross-reference that also returns it.
   @SuppressWarnings("unchecked")
+  // The record the mock keeps: the request data without `$body`, which only the
+  // wire carries.
+  private static Map<String, Object> record(Map<String, Object> reqdata) {
+    if (reqdata == null) {
+      return null;
+    }
+    Map<String, Object> out = new LinkedHashMap<>(reqdata);
+    out.remove("$body");
+    return out;
+  }
+
+  private static final java.util.regex.Pattern ITEM_ENVELOPE_RE =
+      java.util.regex.Pattern.compile("^`\\.([^.`$]+)`$");
+
+  // The key a list's response transform
+  // ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record under.
+  private static String itemEnvelopeKey(Object restf) {
+    if (!(restf instanceof List) || 3 != ((List<?>) restf).size()) {
+      return null;
+    }
+    List<?> spec = (List<?>) restf;
+    if (!"`$EACH`".equals(spec.get(0)) || !"body".equals(spec.get(1)) || !(spec.get(2) instanceof Map)) {
+      return null;
+    }
+    Object merge = ((Map<?, ?>) spec.get(2)).get("`$MERGE`");
+    if (!(merge instanceof String)) {
+      return null;
+    }
+    java.util.regex.Matcher m = ITEM_ENVELOPE_RE.matcher((String) merge);
+    return m.matches() ? m.group(1) : null;
+  }
+
   private static int pointPartsLen(Object point) {
     Object parts = Struct.getprop(point, "parts");
     return parts instanceof List ? ((List<Object>) parts).size() : 0;
@@ -105,6 +138,16 @@ public class TestFeature extends BaseFeature {
     }
     Object tm = Struct.getprop(ctx.point, "transform");
     Object restf = Struct.getprop(tm, "res");
+    String key = itemEnvelopeKey(restf);
+    if (null != key && data instanceof List) {
+      List<Object> items = new ArrayList<>();
+      for (Object item : (List<?>) data) {
+        Map<String, Object> wrapped = new LinkedHashMap<>();
+        wrapped.put(key, item);
+        items.add(wrapped);
+      }
+      return items;
+    }
     if (!(restf instanceof String)) {
       return data;
     }
@@ -199,7 +242,7 @@ public class TestFeature extends BaseFeature {
       Object out = Struct.clone(found);
       return respond(ctx, 200, out, null);
     }
-    else if ("update".equals(op.name)) {
+    else if ("update".equals(op.name) || "patch".equals(op.name)) {
       // Match the existing entity by id only (or its alias). Reqdata
       // also contains the new field values, which would otherwise
       // cause select to filter out the entity we want to update.
@@ -233,7 +276,7 @@ public class TestFeature extends BaseFeature {
         return respond(ctx, 404, null, extra("statusText", "Not found"));
       }
       if (ent instanceof Map && ctx.reqdata != null) {
-        Struct.merge(Struct.jt(ent, ctx.reqdata));
+        Struct.merge(Struct.jt(ent, record(ctx.reqdata)));
       }
       Struct.delprop(ent, "$KEY");
       Object out = Struct.clone(ent);
@@ -261,7 +304,7 @@ public class TestFeature extends BaseFeature {
             r.nextInt(0x10000), r.nextInt(0x10000));
       }
 
-      Object ent = Struct.clone(ctx.reqdata);
+      Object ent = Struct.clone(record(ctx.reqdata));
       if (ent instanceof Map) {
         Map<String, Object> entm = (Map<String, Object>) ent;
         entm.put("id", id);

@@ -77,6 +77,11 @@ public:
       throw Helpers::unsupportedOp("update", this->name_);
     }
 
+  SdkEntityPtr patch(const Value& reqdata, const Value& ctrl) override {
+      (void)reqdata; (void)ctrl;
+      throw Helpers::unsupportedOp("patch", this->name_);
+    }
+
   SdkEntityPtr remove(const Value& reqmatch, const Value& ctrl) override {
       (void)reqmatch; (void)ctrl;
       throw Helpers::unsupportedOp("remove", this->name_);

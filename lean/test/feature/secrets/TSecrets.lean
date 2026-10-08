@@ -158,11 +158,15 @@ def findListEntity : SIO (Option String) := do
     | _ => pure ()
   return none
 
+/-- List with maps of its own: the runtime records a failure on the caller's
+    options map, so a reused map filters every later list by `err`. -/
+def listAll (c : Value) (ent : String) : SIO Value := do
+  SdkRuntime.opList c ent (← emptyMap) (← emptyMap)
+
 /-- Run a list op; the error MESSAGE when it refused, `none` when it went. -/
 def attempt (client : Value) (ent : String) : SIO (Option String) := do
-  let mt ← emptyMap
   try
-    let _ ← SdkRuntime.opList client ent mt mt
+    let _ ← listAll client ent
     pure none
   catch e => pure (some (toString e))
 
@@ -193,20 +197,19 @@ def dropSecret (key : String) : IO Unit := do
 -- ---------------------------------------------------------------------------
 
 def run (ent : String) : SIO Unit := do
-  let mt ← emptyMap
 
   -- ---- inactive: nothing changes ----------------------------------------
   (do
     let w ← mkWire
     let c ← liveClient w (← optsWith #[("apikey", .str "PLAINKEY01")])
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     check ((← w.sent.get) == 1 && credentialIs (← lastAuth w) "PLAINKEY01")
       "inactive: apikey option behaves exactly as before")
 
   (do
     let w ← mkWire
     let c ← liveClient w (← optsWith #[])
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     check ((← w.sent.get) == 1 && (← lastAuth w).isNone)
       "inactive: no apikey means no authorization header")
 
@@ -214,7 +217,7 @@ def run (ent : String) : SIO Unit := do
     let w ← mkWire
     let off ← newMap #[("active", .bool false)]
     let c ← liveClient w (← optsWith #[("apikey", .str "PLAINKEY01")] off)
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     let feats ← match (← gp c "features") with
       | .list i => do pure (← listItems i).size
       | _ => pure 0
@@ -226,7 +229,7 @@ def run (ent : String) : SIO Unit := do
     let w ← mkWire
     let s ← secretsOpts #[← memoryOf #[("APIKEY", .str "from-chain")]]
     let c ← liveClient w (← optsWith #[("apikey", .str "explicit")] s)
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     check (credentialIs (← lastAuth w) "explicit")
       "active: apikey option still wins over the chain")
 
@@ -234,7 +237,7 @@ def run (ent : String) : SIO Unit := do
     let w ← mkWire
     let s ← secretsOpts #[← memoryOf #[("APIKEY", .str "from-chain")]]
     let c ← liveClient w (← optsWith #[] s)
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     check (credentialIs (← lastAuth w) "from-chain")
       "active: an OMITTED apikey defers to the chain")
 
@@ -242,7 +245,7 @@ def run (ent : String) : SIO Unit := do
     let w ← mkWire
     let s ← secretsOpts #[← memoryOf #[("APIKEY", .str "from-chain")]]
     let c ← liveClient w (← optsWith #[("apikey", .str "")] s)
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     check (credentialIs (← lastAuth w) "from-chain")
       "active: an explicitly EMPTY apikey also defers to the chain")
 
@@ -250,7 +253,7 @@ def run (ent : String) : SIO Unit := do
     let w ← mkWire
     let s ← secretsOpts #[← memoryOf #[("APIKEY", .str "from-chain")]]
     let c ← liveClient w (← optsWith #[("auth", .null)] s)
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     check ((← w.sent.get) == 1 && (← lastAuth w).isNone)
       "active: auth null suppresses the credential, chain or no chain")
 
@@ -258,7 +261,7 @@ def run (ent : String) : SIO Unit := do
     let w ← mkWire
     let s ← secretsOpts #[← memoryOf #[("APIKEY", .str "from-chain")]]
     let c ← liveClient w (← optsWith #[("auth", .null), ("apikey", .str "explicit")] s)
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     check ((← w.sent.get) == 1 && (← lastAuth w).isNone)
       "active: auth null suppresses an EXPLICIT apikey too")
 
@@ -274,7 +277,7 @@ def run (ent : String) : SIO Unit := do
     let w ← mkWire
     let s ← secretsOpts #[← memoryOf #[("CUSTOM_KEY", .str "named01")]] #[("name", .str "custom.key")]
     let c ← liveClient w (← optsWith #[] s)
-    let _ ← SdkRuntime.opList c ent mt mt
+    let _ ← listAll c ent
     check (credentialIs (← lastAuth w) "named01") "active: secret name is configurable")
 
   -- ---- active: a provider ERROR refuses, a construction failure refuses,
@@ -598,8 +601,9 @@ def run (ent : String) : SIO Unit := do
     let w ← mkWire 401.0
     let c ← liveClient w (← optsWith #[("base", .str "http://api.test"), ("auth", .null)]
       (← xsecrets #[refreshChain] (← xopts)))
-    let err ← attempt c ent
-    check (err.isNone && (← w.sent.get) == 1 && (← lastAuth w).isNone)
+    -- The op raises on the API's 401; the contract is what reached the wire.
+    let _ ← attempt c ent
+    check ((← w.sent.get) == 1 && (← lastAuth w).isNone)
       "exchange: auth null suppresses the credential, refusal or not - and never retries")
 
   (do

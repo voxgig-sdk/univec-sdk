@@ -78,6 +78,13 @@ import KOTLINPACKAGE.utility.struct.Struct
 class SecretsFeature : BaseFeature("secrets", "0.1.0", true) {
 
   private var client: SdkClient? = null
+
+  // Every value this feature resolves or buys is a secret the SDK handles,
+  // and none arrives under an option key the intake registration saw.
+  private fun register(value: Any?) {
+    val ctx = this.client?.getRootCtx() ?: return
+    ctx.utility?.cleanAdd?.invoke(ctx, value)
+  }
   private var fopts: MutableMap<String, Any?>? = null
 
   // The LIVE options map (the root context's options - the same instance
@@ -205,6 +212,7 @@ class SecretsFeature : BaseFeature("secrets", "0.1.0", true) {
     val providers = mutableListOf<Any?>()
 
     if ("" != explicit) {
+      register(explicit)
       try {
         providers.add(ProviderSpec(
           kind = "memory",
@@ -354,6 +362,7 @@ class SecretsFeature : BaseFeature("secrets", "0.1.0", true) {
     // A provider ERROR throws out of here and fails the op (via the
     // transport gate); only a MISS (null) falls through.
     val found = s.tryget(this.secretname)
+    register(found)
 
     if (null == this.exchange) {
       this.lock.withLock {
@@ -551,6 +560,7 @@ class SecretsFeature : BaseFeature("secrets", "0.1.0", true) {
     // required server variable, for the same reason.
     if ("live" != this.client!!.mode) {
       val token = "test-" + this.exchange!!.response
+      register(token)
       this.lock.withLock { this.cred = token }
       return token
     }
@@ -588,6 +598,7 @@ class SecretsFeature : BaseFeature("secrets", "0.1.0", true) {
     var err: RuntimeException? = null
     try {
       token = buyonce()
+      register(token)
     } catch (e: RuntimeException) {
       err = e
     } catch (e: Exception) {

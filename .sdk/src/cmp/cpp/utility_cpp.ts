@@ -4,6 +4,8 @@ import {
   walk,
 } from '@voxgig/struct'
 
+import { canonScalarKey, requiredItems } from '@voxgig/sdkgen'
+
 
 const CPP_RESERVED = new Set<string>([
   'alignas', 'alignof', 'and', 'and_eq', 'asm', 'auto', 'bitand', 'bitor',
@@ -97,8 +99,19 @@ function cppConfigLiterals(value: any): string {
   return parts.join('\n')
 }
 
+// A list's required route and query parameters, as the match it is called with.
+function cppListMatch(entity: any): string {
+  const lit = (type: any): string =>
+    (({ NULL: 'Value(nullptr)', INTEGER: 'Value(1)', NUMBER: 'Value(1)', BOOLEAN: 'Value(true)', ARRAY: 'vlist()', OBJECT: 'vmap()' }) as any)[canonScalarKey(type)] ?? 'Value("example")'
+  const items = requiredItems(entity, 'list')
+  return 0 < items.length
+    ? `vmap({${items.map((it: any) => `{"${cppEscape(it.name)}", ${lit(it.type)}}`).join(', ')}})`
+    : 'Value::undef()'
+}
+
 
 export {
+  cppListMatch,
   cleanModel,
   cppConfigLiterals,
   cppEscape,

@@ -726,7 +726,7 @@ This package is generated from the API model by
 [@voxgig/sdkgen](https://github.com/voxgig/sdkgen). Edits to these files are
 overwritten on the next regeneration — change the model, not the output.
 
-${model.main[KIT].info?.about_md ? '' : ''}MIT licensed. Unofficial: not
+MIT licensed. Unofficial: not
 affiliated with or endorsed by the upstream API provider.
 `))
 })

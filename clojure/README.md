@@ -17,7 +17,7 @@ keeps the cognitive load low.
 
 ## Install
 This package is not yet published to Clojars. Depend on it directly from the
-GitHub release tag (`clojure/vX.Y.Z`, see [Releases](https://github.com/voxgig-sdk/univec-sdk/releases)),
+GitHub release tag (`clojure/vX.Y.Z`, see [Tags](https://github.com/voxgig-sdk/univec-sdk/tags)),
 using a `tools.deps` git dependency:
 
 ```clojure
@@ -55,7 +55,7 @@ loading a specific record.
 ### 4. Create, update, and remove
 
 ```clojure
-;; Create — returns the bare created record (a map)
+;; Create — returns the created entity
 (def created (e-convert/create (api/convert client nil) (vs/jm "embeddings" (vs/jt) "source_model" "example_source_model" "target_model" "example_target_model") nil))
 
 ```
@@ -68,14 +68,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -84,8 +85,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -138,10 +139,10 @@ Create a mock client for unit testing — no server required:
 
 (def client (api/test-sdk nil nil))
 
-;; Entity ops return the bare record and raise on error.
-(def model (e-model/list (api/model client nil) nil nil))
-;; model contains the mock response record
-(println model)
+;; list returns a vector of entities, one per mock record; it raises on error.
+(def models (e-model/list (api/model client nil) nil nil))
+(doseq [item models]
+  (println ((:data-get item))))
 ```
 
 ### Use a custom fetch function
@@ -230,8 +231,8 @@ entity map and are called via keyword lookup.
 
 | Member | Signature | Description |
 | --- | --- | --- |
-| `list` | `(ent reqmatch ctrl) -> vector` | List entities matching the criteria. Raises on error. |
-| `create` | `(ent reqdata ctrl) -> map` | Create a new entity. Raises on error. |
+| `list` | `(ent reqmatch ctrl) -> vector` | List entities matching the criteria, one per record. Raises on error. |
+| `create` | `(ent reqdata ctrl) -> entity` | Create a new entity, and return it. Raises on error. |
 | `:data-get` | `() -> map` | Get entity data. |
 | `:data-set` | `(data)` | Set entity data. |
 | `:match-get` | `() -> map` | Get entity match criteria. |
@@ -244,9 +245,10 @@ State accessors are called by looking up the fn and applying it, e.g.
 
 ### Result shape
 
-Entity operations return the bare result data (a `map` for single-entity
-ops, a `vector` for `list`) and raise (via `ex-info`) on error. Wrap
-calls in `try`/`catch` to handle failures.
+Entity operations resolve to the entity, and `list` to a `vector` of
+entities, one per record. Read an entity's record with
+`((:data-get ent))`. They raise (via `ex-info`) on error, so wrap calls
+in `try`/`catch` to handle failures.
 
 The `direct` escape hatch never raises — it returns a result `map` you
 branch on via `(vs/getprop result "ok")`:

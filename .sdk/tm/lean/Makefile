@@ -12,13 +12,15 @@ build: ffi
 # the SDK pipeline and the generated entity/direct tests, `feature` the
 # feature suite, `primary` the shared primary-utility corpus, and
 # `structcorpus` the vendored voxgig/struct corpus. Any one exiting non-zero
-# fails the target. The smoke test runs FIRST: a corpus suite that went green
+# fails the target, `pipeline` the request-shaping utilities driven directly.
+# The smoke test runs FIRST: a corpus suite that went green
 # on a broken engine would prove nothing. When the model ships the secrets
 # feature, `secrets` (test/feature/secrets/TSecrets.lean) runs last.
 test: ffi
 	lake exe omnismoke
 	lake exe runner
 	lake exe feature
+	lake exe pipeline
 	lake exe primary
 	lake exe structcorpus
 # #SecretsTest

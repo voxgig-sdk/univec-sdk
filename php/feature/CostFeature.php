@@ -134,12 +134,11 @@ class UnivecCostFeature extends UnivecBaseFeature
         // A rejecting transport still costs an attempt. Without this, a run of
         // connection-level failures under `retry` (which catches and tries
         // again) would be charged nothing at all, and an onBudget 'deny'
-        // ceiling could never stop it.
-        $threw = null;
+        // ceiling could never stop it. Its error is answered as the pair the
+        // fetcher contract names, so make_error reports it as it does any.
         try {
             [$res, $err] = $inner($ctx, $url, $fetchdef);
         } catch (\Throwable $ex) {
-            $threw = $ex;
             $res = null;
             $err = $ex;
         }
@@ -182,10 +181,6 @@ class UnivecCostFeature extends UnivecBaseFeature
             if ($this->pending !== null) {
                 unset($this->pending[$ctx]);
             }
-        }
-
-        if ($threw !== null) {
-            throw $threw;
         }
 
         return [$res, $err];
@@ -280,7 +275,7 @@ class UnivecCostFeature extends UnivecBaseFeature
         $cost['actors'] = $this->_bump($cost['actors'], $actor, $amount);
 
         $this->seq++;
-        $record = [
+        $record = ($ctx->utility->clean)($ctx, [
             'seq' => $this->seq,
             'entity' => $entity,
             'op' => $opname,
@@ -289,7 +284,7 @@ class UnivecCostFeature extends UnivecBaseFeature
             'currency' => $cost['currency'],
             'source' => $source,
             'attempts' => $entry['attempts'],
-        ];
+        ]);
         $cost['last'] = $record;
         $client->_cost = $cost;
 

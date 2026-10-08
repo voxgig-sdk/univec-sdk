@@ -14,7 +14,7 @@ declare class DebugFeature extends BaseFeature {
     PreDone(this: any, ctx: any): void;
     PreUnexpected(this: any, ctx: any): void;
     _finish(this: any, ctx: any, ok: boolean): void;
-    _redact(this: any, headers: any): any;
+    _redact(this: any, ctx: any, headers: any): any;
     _now(this: any): number;
 }
 export { DebugFeature };

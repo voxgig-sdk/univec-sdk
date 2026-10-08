@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import voxgig.univecsdk.core.Context;
+import voxgig.univecsdk.core.Helpers;
 import voxgig.univecsdk.core.SdkClient;
 import voxgig.univecsdk.core.Utility;
 import voxgig.univecsdk.utility.struct.Struct;
@@ -299,6 +300,10 @@ public class CostFeature extends BaseFeature {
     record.put("currency", this.currency);
     record.put("source", source);
     record.put("attempts", pending.attempts);
+    if (ctx.utility != null && ctx.utility.clean != null) {
+      Map<String, Object> cleaned = Helpers.toMapAny(ctx.utility.clean.apply(ctx, record));
+      record = cleaned == null ? record : cleaned;
+    }
     this.last = record;
 
     if (this.options.get("sink") instanceof Consumer) {

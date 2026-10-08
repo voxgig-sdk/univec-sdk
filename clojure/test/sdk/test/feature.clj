@@ -21,7 +21,7 @@
 (defn fspec [name & kvs] {"name" name "options" (if (seq kvs) (apply vs/jm kvs) (vs/jm))})
 
 (defn default-method [opname]
-  (cond (= opname "create") "POST" (= opname "update") "PATCH" (= opname "remove") "DELETE" :else "GET"))
+  (cond (= opname "create") "POST" (or (= opname "update") (= opname "patch")) "PATCH" (= opname "remove") "DELETE" :else "GET"))
 
 (defn make-response [status data headers]
   (let [h (vs/jm)]
@@ -50,6 +50,11 @@
 (defn clock-now [c] (fn [] @c))
 (defn clock-sleeper [c] (fn [ms] (swap! c + (or ms 0))))
 (defn clock-advance [c ms] (swap! c + ms))
+
+;; A clock standing at 0 for the calling thread and at `later` for any other.
+(defn worker-clock [later]
+  (let [caller (Thread/currentThread)]
+    (fn [] (if (identical? (Thread/currentThread) caller) 0 later))))
 
 (defn fake-entity [name] {:get-name (fn [] name)})
 
@@ -265,6 +270,21 @@
            (fn [] (let [c (make-clock)
                         h (make-harness [(fspec "timeout" "ms" 1000 "now" (clock-now c))])]
                     (t/is-eq (get (h-op h) "ok") true "ok"))))
+    ;; The deadline runs from the request's start, not from the wait: the
+    ;; clock stands at the start for the caller and 300 ms later for the worker.
+    (check "timeout-late-response-however-late-the-caller-looks" "timeout"
+           (fn [] (let [h (make-harness [(fspec "timeout" "ms" 20 "now" (worker-clock 300))])
+                        res (h-op h)]
+                    (t/is-eq (rcode res) "timeout" "timeout")
+                    (t/is-eq (mget (h-track h "_timeout") "count") 1 "count"))))
+    ;; A transport failure after the deadline is a timeout too, not the failure.
+    (check "timeout-late-failure-times-out" "timeout"
+           (fn [] (let [failing (fn [fctx _url _fetchdef]
+                                  (core/sdk-throw (core/ctx-error fctx "socket_closed" "socket closed")))
+                        h (make-harness [(fspec "timeout" "ms" 20 "now" (worker-clock 300))] :server failing)
+                        res (h-op h)]
+                    (t/is-eq (rcode res) "timeout" "timeout")
+                    (t/is-eq (mget (h-track h "_timeout") "count") 1 "count"))))
     (check "timeout-ms-zero-disables" "timeout"
            (fn [] (let [h (make-harness [(fspec "timeout" "ms" 0)])]
                     (t/is-eq (get (h-op h) "ok") true "ok"))))
@@ -435,7 +455,9 @@
                     (let [entries (mget (h-track h "_debug") "entries")]
                       (t/is-eq (vs/size entries) 1 "capped")
                       (t/is-eq (count @seen) 2 "2 seen")
-                      (t/is-eq (mget (mget (nth @seen 0) "headers") "authorization") "<redacted>" "redacted")))))
+                      ;; Masked by the core clean rule (clean.keys), not a
+                      ;; feature list of its own.
+                      (t/is-eq (mget (mget (nth @seen 0) "headers") "authorization") "[redacted]" "redacted")))))
     (check "debug-captures-failures" "debug"
            (fn [] (when (feature-present? "netsim")
                     (let [h (make-harness [(fspec "netsim" "failTimes" 1 "failStatus" 500) (fspec "debug")])]
@@ -447,7 +469,7 @@
            (fn [] (let [h (make-harness [(fspec "debug" "now" (fn [] 7) "redact" (vs/jt "x-secret"))])]
                     (h-op h :headers (vs/jm "x-secret" "hide" "x-ok" "show"))
                     (let [entry (vs/getelem (mget (h-track h "_debug") "entries") 0)]
-                      (t/is-eq (mget (mget entry "headers") "x-secret") "<redacted>" "redacted")
+                      (t/is-eq (mget (mget entry "headers") "x-secret") "[redacted]" "redacted")
                       (t/is-eq (mget (mget entry "headers") "x-ok") "show" "shown")))))
 
     ;; ---- audit ----

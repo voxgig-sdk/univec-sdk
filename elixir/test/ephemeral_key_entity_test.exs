@@ -4,23 +4,6 @@ defmodule Univec.EphemeralKeyEntityTest do
   use ExUnit.Case
 
   alias Voxgig.Struct, as: S
-  alias Univec.Helpers, as: H
-  alias Univec.Json
-
-  defp fixture do
-    Json.parse(File.read!("../.sdk/test/entity/ephemeral_key/EphemeralKeyTestData.json"))
-  end
-
-  defp mk_sdk do
-    existing = H.or_(S.getpath(fixture(), "existing"), S.jm([]))
-    Univec.test(S.jm(["entity", existing]))
-  end
-
-  defp first_id do
-    existing = H.or_(S.getpath(fixture(), "existing.ephemeral_key"), S.jm([]))
-    keys = S.keysof(existing)
-    if keys == [], do: nil, else: hd(keys)
-  end
 
   test "should create instance" do
     sdk = Univec.test()
@@ -35,5 +18,18 @@ defmodule Univec.EphemeralKeyEntityTest do
     made = Univec.EntityBase.data_get(created)
     assert S.ismap(made)
     assert S.getprop(made, "id") != nil
+  end
+
+  test "should refuse an invalid request" do
+    if Univec.FeatureHarness.has_feature("validate") do
+      client = Univec.test(nil, S.jm(["feature", S.jm(["validate", S.jm(["active", true])])]))
+
+      err =
+        assert_raise Univec.Error, fn ->
+          Univec.Entity.EphemeralKey.create(Univec.ephemeral_key(client), S.jm(["dailyLimit", "x", "dailyUsed", 1, "key", "x", "resetsAt", "x"]))
+        end
+
+      assert err.code == "validate_failed"
+    end
   end
 end

@@ -35,8 +35,9 @@ object MakeSpec {
 
     ctx.spec.method = utility.prepareMethod(ctx)
 
-    val allowMethod = Struct.getpath(options, java.util.List.of("allow", "method")) match { case s: String => s; case _ => "" }
-    if (!allowMethod.contains(ctx.spec.method)) {
+    val allowMethodRaw = Struct.getpath(options, java.util.List.of("allow", "method"))
+    val allowMethod = allowMethodRaw match { case s: String => s; case _ => "" }
+    if (!Helpers.allowed(allowMethodRaw, ctx.spec.method)) {
       throw ctx.makeError("spec_method_allow",
         "Method \"" + ctx.spec.method + "\" not allowed by SDK option allow.method value: \"" + allowMethod + "\"")
     }
@@ -69,7 +70,24 @@ object MakeSpec {
 
     if (ctx.ctrl.explain != null) ctx.ctrl.explain.put("spec", ctx.spec)
 
+    // Whatever prepareAuth sets in the query, under whichever name, is the
+    // credential; a key it leaves as it was is the caller's.
+    val query = new LinkedHashMap[String, Object]()
+    if (ctx.spec.query != null) query.putAll(ctx.spec.query)
+
     val spec = utility.prepareAuth(ctx)
+    val authquery = new java.util.ArrayList[String]()
+    if (spec.query != null) {
+      val qit = spec.query.entrySet().iterator()
+      while (qit.hasNext) {
+        val entry = qit.next()
+        if (!query.containsKey(entry.getKey) ||
+          !java.util.Objects.equals(query.get(entry.getKey), entry.getValue)) {
+          authquery.add(entry.getKey)
+        }
+      }
+    }
+    spec.authquery = authquery
     ctx.spec = spec
     spec
   }

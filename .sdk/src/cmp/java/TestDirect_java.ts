@@ -15,6 +15,8 @@ import {
   serverVarEnv,
   serverVariables, envName, envToken,
   pointParts,
+  liveStrict,
+  liveStrictNote,
 } from '@voxgig/sdkgen'
 
 
@@ -181,6 +183,15 @@ import ${javapackage}.utility.Json;
 @SuppressWarnings({"unchecked", "unused"})
 public class ${entity.Name}DirectTest {
 
+${liveStrictNote(liveStrict(model, target.name), '//', '  ')}
+  static final boolean LIVE_STRICT = ${liveStrict(model, target.name)};
+
+  static boolean liveOk(Map<String, Object> result) {
+    int status = Helpers.toInt(result.get("status"));
+    return result.get("err") == null && Boolean.TRUE.equals(result.get("ok"))
+        && status >= 200 && status < 300;
+  }
+
   static Map<String, Object> jm(Object... kv) {
     Map<String, Object> out = new LinkedHashMap<>();
     for (int i = 0; i < kv.length - 1; i += 2) {
@@ -207,8 +218,9 @@ public class ${entity.Name}DirectTest {
       const listSkipBlock = listLiveIdKeys.length > 0
         ? `    if (setup.live) {
       for (String liveKey : new String[] { ${listLiveIdKeys.map((k: string) => `"${k}"`).join(', ')} }) {
-        Assumptions.assumeTrue(setup.idmap.get(liveKey) != null,
-            "live test needs " + liveKey + " via *_ENTID env var (synthetic IDs only)");
+        if (setup.idmap.get(liveKey) == null) {
+          RunnerSupport.liveMiss(LIVE_STRICT, "Live test blocked: needs " + liveKey + " via ${entidEnvVar}");
+        }
       }
     }
 `
@@ -258,14 +270,12 @@ ${listSkipBlock}    ${SDK} client = setup.client;
       }
 
       Content(`    if (setup.live) {
-      // Live mode is lenient: synthetic IDs frequently 4xx and the
-      // list-response shape varies wildly across public APIs. Skip
-      // rather than fail when the call doesn't return a usable list.
-      Assumptions.assumeTrue(Boolean.TRUE.equals(result.get("ok")),
-          "list call not ok (likely synthetic IDs against live API): " + result);
-      int status = Helpers.toInt(result.get("status"));
-      Assumptions.assumeTrue(status >= 200 && status < 300,
-          "expected 2xx status, got " + result.get("status"));
+      if (!liveOk(result)) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live list failed: " + RunnerSupport.liveDescribe(result));
+      }
+      if (RunnerSupport.liveList(result.get("data")) == null) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live list returned no list: " + RunnerSupport.liveDescribe(result));
+      }
     }
     else {
       assertEquals(true, result.get("ok"), "expected ok to be true");
@@ -306,23 +316,18 @@ ${listSkipBlock}    ${SDK} client = setup.client;
       // Identify ancestor params (not 'id') for live mode
       const ancestorParams = loadParams.filter((p: any) => p.n !== 'id')
 
+      const liveKey = (p: any) => p.n === 'id' ? entity.name + '01' : p.n.replace(/_id$/, '') + '01'
       let loadLiveIdKeys: string[] = []
       if (loadParams.length > 0 && !loadAllHaveExamples) {
-        if (hasList) {
-          loadLiveIdKeys = listParams.map((p: any) => {
-            return p.n === 'id'
-              ? entity.name + '01'
-              : p.n.replace(/_id$/, '') + '01'
-          })
-        } else {
-          loadLiveIdKeys = loadParams.map((p: any) => p.n + '01')
-        }
+        loadLiveIdKeys = [...new Set((hasList ?
+          [...listParams, ...loadParams.filter((p: any) => p.n !== 'id')] : loadParams).map(liveKey))]
       }
       const loadSkipBlock = loadLiveIdKeys.length > 0
         ? `    if (setup.live) {
       for (String liveKey : new String[] { ${loadLiveIdKeys.map(k => `"${k}"`).join(', ')} }) {
-        Assumptions.assumeTrue(setup.idmap.get(liveKey) != null,
-            "live test needs " + liveKey + " via *_ENTID env var (synthetic IDs only)");
+        if (setup.idmap.get(liveKey) == null) {
+          RunnerSupport.liveMiss(LIVE_STRICT, "Live test blocked: needs " + liveKey + " via ${entidEnvVar}");
+        }
       }
     }
 `
@@ -370,19 +375,30 @@ ${loadSkipBlock}    ${SDK} client = setup.client;
           "path", "${listPath}",
           "method", "GET",
           "params", listParams));
-      Assumptions.assumeTrue(Boolean.TRUE.equals(listResult.get("ok")),
-          "list call not ok (likely synthetic IDs against live API): " + listResult);
-
-      // Get first entity ID from list
-      List<Object> listData = listResult.get("data") instanceof List
-          ? (List<Object>) listResult.get("data") : new ArrayList<>();
-      Assumptions.assumeTrue(!listData.isEmpty(), "no entities to load in live mode");
+      if (!liveOk(listResult)) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live list discovery failed: " + RunnerSupport.liveDescribe(listResult));
+      }
+      List<Object> listData = RunnerSupport.liveList(listResult.get("data"));
+      if (listData == null) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live list discovery returned no list: " + RunnerSupport.liveDescribe(listResult));
+      }
+      if (listData.isEmpty()) {
+        RunnerSupport.liveEmpty("The account has no ${entity.name} record to load");
+      }
       Map<String, Object> firstEnt = Helpers.toMapAny(listData.get(0));
+      if (firstEnt == null || firstEnt.get("id") == null) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live load blocked: discovery returned no usable identity");
+      }
       params.put("id", firstEnt.get("id"));
 `)
           for (const p of ancestorParams) {
             const key = p.n.replace(/_id$/, '') + '01'
             Content(`      params.put("${p.n}", setup.idmap.get("${key}"));
+`)
+          }
+        } else if (loadParams.length > 0) {
+          for (const p of loadParams) {
+            Content(`      params.put("${p.n}", setup.idmap.get("${liveKey(p)}"));
 `)
           }
         }
@@ -418,14 +434,12 @@ ${loadSkipBlock}    ${SDK} client = setup.client;
       }
 
       Content(`    if (setup.live) {
-      // Live mode is lenient: synthetic IDs frequently 4xx. Skip rather
-      // than fail when the load endpoint isn't reachable with the IDs we
-      // can construct from setup.idmap.
-      Assumptions.assumeTrue(Boolean.TRUE.equals(result.get("ok")),
-          "load call not ok (likely synthetic IDs against live API): " + result);
-      int status = Helpers.toInt(result.get("status"));
-      Assumptions.assumeTrue(status >= 200 && status < 300,
-          "expected 2xx status, got " + result.get("status"));
+      if (!liveOk(result)) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live load failed: " + RunnerSupport.liveDescribe(result));
+      }
+      if (result.get("data") == null) {
+        RunnerSupport.liveMiss(LIVE_STRICT, "Live load returned no data: " + RunnerSupport.liveDescribe(result));
+      }
     }
     else {
       assertEquals(true, result.get("ok"), "expected ok to be true");

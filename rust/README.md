@@ -15,7 +15,7 @@ keeps the cognitive load low.
 
 ## Install
 This crate is not yet published to crates.io. Depend on it from the GitHub
-release tag (`rust/vX.Y.Z`, see [Releases](https://github.com/voxgig-sdk/univec-sdk/releases)) or
+release tag (`rust/vX.Y.Z`, see [Tags](https://github.com/voxgig-sdk/univec-sdk/tags)) or
 from a source checkout by adding it to your `Cargo.toml`:
 
 ```toml
@@ -36,7 +36,7 @@ loading a specific record.
 ### 1. Create a client
 
 ```rust
-use univec_sdk::{getp, jo, UnivecSDK, Value};
+use univec_sdk::{getp, jo, UnivecEntity, UnivecSDK, Entity, Value};
 
 let client = UnivecSDK::new(jo(vec![
     ("apikey", Value::str(std::env::var("UNIVEC_APIKEY").unwrap_or_default())),
@@ -46,7 +46,7 @@ let client = UnivecSDK::new(jo(vec![
 ### 4. Create, update, and remove
 
 ```rust
-// Create — returns the bare created record
+// Create — returns the created entity
 let created = client.convert(Value::Noval).create(jo(vec![("embeddings", Value::empty_list()), ("source_model", Value::str("example_source_model")), ("target_model", Value::str("example_target_model"))]), Value::Noval).unwrap();
 
 ```
@@ -59,14 +59,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -75,8 +76,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -124,11 +125,14 @@ println!("{:?}", getp(&fetchdef, "headers"));
 Create a mock client for unit testing — no server required:
 
 ```rust
+use univec_sdk::{jo, test_sdk, UnivecEntity, Entity, Value};
+
 let client = test_sdk(Value::Noval, Value::Noval);
 
-// Entity ops return the bare record on Ok and Err on failure.
-let model = client.model(Value::Noval).list(Value::Noval, Value::Noval).unwrap();
-// model contains the mock response record
+// list returns one entity per mock record on Ok, and Err on failure.
+for model in client.model(Value::Noval).list(Value::Noval, Value::Noval).unwrap() {
+    println!("{:?}", model.data(None));
+}
 ```
 
 ### Point at a different server
@@ -209,8 +213,8 @@ All entities share the same interface.
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `list` | `(reqmatch: Value, ctrl: Value) -> Result<Value, UnivecError>` | List entities matching the criteria (Ok is a `Value::List`). |
-| `create` | `(reqdata: Value, ctrl: Value) -> Result<Value, UnivecError>` | Create a new entity. |
+| `list` | `(reqmatch: Value, ctrl: Value) -> Result<Vec<Rc<Self>>, UnivecError>` | List entities matching the criteria, one per record. |
+| `create` | `(reqdata: Value, ctrl: Value) -> Result<Rc<Self>, UnivecError>` | Create a new entity. |
 | `data` | `(args: Option<&Value>) -> Value` | Get entity data (pass `Some(&map)` to set). |
 | `matchv` | `(args: Option<&Value>) -> Value` | Get entity match criteria (pass `Some(&map)` to set). |
 | `make` | `() -> Rc<dyn Entity>` | Create a new instance with the same options. |
@@ -218,9 +222,11 @@ All entities share the same interface.
 
 ### Result shape
 
-Entity operations return `Result<Value, UnivecError>` — the
-bare result data on `Ok` (a `Value::Map` for single-entity ops, a
-`Value::List` for `list`) and the branded error on `Err`.
+Entity operations return the entity on `Ok`, and `list` a `Vec` of
+entities, one per record; `data(None)` reads an entity's record. `Err` is
+the branded error. The operations are methods of the
+`UnivecEntity` trait and `data` of the `Entity` trait, so
+import both.
 
 The `direct()` escape hatch resolves to `Ok` even on a non-2xx response —
 it returns a result `Value::Map` you branch on via `getp(&result, "ok")`:
@@ -305,7 +311,7 @@ Create an instance: `let convert = client.convert(Value::Noval);`
 
 | Method | Description |
 | --- | --- |
-| `create(reqdata, ctrl)` | Create a new entity with the given data. |
+| `create(reqdata, ctrl)` | Create a new entity with the given data. `Ok` is the entity. |
 
 #### Fields
 
@@ -334,7 +340,7 @@ Create an instance: `let embed = client.embed(Value::Noval);`
 
 | Method | Description |
 | --- | --- |
-| `create(reqdata, ctrl)` | Create a new entity with the given data. |
+| `create(reqdata, ctrl)` | Create a new entity with the given data. `Ok` is the entity. |
 
 #### Fields
 
@@ -363,7 +369,7 @@ Create an instance: `let ephemeral_key = client.ephemeral_key(Value::Noval);`
 
 | Method | Description |
 | --- | --- |
-| `create(reqdata, ctrl)` | Create a new entity with the given data. |
+| `create(reqdata, ctrl)` | Create a new entity with the given data. `Ok` is the entity. |
 
 #### Fields
 
@@ -394,7 +400,7 @@ Create an instance: `let model = client.model(Value::Noval);`
 
 | Method | Description |
 | --- | --- |
-| `list(reqmatch, ctrl)` | List entities, optionally matching the given criteria. |
+| `list(reqmatch, ctrl)` | List entities, optionally matching the given criteria. `Ok` is a `Vec` of entities, one per record. |
 
 #### Fields
 
@@ -415,6 +421,9 @@ Create an instance: `let model = client.model(Value::Noval);`
 
 ```rust
 let models = client.model(Value::Noval).list(Value::Noval, Value::Noval).unwrap();
+for model in &models {
+    println!("{:?}", model.data(None));
+}
 ```
 
 ## Features

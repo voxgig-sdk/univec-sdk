@@ -34,6 +34,8 @@ sub new {
     json_func   => $json_func,
     body        => UnivecHelpers::gp($resmap, 'body'),
     err         => UnivecHelpers::gp($resmap, 'err'),
+    # Set by a transport that could not read a non-blank body as JSON.
+    unreadable  => (UnivecHelpers::gp($resmap, 'unreadable') ? 1 : 0),
   }, $class;
 }
 

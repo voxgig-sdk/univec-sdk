@@ -85,6 +85,14 @@ func gpath(_ m: VMap?, _ segs: String...) -> Value {
 }
 func gpath(_ v: Value, _ segs: String...) -> Value { getpath(v, jtpv(segs)) }
 
+// Whether a comma-separated allow option names the item: whole names, any case.
+func allowed(_ names: Value, _ item: String?) -> Bool {
+  guard let list = names.asString, let item = item, !item.isEmpty else { return false }
+  let want = item.uppercased()
+  return list.split(separator: ",", omittingEmptySubsequences: false)
+    .contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == want }
+}
+
 // regexReplace replaces every match of `pattern` in `input` with the literal
 // `replacement` (template metacharacters in the replacement are escaped).
 func regexReplace(_ input: String, _ pattern: String, _ replacement: String) -> String {

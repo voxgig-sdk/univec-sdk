@@ -6,17 +6,7 @@ public static partial class SdkUtility
 {
     internal static object? DoneUtil(Context ctx)
     {
-        if (ctx.Ctrl.Explain != null)
-        {
-            ctx.Ctrl.Explain =
-                CleanUtil(ctx, ctx.Ctrl.Explain) as Dictionary<string, object?>;
-            if (ctx.Ctrl.Explain != null &&
-                ctx.Ctrl.Explain.TryGetValue("result", out var explainResult) &&
-                explainResult is Dictionary<string, object?> rm)
-            {
-                rm.Remove("err");
-            }
-        }
+        CleanExplainUtil(ctx);
 
         if (ctx.Result != null && ctx.Result.Ok)
         {
@@ -24,5 +14,31 @@ public static partial class SdkUtility
         }
 
         return MakeErrorUtil(ctx, null);
+    }
+
+    // Refilled in place: the caller holds this very dictionary (the Context
+    // copied it out of the ctrl map), so a replacement would leave them
+    // reading the raw one. err is pruned from the cleaned copy of result only.
+    internal static void CleanExplainUtil(Context ctx)
+    {
+        var explain = ctx.Ctrl.Explain;
+        if (explain == null)
+        {
+            return;
+        }
+        if (CleanUtil(ctx, explain) is Dictionary<string, object?> cleaned &&
+            !ReferenceEquals(cleaned, explain))
+        {
+            explain.Clear();
+            foreach (var kv in cleaned)
+            {
+                explain[kv.Key] = kv.Value;
+            }
+        }
+        if (explain.TryGetValue("result", out var explainResult) &&
+            explainResult is Dictionary<string, object?> rm)
+        {
+            rm.Remove("err");
+        }
     }
 }

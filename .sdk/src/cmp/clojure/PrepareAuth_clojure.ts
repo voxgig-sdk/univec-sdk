@@ -78,7 +78,7 @@ function renderHeader(spec: AuthSpec, head: string): string {
 (def OPTION-APIKEY "apikey")
 ` + (spec.basic ? `(def OPTION-SECRET "secret")
 ` : '') + `(def NOT-FOUND "__NOTFOUND__")
-
+${authName('HEADER-AUTH', true)}
 (defn u-prepare-auth [ctx]
   (let [spec (oget ctx :spec)]
     (if (nil? spec) [nil (ctx-error ctx "auth_no_spec" "Expected context spec property to be defined.")]
@@ -87,7 +87,10 @@ function renderHeader(spec: AuthSpec, head: string): string {
           (if (nil? (vs/getprop options "auth"))
             ;; Public APIs that need no auth omit the options.auth block entirely.
             (do (vs/delprop headers HEADER-AUTH) [spec nil])
-            (let [apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
+            (let [cred (prepare-auth-name options)
+                  apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
+              ;; A credential left under the declared name would travel beside the renamed one.
+              (when (not= cred HEADER-AUTH) (vs/delprop headers HEADER-AUTH))
 ${spec.basic ? basicBlock() : headerPlace(14)}
               [spec nil]))))))
 `
@@ -97,29 +100,34 @@ ${spec.basic ? basicBlock() : headerPlace(14)}
 function headerPlace(col: number): string {
   const p = ' '.repeat(col)
   return `${p}(if (or (nil? apikey) (and (string? apikey) (or (= apikey NOT-FOUND) (= apikey ""))))
-${p}  (vs/delprop headers HEADER-AUTH)
+${p}  (vs/delprop headers cred)
 ${p}  (let [auth-prefix (or (vs/getpath options "auth.prefix") "")
 ${p}        apikey-val (if (string? apikey) apikey "")]
-${p}    (.put ^java.util.Map headers HEADER-AUTH
+${p}    (.put ^java.util.Map headers cred
 ${p}          (if (= auth-prefix "") apikey-val (str auth-prefix " " apikey-val)))))`
 }
 
 
 function basicBlock(): string {
-  return `              ;; True HTTP Basic Auth needs TWO credentials, base64-joined - a
-              ;; single token in the header (the branch below) can never
+  return `              ;; True HTTP Basic Auth joins the two credentials, base64-encoded -
+              ;; a single token in the header (the branch below) can never
               ;; authenticate against an API that actually checks
-              ;; \`Authorization: Basic base64(user:pass)\`.
+              ;; \`Authorization: Basic base64(user:pass)\`. The password may
+              ;; be empty (RFC 7617): Lob, for one, documents the key as the
+              ;; user with a blank password (\`curl -u key:\`).
               (if (= true (vs/getpath options "auth.basic"))
                 (let [secret (vs/getprop options OPTION-SECRET NOT-FOUND)
                       missing? (fn [v] (or (nil? v)
                                            (and (string? v) (or (= v NOT-FOUND) (= v "")))))]
-                  (if (or (missing? apikey) (missing? secret))
-                    (vs/delprop headers HEADER-AUTH)
+                  (if (missing? apikey)
+                    (vs/delprop headers cred)
                     (let [auth-prefix (or (vs/getpath options "auth.prefix") "")
                           b64 (.encodeToString (java.util.Base64/getEncoder)
-                                               (.getBytes ^String (str apikey ":" secret) "UTF-8"))]
-                      (.put ^java.util.Map headers HEADER-AUTH
+                                               (.getBytes ^String (str apikey ":" (if (missing? secret) "" secret)) "UTF-8"))]
+                      ;; The joined, encoded pair is a wire form neither
+                      ;; credential's own registration covers.
+                      (ucall ctx :clean-add b64)
+                      (.put ^java.util.Map headers cred
                             (if (= auth-prefix "") b64 (str auth-prefix " " b64))))))
 ${headerPlace(16)})`
 }
@@ -132,7 +140,7 @@ function renderQuery(spec: AuthSpec, head: string): string {
 (def QUERY-AUTH ${cljstr(spec.name)})
 (def OPTION-APIKEY "apikey")
 (def NOT-FOUND "__NOTFOUND__")
-
+${authName('QUERY-AUTH', false)}
 (defn u-prepare-auth [ctx]
   (let [spec (oget ctx :spec)]
     (if (nil? spec) [nil (ctx-error ctx "auth_no_spec" "Expected context spec property to be defined.")]
@@ -141,14 +149,17 @@ function renderQuery(spec: AuthSpec, head: string): string {
           (if (nil? (vs/getprop options "auth"))
             ;; Public APIs that need no auth omit the options.auth block entirely.
             (do (vs/delprop query QUERY-AUTH) [spec nil])
-            (let [apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
+            (let [cred (prepare-auth-name options)
+                  apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
+              ;; A credential left under the declared name would travel beside the renamed one.
+              (when (not= cred QUERY-AUTH) (vs/delprop query QUERY-AUTH))
               (if (or (nil? apikey) (and (string? apikey) (or (= apikey NOT-FOUND) (= apikey ""))))
-                (vs/delprop query QUERY-AUTH)
+                (vs/delprop query cred)
                 (let [apikey-val (if (string? apikey) apikey "")]
                   ;; NO PREFIX IN A QUERY STRING. \`?${spec.name}=Bearer%20abc\` is not a
                   ;; thing any API reads: the prefix is a header convention, so it is
                   ;; dropped here deliberately rather than silently concatenated.
-                  (.put ^java.util.Map query QUERY-AUTH apikey-val)))
+                  (.put ^java.util.Map query cred apikey-val)))
               [spec nil]))))))
 `
 }
@@ -162,27 +173,22 @@ function renderCookie(spec: AuthSpec, head: string): string {
 (def COOKIE-AUTH ${cljstr(spec.name)})
 (def OPTION-APIKEY "apikey")
 (def NOT-FOUND "__NOTFOUND__")
-
-;; The cookie header minus our own pair, every other cookie left untouched.
-(defn- cookies-without-cred [headers]
+${authName('COOKIE-AUTH', false)}
+;; The cookie header minus the named pair, every other cookie left untouched.
+(defn- cookies-without-cred [headers cred]
   (let [existing (vs/getprop headers HEADER-COOKIE)]
     (if (or (not (string? existing)) (= "" existing))
       ""
-      (str/join "; "
-                (remove (fn [piece]
-                          (or (= "" piece)
-                              (= COOKIE-AUTH piece)
-                              (str/starts-with? piece (str COOKIE-AUTH "="))))
-                        (map str/trim (str/split existing #";")))))))
+      (str/join "; " (cookie-keep existing #{cred})))))
 
-;; Set (a string) or remove (nil) our pair, leaving the rest in place.
-(defn- apply-cookie! [headers value]
-  (let [rest (cookies-without-cred headers)]
+;; Set (a string) or remove (nil) the named pair, leaving the rest in place.
+(defn- apply-cookie! [headers cred value]
+  (let [rest (cookies-without-cred headers cred)]
     (if (nil? value)
       (if (= "" rest)
         (vs/delprop headers HEADER-COOKIE)
         (.put ^java.util.Map headers HEADER-COOKIE rest))
-      (let [pair (str COOKIE-AUTH "=" value)]
+      (let [pair (str cred "=" value)]
         (.put ^java.util.Map headers HEADER-COOKIE
               (if (= "" rest) pair (str rest "; " pair)))))))
 
@@ -193,13 +199,16 @@ function renderCookie(spec: AuthSpec, head: string): string {
               options (client-options-map (oget ctx :client))]
           (if (nil? (vs/getprop options "auth"))
             ;; Public APIs that need no auth omit the options.auth block entirely.
-            (do (apply-cookie! headers nil) [spec nil])
-            (let [apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
+            (do (apply-cookie! headers COOKIE-AUTH nil) [spec nil])
+            (let [cred (prepare-auth-name options)
+                  apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
+              ;; A credential left under the declared name would travel beside the renamed one.
+              (when (not= cred COOKIE-AUTH) (apply-cookie! headers COOKIE-AUTH nil))
               (if (or (nil? apikey) (and (string? apikey) (or (= apikey NOT-FOUND) (= apikey ""))))
-                (apply-cookie! headers nil)
+                (apply-cookie! headers cred nil)
                 ;; NO PREFIX IN A COOKIE either - a cookie carries a bare
                 ;; \`name=value\` pair, not a header's scheme-prefixed credential.
-                (apply-cookie! headers (if (string? apikey) apikey "")))
+                (apply-cookie! headers cred (if (string? apikey) apikey "")))
               [spec nil]))))))
 `
 }
@@ -223,6 +232,18 @@ function renderInactive(spec: AuthSpec, head: string): string {
   (let [spec (oget ctx :spec)]
     (if (nil? spec) [nil (ctx-error ctx "auth_no_spec" "Expected context spec property to be defined.")]
         [spec nil])))
+`
+}
+
+
+// The client's `auth.name` option, when set, replaces the declared name; a
+// header name travels lower-cased.
+function authName(declared: string, header: boolean): string {
+  return `
+;; The client's auth.name option, when set, replaces the name the API declares.
+(defn- prepare-auth-name [options]
+  (let [given (vs/getpath options "auth.name")]
+    (if (and (string? given) (not= "" given)) ${header ? '(.toLowerCase ^String given java.util.Locale/ROOT)' : 'given'} ${declared})))
 `
 }
 

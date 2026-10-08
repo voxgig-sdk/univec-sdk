@@ -12,7 +12,13 @@ use common::*;
 
 use univec_sdk::core::helpers::{getp, ja, jo, json_thunk, setp, to_int, to_map};
 use univec_sdk::utility::voxgigstruct as vs;
-use univec_sdk::{Value, UnivecSDK};
+use univec_sdk::{json_parse, Value, UnivecSDK};
+
+// main.kit.test.live.strict is true (the default is true): a live
+// request that fails, or a live test missing an input it needs,
+// fails the test.
+// An account with no record for a test to read skips it either way.
+const LIVE_STRICT: bool = true;
 
 struct ModelDirectSetup {
     client: Rc<UnivecSDK>,
@@ -111,24 +117,26 @@ fn model_direct_list() {
 
     let params = Value::empty_map();
 
-    let result = client
-        .direct(jo(vec![
-            ("path", Value::str("v1/models")),
-            ("method", Value::str("GET")),
-            ("params", params.clone()),
-        ]))
-        .expect("direct failed");
-
-    if setup.live {
-        // Live mode is lenient: synthetic IDs frequently 4xx and the
-        // list-response shape varies wildly across public APIs.
-        if getp(&result, "ok") != Value::Bool(true) {
-            eprintln!("skip: list call not ok (likely synthetic IDs against live API)");
+    let result = match client.direct(jo(vec![
+        ("path", Value::str("v1/models")),
+        ("method", Value::str("GET")),
+        ("params", params.clone()),
+    ])) {
+        Ok(result) => result,
+        Err(err) if setup.live => {
+            live_miss(LIVE_STRICT, &format!("Live list failed: {}", err));
             return;
         }
-        let status = to_int(&getp(&result, "status"));
-        if !(200..300).contains(&status) {
-            eprintln!("skip: expected 2xx status, got {}", status);
+        Err(err) => panic!("direct failed: {}", err),
+    };
+
+    if setup.live {
+        if !live_ok(&result) {
+            live_miss(LIVE_STRICT, &format!("Live list failed: {}", live_describe(&result)));
+            return;
+        }
+        if live_list(&getp(&result, "data")).is_none() {
+            live_miss(LIVE_STRICT, &format!("Live list returned no list: {}", live_describe(&result)));
             return;
         }
     } else {

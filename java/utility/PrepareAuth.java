@@ -15,6 +15,13 @@ final class PrepareAuth {
   static final String OPTION_APIKEY = "apikey";
   static final String NOT_FOUND = "__NOTFOUND__";
 
+  // The client's auth.name option, when set, replaces the name the API declares.
+  static String authName(Map<String, Object> options) {
+    Object name = Struct.getpath(options, List.of("auth", "name"));
+    return name instanceof String && !"".equals(name)
+        ? ((String) name).toLowerCase(java.util.Locale.ROOT) : CRED_NAME;
+  }
+
   static Spec prepareAuth(Context ctx) {
     Spec spec = ctx.spec;
     if (spec == null) {
@@ -31,6 +38,13 @@ final class PrepareAuth {
       return spec;
     }
 
+    String name = authName(options);
+
+    // A credential left under the declared name would travel beside the renamed one.
+    if (!name.equals(CRED_NAME)) {
+      headers.remove(CRED_NAME);
+    }
+
     Object apikey = Struct.getprop(options, OPTION_APIKEY, NOT_FOUND);
 
     boolean skip = false;
@@ -43,7 +57,7 @@ final class PrepareAuth {
     }
 
     if (skip) {
-      headers.remove(CRED_NAME);
+      headers.remove(name);
     }
     else {
       String authPrefix = "";
@@ -54,10 +68,10 @@ final class PrepareAuth {
       String apikeyVal = apikey instanceof String ? (String) apikey : "";
       // Empty prefix (raw apiKey credential) must not add a leading space.
       if ("".equals(authPrefix)) {
-        headers.put(CRED_NAME, apikeyVal);
+        headers.put(name, apikeyVal);
       }
       else {
-        headers.put(CRED_NAME, authPrefix + " " + apikeyVal);
+        headers.put(name, authPrefix + " " + apikeyVal);
       }
     }
 

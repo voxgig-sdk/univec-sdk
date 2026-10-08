@@ -1,3 +1,4 @@
+const { abortError } = require('./MakeRequestUtility')
 
 async function makeResponse(ctx) {
   // PreResponse feature hook has already provided a result.
@@ -47,7 +48,7 @@ async function makeResponse(ctx) {
     }
   }
   catch (err) {
-    result.err = err
+    result.err = abortError(ctx, err)
   }
 
   if (ctx.ctrl.explain) {

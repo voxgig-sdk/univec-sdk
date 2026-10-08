@@ -2,24 +2,18 @@
 --
 -- Request/response capture for debugging. Records a bounded ring buffer
 -- of per-operation traces — op, method, URL, redacted headers, response
--- status and timing — on `client._debug.entries`. Sensitive header values
--- (names matching `redact`, default authorization/cookie/api-key style
--- names) are masked as `<redacted>`. An optional `on_entry` callback
--- (camelCase `onEntry` also accepted, matching the other targets)
--- receives each finished entry. `max` caps the buffer (default 100). The
--- clock is injectable (`now`) for deterministic tests.
+-- status and timing — on `client._debug.entries`. Every entry passes
+-- through the SDK's clean rules (clean.keys and every registered secret);
+-- the `redact` option ADDS header names on top of them. An optional
+-- `on_entry` callback (camelCase `onEntry` also accepted, matching the
+-- other targets) receives each finished entry. `max` caps the buffer
+-- (default 100). The clock is injectable (`now`) for deterministic tests.
 
 local BaseFeature = require("feature.base_feature")
 
 local DebugFeature = {}
 DebugFeature.__index = DebugFeature
 setmetatable(DebugFeature, { __index = BaseFeature })
-
-
-local REDACT = {
-  "authorization", "cookie", "set-cookie", "api-key", "apikey",
-  "x-api-key", "idempotency-key",
-}
 
 
 function DebugFeature.new()
@@ -76,7 +70,7 @@ function DebugFeature:PreRequest(ctx)
       ((ctx.op ~= nil and ctx.op.name) or "_"),
     method = method,
     url = url,
-    headers = self:_redact(headers),
+    headers = self:_redact(ctx, headers),
     start = self:_now(),
   }
   self.entries[ctx] = entry
@@ -140,6 +134,11 @@ function DebugFeature:_finish(ctx, ok)
     entry.status = ctx.result.status
   end
 
+  -- The whole entry leaves through the buffer and the callback: the url
+  -- and the error message can carry a query credential the header mask
+  -- above never saw.
+  entry = ctx.utility.clean(ctx, entry)
+
   local client = self.client
   local buf = client._debug.entries
   table.insert(buf, entry)
@@ -155,11 +154,16 @@ function DebugFeature:_finish(ctx, ok)
 end
 
 
-function DebugFeature:_redact(headers)
+-- The core clean rules apply (clean.keys, every registered value); the
+-- feature's own `redact` list ADDS header names on top of them.
+function DebugFeature:_redact(ctx, headers)
   if headers == nil then
     return {}
   end
-  local patterns = self.options["redact"] or REDACT
+  local patterns = {}
+  for _, p in ipairs(self.options["redact"] or {}) do
+    patterns[#patterns + 1] = string.lower(tostring(p))
+  end
   local out = {}
   for k, v in pairs(headers) do
     local masked = false
@@ -173,12 +177,12 @@ function DebugFeature:_redact(headers)
       end
     end
     if masked then
-      out[k] = "<redacted>"
+      out[k] = "[redacted]"
     else
       out[k] = v
     end
   end
-  return out
+  return ctx.utility.clean(ctx, out)
 end
 
 

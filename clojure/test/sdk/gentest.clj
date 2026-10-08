@@ -23,6 +23,11 @@
                (t/is-true (vs/ismap rec) "create resolves to an entity carrying a record")
                (t/is-true (some? (vs/getprop rec "id")) "created record has an id"))
              )))
+  (t/run-check rec "gen-validate-convert"
+    (fn [] (when (vs/getpath (config/make-config) "feature.validate")
+             (let [client (api/test-sdk nil (vs/jm "feature" (vs/jm "validate" (vs/jm "active" true))))]
+               (t/is-throws (fn [] (e-convert/create (api/convert client nil) (vs/jm "embeddings" "x" "source_model" 1 "target_model" "x") nil))
+                            "validate_failed" "validate refuses an invalid request")))))
   (t/run-check rec "gen-exists-embed"
     (fn [] (let [sdk (api/test-sdk nil nil)]
              (t/is-true (some? (api/embed sdk nil)) "embed accessor present"))))
@@ -35,6 +40,11 @@
                (t/is-true (vs/ismap rec) "create resolves to an entity carrying a record")
                (t/is-true (some? (vs/getprop rec "id")) "created record has an id"))
              )))
+  (t/run-check rec "gen-validate-embed"
+    (fn [] (when (vs/getpath (config/make-config) "feature.validate")
+             (let [client (api/test-sdk nil (vs/jm "feature" (vs/jm "validate" (vs/jm "active" true))))]
+               (t/is-throws (fn [] (e-embed/create (api/embed client nil) (vs/jm "embeddings" "x" "model" 1 "texts" "x") nil))
+                            "validate_failed" "validate refuses an invalid request")))))
   (t/run-check rec "gen-exists-ephemeral_key"
     (fn [] (let [sdk (api/test-sdk nil nil)]
              (t/is-true (some? (api/ephemeral_key sdk nil)) "ephemeral_key accessor present"))))
@@ -47,6 +57,11 @@
                (t/is-true (vs/ismap rec) "create resolves to an entity carrying a record")
                (t/is-true (some? (vs/getprop rec "id")) "created record has an id"))
              )))
+  (t/run-check rec "gen-validate-ephemeral_key"
+    (fn [] (when (vs/getpath (config/make-config) "feature.validate")
+             (let [client (api/test-sdk nil (vs/jm "feature" (vs/jm "validate" (vs/jm "active" true))))]
+               (t/is-throws (fn [] (e-ephemeral_key/create (api/ephemeral_key client nil) (vs/jm "dailyLimit" "x" "dailyUsed" 1 "key" "x" "resetsAt" "x") nil))
+                            "validate_failed" "validate refuses an invalid request")))))
   (t/run-check rec "gen-exists-model"
     (fn [] (let [sdk (api/test-sdk nil nil)]
              (t/is-true (some? (api/model sdk nil)) "model accessor present"))))
@@ -57,6 +72,15 @@
                ;; list resolves to one entity per record.
                (t/is-true (sequential? items) "list returns a sequential collection"))
              )))
+  (t/run-check rec "gen-list-model"
+    (fn [] (let [seed (vs/jm "model" (vs/jm "L1" (vs/jm "id" "L1" "name" "a")
+                                                "L2" (vs/jm "id" "L2" "name" "b")))
+                 items (e-model/list (api/model (api/test-sdk (vs/jm "entity" seed) nil) nil)
+                                         (vs/jm) nil)]
+             ;; list resolves to one entity per record; data-get reads the record.
+             (t/is-eq (count items) 2 "list answers each seeded record")
+             (t/is-true (every? (fn [item] (and (map? item) (vs/ismap ((:data-get item))))) items)
+                        "each listed item is an entity carrying its record"))))
   (t/run-check rec "gen-stream-model"
     (fn [] (let [seed (vs/jm "model" (vs/jm "S1" (vs/jm "id" "S1" "name" "a")
                                                 "S2" (vs/jm "id" "S2" "name" "b")
@@ -79,6 +103,45 @@
                (let [csdk (api/test-sdk (vs/jm "entity" seed) (vs/jm "feature" (vs/jm "streaming" (vs/jm "active" true "chunkSize" 2))))
                      batches (vec (e-model/stream (api/model csdk nil) "list" (vs/jm) nil))]
                  (t/is-eq (count batches) 2 "stream chunkSize groups items into 2 batches"))))))
+  (t/run-check rec "gen-stream-error-model"
+    (fn [] (let [offline (vs/jm "net" (vs/jm "offline" true))
+                 err (try (vec (e-model/stream (api/model (api/test-sdk offline nil) nil) "list" (vs/jm) nil)) nil
+                          (catch Throwable e e))]
+             (t/is-true (and (some? err) (.contains (str (.getMessage ^Throwable err)) "offline"))
+                        "the transport failure raises from the stream")
+             (t/is-eq (count (vec (e-model/stream (api/model (api/test-sdk offline nil) nil) "list" (vs/jm)
+                                                 (vs/jm "ctrl" (vs/jm "throw" false)))))
+                      0 "throw false ends the stream quietly")
+             (when (vs/getpath (config/make-config) "feature.rbac")
+               (let [denied (api/test-sdk nil (vs/jm "feature" (vs/jm "rbac" (vs/jm "active" true "deny" true))))]
+                 (t/is-throws (fn [] (vec (e-model/stream (api/model denied nil) "list" (vs/jm) nil)))
+                              "rbac_denied" "the rbac denial raises from the stream"))))))
+  (t/run-check rec "gen-stream-ctrl-model"
+    (fn [] (let [explain (vs/jm)
+                 ctrl (vs/jm "explain" explain)]
+             (vec (e-model/stream (api/model (api/test-sdk nil nil) nil) "list" (vs/jm) (vs/jm "ctrl" ctrl)))
+             (t/is-eq (vec (vs/keysof ctrl)) ["explain"] "the stream changed the caller's ctrl")
+             (t/is-true (identical? explain (vs/getprop ctrl "explain")) "the caller's explain record is not its own")
+             (t/is-true (pos? (count (vs/keysof explain))) "the caller's explain record was not filled"))))
+  (t/run-check rec "gen-unexpected-model"
+    (fn [] (let [seen (atom 0)
+                 hook (atom {:name "failhook" :active true :version "0.0.1" :_options nil
+                             "init" (fn [_ctx _opts] nil)
+                             "PreSpec" (fn [_ctx] (throw (RuntimeException. "model hook failed")))
+                             "PreUnexpected" (fn [_ctx] (swap! seen inc))})
+                 ent (api/model (api/make-sdk (vs/jm "feature" (vs/jm "test" (vs/jm "active" true)) "extend" [hook])) nil)
+                 err (try (e-model/list ent (vs/jm) nil) nil (catch Throwable e e))]
+             (t/is-true (and (some? err) (.contains (str (.getMessage ^Throwable err)) "hook failed"))
+                        "the hook's failure is raised")
+             (t/is-true (pos? @seen) "PreUnexpected did not fire")
+             (let [fired @seen]
+               (t/is-nil (e-model/list ent (vs/jm) (vs/jm "throw" false)) "throw false should resolve to nothing")
+               (t/is-true (> @seen fired) "PreUnexpected did not fire under throw false")))))
+  (t/run-check rec "gen-validate-model"
+    (fn [] (when (vs/getpath (config/make-config) "feature.validate")
+             (let [client (api/test-sdk nil (vs/jm "feature" (vs/jm "validate" (vs/jm "active" true))))]
+               (t/is-throws (fn [] (e-model/list (api/model client nil) (vs/jm "executionProvider" 1) nil))
+                            "validate_failed" "validate refuses an invalid request")))))
   (t/run-check rec "gen-prepare-model"
     (fn [] (let [client (api/make-sdk (vs/jm "base" "http://example.test" "apikey" "test-key"))
                  fetchdef (api/prepare client (vs/jm "path" "/api/model" "method" "GET"))]

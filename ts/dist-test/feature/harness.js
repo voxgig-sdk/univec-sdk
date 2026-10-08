@@ -51,7 +51,7 @@ function defaultServer() {
 function defaultMethod(op) {
     if ('create' === op)
         return 'POST';
-    if ('update' === op)
+    if ('update' === op || 'patch' === op)
         return 'PATCH';
     if ('remove' === op)
         return 'DELETE';
@@ -64,6 +64,9 @@ function makeClient(spec) {
     const server = spec.server || defaultServer();
     const utility = {
         struct,
+        // Features pass every record they emit through the SDK's own clean.
+        clean: __1.stdutil.clean,
+        cleanAdd: __1.stdutil.cleanAdd,
         fetcher: server,
         param: (ctx, name) => {
             const p = (ctx.spec && ctx.spec.params) || {};
@@ -71,10 +74,15 @@ function makeClient(spec) {
             return null != p[name] ? p[name] : q[name];
         },
     };
+    // One clean registry per client, as makeOptions gives a real one, so a value
+    // a feature registers with cleanAdd is masked by every clean after it.
+    const derived = __1.stdutil.makeOptions({
+        utility, options: { feature: { test: { active: true } } }, config: {},
+    }).__derived__;
     const client = {
         _mode: spec.mode || 'test',
         _features: [],
-        _options: { base, headers: spec.headers || {}, feature: {} },
+        _options: { base, headers: spec.headers || {}, feature: {}, __derived__: derived },
         options() { return this._options; },
         utility() { return utility; },
     };
@@ -92,6 +100,7 @@ function makeClient(spec) {
             id: 'C' + idseq,
             client,
             utility,
+            options: client._options,
             out: {},
             ctrl: over.ctrl || {},
             meta: {},
@@ -205,6 +214,9 @@ function makeClient(spec) {
                     headers: ctx.spec.headers,
                     body: ctx.spec.body,
                 };
+                if (null != ctx.ctrl.signal) {
+                    fetchdef.signal = ctx.ctrl.signal;
+                }
                 response = await utility.fetcher(ctx, fetchdef.url, fetchdef);
             }
             ctx.response = response;

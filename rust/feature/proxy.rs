@@ -12,8 +12,48 @@ use crate::utility::voxgigstruct::Value;
 pub struct ProxyTrack {
     // Activity tracking (mirrors the ts client._proxy record).
     pub routed: i64,
+    /// The proxy URL as it may be shown: userinfo masked.
     pub url: String,
+    /// The proxy URL as it is used, kept off the tracking record.
+    raw_url: String,
     pub no_proxy: Vec<String>,
+}
+
+// A proxy URL may carry credentials as userinfo, from the option or the
+// environment, and neither is under a sensitive key name.
+fn userinfo(url: &str) -> Vec<String> {
+    let rest = match url.find("://") {
+        Some(i) => &url[i + 3..],
+        None => url,
+    };
+    let authority = &rest[..rest.find('/').unwrap_or(rest.len())];
+    let at = match authority.rfind('@') {
+        Some(i) => i,
+        None => return Vec::new(),
+    };
+    authority[..at]
+        .splitn(2, ':')
+        .filter(|p| !p.is_empty())
+        .map(|p| p.to_string())
+        .collect()
+}
+
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if b'%' == bytes[i] && i + 2 < bytes.len() {
+            if let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(b);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| s.to_string())
 }
 
 pub struct ProxyFeature {
@@ -117,9 +157,15 @@ impl Feature for ProxyFeature {
             .filter(|s| !s.is_empty())
             .collect();
 
+        for part in userinfo(&url) {
+            ctx.util().clean_add(ctx, &part);
+            ctx.util().clean_add(ctx, &percent_decode(&part));
+        }
+
         {
             let mut t = self.track.borrow_mut();
-            t.url = url;
+            t.url = ctx.util().clean_str(ctx, &url);
+            t.raw_url = url;
             t.no_proxy = no_proxy;
         }
 
@@ -137,7 +183,7 @@ impl Feature for ProxyFeature {
 fn route(track: &Rc<RefCell<ProxyTrack>>, url: &str, fetchdef: &Value) -> Value {
     let (proxy_url, no_proxy) = {
         let t = track.borrow();
-        (t.url.clone(), t.no_proxy.clone())
+        (t.raw_url.clone(), t.no_proxy.clone())
     };
 
     if proxy_url.is_empty() || bypass(&no_proxy, url) {

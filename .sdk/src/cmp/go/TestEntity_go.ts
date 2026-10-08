@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable } from '@voxgig/sdkgen'
 
 import {
   flatten,
@@ -27,7 +27,9 @@ import {
   isAuthActive,
   serverVarEnv,
   serverVariables,
-  entityDataIdField, envName, envToken
+  entityDataIdField, envName, envToken,
+  invalidRequest,
+  liveFlowNeeds, liveStrict, liveStrictNote,
 } from '@voxgig/sdkgen'
 
 
@@ -56,11 +58,11 @@ const TestEntity = cmp(function TestEntity(props: any) {
   const entity: ModelEntity = props.entity
   const gomodule: string = props.gomodule
 
-  // The stream test streams the "list" op and asserts a 3-item collection, so
-  // it only applies to entities that declare a list op. Others (e.g. Batch =
-  // create/load) have no list endpoint — make_point errors and the stream
-  // yields nothing — so skip the stream test for them.
-  const hasList = !!(entity.op && (entity.op as any)?.list)
+  // The stream test streams the "list" op with no match and asserts a 3-item
+  // collection, so it only applies to an entity whose list a bare call can
+  // reach: not one without a list (e.g. Batch = create/load), not a nested
+  // list needing its parent's id, and not one whose routes all need an action.
+  const hasList = opReachable((entity.op as any)?.list, [])
 
   const basicflow: ModelEntityFlow | undefined =
     getModelPath(model, `main.${KIT}.flow.Basic${nom(entity, 'Name')}Flow`)
@@ -105,6 +107,9 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const genCtx: GenCtx = { model, entity, gomodule, flow: basicflow, PROJUPPER }
 
+  const strict = liveStrict(model, target.name)
+  const strictConst = entity.name + 'EntityLiveStrict'
+
   // fmt is only used by the TextFieldMark Update branch — omit the import
   // when no step needs it, otherwise Go's strict unused-import check fails.
   const needsFmt = allSteps.some((s: any) =>
@@ -132,6 +137,10 @@ import (
 	vs "${gomodule}/utility/struct"
 )
 
+${liveStrictNote(strict, '//')}
+const ${strictConst} = ${strict}
+
+${hasList ? failHookType(entity) : ''}
 func Test${entity.Name}Entity(t *testing.T) {
 	t.Run("instance", func(t *testing.T) {
 		testsdk := sdk.TestSDK(nil, nil)
@@ -159,8 +168,11 @@ ${hasList ? `
 		// Fallback: streaming inactive -> yields the materialised list items.
 		base := sdk.TestSDK(seed, nil)
 		var seen []any
-		for item := range base.${entity.Name}(nil).Stream("list", nil, nil) {
-			seen = append(seen, item)
+		for si := range base.${entity.Name}(nil).Stream("list", nil, nil) {
+			if si.Err != nil {
+				t.Fatalf("stream failed: %v", si.Err)
+			}
+			seen = append(seen, si.Item)
 		}
 		if len(seen) != 3 {
 			t.Fatalf("expected 3 streamed items, got %d", len(seen))
@@ -176,11 +188,14 @@ ${hasList ? `
 				"feature": map[string]any{"streaming": map[string]any{"active": true}},
 			})
 			var got []any
-			for item := range streamSdk.${entity.Name}(nil).Stream("list", nil, nil) {
-				if sub, ok := item.([]any); ok {
+			for si := range streamSdk.${entity.Name}(nil).Stream("list", nil, nil) {
+				if si.Err != nil {
+					t.Fatalf("stream failed: %v", si.Err)
+				}
+				if sub, ok := si.Item.([]any); ok {
 					got = append(got, sub...)
 				} else {
-					got = append(got, item)
+					got = append(got, si.Item)
 				}
 			}
 			if len(got) != 3 {
@@ -188,8 +203,9 @@ ${hasList ? `
 			}
 		}
 	})
-` : ''}
-	t.Run("basic", func(t *testing.T) {
+${failureTests(model, entity)}` : ''}${validateTest(model, entity)}
+	t.Run("basic", func(tt *testing.T) {
+		var t testing.TB = tt
 		setup := ${entity.name}BasicSetup(nil)
 		// Per-op sdk-test-control.json skip — basic test exercises a flow
 		// with multiple ops; skipping any op skips the whole flow.
@@ -206,13 +222,8 @@ ${hasList ? `
 				return
 			}
 		}
-		// The basic flow consumes synthetic IDs from the fixture. In live mode
-		// without an *_ENTID env override, those IDs hit the live API and 4xx.
-		if setup.syntheticOnly {
-			t.Skip("live entity test uses synthetic IDs from fixture — set ${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID JSON to run live")
-			return
-		}
-${allSteps.length > 0 ? '\t\tclient := setup.client\n\n' : ''}`)
+${liveFlowGate(entity, liveFlowNeeds(entity, basicflow), strict, strictConst,
+      PROJUPPER + '_TEST_' + envToken(entity.name) + '_ENTID', allSteps.length > 0)}`)
 
     // Check if the flow has a create step; if not, bootstrap entity data
     const flowHasCreate = allSteps.some((s: any) => s.o === 'create')
@@ -292,9 +303,8 @@ ${allSteps.length > 0 ? '\t\tclient := setup.client\n\n' : ''}`)
     Content('\t)\n')
 
     Content(`
-	// Detect ENTID env override before envOverride consumes it. When live
-	// mode is on without a real override, the basic test runs against synthetic
-	// IDs from the fixture and 4xx's. Surface this so the test can skip.
+	// Whether *_ENTID supplied the idmap, read before envOverride consumes it:
+	// without it, the ids a live flow binds are the fixture's synthetic ones.
 	entidEnvRaw := os.Getenv("${PROJUPPER}_TEST_${envToken(entity.name)}_ENTID")
 	idmapOverridden := entidEnvRaw != "" && strings.HasPrefix(strings.TrimSpace(entidEnvRaw), "{")
 
@@ -356,6 +366,51 @@ ${allSteps.length > 0 ? '\t\tclient := setup.client\n\n' : ''}`)
 `)
   })
 })
+
+
+// The live prologue of a flow built from offline fixtures: blocked without
+// the ids it binds, a create-less load reading the first listed record, and
+// a lenient run observing its checks rather than failing on them.
+function liveFlowGate(entity: any, needs: any, strict: boolean, strictConst: string,
+  entidEnv: string, hasSteps: boolean): string {
+  let out = ''
+  if (0 < needs.keys.length) {
+    out += `		if setup.live {
+			for _, _liveKey := range []string{${needs.keys.map((k: string) => JSON.stringify(k)).join(', ')}} {
+				if setup.syntheticOnly || setup.idmap[_liveKey] == nil {
+					liveMiss(t, ${strictConst}, "Live entity test blocked: needs %s via ${entidEnv}", _liveKey)
+				}
+			}
+		}
+`
+  }
+  if (null != needs.blocked) {
+    out += `		if setup.live {
+			liveMiss(t, ${strictConst}, "Live entity test blocked: %s", ${JSON.stringify(needs.blocked)})
+		}
+`
+  }
+  if (hasSteps) {
+    out += '\t\tclient := setup.client\n'
+  }
+  if (null != needs.discover) {
+    const match = Object.entries(needs.discover)
+      .map(([k, v]: any) => `${JSON.stringify(k)}: setup.idmap[${JSON.stringify(v)}]`).join(', ')
+    out += `		if setup.live {
+			liveExisting(t, ${strictConst}, setup.data, ${JSON.stringify(entity.name)}, func() (any, error) {
+				return client.${entity.Name}(nil).List(map[string]any{${match}}, nil)
+			})
+		}
+`
+  }
+  if (!strict) {
+    out += `		if setup.live {
+			t = liveObserver{tt}
+		}
+`
+  }
+  return out + (hasSteps ? '\n' : '')
+}
 
 
 const generateCreate: OpGen = (ctx, step, index) => {
@@ -712,6 +767,131 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A feature whose PreSpec hook panics, counting the PreUnexpected calls it sees.
+function failHookType(entity: ModelEntity): string {
+  return `
+type ${entity.name}FailHook struct {
+	sdk.BaseFeature
+	unexpected int
+}
+
+func (f *${entity.name}FailHook) PreSpec(ctx *sdk.Context) {
+	panic("${entity.name} hook failed")
+}
+
+func (f *${entity.name}FailHook) PreUnexpected(ctx *sdk.Context) {
+	f.unexpected++
+}
+`
+}
+
+
+// A failed operation ends a stream with its error as the last value: a
+// transport failure, and a hook that rejects the call. A panicking hook
+// fires PreUnexpected. The caller's ctrl stays its own.
+function failureTests(model: Model, entity: ModelEntity): string {
+  const Name = entity.Name
+  const SdkError = 'core.' + model.const.Name + 'Error'
+  return `
+	t.Run("stream-error", func(t *testing.T) {
+		offline := map[string]any{"net": map[string]any{"offline": true}}
+		var streamerr error
+		for si := range sdk.TestSDK(offline, nil).${Name}(nil).Stream("list", nil, nil) {
+			if si.Err != nil {
+				streamerr = si.Err
+			}
+		}
+		if nil == streamerr || !strings.Contains(streamerr.Error(), "offline") {
+			t.Fatalf("expected the transport failure as a stream value, got %v", streamerr)
+		}
+
+		quiet := map[string]any{"ctrl": map[string]any{"throw": false}}
+		for si := range sdk.TestSDK(offline, nil).${Name}(nil).Stream("list", nil, quiet) {
+			if si.Err != nil {
+				t.Fatalf("throw false: expected no error value, got %v", si.Err)
+			}
+		}
+
+		if fhHasFeature("rbac") {
+			denied := sdk.TestSDK(nil, map[string]any{
+				"feature": map[string]any{"rbac": map[string]any{"active": true, "deny": true}},
+			})
+			var denyerr error
+			for si := range denied.${Name}(nil).Stream("list", nil, nil) {
+				if si.Err != nil {
+					denyerr = si.Err
+				}
+			}
+			if sdkerr, ok := denyerr.(*${SdkError}); !ok || "rbac_denied" != sdkerr.Code {
+				t.Fatalf("expected the rbac denial as a stream value, got %v", denyerr)
+			}
+		}
+	})
+
+	t.Run("stream-ctrl", func(t *testing.T) {
+		explain := map[string]any{}
+		ctrl := map[string]any{"explain": explain}
+		for range sdk.TestSDK(nil, nil).${Name}(nil).Stream("list", nil, map[string]any{"ctrl": ctrl}) {
+		}
+		if _, has := ctrl["stream"]; has || 1 != len(ctrl) {
+			t.Fatalf("the stream changed the caller's ctrl")
+		}
+		if 0 == len(explain) {
+			t.Fatalf("the caller's explain record was not filled")
+		}
+	})
+
+	t.Run("unexpected", func(t *testing.T) {
+		hook := &${entity.name}FailHook{
+			BaseFeature: sdk.BaseFeature{Version: "0.0.1", Name: "failhook", Active: true}}
+		client := sdk.TestSDK(nil, map[string]any{"extend": []any{hook}})
+
+		_, err := client.${Name}(nil).List(nil, nil)
+		if nil == err || !strings.Contains(err.Error(), "hook failed") {
+			t.Fatalf("expected the hook's failure, got %v", err)
+		}
+		if 0 == hook.unexpected {
+			t.Fatalf("PreUnexpected did not fire")
+		}
+
+		fired := hook.unexpected
+		if _, err := client.${Name}(nil).List(nil, map[string]any{"throw": false}); nil != err {
+			t.Fatalf("throw false: expected no error, got %v", err)
+		}
+		if fired == hook.unexpected {
+			t.Fatalf("throw false: PreUnexpected did not fire")
+		}
+	})
+`
+}
+
+
+// An invalid request fails with validate's own error, before it is sent.
+function validateTest(model: Model, entity: ModelEntity): string {
+  const bad = invalidRequest(entity)
+  if (null == bad) {
+    return ''
+  }
+  const SdkError = 'core.' + model.const.Name + 'Error'
+  const args = Object.entries(bad.args)
+    .map(([k, v]) => JSON.stringify(k) + ': ' + JSON.stringify(v)).join(', ')
+  return `
+	t.Run("validate", func(t *testing.T) {
+		if !fhHasFeature("validate") {
+			t.Skip("feature not present in this SDK: validate")
+		}
+		client := sdk.TestSDK(nil, map[string]any{
+			"feature": map[string]any{"validate": map[string]any{"active": true}},
+		})
+		_, err := client.${entity.Name}(nil).${bad.op[0].toUpperCase() + bad.op.slice(1)}(map[string]any{${args}}, nil)
+		if sdkerr, ok := err.(*${SdkError}); !ok || "validate_failed" != sdkerr.Code {
+			t.Fatalf("expected validate_failed, got %v", err)
+		}
+	})
+`
 }
 
 

@@ -14,7 +14,7 @@ Full documentation for this SDK: [https://voxgig-sdk.github.io/univec-sdk/](http
 
 > TypeScript, Python, PHP, Golang, Ruby, Lua, C, Clojure, C++, C#, Dart, Elixir, Haskell, Java, JavaScript, Kotlin, Lean, OCaml, Perl, Python Data, Rust, Scala, Swift, Zig SDKs, a CLI with an interactive REPL, and an MCP server for AI agents — all generated from one OpenAPI spec by [@voxgig/sdkgen](https://github.com/voxgig/sdkgen).
 
-> **Features:** `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined`, `undefined` — opt-in,
+> **Features:** `audit`, `cache`, `clienttrack`, `cost`, `debug`, `idempotency`, `log`, `metrics`, `netsim`, `paging`, `proxy`, `ratelimit`, `rbac`, `retry`, `secrets`, `streaming`, `telemetry`, `test`, `timeout` — opt-in,
 > inactive until switched on, and configured per client. See the Features
 > section of any SDK README below for what each one does.
 
@@ -56,9 +56,8 @@ const client = UnivecSDK.test({
   },
 })
 const models = await client.Model().list()
-// models is an array of Model entities, populated with mock data
-// — call models[0].data() for the record itself
-console.log(models)
+// models is an array of Model entities, one per mock record
+console.log(models.map((model) => model.data()))
 ```
 
 ### Python
@@ -66,7 +65,7 @@ console.log(models)
 ```python
 client = UnivecSDK.test()
 models = client.Model().list()
-print(models)
+print([item.data_get() for item in models])
 ```
 
 ### PHP
@@ -113,8 +112,10 @@ local results, err = client:Model():list()
 UnivecSDK* client = test_sdk(NULL, NULL);
 PNError* err = NULL;
 Entity* model = univec_model(client, NULL);
-voxgig_value* models = model->vt->list(model, NULL, NULL, &err);
-printf("%s\n", voxgig_to_json(models));
+Entity** models = model->vt->list(model, NULL, NULL, &err);
+for (size_t i = 0; models && models[i]; i++) {
+    printf("%s\n", voxgig_to_json(models[i]->vt->data(models[i], NULL)));
+}
 ```
 
 ### Clojure
@@ -126,23 +127,28 @@ printf("%s\n", voxgig_to_json(models));
 
 (def client (api/test-sdk nil nil))
 (def models (e-model/list (api/model client nil) nil nil))
-(println models)
+(doseq [item models]
+  (println ((:data-get item))))
 ```
 
 ### C++
 
 ```cpp
 auto client = UnivecSDK::testSDK();
-Value models = client->model()->list(Value::undef(), Value::undef());
-std::cout << Struct::jsonify(models) << std::endl;
+for (const auto& model : client->model()->list(Value::undef(), Value::undef())) {
+  std::cout << Struct::jsonify(model->data()) << std::endl;
+}
 ```
 
 ### C#
 
 ```csharp
 var client = UnivecSDK.TestSDK(null, null);
-var modelList = client.Model().List(null);
-Console.WriteLine(modelList);
+var modelList = (List<object?>)client.Model().List(null)!;
+foreach (var modelItem in modelList)
+{
+    Console.WriteLine(StructUtils.Jsonify(((IEntity)modelItem!).Data()));
+}
 ```
 
 ### Dart
@@ -153,7 +159,9 @@ import 'package:univec_sdk/UnivecSDK.dart';
 Future<void> main() async {
   final client = UnivecSDK.test();
   final models = await client.Model().list();
-  print(models);
+  for (final item in models) {
+    print(item.data());
+  }
 }
 ```
 
@@ -164,15 +172,17 @@ alias Univec.Helpers, as: H
 
 sdk = Univec.test()
 model = Univec.model(sdk)
-records = Univec.Entity.Model.list(model, H.deep(%{}))
-IO.inspect(records)
+models = Univec.Entity.Model.list(model, H.deep(%{}))
+for i <- 0..(Voxgig.Struct.size(models) - 1)//1 do
+  IO.puts(Voxgig.Struct.jsonify(Univec.Entity.Model.data_get(Voxgig.Struct.getelem(models, i))))
+end
 ```
 
 ### Haskell
 
 ```haskell
 import qualified SdkClient as Sdk
-import VoxgigStruct (Value (..), emptyMap)
+import VoxgigStruct (Value (..), emptyMap, stringify)
 import SdkHelpers (jo)
 
 main :: IO ()
@@ -182,15 +192,17 @@ main = do
   arg <- emptyMap
   ctrl <- emptyMap
   models <- Sdk.eList ent arg ctrl
-  print models
+  mapM_ (\en -> putStrLn =<< stringify =<< Sdk.eDataGet en) models
 ```
 
 ### Java
 
 ```java
 UnivecSDK client = UnivecSDK.testSDK(null, null);
-Object modelList = client.model(null).list(null, null);
-System.out.println(modelList);
+List<?> modelList = (List<?>) client.model(null).list(null, null);
+for (Object modelItem : modelList) {
+    System.out.println(((SdkEntity) modelItem).data());
+}
 ```
 
 ### JavaScript
@@ -198,17 +210,18 @@ System.out.println(modelList);
 ```js
 const client = UnivecSDK.test()
 const models = await client.Model().list()
-// models is an array of entities, populated with mock data
-// — call models[0].data() for the record itself
-console.log(models)
+// models is an array of Model entities, one per mock record
+console.log(models.map((model) => model.data()))
 ```
 
 ### Kotlin
 
 ```kotlin
 val client = UnivecSDK.testSDK(null, null)
-val modelList = client.model(null).list(null, null)
-println(modelList)
+val modelList = client.model(null).list(null, null) as List<*>
+for (modelItem in modelList) {
+    println((modelItem as SdkEntity).data())
+}
 ```
 
 ### Lean
@@ -218,6 +231,7 @@ cd lean
 lake build
 lake exe omnismoke      # the vendored @voxgig/omni corpus engine itself
 lake exe primary        # shared corpus: request-shaping utilities
+lake exe pipeline       # request shaping driven directly: header, cookie and query arguments
 lake exe feature        # the feature catalog (retry, cache, rbac, netsim, …)
 lake exe structcorpus   # shared corpus: the vendored struct model
 lake exe runner         # entity behaviour (offline; add SDK_TEST_BASE for live)
@@ -241,25 +255,26 @@ use UnivecSDK;
 
 my $client = UnivecSDK->test(undef, undef);
 my $models = $client->Model->list();
-print scalar(@$models), " records\n";
+print $_->data_get->{id}, "\n" for @$models;
 ```
 
 ### Rust
 
 ```rust
-use univec_sdk::{jo, test_sdk, Value};
+use univec_sdk::{jo, test_sdk, UnivecEntity, Entity, Value};
 
 let client = test_sdk(Value::Noval, Value::Noval);
-let models = client.model(Value::Noval).list(Value::Noval, Value::Noval).unwrap();
-println!("{:?}", models);
+for model in client.model(Value::Noval).list(Value::Noval, Value::Noval).unwrap() {
+    println!("{:?}", model.data(None));
+}
 ```
 
 ### Scala
 
 ```scala
 val client = UnivecSDK.testSDK(null, null)
-val modelList = client.model(null).list(null, null)
-println(modelList)
+val modelList = client.model(null).list(null, null).asInstanceOf[java.util.List[SdkEntity]]
+modelList.forEach(modelItem => println(modelItem.data()))
 ```
 
 ### Swift
@@ -267,7 +282,11 @@ println(modelList)
 ```swift
 let client = UnivecSDK.testSDK(nil, nil)
 let modelList = try client.Model().list(nil, nil)
-print(modelList)
+for modelItem in modelList.asList?.items ?? [] {
+    if let modelEntity = modelItem.asNative as? Entity {
+        print(modelEntity.data())
+    }
+}
 ```
 
 ### Zig
@@ -279,7 +298,11 @@ const h = sdk.h;
 
 const client = sdk.test_sdk(h.vnull(), h.vnull());
 switch (client.model(h.vnull()).list(h.vnull(), h.vnull())) {
-    .ok => |models| std.debug.print("{s}\n", .{h.stringify(models)}),
+    .ok => |models| {
+        for (models) |model| {
+            std.debug.print("{s}\n", .{h.stringify(model.asEntity().data(null))});
+        }
+    },
     .err => |e| std.debug.print("list failed: {s}\n", .{e.msg}),
 }
 ```
@@ -288,32 +311,32 @@ switch (client.model(h.vnull()).list(h.vnull(), h.vnull())) {
 
 | Language | Package | Install |
 | --- | --- | --- |
-| TypeScript | `@voxgig-sdk/univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Python | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| PHP | `voxgig-sdk/univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
+| TypeScript | `@voxgig-sdk/univec-sdk` | publish pending — [install from source](ts/README.md#install) |
+| Python | `voxgig-sdk-univec-sdk` | publish pending — [install from source](py/README.md#install) |
+| PHP | `voxgig-sdk/univec-sdk` | publish pending — [install from source](php/README.md#install) |
 | Golang | `github.com/voxgig-sdk/univec-sdk/go` | `go get github.com/voxgig-sdk/univec-sdk/go@latest` |
-| Ruby | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Lua | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| C | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Clojure | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| C++ | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| C# | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Dart | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Elixir | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Haskell | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Java | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| JavaScript | `@voxgig-sdk/univec-sdk-js` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Kotlin | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Lean | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| OCaml | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Perl | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Python Data | `voxgig-sdk-univec-sdk-data` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Rust | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Scala | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Swift | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Zig | `voxgig-sdk-univec-sdk` | publish pending — [install from git tag](https://github.com/voxgig-sdk/univec-sdk/tags) |
-| Go CLI | `github.com/voxgig-sdk/univec-sdk/go-cli` | `go install github.com/voxgig-sdk/univec-sdk/go-cli/cmd/univec@latest` |
-| Go MCP server | `github.com/voxgig-sdk/univec-sdk/go-mcp` | `go get github.com/voxgig-sdk/univec-sdk/go-mcp@latest` |
+| Ruby | `voxgig-sdk-univec-sdk` | publish pending — [install from source](rb/README.md#install) |
+| Lua | `voxgig-sdk-univec-sdk` | publish pending — [install from source](lua/README.md#install) |
+| C | `voxgig-sdk-univec-sdk` | publish pending — [install from source](c/README.md#install) |
+| Clojure | `voxgig-sdk-univec-sdk` | publish pending — [install from source](clojure/README.md#install) |
+| C++ | `voxgig-sdk-univec-sdk` | publish pending — [install from source](cpp/README.md#install) |
+| C# | `voxgig-sdk-univec-sdk` | publish pending — [install from source](csharp/README.md#install) |
+| Dart | `voxgig-sdk-univec-sdk` | publish pending — [install from source](dart/README.md#install) |
+| Elixir | `voxgig-sdk-univec-sdk` | publish pending — [install from source](elixir/README.md#install) |
+| Haskell | `voxgig-sdk-univec-sdk` | publish pending — [install from source](haskell/README.md#install) |
+| Java | `voxgig-sdk-univec-sdk` | publish pending — [install from source](java/README.md#install) |
+| JavaScript | `@voxgig-sdk/univec-sdk-js` | publish pending — [install from source](js/README.md#install) |
+| Kotlin | `voxgig-sdk-univec-sdk` | publish pending — [install from source](kotlin/README.md#install) |
+| Lean | `voxgig-sdk-univec-sdk` | publish pending — [install from source](lean/README.md#install) |
+| OCaml | `voxgig-sdk-univec-sdk` | publish pending — [install from source](ocaml/README.md#install) |
+| Perl | `voxgig-sdk-univec-sdk` | publish pending — [install from source](perl/README.md#install) |
+| Python Data | `voxgig-sdk-univec-sdk-data` | publish pending — [install from source](py-data/README.md#install) |
+| Rust | `voxgig-sdk-univec-sdk` | publish pending — [install from source](rust/README.md#install) |
+| Scala | `voxgig-sdk-univec-sdk` | publish pending — [install from source](scala/README.md#install) |
+| Swift | `voxgig-sdk-univec-sdk` | publish pending — [install from source](swift/README.md#install) |
+| Zig | `voxgig-sdk-univec-sdk` | publish pending — [install from source](zig/README.md#install) |
+| Go CLI | `github.com/voxgig-sdk/univec-sdk/go-cli` | build from source — [go-cli/README.md](go-cli/README.md) |
+| Go MCP server | `github.com/voxgig-sdk/univec-sdk/go-mcp` | build from source — [go-mcp/README.md](go-mcp/README.md) |
 
 ## Quickstart
 
@@ -340,9 +363,10 @@ See the [TypeScript README](ts/README.md) for the full guide.
 
 ## Use it from an AI agent (MCP)
 
-The generated MCP server exposes every operation in this SDK as an
-[MCP](https://modelcontextprotocol.io) tool that Claude, Cursor or Cline
-can call directly. Build and register it:
+The generated MCP server exposes this SDK's list operations as
+[MCP](https://modelcontextprotocol.io) tools that Claude, Cursor or Cline
+can call directly. It only reads: create, update, patch and remove become tools when the SDK's model sets
+`main: kit: target: 'go-mcp': tool: write: true`. Build and register it:
 
 ```bash
 cd go-mcp && go build -o univec-mcp .
@@ -511,7 +535,7 @@ convert = Univec.convert(sdk)
 ```haskell
 import System.Environment (lookupEnv)
 import qualified SdkClient as Sdk
-import VoxgigStruct (Value (..), emptyMap)
+import VoxgigStruct (Value (..), emptyMap, stringify)
 import SdkHelpers (jo)
 
 main :: IO ()
@@ -524,6 +548,7 @@ main = do
 ### Java
 
 ```java
+import java.util.Map;
 import voxgig.univecsdk.core.UnivecSDK;
 
 Map<String, Object> options = new java.util.LinkedHashMap<>();
@@ -576,6 +601,7 @@ Build it with `cd lean && lake build`.
 ```ocaml
 open Voxgig_struct
 open Sdk_helpers
+open Sdk_types
 
 let () =
   let client = Sdk_client.make (jo [("apikey", Str (Sys.getenv "UNIVEC_APIKEY"))]) in
@@ -596,7 +622,7 @@ my $client = UnivecSDK->new({
 ### Rust
 
 ```rust
-use univec_sdk::{jo, UnivecSDK, Value};
+use univec_sdk::{jo, UnivecEntity, UnivecSDK, Entity, Value};
 
 let client = UnivecSDK::new(jo(vec![
     ("apikey", Value::str(std::env::var("UNIVEC_APIKEY").unwrap_or_default())),
@@ -663,10 +689,9 @@ const result = await client.direct({
   method: 'GET',
   params: { id: 'example' },
 })
-if (result instanceof Error) {
-  throw result
+if (result.ok) {
+  console.log(result.data)
 }
-console.log(result.data)
 ```
 
 **Python:**
@@ -777,7 +802,7 @@ result = Univec.direct(sdk, Univec.Helpers.deep(%{
 ```haskell
 import qualified SdkClient as Sdk
 import qualified SdkFeatures as F
-import VoxgigStruct (Value (..))
+import VoxgigStruct (Value (..), stringify)
 import SdkHelpers (jo)
 
 main :: IO ()
@@ -786,7 +811,7 @@ main = do
   params <- jo [("id", VStr "example")]
   args <- jo [("path", VStr "/api/resource/{id}"), ("method", VStr "GET"), ("params", params)]
   result <- F.direct sdk args
-  print result
+  putStrLn =<< stringify result
 ```
 
 **Java:**
@@ -804,10 +829,9 @@ const result = await client.direct({
   method: 'GET',
   params: { id: 'example' },
 })
-if (result instanceof Error) {
-  throw result
+if (result.ok) {
+  console.log(result.data)
 }
-console.log(result.data)
 ```
 
 **Kotlin:**
@@ -936,10 +960,12 @@ customizable without forking any upstream tool:
 - **Templates** (`.sdk/tm/`) and **components** (`.sdk/src/cmp/`) are
   the two layers of generation, copied into this repo: templates are the
   literal per-language source, components generate the API-shaped parts.
-- **Regeneration merges.** By default, newly generated content is
-  three-way merged into existing files, so generator updates and local
-  edits usually converge without manual conflict handling. A project can
-  opt for plain overwrite instead.
+- **Regeneration overwrites.** Each run rewrites every generated file from
+  the model, the templates and the components, so an edit made to
+  generated output is lost. Say what this project needs in its own model
+  (`.sdk/model/sdk.aontu`), or extend a target with a component of its
+  own in `.sdk/src/cmp/<target>/`, registered with `registerComponent`,
+  which `voxgig-sdkgen doctor` reports as an addition rather than drift.
 - **Custom features and entire custom targets** arrive through sdkgen
   packages (`voxgig-sdkgen package add`), on the same rails as the
   bundled languages, and `voxgig-sdkgen doctor` reports any drift from

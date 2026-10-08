@@ -83,8 +83,20 @@ return prepare_auth_util
 
   return head + `
 local vs = require("utility.struct.struct")
+` + ('cookie' === where ? `local helpers = require("core.helpers")
+` : '') + `
+` + consts + `
 
-` + consts + (basic ? BASE64 : '') + ('cookie' === where ? COOKIE_SET : '') + `
+-- The client's auth.name option, when set, replaces the name the API declares.
+local function auth_name(options)
+  local name = vs.getpath(options, "auth.name")
+  if type(name) == "string" and name ~= "" then${'header' === where ? `
+    -- ASCII rules, as a field name is ASCII: lower-casing in the string library follows the C locale.` : ''}
+    return ${'header' === where ? FOLD : 'name'}
+  end
+  return ${CRED}
+end
+` + (basic ? BASE64 : '') + ('cookie' === where ? COOKIE_SET : '') + `
 local function prepare_auth_util(ctx)
   local spec = ctx.spec
   if spec == nil then
@@ -96,8 +108,15 @@ ${bag(where)}  local options = ctx.client:options_map()
 
   -- Public APIs that need no auth omit the options.auth block entirely.
   if options.auth == nil then
-${clear(where, 4)}
+${clear(where, CRED, 4)}
     return spec, nil
+  end
+
+  local name = auth_name(options)
+
+  -- A credential left under the declared name would travel beside the renamed one.
+  if name ~= ${CRED} then
+${clear(where, CRED, 4)}
   end
 
   local apikey = vs.getprop(options, OPTION_APIKEY, NOT_FOUND)
@@ -105,7 +124,7 @@ ${clear(where, 4)}
   if apikey == nil
     or (type(apikey) == "string" and (apikey == NOT_FOUND or apikey == ""))
   then
-${clear(where, 4)}
+${clear(where, 'name', 4)}
   else
 ${place(where)}
   end
@@ -116,6 +135,9 @@ end
 return prepare_auth_util
 `
 }
+
+
+const FOLD = '(string.gsub(name, "[A-Z]", function(c) return string.char(c:byte() + 32) end))'
 
 
 function credConst(where: string): string {
@@ -133,18 +155,20 @@ function bag(where: string): string {
 }
 
 
-function clear(where: string, indent: number): string {
+// A cookie has no header of its own: place() writes it into `cookie` as
+// `name=value`, so clear() frees that pair, not a header of that name.
+function clear(where: string, name: string, indent: number): string {
   const pad = ' '.repeat(indent)
 
   if ('query' === where) {
-    return pad + 'query[QUERY_AUTH] = nil'
+    return pad + `query[${name}] = nil`
   }
 
   if ('cookie' === where) {
-    return pad + 'cookie_set(headers, nil)'
+    return pad + `cookie_set(headers, ${name}, nil)`
   }
 
-  return pad + 'headers[HEADER_AUTH] = nil'
+  return pad + `headers[${name}] = nil`
 }
 
 
@@ -157,7 +181,7 @@ function place(where: string): string {
     if type(apikey) == "string" then
       apikey_val = apikey
     end
-    query[QUERY_AUTH] = apikey_val`
+    query[name] = apikey_val`
   }
 
   if ('cookie' === where) {
@@ -167,7 +191,7 @@ function place(where: string): string {
     end
     -- The prefix is a header-value convention and has no meaning in a
     -- cookie pair, so it is dropped the way a query placement drops it.
-    cookie_set(headers, apikey_val)`
+    cookie_set(headers, name, apikey_val)`
   }
 
   return `    local auth_prefix = ""
@@ -181,25 +205,29 @@ function place(where: string): string {
     end
     -- Empty prefix (raw apiKey credential) must not add a leading space.
     if auth_prefix == "" then
-      headers[HEADER_AUTH] = apikey_val
+      headers[name] = apikey_val
     else
-      headers[HEADER_AUTH] = auth_prefix .. " " .. apikey_val
+      headers[name] = auth_prefix .. " " .. apikey_val
     end`
 }
 
 
 const BASIC = `
-  -- True HTTP Basic Auth needs TWO credentials, base64-joined - a single
+  -- True HTTP Basic Auth joins the two credentials, base64-encoded - a single
   -- token in the header (the branch below) can never authenticate against
   -- an API that actually checks "Authorization: Basic base64(user:pass)".
+  -- The password may be empty (RFC 7617): Lob, for one, documents the key as
+  -- the user with a blank password ("curl -u key:").
   if vs.getpath(options, "auth.basic") == true then
     local secret = vs.getprop(options, OPTION_SECRET, NOT_FOUND)
+    if secret == nil or secret == NOT_FOUND then
+      secret = ""
+    end
 
-    if apikey == nil or secret == nil
+    if apikey == nil
       or (type(apikey) == "string" and (apikey == NOT_FOUND or apikey == ""))
-      or (type(secret) == "string" and (secret == NOT_FOUND or secret == ""))
     then
-      headers[HEADER_AUTH] = nil
+      headers[name] = nil
     else
       local auth_prefix = ""
       local ap = vs.getpath(options, "auth.prefix")
@@ -207,10 +235,13 @@ const BASIC = `
         auth_prefix = ap
       end
       local joined = base64(tostring(apikey) .. ":" .. tostring(secret))
+      -- The joined, encoded pair is a wire form neither credential's own
+      -- registration covers.
+      ctx.utility.clean_add(ctx, joined)
       if auth_prefix == "" then
-        headers[HEADER_AUTH] = joined
+        headers[name] = joined
       else
-        headers[HEADER_AUTH] = auth_prefix .. " " .. joined
+        headers[name] = auth_prefix .. " " .. joined
       end
     end
 
@@ -266,21 +297,16 @@ end
 
 
 const COOKIE_SET = `
-local function cookie_set(headers, value)
+local function cookie_set(headers, name, value)
   local kept = {}
   local existing = headers[HEADER_COOKIE]
 
   if type(existing) == "string" then
-    for pair in string.gmatch(existing, "[^;]+") do
-      local one = string.match(pair, "^%s*(.-)%s*$")
-      if one ~= "" and string.match(one, "^[^=]*") ~= COOKIE_AUTH then
-        kept[#kept + 1] = one
-      end
-    end
+    kept = helpers.cookie_keep(existing, { [name] = true })
   end
 
   if value ~= nil then
-    kept[#kept + 1] = COOKIE_AUTH .. "=" .. value
+    kept[#kept + 1] = name .. "=" .. value
   end
 
   if #kept == 0 then

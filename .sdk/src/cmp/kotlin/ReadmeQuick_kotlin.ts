@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { kotlinVarName, kotlinPackage } from './utility_kotlin'
+import { kotlinVarName, kotlinPackage, kotlinListMatch } from './utility_kotlin'
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -36,6 +36,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
   // all values live in a MutableMap<String, Any?>.
   const kotlinLit = (type: any, placeholder: string = 'example'): string => {
     const k = canonScalarKey(type)
+    if ('NULL' === k) return 'null'
     if ('INTEGER' === k) return '1L'
     if ('NUMBER' === k) return '1.0'
     if ('BOOLEAN' === k) return 'true'
@@ -49,6 +50,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
 
 \`\`\`kotlin
 import ${kotlinPackage(model)}.core.${SDK}
+import ${kotlinPackage(model)}.core.SdkEntity
 
 val client = ${SDK}(mutableMapOf<String, Any?>(
     "apikey" to System.getenv("${envName(model)}_APIKEY"),
@@ -62,6 +64,7 @@ val client = ${SDK}(mutableMapOf<String, Any?>(
 
 \`\`\`kotlin
 import ${kotlinPackage(model)}.core.${SDK}
+import ${kotlinPackage(model)}.core.SdkEntity
 
 val client = ${SDK}()
 \`\`\`
@@ -84,13 +87,15 @@ val client = ${SDK}()
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`list(null, null)\` returns an aggregate list of records (as \`Any?\`, an
-aggregate list) and raises on error.
+\`list(null, null)\` returns a list of entities, one per record (as \`Any?\`),
+and raises on error; an entity's \`data()\` reads its record.
 
 \`\`\`kotlin
 try {
-    val ${eVar}List = client.${accessor}(null).list(null, null)
-    println(${eVar}List)
+    val ${eVar}List = client.${accessor}(null).list(${kotlinListMatch(exampleEntity)}, null) as List<*>
+    for (${eVar}Item in ${eVar}List) {
+        println((${eVar}Item as SdkEntity).data())
+    }
 }
 catch (err: RuntimeException) {
     println("list failed: " + err.message)
@@ -127,8 +132,8 @@ ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
 
 \`\`\`kotlin
 try {
-    val ${neVar} = client.${neAccessor}(null).load(mutableMapOf<String, Any?>(${neMatch.join(', ')}), null)
-    println(${neVar})
+    val ${neVar} = client.${neAccessor}(null).load(mutableMapOf<String, Any?>(${neMatch.join(', ')}), null) as SdkEntity
+    println(${neVar}.data())
 }
 catch (err: RuntimeException) {
     println("load failed: " + err.message)
@@ -155,8 +160,8 @@ catch (err: RuntimeException) {
 
 \`\`\`kotlin
 try {
-    val ${eVar} = client.${accessor}(null).load(${loadArg}, null)
-    println(${eVar})
+    val ${eVar} = client.${accessor}(null).load(${loadArg}, null) as SdkEntity
+    println(${eVar}.data())
 }
 catch (err: RuntimeException) {
     println("load failed: " + err.message)
@@ -185,7 +190,8 @@ catch (err: RuntimeException) {
       return it && it.type
     }
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`kotlin
@@ -201,6 +207,14 @@ val created = client.${accessor}(null).create(mutableMapOf<String, Any?>(${examp
           .concat(examplePairs('update'))
         Content(`// Update — supply the id in the match/data
 client.${accessor}(null).update(mutableMapOf<String, Any?>(${updatePairs.join(', ')}), null)
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`"${idF}" to ${kotlinLit(idParamType('patch'), 'example_id')}`] : [])
+          .concat(examplePairs('patch'))
+        Content(`// Patch — sends only the fields given
+client.${accessor}(null).patch(mutableMapOf<String, Any?>(${patchPairs.join(', ')}), null)
 
 `)
       }

@@ -86,6 +86,9 @@ class UnivecSecretsFeature < UnivecBaseFeature
     @lastset = nil
     @resolved = false
 
+    # The root context, for registering what this feature resolves.
+    @ctx = nil
+
     @statelock = Mutex.new
     @resolvelock = Mutex.new
     @buylock = Mutex.new
@@ -94,6 +97,7 @@ class UnivecSecretsFeature < UnivecBaseFeature
   # Sync by feature contract: build the chain, never look anything up here.
   def init(ctx, options)
     @client = ctx.client
+    @ctx = ctx
     @options = options.is_a?(Hash) ? options : {}
     @liveopts = ctx.options.is_a?(Hash) ? ctx.options : {}
     @active = @options["active"] == true
@@ -140,6 +144,7 @@ class UnivecSecretsFeature < UnivecBaseFeature
       specs = []
 
       if explicit.is_a?(String) && !explicit.empty?
+        _register(explicit)
         specs << {
           "kind" => "memory",
           "name" => "options",
@@ -256,6 +261,15 @@ class UnivecSecretsFeature < UnivecBaseFeature
 
   private
 
+  # Every value this feature resolves or buys is a secret the SDK handles,
+  # and none arrives under an option key the intake registration saw.
+  def _register(value)
+    ctx = @ctx
+    return if ctx.nil? || ctx.utility.nil? || !ctx.utility.respond_to?(:clean_add)
+    add = ctx.utility.clean_add
+    add.call(ctx, value) if add.respond_to?(:call)
+  end
+
   # Resolve once, answering whether a credential came out of it. That
   # boolean is the whole of what resolve needs to tell a cacheable HIT from
   # a miss it must not keep.
@@ -266,6 +280,7 @@ class UnivecSecretsFeature < UnivecBaseFeature
     # "a store could not answer" - only the miss falls through.
     found = @sekreto.try(@secretname)
     found = nil unless found.is_a?(String)
+    _register(found)
 
     if @exchange.nil?
       # An UNCACHED miss after an earlier hit is a revocation: the chain
@@ -468,6 +483,8 @@ class UnivecSecretsFeature < UnivecBaseFeature
       raise VoxgigSekreto::SekretoError,
         "secrets: token exchange returned no '#{x['response']}' field from #{url}"
     end
+
+    _register(token)
 
     token
   end

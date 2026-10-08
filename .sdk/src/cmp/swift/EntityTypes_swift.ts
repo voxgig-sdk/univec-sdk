@@ -5,7 +5,7 @@ import {
   File, Content, Folder,
 } from '@voxgig/sdkgen'
 
-import { canonToType, opTypeName, opRequestShape, warnEntityTypeCollisions , deriveEntityNames, swiftSafeTypeName } from '@voxgig/sdkgen'
+import { canonToType, opTypeName, opRequestShape, warnEntityTypeCollisions , deriveEntityNames, swiftTypeName, entityCollection } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -36,7 +36,7 @@ public struct ${typeName} {
   items.forEach((it: any) => {
     if (null == it || null == it.name) return
     const ident = swiftVarName(it.name)
-    if (seen.has(ident)) return
+    if ('' === ident || seen.has(ident)) return
     seen.add(ident)
     Content(propLine(it.name, it.type, !!it.optional))
   })
@@ -84,7 +84,7 @@ import Foundation
             const fields = (ent.fields ? each(ent.fields) : [])
               .filter((f: any) => f.a !== false)
 
-            const TypeName = swiftSafeTypeName(Name)
+            const TypeName = swiftTypeName(ent, entityCollection(model))
             emitStruct(
               `/// ${TypeName} is the typed data model for the ${ent.name} entity.`,
               TypeName,
@@ -92,7 +92,7 @@ import Foundation
             )
 
             const ops = ent.op || {}
-              ;['load', 'list', 'create', 'update', 'remove'].forEach((opname: string) => {
+              ;['load', 'list', 'create', 'update', 'patch', 'remove'].forEach((opname: string) => {
                 if (null == ops[opname]) {
                   return
                 }

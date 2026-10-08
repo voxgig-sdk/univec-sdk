@@ -16,6 +16,9 @@ public final class Spec {
   public var body: Value = .noval
   public var url: String = ""
   public var path: String = ""
+  // The query parameters prepareAuth placed: the credential, which the
+  // request sends and the entity's match leaves out.
+  public var authquery: [String] = []
 
   public init(_ specmap: VMap?) {
     guard let m = specmap else { return }

@@ -78,6 +78,8 @@ static void telemetry_close(TelemetryFeature* tf, Context* ctx, bool ok) {
   setp(span, "durationMs", v_num((double)dur));
   setp(span, "ok", v_bool(ok));
 
+  span = clean_util(ctx, span);
+
   tf->active_spans -= 1;
   voxgig_list_push(voxgig_as_list(tf->spans), voxgig_retain(span));
 

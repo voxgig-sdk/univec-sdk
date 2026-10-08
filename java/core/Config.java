@@ -408,6 +408,7 @@ public final class Config {
     b.append("   },");
     b.append("   \"optspec\": {");
     b.append("    \"clearTimer\": \"`$FUNCTION`\",");
+    b.append("    \"now\": \"`$FUNCTION`\",");
     b.append("    \"setTimer\": \"`$FUNCTION`\"");
     b.append("   },");
     b.append("   \"strict\": false,");
@@ -575,6 +576,10 @@ public final class Config {
     b.append("          }");
     b.append("         }");
     b.append("        }");
+    b.append("       },");
+    b.append("       \"response\": {");
+    b.append("        \"kind\": \"json\",");
+    b.append("        \"media\": \"application/json\"");
     b.append("       }");
     b.append("      },");
     b.append("      {");
@@ -693,6 +698,10 @@ public final class Config {
     b.append("          \"SDK live coverage test.\"");
     b.append("         ]");
     b.append("        }");
+    b.append("       },");
+    b.append("       \"response\": {");
+    b.append("        \"kind\": \"json\",");
+    b.append("        \"media\": \"application/json\"");
     b.append("       }");
     b.append("      },");
     b.append("      {");
@@ -820,6 +829,10 @@ public final class Config {
     b.append("          }");
     b.append("         }");
     b.append("        }");
+    b.append("       },");
+    b.append("       \"response\": {");
+    b.append("        \"kind\": \"json\",");
+    b.append("        \"media\": \"application/json\"");
     b.append("       }");
     b.append("      },");
     b.append("      {");
@@ -946,6 +959,10 @@ public final class Config {
     b.append("          \"SDK live coverage test.\"");
     b.append("         ]");
     b.append("        }");
+    b.append("       },");
+    b.append("       \"response\": {");
+    b.append("        \"kind\": \"json\",");
+    b.append("        \"media\": \"application/json\"");
     b.append("       }");
     b.append("      }");
     b.append("     ]");
@@ -1069,6 +1086,10 @@ public final class Config {
     b.append("          \"SDK live coverage test.\"");
     b.append("         ]");
     b.append("        }");
+    b.append("       },");
+    b.append("       \"response\": {");
+    b.append("        \"kind\": \"json\",");
+    b.append("        \"media\": \"application/json\"");
     b.append("       }");
     b.append("      },");
     b.append("      {");
@@ -1165,6 +1186,10 @@ public final class Config {
     b.append("          \"SDK live coverage test.\"");
     b.append("         ]");
     b.append("        }");
+    b.append("       },");
+    b.append("       \"response\": {");
+    b.append("        \"kind\": \"json\",");
+    b.append("        \"media\": \"application/json\"");
     b.append("       }");
     b.append("      }");
     b.append("     ]");
@@ -1248,6 +1273,10 @@ public final class Config {
     b.append("        \"auth\": \"public\",");
     b.append("        \"id\": \"key\",");
     b.append("        \"retention\": \"No deletion endpoint; issued key is subject to the service daily allowance\"");
+    b.append("       },");
+    b.append("       \"response\": {");
+    b.append("        \"kind\": \"json\",");
+    b.append("        \"media\": \"application/json\"");
     b.append("       }");
     b.append("      }");
     b.append("     ]");
@@ -1361,6 +1390,10 @@ public final class Config {
     b.append("        },");
     b.append("        \"auth\": \"public\",");
     b.append("        \"id\": \"models\"");
+    b.append("       },");
+    b.append("       \"response\": {");
+    b.append("        \"kind\": \"json\",");
+    b.append("        \"media\": \"application/json\"");
     b.append("       }");
     b.append("      }");
     b.append("     ]");

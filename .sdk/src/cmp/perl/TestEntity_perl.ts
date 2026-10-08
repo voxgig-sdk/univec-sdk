@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable, invalidRequest } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -20,7 +20,8 @@ import {
   getMatchEntries,
   isAuthActive, envName, envToken,
   serverVarEnv,
-  serverVariables
+  serverVariables,
+  liveFlowNeeds, liveStrict, liveStrictNote,
 } from '@voxgig/sdkgen'
 
 import { perlStringLiteral } from './utility_perl'
@@ -40,11 +41,55 @@ type GenCtx = {
 type OpGen = (ctx: GenCtx, step: ModelEntityFlowStep, index: number) => void
 
 
+// The live prologue of a flow built from offline fixtures: blocked without
+// the ids it binds, a create-less load reading the first listed record, and
+// a lenient run reporting a failed check without failing the test.
+function liveFlowGate(N: string, entity: any, needs: any, entidEnv: string,
+  strict: boolean): string {
+  const label = entity.name + ': basic flow'
+  let out = ''
+  if (0 < needs.keys.length) {
+    out += `  if ($setup->{live}) {
+    my @missing = grep { $setup->{synthetic_only} || !defined $setup->{idmap}{$_} } (${needs.keys.map((k: string) => `'${k}'`).join(', ')});
+    if (@missing) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live entity test blocked: needs ' . join(', ', @missing) . ' via ${entidEnv}');
+      last BASIC_FLOW;
+    }
+  }
+`
+  }
+  if (null != needs.blocked) {
+    out += `  if ($setup->{live}) {
+    ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live entity test blocked: ${needs.blocked}');
+    last BASIC_FLOW;
+  }
+`
+  }
+  out += '  my $client = $setup->{client};\n'
+  if (null != needs.discover) {
+    const match = Object.entries(needs.discover)
+      .map(([k, v]: any) => `'${k}' => $setup->{idmap}{'${v}'}`).join(', ')
+    out += `  if ($setup->{live}) {
+    ${N}TestRunner::live_existing($setup, LIVE_STRICT, '${label}', '${entity.name}',
+      sub { $client->${entity.Name}(undef)->list({${match}}, undef) }) or last BASIC_FLOW;
+  }
+`
+  }
+  if (!strict) {
+    out += `  local $main::TODO = $setup->{live} ? 'live run, main.kit.test.live.strict is false' : undef;
+  eval {
+`
+  }
+  return out
+}
+
+
 const TestEntity = cmp(function TestEntity(props: any) {
   const ctx$ = props.ctx$
   const model: Model = ctx$.model
 
   const entity: ModelEntity = props.entity
+  const target = props.target
 
   const basicflow: ModelEntityFlow | undefined =
     getModelPath(model, `main.${KIT}.flow.Basic${nom(entity, 'Name')}Flow`)
@@ -99,6 +144,12 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const genCtx: GenCtx = { model, entity, flow: basicflow, N, PROJUPPER }
 
+  const strict = liveStrict(model, target.name)
+  const needs = liveFlowNeeds(entity, basicflow)
+  // The failure tests stream and list with no match, so they need a list a
+  // bare call can reach.
+  const hasList = opReachable((entity.op as any)?.list, [])
+
   File({ name: entity.name + '_entity.t' }, () => {
 
     Content(`#!perl
@@ -114,12 +165,15 @@ use Cwd ();
 use ${N}SDK;
 require(Cwd::abs_path("$FindBin::Bin/runner.pm"));
 
+${liveStrictNote(strict, '#')}
+use constant LIVE_STRICT => ${strict ? 1 : 0};
+
 {
   my $testsdk = ${N}SDK->test(undef, undef);
   my $ent = $testsdk->${entity.Name}(undef);
   ok(defined $ent, '${entity.name}: create instance');
 }
-
+${hasList ? failureTests(N, entity) : ''}${validateTest(N, entity)}
 BASIC_FLOW: {
   my $setup = ${entity.name}_basic_setup(undef);
   my $_live = $setup->{live} ? 1 : 0;
@@ -133,15 +187,7 @@ BASIC_FLOW: {
       last BASIC_FLOW;
     }
   }
-  # The basic flow consumes synthetic IDs from the fixture. In live mode
-  # without an *_ENTID env override, those IDs hit the live API and 4xx.
-  if ($setup->{synthetic_only}) {
-    note('live entity test uses synthetic IDs from fixture - set ${ENTIDVAR} JSON to run live');
-    pass('${entity.name}: basic flow skipped (synthetic IDs only)');
-    last BASIC_FLOW;
-  }
-  my $client = $setup->{client};
-  my %V;
+${liveFlowGate(N, entity, needs, ENTIDVAR, strict)}  my %V;
 
 `)
 
@@ -168,7 +214,9 @@ BASIC_FLOW: {
       }
     })
 
-    Content(`}
+    Content(`${strict ? '' : `    1;
+  } or ${N}TestRunner::live_observe($@, $setup, LIVE_STRICT, '${entity.name}: basic flow');
+`}}
 
 `)
 
@@ -201,10 +249,8 @@ BASIC_FLOW: {
     }
   );
 
-  # Detect ENTID env override before env_override consumes it. When live
-  # mode is on without a real override, the basic test runs against
-  # synthetic IDs from the fixture and 4xx's. Surface this so the test can
-  # skip.
+  # Whether *_ENTID supplied the idmap, read before env_override consumes
+  # it: without it, the ids a live flow binds are the fixture's synthetic ones.
   my $entid_env_raw = $ENV{'${ENTIDVAR}'};
   my $idmap_overridden = (defined $entid_env_raw && $entid_env_raw =~ /^\\s*\\{/) ? 1 : 0;
 
@@ -533,6 +579,121 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A failed operation raises from a stream as it does from the operation: a
+// transport failure, and a hook that rejects the call. A dying hook fires
+// PreUnexpected, and under throw false the call returns undef. The caller's
+// ctrl stays its own.
+function failureTests(N: string, entity: ModelEntity): string {
+  const Entity = entity.Name
+  const Hook = N + 'EntityTest' + Entity + 'FailHook'
+  return `
+{
+  package ${Hook};
+  our @ISA = ('${N}BaseFeature');
+
+  sub new {
+    my ($class) = @_;
+    my $self = ${N}BaseFeature::new($class);
+    $self->{name} = 'failhook';
+    $self->{unexpected} = 0;
+    return $self;
+  }
+
+  sub init { }
+  sub PreSpec { die "${entity.name} hook failed\\n" }
+  sub PreUnexpected { $_[0]->{unexpected}++; return }
+}
+
+{
+  my $offline = { net => { offline => 1 } };
+  my $died = !eval {
+    my $next = ${N}SDK->test($offline, undef)->${Entity}(undef)->stream('list', undef, undef);
+    1 while defined $next->();
+    1;
+  };
+  like($died ? "$@" : '', qr/offline/, '${entity.name}: a failed stream raises');
+
+  ok(eval {
+    my $next = ${N}SDK->test($offline, undef)->${Entity}(undef)
+      ->stream('list', undef, { ctrl => { throw => 0 } });
+    1 while defined $next->();
+    1;
+  }, '${entity.name}: under throw false a failed stream ends');
+
+  if (${N}Config::shared_config()->{feature}{rbac}) {
+    my $denied = ${N}SDK->test(undef, { feature => { rbac => { active => 1, deny => 1 } } });
+    my $denyerr = eval {
+      my $next = $denied->${Entity}(undef)->stream('list', undef, undef);
+      1 while defined $next->();
+      undef;
+    } // $@;
+    is(ref $denyerr ? $denyerr->{code} : undef, 'rbac_denied',
+      '${entity.name}: a denied stream raises');
+  }
+}
+
+{
+  my $explain = {};
+  my $ctrl = { explain => $explain };
+  my $next = ${N}SDK->test(undef, undef)->${Entity}(undef)
+    ->stream('list', undef, { ctrl => $ctrl });
+  1 while defined $next->();
+  is_deeply([sort keys %$ctrl], ['explain'], '${entity.name}: the stream leaves the caller ctrl');
+  ok($explain == $ctrl->{explain} && 0 < keys %$explain,
+    '${entity.name}: the caller explain record is filled');
+}
+
+{
+  my $hook = ${Hook}->new;
+  my $client = ${N}SDK->new({ feature => { test => { active => 1 } }, extend => [$hook] });
+
+  my $err = eval { $client->${Entity}(undef)->list(undef, undef); undef } // $@;
+  like("$err", qr/hook failed/, '${entity.name}: a dying hook fails the operation');
+  ok(0 < $hook->{unexpected}, '${entity.name}: PreUnexpected fired');
+
+  my $fired = $hook->{unexpected};
+  my $out = eval { $client->${Entity}(undef)->list(undef, { throw => 0 }) };
+  ok(!$@ && !defined $out, '${entity.name}: under throw false the call returns undef');
+  ok($fired < $hook->{unexpected}, '${entity.name}: PreUnexpected fired under throw false');
+}
+
+{
+  my $seed = { entity => { '${entity.name}' => { l1 => { id => 'l1' }, l2 => { id => 'l2' } } } };
+  my $items = ${N}SDK->test($seed, undef)->${Entity}(undef)->list(undef, undef);
+  # list resolves to one entity per record; data_get reads the record.
+  is(scalar(@$items), 2, '${entity.name}: list answers each seeded record');
+  my $entities = grep {
+    Scalar::Util::blessed($_) && $_->can('data_get') && Voxgig::Struct::ismap($_->data_get)
+  } @$items;
+  is($entities, 2, '${entity.name}: each listed item is an entity carrying its record');
+}
+`
+}
+
+
+// An invalid request fails with validate's own error, before it is sent.
+function validateTest(N: string, entity: ModelEntity): string {
+  const bad = invalidRequest(entity)
+  if (null == bad) {
+    return ''
+  }
+  const args = Object.entries(bad.args)
+    .map(([k, v]) => perlStringLiteral(k) + ' => ' +
+      ('string' === typeof v ? perlStringLiteral(v) : true === v ? '1' : String(v)))
+    .join(', ')
+  return `
+SKIP: {
+  skip('feature not present in this SDK: validate', 1)
+    unless ${N}Config::shared_config()->{feature}{validate};
+  my $client = ${N}SDK->test(undef, { feature => { validate => { active => 1 } } });
+  my $err = eval { $client->${entity.Name}(undef)->${bad.op}({ ${args} }, undef); undef } // $@;
+  is(ref $err ? $err->{code} : undef, 'validate_failed',
+    '${entity.name}: an invalid request fails with validate_failed');
+}
+`
 }
 
 

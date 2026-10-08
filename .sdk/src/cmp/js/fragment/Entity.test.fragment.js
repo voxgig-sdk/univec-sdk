@@ -37,6 +37,8 @@ describe('EntityNameEntity', async () => {
     assert(null != ent)
   })
 
+  // <[SLOT:failure]>
+
 
   test('basic', async (t) => {
     // <[SLOT:basic]>

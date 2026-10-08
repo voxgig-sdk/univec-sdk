@@ -112,7 +112,7 @@ private const val HEADER_AUTH = "${ktstr(spec.name)}"
 private const val OPTION_APIKEY = "apikey"
 ` + (basicBranch ? `private const val OPTION_SECRET = "secret"
 ` : '') + `private const val NOT_FOUND = "__NOTFOUND__"
-
+` + authName('HEADER_AUTH', true) + `
 fun prepareAuth(ctx: Context): Spec {
   val spec = ctx.spec
     ?: throw ctx.makeError("auth_no_spec", "Expected context spec property to be defined.")
@@ -126,11 +126,18 @@ fun prepareAuth(ctx: Context): Spec {
     return spec
   }
 
+  val name = prepareAuthName(options)
+
+  // A credential left under the declared name would travel beside the renamed one.
+  if (name != HEADER_AUTH) {
+    headers.remove(HEADER_AUTH)
+  }
+
   val apikey = Struct.getprop(options, OPTION_APIKEY, NOT_FOUND)
 ` + basicBlock(spec) + `
 ` + SKIP + `
   if (skip) {
-    headers.remove(HEADER_AUTH)
+    headers.remove(name)
   } else {
     var authPrefix = ""
     val ap = Struct.getpath(options, listOf("auth", "prefix"))
@@ -140,9 +147,9 @@ fun prepareAuth(ctx: Context): Spec {
     val apikeyVal = if (apikey is String) apikey else ""
     // Empty prefix (raw apiKey credential) must not add a leading space.
     if ("" == authPrefix) {
-      headers[HEADER_AUTH] = apikeyVal
+      headers[name] = apikeyVal
     } else {
-      headers[HEADER_AUTH] = "\$authPrefix \$apikeyVal"
+      headers[name] = "\$authPrefix \$apikeyVal"
     }
   }
 
@@ -156,9 +163,11 @@ function basicBlock(spec: AuthSpec): string {
   if (!spec.basic) return ''
 
   return `
-  // True HTTP Basic Auth needs TWO credentials, base64-joined - a single
+  // True HTTP Basic Auth joins the two credentials, base64-encoded - a single
   // token in the header (the branch below) can never authenticate against
   // an API that actually checks \`Authorization: Basic base64(user:pass)\`.
+  // The password may be empty (RFC 7617): Lob, for one, documents the key as
+  // the user with a blank password (\`curl -u key:\`).
   val basicOpt = Struct.getpath(options, listOf("auth", "basic"))
   if (basicOpt is Boolean && basicOpt) {
     val secret = Struct.getprop(options, OPTION_SECRET, NOT_FOUND)
@@ -167,8 +176,8 @@ function basicBlock(spec: AuthSpec): string {
     val noSecret = secret == null ||
       (secret is String && (NOT_FOUND == secret || "" == secret))
 
-    if (noApikey || noSecret) {
-      headers.remove(HEADER_AUTH)
+    if (noApikey) {
+      headers.remove(name)
     } else {
       var basicPrefix = ""
       val bp = Struct.getpath(options, listOf("auth", "prefix"))
@@ -176,11 +185,14 @@ function basicBlock(spec: AuthSpec): string {
         basicPrefix = bp
       }
       val b64 = Base64.getEncoder().encodeToString(
-        (apikey.toString() + ":" + secret.toString()).toByteArray(Charsets.UTF_8))
+        (apikey.toString() + ":" + (if (noSecret) "" else secret.toString())).toByteArray(Charsets.UTF_8))
+      // The joined, encoded pair is a wire form neither credential's own
+      // registration covers.
+      ctx.utility!!.cleanAdd(ctx, b64)
       if ("" == basicPrefix) {
-        headers[HEADER_AUTH] = b64
+        headers[name] = b64
       } else {
-        headers[HEADER_AUTH] = "\$basicPrefix \$b64"
+        headers[name] = "\$basicPrefix \$b64"
       }
     }
 
@@ -198,7 +210,7 @@ import ${spec.kotlinpackage}.utility.struct.Struct
 private const val QUERY_AUTH = "${ktstr(spec.name)}"
 private const val OPTION_APIKEY = "apikey"
 private const val NOT_FOUND = "__NOTFOUND__"
-
+` + authName('QUERY_AUTH', false) + `
 fun prepareAuth(ctx: Context): Spec {
   val spec = ctx.spec
     ?: throw ctx.makeError("auth_no_spec", "Expected context spec property to be defined.")
@@ -212,18 +224,25 @@ fun prepareAuth(ctx: Context): Spec {
     return spec
   }
 
+  val name = prepareAuthName(options)
+
+  // A credential left under the declared name would travel beside the renamed one.
+  if (name != QUERY_AUTH) {
+    query.remove(QUERY_AUTH)
+  }
+
   val apikey = Struct.getprop(options, OPTION_APIKEY, NOT_FOUND)
 
 ` + SKIP + `
   if (skip) {
-    query.remove(QUERY_AUTH)
+    query.remove(name)
   } else {
     val apikeyVal = if (apikey is String) apikey else ""
     // NO PREFIX IN A QUERY STRING. \`?${spec.name}=Bearer%20abc\` is not a
     // thing any API reads; the prefix is a header convention, so
     // options.auth.prefix is dropped here deliberately rather than silently
     // concatenated.
-    query[QUERY_AUTH] = apikeyVal
+    query[name] = apikeyVal
   }
 
   return spec
@@ -241,30 +260,21 @@ private const val COOKIE_HEADER = "cookie"
 private const val COOKIE_AUTH = "${ktstr(spec.name)}"
 private const val OPTION_APIKEY = "apikey"
 private const val NOT_FOUND = "__NOTFOUND__"
-
-// The cookie header minus our own pair, every other cookie untouched.
-private fun cookiesWithoutCred(headers: MutableMap<String, Any?>): String {
+` + authName('COOKIE_AUTH', false) + `
+// The cookie header minus the named pair, every other cookie untouched.
+private fun cookiesWithoutCred(headers: MutableMap<String, Any?>, name: String): String {
   val existing = headers[COOKIE_HEADER]
   if (existing !is String || "" == existing) {
     return ""
   }
 
-  val kept = mutableListOf<String>()
-  for (part in existing.split(";")) {
-    val piece = part.trim()
-    if ("" == piece || COOKIE_AUTH == piece || piece.startsWith("\$COOKIE_AUTH=")) {
-      continue
-    }
-    kept.add(piece)
-  }
-
-  return kept.joinToString("; ")
+  return cookieKeep(existing, listOf(name)).joinToString("; ")
 }
 
-// Set (a value) or remove (null) our pair, leaving every other cookie in
-// place.
-private fun applyCookie(headers: MutableMap<String, Any?>, value: String?) {
-  val rest = cookiesWithoutCred(headers)
+// Set (a value) or remove (null) the named pair, leaving every other cookie
+// in place.
+private fun applyCookie(headers: MutableMap<String, Any?>, name: String, value: String?) {
+  val rest = cookiesWithoutCred(headers, name)
 
   if (value == null) {
     if ("" == rest) {
@@ -275,7 +285,7 @@ private fun applyCookie(headers: MutableMap<String, Any?>, value: String?) {
     return
   }
 
-  val pair = "\$COOKIE_AUTH=\$value"
+  val pair = "\$name=\$value"
   headers[COOKIE_HEADER] = if ("" == rest) pair else "\$rest; \$pair"
 }
 
@@ -288,23 +298,43 @@ fun prepareAuth(ctx: Context): Spec {
 
   // Public APIs that need no auth omit the options.auth block entirely.
   if (options["auth"] == null) {
-    applyCookie(headers, null)
+    applyCookie(headers, COOKIE_AUTH, null)
     return spec
+  }
+
+  val name = prepareAuthName(options)
+
+  // A credential left under the declared name would travel beside the renamed one.
+  if (name != COOKIE_AUTH) {
+    applyCookie(headers, COOKIE_AUTH, null)
   }
 
   val apikey = Struct.getprop(options, OPTION_APIKEY, NOT_FOUND)
 
 ` + SKIP + `
   if (skip) {
-    applyCookie(headers, null)
+    applyCookie(headers, name, null)
   } else {
     val apikeyVal = if (apikey is String) apikey else ""
     // NO PREFIX IN A COOKIE either - a cookie carries a bare \`name=value\`
     // pair, not a header's scheme-prefixed credential.
-    applyCookie(headers, apikeyVal)
+    applyCookie(headers, name, apikeyVal)
   }
 
   return spec
+}
+`
+}
+
+
+// The client's `auth.name` option, when set, replaces the declared name; a
+// header name travels lower-cased.
+function authName(declared: string, header: boolean): string {
+  return `
+// The client's auth.name option, when set, replaces the name the API declares.
+private fun prepareAuthName(options: Any?): String {
+  val name = Struct.getpath(options, listOf("auth", "name"))
+  return if (name is String && "" != name) ${header ? 'name.lowercase()' : 'name'} else ${declared}
 }
 `
 }

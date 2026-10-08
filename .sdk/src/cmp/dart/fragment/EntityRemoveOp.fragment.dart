@@ -4,7 +4,7 @@
 // EJECT-START
 
   /// Remove a EntityName by match (see EntityNameRemoveMatch in
-  /// ProjectNameTypes.dart). Returns the entity data map (EntityName).
+  /// ProjectNameTypes.dart). Returns the entity, marked as deleted.
   Future<dynamic> remove([dynamic reqmatch, dynamic ctrl]) async {
     final utility = this.utility;
 
@@ -92,9 +92,15 @@
 
       return out;
     } catch (err) {
-      // #PreUnexpected-Hook
+      // What a hook throws here must not escape the cleaning below.
+      dynamic failure = err;
+      try {
+        // #PreUnexpected-Hook
+      } catch (hookerr) {
+        failure = hookerr;
+      }
 
-      final uerr = unexpected(ctx, err);
+      final uerr = unexpected(ctx, failure);
 
       if (null != uerr) {
         throw uerr;

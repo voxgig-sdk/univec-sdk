@@ -55,7 +55,7 @@ final client = UnivecSDK({
 ### 4. Create, update, and remove
 
 ```dart
-// Create — returns the ENTITY (call data() for the record)
+// Create — returns the created entity; data() reads its record
 final created = await client.Convert().create({'embeddings': <dynamic>[], 'source_model': 'example_source_model', 'target_model': 'example_target_model'});
 
 ```
@@ -68,14 +68,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -84,8 +85,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -137,11 +138,12 @@ Create a mock client for unit testing — no server required:
 ```dart
 final client = UnivecSDK.test();
 
-// Entity ops return the ENTITY and throws on error;
-// call data() for the record.
-final model = await client.Model().list();
-// model contains the mock response record
-print(model);
+// list returns one entity per record and throws on error;
+// data() reads each mock record.
+final models = await client.Model().list();
+for (final item in models) {
+  print(item.data());
+}
 ```
 
 ### Use a custom fetch function
@@ -231,8 +233,8 @@ All entities share the same interface.
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `list` | `(reqmatch, [ctrl]) -> Future<List>` | List entities matching the criteria (a list of entity instances). Throws on error. |
-| `create` | `(reqdata, [ctrl]) -> Future<dynamic>` | Create a new entity. Throws on error. |
+| `list` | `(reqmatch, [ctrl]) -> Future<List>` | List entities matching the criteria. Returns one entity per record. Throws on error. |
+| `create` | `(reqdata, [ctrl]) -> Future<dynamic>` | Create a new entity. Returns the entity. Throws on error. |
 | `data` | `([d]) -> Map` | Get (or, with an argument, set) entity data. |
 | `match` | `([m]) -> Map` | Get (or, with an argument, set) entity match criteria. |
 | `make` | `() -> Entity` | Create a new instance with the same options. |
@@ -241,9 +243,10 @@ All entities share the same interface.
 
 ### Result shape
 
-Entity operations return the ENTITY (call data() for the record) (a `Map` for single-entity
-ops, a `List` of entity instances for `list`) and throw on error. Wrap calls
-in `try`/`catch` to handle failures.
+Entity operations return the entity, not the raw record — `list` a `List`
+of entities, one per record — and throw on error. An entity's `data()` reads
+its record. `remove` returns the entity marked as deleted (`deleted()`); it
+keeps the data it held. Wrap calls in `try`/`catch` to handle failures.
 
 The `direct()` escape hatch never throws — it returns a result `Map` you
 branch on via `result['ok']`:
@@ -328,7 +331,7 @@ Create an instance: `final convert = client.Convert();`
 
 | Method | Description |
 | --- | --- |
-| `create(data)` | Create a new entity with the given data. |
+| `create(data)` | Create a new entity with the given data. Returns the entity. |
 
 #### Fields
 
@@ -357,7 +360,7 @@ Create an instance: `final embed = client.Embed();`
 
 | Method | Description |
 | --- | --- |
-| `create(data)` | Create a new entity with the given data. |
+| `create(data)` | Create a new entity with the given data. Returns the entity. |
 
 #### Fields
 
@@ -386,7 +389,7 @@ Create an instance: `final ephemeral_key = client.EphemeralKey();`
 
 | Method | Description |
 | --- | --- |
-| `create(data)` | Create a new entity with the given data. |
+| `create(data)` | Create a new entity with the given data. Returns the entity. |
 
 #### Fields
 
@@ -417,7 +420,7 @@ Create an instance: `final model = client.Model();`
 
 | Method | Description |
 | --- | --- |
-| `list()` | List entities, optionally matching the given criteria. |
+| `list()` | List entities, optionally matching the given criteria. Returns one entity per record. |
 
 #### Fields
 

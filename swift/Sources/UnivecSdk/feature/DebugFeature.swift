@@ -1,9 +1,10 @@
 // Request/response capture for debugging. Records a bounded ring buffer of
 // per-operation traces - method, URL, redacted headers, response status and
-// timing - on the feature's entries. Sensitive header values (matching
-// `redact`, default authorization/cookie/api-key style names) are masked.
-// An optional `onEntry` callback receives each finished entry (e.g. to
-// stream to a console). `max` caps the buffer (default 100).
+// timing - on the feature's entries. Every entry passes through the SDK's
+// clean utility (clean.keys and every registered secret value); the
+// `redact` option ADDS header names on top of that. An optional `onEntry`
+// callback receives each finished entry (e.g. to stream to a console).
+// `max` caps the buffer (default 100).
 
 import Foundation
 
@@ -15,11 +16,6 @@ public final class DebugFeature: BaseFeature {
   public var entries: [VMap] = []
 
   private static let entryKey = "debug_entry"
-
-  private static let defaultRedact: [String] = [
-    "authorization", "cookie", "set-cookie", "api-key", "apikey",
-    "x-api-key", "idempotency-key",
-  ]
 
   public override init() {
     super.init()
@@ -48,7 +44,7 @@ public final class DebugFeature: BaseFeature {
     if let spec = ctx.spec {
       entry.entries["method"] = .string(spec.method)
       entry.entries["url"] = .string(spec.url != "" ? spec.url : spec.path)
-      entry.entries["headers"] = .map(redact(spec.headers))
+      entry.entries["headers"] = .map(redact(ctx, spec.headers))
     }
     ctx.out[DebugFeature.entryKey] = entry
   }
@@ -83,10 +79,11 @@ public final class DebugFeature: BaseFeature {
 
   private func finish(_ ctx: Context, _ ok: Bool) {
     // Finish once per operation: the marker in ctx.out is consumed here.
-    guard let entry = ctx.out[DebugFeature.entryKey] as? VMap else {
+    guard let raw = ctx.out[DebugFeature.entryKey] as? VMap else {
       return
     }
     ctx.out.removeValue(forKey: DebugFeature.entryKey)
+    var entry = raw
 
     entry.entries["ok"] = .bool(ok && (ctx.result == nil || ctx.result!.ok))
     let sv = gp(entry, "start")
@@ -100,6 +97,11 @@ public final class DebugFeature: BaseFeature {
       entry.entries["status"] = .int(Int64(result.status))
     }
 
+    // The whole entry leaves through the buffer and the callback: the url
+    // and the error message can carry a query credential the header mask
+    // above never saw.
+    entry = fclean(ctx, entry)
+
     entries.append(entry)
     let max = foptInt(options, "max", 100)
     while entries.count > max {
@@ -111,16 +113,18 @@ public final class DebugFeature: BaseFeature {
     }
   }
 
-  private func redact(_ headers: VMap?) -> VMap {
+  // The core clean rules apply (clean.keys, every registered value); the
+  // feature's own `redact` list ADDS header names on top of them.
+  private func redact(_ ctx: Context, _ headers: VMap?) -> VMap {
     let redacted = VMap()
     guard let headers = headers else {
       return redacted
     }
-    let patterns = foptStrList(options, "redact") ?? DebugFeature.defaultRedact
+    let patterns = (foptStrList(options, "redact") ?? []).map { $0.lowercased() }
     for (k, v) in headers.entries {
       let masked = patterns.contains(k.lowercased())
-      redacted.entries[k] = masked ? .string("<redacted>") : v
+      redacted.entries[k] = masked ? .string("[redacted]") : v
     }
-    return redacted
+    return fclean(ctx, redacted)
   }
 }

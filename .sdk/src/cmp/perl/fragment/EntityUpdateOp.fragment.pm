@@ -3,8 +3,8 @@
 # Update an existing EntityName.
 #
 # reqdata: body data hashref (EntityNameUpdateData shape). ctrl: optional
-# per-call control. Returns the updated EntityName data (hashref); dies
-# with ProjectNameError on failure.
+# per-call control. Returns the updated EntityName entity (data_get reads
+# its record); dies with ProjectNameError on failure.
 sub update {
   my ($self, $reqdata, $ctrl) = @_;
   my $utility = $self->{_utility};

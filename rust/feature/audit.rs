@@ -80,6 +80,8 @@ impl AuditFeature {
             setp(&record, "status", Value::Num(r.borrow().status as f64));
         }
 
+        let record = ctx.util().clean(ctx, &record);
+
         self.records.push(record.clone());
         let max = fopt_int(&self.options, "max", 1000) as usize;
         while self.records.len() > max {

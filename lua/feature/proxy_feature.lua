@@ -27,6 +27,7 @@ function ProxyFeature.new()
   self.options = nil
   self.url = nil
   self.no_proxy = {}
+  self._ctx = nil
   return self
 end
 
@@ -64,6 +65,22 @@ function ProxyFeature:init(ctx, options)
   end
 
   self.url = url
+  self._ctx = ctx
+
+  -- A proxy URL may carry credentials as userinfo, from the option or the
+  -- environment, and neither is under a sensitive key name.
+  if type(url) == "string" then
+    local userinfo = string.match(url, "^%a[%w+.-]*://([^@/]+)@")
+    if userinfo ~= nil then
+      for part in string.gmatch(userinfo, "[^:]+") do
+        ctx.utility.clean_add(ctx, part)
+        ctx.utility.clean_add(ctx, (string.gsub(part, "%%(%x%x)", function(hex)
+          return string.char(tonumber(hex, 16))
+        end)))
+      end
+    end
+  end
+
   self.no_proxy = {}
   if type(no_proxy) == "string" then
     for part in string.gmatch(no_proxy, "[^,]+") do
@@ -138,7 +155,12 @@ end
 function ProxyFeature:_track(fullurl)
   local client = self.client
   if client._proxy == nil then
-    client._proxy = { routed = 0, url = self.url }
+    local ctx = self._ctx
+    local url = self.url
+    if ctx ~= nil and type(url) == "string" then
+      url = ctx.utility.clean(ctx, url)
+    end
+    client._proxy = { routed = 0, url = url }
   end
   client._proxy.routed = client._proxy.routed + 1
 end

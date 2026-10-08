@@ -1,18 +1,19 @@
 
-import { cmp, each, Content, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, entityIdField, opRequestShape, opNeedsAction } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { ocamlVarName } from './utility_ocaml'
+import { ocamlVarName, ocamlListMatch } from './utility_ocaml'
 
 
 // A type-correct OCaml `value` literal for a field's canonical type. Strings
 // render the quoted placeholder.
 function ocamlLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Null'
   if ('INTEGER' === k || 'NUMBER' === k) return '(Num 1.)'
   if ('BOOLEAN' === k) return '(Bool true)'
   if ('ARRAY' === k) return '(empty_list ())'
@@ -43,6 +44,7 @@ const OP_DESC: Record<string, { method: string, desc: string }> = {
   list:   { method: 'e_list reqmatch ctrl',   desc: 'List entities, optionally matching the given criteria. Resolves to one entity per record.' },
   create: { method: 'e_create reqdata ctrl',  desc: 'Create a new entity with the given data. Resolves to the entity.' },
   update: { method: 'e_update reqdata ctrl',  desc: 'Update an existing entity. Resolves to the entity.' },
+  patch:  { method: 'e_patch reqdata ctrl',   desc: 'Change part of an existing entity. Resolves to the entity.' },
   remove: { method: 'e_remove reqmatch ctrl', desc: 'Remove the matching entity. Resolves to the entity, marked deleted.' },
 }
 
@@ -68,6 +70,8 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
+    // An op that needs an action has no plain call to show.
+    const callable = opnames.filter((o: string) => !opNeedsAction(entity.op[o]))
     const fields = Object.values(entity.fields || {})
     // Model-driven id key: null when this entity has no id-like field.
     const idF = entityIdField(entity)
@@ -123,7 +127,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 `)
     }
 
-    if (opnames.includes('load')) {
+    if (callable.includes('load')) {
       // The id key plus every REQUIRED match key (parent path params like
       // page_id) — the same shape the runtime resolves path params from.
       const loadItems = opRequestShape(entity, 'load').items
@@ -146,19 +150,19 @@ let ${fn}_data = ${fn}.e_data_get ()
 `)
     }
 
-    if (opnames.includes('list')) {
+    if (callable.includes('list')) {
       Content(`#### Example: List
 
 \`\`\`ocaml
 (* One ENTITY per record. *)
-let ${fn}s = (Sdk_client.${fn} client Noval).e_list (empty_map ()) Noval
+let ${fn}s = (Sdk_client.${fn} client Noval).e_list ${ocamlListMatch(entity)} Noval
 let ${fn}_datas = List.map (fun e -> e.e_data_get ()) ${fn}s
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('create')) {
+    if (callable.includes('create')) {
       const createItems = opRequestShape(entity, 'create').items
         .filter((it: any) => !it.optional)
       Content(`#### Example: Create

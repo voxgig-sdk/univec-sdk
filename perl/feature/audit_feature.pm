@@ -82,7 +82,7 @@ sub _emit {
   $self->{seen}{$addr} = 1;
   $self->{seq} += 1;
 
-  my $record = {
+  my $record = $ctx->{utility}{clean}->($ctx, {
     'seq' => $self->{seq},
     'ts' => $self->_now,
     'actor' => $self->_actor($ctx),
@@ -91,7 +91,7 @@ sub _emit {
     'outcome' => $outcome,
     'status' => ($ctx->{result} ? $ctx->{result}{status} : undef),
     'correlationId' => $ctx->{id},
-  };
+  });
 
   my $track = $self->{client}{_audit};
   if (!$track) {

@@ -6,18 +6,29 @@ import java.nio.file.Paths
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 
+import voxgig.univecsdk.core.Config
+import voxgig.univecsdk.core.Context
 import voxgig.univecsdk.core.Helpers
 import voxgig.univecsdk.core.SdkEntity
+import voxgig.univecsdk.core.SdkError
 import voxgig.univecsdk.core.UnivecSDK
+import voxgig.univecsdk.feature.BaseFeature
 import voxgig.univecsdk.utility.Json
 import voxgig.univecsdk.utility.struct.Struct
 
 @Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "UNUSED_VALUE")
 class ModelEntityTest {
+
+  // main.kit.test.live.strict is true (the default is true): a live
+  // request that fails, or a live test missing an input it needs,
+  // fails the test.
+  // An account with no record for a test to read skips it either way.
+  private val LIVE_STRICT = true
 
   @Test
   fun instance() {
@@ -38,10 +49,6 @@ class ModelEntityTest {
         if (reason == null || "" == reason) "skipped via sdk-test-control.json" else reason,
       )
     }
-    Assumptions.assumeFalse(
-      setup.syntheticOnly,
-      "live entity test uses synthetic IDs from fixture — set UNIVEC_TEST_MODEL_ENTID JSON to run live",
-    )
     val client = setup.client
 
     // Bootstrap entity data from existing test data (no create step in flow).
@@ -93,6 +100,79 @@ class ModelEntityTest {
     assertEquals(listed.size, streamed2.size, "expected fallback stream to match list")
   }
 
+  private fun hasFeature(name: String): Boolean {
+    val fm = Helpers.toMapAny(Config.sharedConfig()["feature"])
+    return fm != null && fm[name] != null
+  }
+
+  class FailHook : BaseFeature("failhook", "0.0.1", true) {
+    var unexpected = 0
+    override fun preSpec(ctx: Context) { throw RuntimeException("model hook failed") }
+    override fun preUnexpected(ctx: Context) { unexpected++ }
+  }
+
+  @Test
+  fun streamError() {
+    val offline = linkedMapOf<String, Any?>("net" to linkedMapOf<String, Any?>("offline" to true))
+    val err = assertThrows(RuntimeException::class.java) {
+      UnivecSDK.testSDK(offline, null).model(null).stream("list", null, null).toList()
+    }
+    assertTrue(err.message.orEmpty().contains("offline"), err.message)
+
+    UnivecSDK.testSDK(offline, null).model(null).stream("list", null,
+      linkedMapOf<String, Any?>("ctrl" to linkedMapOf<String, Any?>("throw" to false))).toList()
+
+    if (hasFeature("rbac")) {
+      val denied = UnivecSDK.testSDK(null, linkedMapOf<String, Any?>(
+        "feature" to linkedMapOf<String, Any?>(
+          "rbac" to linkedMapOf<String, Any?>("active" to true, "deny" to true))))
+      val denyerr = assertThrows(SdkError::class.java) {
+        denied.model(null).stream("list", null, null).toList()
+      }
+      assertEquals("rbac_denied", denyerr.code)
+    }
+  }
+
+  @Test
+  fun streamCtrl() {
+    val explain = linkedMapOf<String, Any?>()
+    val ctrl = linkedMapOf<String, Any?>("explain" to explain)
+    UnivecSDK.testSDK().model(null).stream("list", null,
+      linkedMapOf<String, Any?>("ctrl" to ctrl)).toList()
+    assertEquals(listOf("explain"), ctrl.keys.toList())
+    assertTrue(explain === ctrl["explain"] && explain.isNotEmpty())
+  }
+
+  @Test
+  fun unexpected() {
+    val hook = FailHook()
+    val client = UnivecSDK(linkedMapOf<String, Any?>(
+      "feature" to linkedMapOf<String, Any?>("test" to linkedMapOf<String, Any?>("active" to true)),
+      "extend" to mutableListOf<Any?>(hook)))
+
+    val err = assertThrows(RuntimeException::class.java) {
+      client.model(null).list(null, null)
+    }
+    assertTrue(err.message.orEmpty().contains("hook failed"), err.message)
+    assertTrue(0 < hook.unexpected)
+
+    val fired = hook.unexpected
+    client.model(null).list(null, linkedMapOf<String, Any?>("throw" to false))
+    assertTrue(fired < hook.unexpected)
+  }
+
+  @Test
+  fun validate() {
+    Assumptions.assumeTrue(hasFeature("validate"), "feature not present in this SDK: validate")
+    val client = UnivecSDK.testSDK(null, linkedMapOf<String, Any?>(
+      "feature" to linkedMapOf<String, Any?>(
+        "validate" to linkedMapOf<String, Any?>("active" to true))))
+    val err = assertThrows(SdkError::class.java) {
+      client.model(null).list(linkedMapOf<String, Any?>("executionProvider" to 1), null)
+    }
+    assertEquals("validate_failed", err.code)
+  }
+
   companion object {
     fun modelBasicSetup(extra: MutableMap<String, Any?>?): RunnerSupport.EntityTestSetup {
       RunnerSupport.loadEnvLocal()
@@ -122,7 +202,7 @@ class ModelEntityTest {
           "\"`\$VAL`\": [\"`\$FORMAT`\", \"upper\", \"`\$COPY`\"]" +
           "}]}"))
 
-      // Detect ENTID env override before envOverride consumes it.
+      // Whether *_ENTID supplied the idmap, read before envOverride consumes it.
       val entidEnvRaw = RunnerSupport.getenv("UNIVEC_TEST_MODEL_ENTID")
       val idmapOverridden = entidEnvRaw != null && entidEnvRaw.trim().startsWith("{")
 

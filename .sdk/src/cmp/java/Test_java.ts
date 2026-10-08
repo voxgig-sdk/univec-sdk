@@ -9,6 +9,7 @@ import { cmp, each, Folder, entityCollection,
 
 import { TestEntity } from './TestEntity_java'
 import { TestDirect } from './TestDirect_java'
+import { TestClean } from './TestClean_java'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_java'
 import { javaPackage } from './utility_java'
 
@@ -23,6 +24,7 @@ const Test = cmp(function Test(props: any) {
 
     // Write-once: a project's edited control file survives regeneration.
     TestControl({ target, dir: 'test' })
+    TestClean({ target, javapackage })
 
     const entity = each(entityCollection(model))
       .filter((e: any) => false !== e.active)

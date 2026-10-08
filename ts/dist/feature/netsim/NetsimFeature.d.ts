@@ -12,7 +12,7 @@ declare class NetsimFeature extends BaseFeature {
     init(ctx: Context, options: FeatureOptions): void | Promise<any>;
     _simulate(this: any, ctx: any, url: string, fetchdef: any, inner: any): Promise<any>;
     _pickLatency(this: any): number;
-    _sleep(this: any, ms: number): Promise<void>;
+    _sleep(this: any, ms: number, signal?: any): Promise<void>;
     _rand(this: any): number;
     _track(this: any, ctx: any, applied: any): void;
     _respond(this: any, ctx: any, status: number, data?: any, extra?: any): any;

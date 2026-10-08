@@ -72,12 +72,14 @@ pub const TelemetryFeature = struct {
         h.setp(span, "durationMs", h.vnum(dur));
         h.setp(span, "ok", h.vbool(ok));
 
+        const out = ctx.util().clean(ctx, span);
+
         self.active_spans -= 1;
-        self.spans.append(h.A(), span) catch {};
+        self.spans.append(h.A(), out) catch {};
 
         const exporter = h.getp(self.options, "exporter");
         if (exporter == .function) {
-            _ = h.call_vfn(exporter, span);
+            _ = h.call_vfn(exporter, out);
         }
     }
 

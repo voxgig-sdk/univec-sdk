@@ -47,6 +47,21 @@ defmodule Univec.Feature.Test do
     nil
   end
 
+  # The key a list's response transform
+  # ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record under.
+  defp item_envelope_key(spec) do
+    with true <- S.islist(spec),
+         3 <- S.size(spec),
+         "`$EACH`" <- S.getelem(spec, 0),
+         "body" <- S.getelem(spec, 1),
+         merge when is_binary(merge) <- S.getprop(S.getelem(spec, 2), "`$MERGE`"),
+         [_, key] <- Regex.run(~r/^`\.([^.`$]+)`$/, merge) do
+      key
+    else
+      _ -> nil
+    end
+  end
+
   # THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
   # `transform.res: `body.item`` describes an API that answers {"item": {...}}
   # and the response transform unwraps that key on the way back. Returning the
@@ -54,27 +69,32 @@ defmodule Univec.Feature.Test do
   # the caller gets nothing. Mirrors the go/ts/lua/php mocks.
   defp envelope(fctx, data) do
     spec = S.getprop(S.getprop(S.getprop(fctx, "point"), "transform"), "res")
+    key = item_envelope_key(spec)
 
-    # Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
-    # GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
-    case {data, spec} do
-      {nil, _} ->
-        data
+    if key != nil and S.islist(data) do
+      S.jt(for i <- 0..(S.size(data) - 1)//1, do: S.jm([key, S.getelem(data, i)]))
+    else
+      # Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
+      # GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
+      case {data, spec} do
+        {nil, _} ->
+          data
 
-      {_, s} when is_binary(s) ->
-        case Regex.run(~r/^`body\.(.+)`$/, s) do
-          [_, inner] ->
-            inner
-            |> String.split(".")
-            |> Enum.reverse()
-            |> Enum.reduce(data, fn seg, out -> S.jm([seg, out]) end)
+        {_, s} when is_binary(s) ->
+          case Regex.run(~r/^`body\.(.+)`$/, s) do
+            [_, inner] ->
+              inner
+              |> String.split(".")
+              |> Enum.reverse()
+              |> Enum.reduce(data, fn seg, out -> S.jm([seg, out]) end)
 
-          _ ->
-            data
-        end
+            _ ->
+              data
+          end
 
-      _ ->
-        data
+        _ ->
+          data
+      end
     end
   end
 
@@ -140,7 +160,7 @@ defmodule Univec.Feature.Test do
           respond(fctx, 200, S.clone(found))
         end
 
-      "update" ->
+      opn when opn in ["update", "patch"] ->
         reqdata = S.getprop(fctx, "reqdata")
 
         update_match =
@@ -171,7 +191,12 @@ defmodule Univec.Feature.Test do
           # update miss: 404, never another record
           respond(fctx, 404, nil, S.jm(["statusText", "Not found"]))
         else
-          if S.ismap(ent) and S.ismap(reqdata), do: S.merge(S.jt([ent, reqdata]))
+          # `$body` travels on the wire alone; the record is the rest.
+          if S.ismap(ent) and S.ismap(reqdata) do
+            rec = S.clone(reqdata)
+            S.delprop(rec, "$body")
+            S.merge(S.jt([ent, rec]))
+          end
 
           S.delprop(ent, "$KEY")
           respond(fctx, 200, S.clone(ent))
@@ -196,6 +221,7 @@ defmodule Univec.Feature.Test do
         ent = S.clone(S.getprop(fctx, "reqdata"))
 
         if S.ismap(ent) do
+          S.delprop(ent, "$body")
           S.setprop(ent, "id", eid)
           if is_binary(eid), do: S.setprop(entmap, eid, ent)
           S.delprop(ent, "$KEY")

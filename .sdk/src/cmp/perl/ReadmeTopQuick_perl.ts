@@ -7,6 +7,8 @@ import {
   nom,
 } from '@voxgig/apidef'
 
+import { perlListArgs } from './utility_perl'
+
 
 // A type-correct, executable Perl literal for a param: numeric/boolean/
 // array/hash params render a typed literal; strings render the quoted
@@ -14,6 +16,7 @@ import {
 // would break it).
 function perlLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'undef'
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return '1'
   if ('ARRAY' === k) return '[]'
@@ -49,10 +52,10 @@ my $client = ${ctor};
     const idF = entityIdField(exampleEntity)
 
     if (opnames.includes('list')) {
-      Content(`# List all ${eName.toLowerCase()}s (returns an arrayref; dies on error)
-my $${eVar}s = $client->${eName}->list;
+      Content(`# List all ${eName.toLowerCase()}s (an arrayref of entities, one per record; dies on error)
+my $${eVar}s = $client->${eName}->list${perlListArgs(exampleEntity)};
 for my $${eVar} (@$${eVar}s) {
-    print "$${eVar}->{id}\\n";
+    print $${eVar}->data_get->{id}, "\\n";
 }
 `)
     }
@@ -71,9 +74,9 @@ for my $${eVar} (@$${eVar}s) {
             it.name === idF ? 'example_id' : 'example_' + it.name)}`).join(', ')} }`
         : ''
       Content(`
-# Load a specific ${eName.toLowerCase()} (returns the ENTITY; call data_get for the record; dies on error)
+# Load a specific ${eName.toLowerCase()} (returns the entity; data_get reads its record; dies on error)
 my $${eVar} = $client->${eName}->load(${loadArg});
-print "$${eVar}->{id}\\n";
+print $${eVar}->data_get->{id}, "\\n";
 `)
     }
   }

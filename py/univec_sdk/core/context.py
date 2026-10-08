@@ -186,7 +186,7 @@ class UnivecContext:
         opcfg = vs.getpath(self.config, "entity." + entname + ".op." + opname)
 
         inpt = "match"
-        if opname == "update" or opname == "create":
+        if opname == "update" or opname == "create" or opname == "patch":
             inpt = "data"
 
         points = []
@@ -202,8 +202,25 @@ class UnivecContext:
             "points": points,
         })
 
-        self.opmap[cache_key] = op
-        return op
+        # Every request racing to build this Operation gets the one stored first.
+        return self.opmap.setdefault(cache_key, op)
 
     def make_error(self, code, msg):
         return UnivecError(code, msg, self)
+
+    # The serialised context leaves the pipeline (a logger, an error dump),
+    # so it is cleaned; the live fields stay raw for the pipeline's own use.
+    def to_json(self):
+        record = {
+            "id": self.id,
+            "op": self.op,
+            "spec": self.spec,
+            "result": self.result,
+            "response": self.response,
+            "meta": self.meta,
+        }
+        clean = getattr(self.utility, "clean", None) if self.utility is not None else None
+        return clean(self, record) if callable(clean) else record
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(" + repr(self.to_json()) + ")"

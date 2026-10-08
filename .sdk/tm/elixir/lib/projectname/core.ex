@@ -42,7 +42,10 @@ defmodule Univec.Spec do
       "method", d.("method", "GET"),
       "body", S.getprop(m, "body"),
       "url", d.("url", ""),
-      "path", d.("path", "")
+      "path", d.("path", ""),
+      # The query parameters prepare_auth placed: the credential, which the
+      # request sends and the entity's match leaves out.
+      "authquery", d.("authquery", S.jt([]))
     ])
   end
 end
@@ -99,7 +102,9 @@ defmodule Univec.Response do
       "headers", S.getprop(m, "headers"),
       "json_func", if(S.isfunc(jf), do: jf, else: nil),
       "body", S.getprop(m, "body"),
-      "err", S.getprop(m, "err")
+      "err", S.getprop(m, "err"),
+      # Set by a transport that could not read a non-blank body as JSON.
+      "unreadable", S.getprop(m, "unreadable") == true
     ])
   end
 end

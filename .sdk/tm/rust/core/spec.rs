@@ -16,6 +16,9 @@ pub struct Spec {
     pub body: Value,
     pub url: String,
     pub path: String,
+    /// The query parameters prepare_auth placed: the credential, which the
+    /// request sends and the entity's match leaves out.
+    pub authquery: Vec<String>,
 }
 
 impl Spec {
@@ -34,6 +37,7 @@ impl Spec {
             body: Value::Noval,
             url: String::new(),
             path: String::new(),
+            authquery: Vec::new(),
         };
 
         if !matches!(specmap, Value::Map(_)) {

@@ -3,6 +3,7 @@
 // unsupported-op implementations of every CRUD method. Generated entity
 // classes derive from this and override the operations their API defines.
 
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 using Voxgig.Struct;
@@ -113,11 +114,47 @@ public abstract class ProjectNameEntityBase : IEntity
         Dictionary<string, object?>? ctrl = null)
         => throw Helpers.UnsupportedOp("update", name);
 
+    public virtual object? Patch(Dictionary<string, object?>? reqdata,
+        Dictionary<string, object?>? ctrl = null)
+        => throw Helpers.UnsupportedOp("patch", name);
+
     public virtual object? Remove(Dictionary<string, object?>? reqmatch,
         Dictionary<string, object?>? ctrl = null)
         => throw Helpers.UnsupportedOp("remove", name);
 
     protected object? RunOp(Context ctx, Action postDone)
+    {
+        try
+        {
+            return RunPipeline(ctx, postDone);
+        }
+        catch (Exception err) when (!ReferenceEquals(err, ctx.Ctrl.Err))
+        {
+            return Unexpected(ctx, err);
+        }
+    }
+
+    // The catch path. A hook's exception never passed through MakeError, and
+    // can quote the request. FeatureHook invokes by reflection, which wraps it.
+    // MakeError fires PreUnexpected; an error a hook throws there escapes it,
+    // even under throw false, so it is cleaned here.
+    private object? Unexpected(Context ctx, Exception err)
+    {
+        try
+        {
+            return utility.MakeError(ctx, Unwrapped(err));
+        }
+        catch (Exception thrown) when (!ReferenceEquals(thrown, ctx.Ctrl.Err))
+        {
+            var cause = Unwrapped(thrown);
+            throw utility.Clean(ctx, cause) as Exception ?? cause;
+        }
+    }
+
+    private static Exception Unwrapped(Exception err) =>
+        err is TargetInvocationException { InnerException: { } inner } ? inner : err;
+
+    private object? RunPipeline(Context ctx, Action postDone)
     {
         // #PrePoint-Hook
 
@@ -225,13 +262,18 @@ public abstract class ProjectNameEntityBase : IEntity
     {
         callopts ??= new Dictionary<string, object?>();
 
+        // Read between yields only: the request itself is not cancelled,
+        // where ts and js cancel it in flight.
         var signal =
             StructUtils.GetProp(callopts, "signal") is CancellationToken sigTok
                 ? sigTok
                 : CancellationToken.None;
 
-        var ctrl = Helpers.ToMapAny(StructUtils.GetProp(callopts, "ctrl"))
-            ?? new Dictionary<string, object?>();
+        // A copy: the caller's ctrl gains no key, and explain stays its own record.
+        var callerCtrl = Helpers.ToMapAny(StructUtils.GetProp(callopts, "ctrl"));
+        var ctrl = callerCtrl == null
+            ? new Dictionary<string, object?>()
+            : new Dictionary<string, object?>(callerCtrl);
         ctrl["stream"] = callopts;
 
         var ctxmap = new Dictionary<string, object?>
@@ -276,13 +318,44 @@ public abstract class ProjectNameEntityBase : IEntity
         var stream = ctx.Result?.Stream;
         if (stream != null)
         {
-            foreach (var item in stream())
+            // The caller iterates after RunOp has returned, so a failing source
+            // takes the catch path here; under throw false the stream ends. A
+            // yield cannot sit in a try with a catch: the source is driven by hand.
+            IEnumerator<object?>? source = null;
+            try
             {
-                if (cancel.IsCancellationRequested || signal.IsCancellationRequested)
+                while (true)
                 {
-                    yield break;
+                    var more = false;
+                    object? item = null;
+                    try
+                    {
+                        source ??= stream().GetEnumerator();
+                        more = source.MoveNext();
+                        item = more ? source.Current : null;
+                    }
+                    catch (Exception err) when (!ReferenceEquals(err, ctx.Ctrl.Err))
+                    {
+                        more = false;
+                        Unexpected(ctx, err);
+                    }
+                    if (!more || cancel.IsCancellationRequested || signal.IsCancellationRequested)
+                    {
+                        yield break;
+                    }
+                    yield return item;
                 }
-                yield return item;
+            }
+            finally
+            {
+                try
+                {
+                    source?.Dispose();
+                }
+                catch (Exception err) when (!ReferenceEquals(err, ctx.Ctrl.Err))
+                {
+                    Unexpected(ctx, err);
+                }
             }
         }
         else

@@ -66,6 +66,8 @@ impl TelemetryFeature {
         setp(&span, "durationMs", Value::Num(dur as f64));
         setp(&span, "ok", Value::Bool(ok));
 
+        let span = ctx.util().clean(ctx, &span);
+
         self.active_spans -= 1;
         self.spans.push(span.clone());
 

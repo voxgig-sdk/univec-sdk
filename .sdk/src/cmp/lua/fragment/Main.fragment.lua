@@ -1,9 +1,11 @@
 -- ProjectName SDK
 
+local json = require("dkjson")
 local vs = require("utility.struct.struct")
 local Utility = require("core.utility_type")
 local Spec = require("core.spec")
 local helpers = require("core.helpers")
+local unreadable_body = require("utility.unreadable_body")
 
 -- Load utility registration (populates Utility._registrar)
 require("utility.register")
@@ -16,7 +18,53 @@ local features_factory = require("features")
 
 
 local ProjectNameSDK = {}
-ProjectNameSDK.__index = ProjectNameSDK
+
+-- The options and the root context both hold the credential. They live in
+-- a side table rather than in the client, so a dump or an encoder walking
+-- the client's fields never reaches them; `sdk.options` still reads and
+-- writes through the metamethods, and options_map() is the documented way
+-- to read the credential back.
+local HIDDEN = { options = true, _rootctx = true }
+local SLOTS = setmetatable({}, { __mode = "k" })
+
+ProjectNameSDK.__index = function(self, key)
+  local member = rawget(ProjectNameSDK, key)
+  if member ~= nil then
+    return member
+  end
+  if HIDDEN[key] then
+    local slots = SLOTS[self]
+    return slots ~= nil and slots[key] or nil
+  end
+  return nil
+end
+
+ProjectNameSDK.__newindex = function(self, key, val)
+  if HIDDEN[key] then
+    local slots = SLOTS[self]
+    if slots == nil then
+      slots = {}
+      SLOTS[self] = slots
+    end
+    slots[key] = val
+  else
+    rawset(self, key, val)
+  end
+end
+
+-- The client's own record: what a serialiser or clean's snapshot sees in
+-- place of the client, so neither reaches the options through it.
+function ProjectNameSDK:to_record()
+  return { sdk = "ProjectName", mode = self.mode }
+end
+
+ProjectNameSDK.__tostring = function(self)
+  return "ProjectNameSDK mode=" .. tostring(self.mode)
+end
+
+ProjectNameSDK.__tojson = function(self)
+  return json.encode(self:to_record())
+end
 
 
 local function _make_feature(name)
@@ -145,7 +193,15 @@ function ProjectNameSDK:prepare(fetchargs)
   if type(path) ~= "string" then path = "" end
 
   local method = vs.getprop(fetchargs, "method") or "GET"
-  if type(method) ~= "string" then method = "GET" end
+  if type(method) ~= "string" or method == "" then method = "GET" end
+  method = string.upper(method)
+
+  local allow_method = vs.getpath(options, "allow.method")
+  if not helpers.allowed(allow_method, method) then
+    return nil, ctx:make_error("spec_method_allow",
+      'Method "' .. method ..
+      '" not allowed by SDK option allow.method value: "' .. tostring(allow_method or "") .. '"')
+  end
 
   local params = helpers.to_map(vs.getprop(fetchargs, "params")) or {}
   local query = helpers.to_map(vs.getprop(fetchargs, "query")) or {}
@@ -203,8 +259,7 @@ end
 
 -- Is this raw-access op permitted by the SDK's allow.op option?
 function ProjectNameSDK:_op_allowed(op)
-  local allow = vs.getpath(self.options, "allow.op")
-  return type(allow) == "string" and allow:find(op, 1, true) ~= nil
+  return helpers.allowed(vs.getpath(self.options, "allow.op"), op)
 end
 
 
@@ -243,7 +298,7 @@ function ProjectNameSDK:_raw_request(fetchargs)
   local fetched, fetch_err = utility.fetcher(ctx, url, fetchdef)
 
   if fetch_err ~= nil then
-    return { ok = false, err = fetch_err }, nil
+    return { ok = false, err = utility.clean(ctx, fetch_err) }, nil
   end
 
   if fetched == nil then
@@ -266,6 +321,7 @@ function ProjectNameSDK:_raw_request(fetchargs)
     local no_body = status == 204 or status == 304 or tostring(content_length) == "0"
 
     local json_data = nil
+    local body_err = nil
     if not no_body then
       local jf = vs.getprop(fetched, "json")
       if type(jf) == "function" then
@@ -275,14 +331,27 @@ function ProjectNameSDK:_raw_request(fetchargs)
         end
         -- Non-JSON body: json_data stays nil, status/headers preserved.
       end
+      if vs.getprop(fetched, "unreadable") == true then
+        local failed = nil
+        if status < 200 or status >= 300 then
+          failed = ctx:make_error("request_status",
+            "request: " .. tostring(status) .. ": " .. tostring(vs.getprop(fetched, "statusText")))
+        end
+        body_err = unreadable_body(ctx, status, headers, vs.getprop(fetched, "body"),
+          fetchdef["headers"], failed)
+      end
     end
 
-    return {
-      ok = status >= 200 and status < 300,
+    local out = {
+      ok = body_err == nil and status >= 200 and status < 300,
       status = status,
       headers = headers,
       data = json_data,
-    }, nil
+    }
+    if body_err ~= nil then
+      out.err = utility.clean(ctx, body_err)
+    end
+    return out, nil
   end
 
   return {

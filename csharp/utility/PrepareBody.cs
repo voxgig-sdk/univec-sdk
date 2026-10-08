@@ -10,6 +10,10 @@ public static partial class SdkUtility
 
         if (op.Input == "data")
         {
+            if (IsRawRequest(ctx.Point))
+            {
+                return RawBodyOf(ctx.Reqdata);
+            }
             var body = ctx.Utility!.TransformRequest(ctx);
             return body;
         }

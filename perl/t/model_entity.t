@@ -11,10 +11,106 @@ use Cwd ();
 use UnivecSDK;
 require(Cwd::abs_path("$FindBin::Bin/runner.pm"));
 
+# main.kit.test.live.strict is true (the default is true): a live
+# request that fails, or a live test missing an input it needs,
+# fails the test.
+# An account with no record for a test to read skips it either way.
+use constant LIVE_STRICT => 1;
+
 {
   my $testsdk = UnivecSDK->test(undef, undef);
   my $ent = $testsdk->Model(undef);
   ok(defined $ent, 'model: create instance');
+}
+
+{
+  package UnivecEntityTestModelFailHook;
+  our @ISA = ('UnivecBaseFeature');
+
+  sub new {
+    my ($class) = @_;
+    my $self = UnivecBaseFeature::new($class);
+    $self->{name} = 'failhook';
+    $self->{unexpected} = 0;
+    return $self;
+  }
+
+  sub init { }
+  sub PreSpec { die "model hook failed\n" }
+  sub PreUnexpected { $_[0]->{unexpected}++; return }
+}
+
+{
+  my $offline = { net => { offline => 1 } };
+  my $died = !eval {
+    my $next = UnivecSDK->test($offline, undef)->Model(undef)->stream('list', undef, undef);
+    1 while defined $next->();
+    1;
+  };
+  like($died ? "$@" : '', qr/offline/, 'model: a failed stream raises');
+
+  ok(eval {
+    my $next = UnivecSDK->test($offline, undef)->Model(undef)
+      ->stream('list', undef, { ctrl => { throw => 0 } });
+    1 while defined $next->();
+    1;
+  }, 'model: under throw false a failed stream ends');
+
+  if (UnivecConfig::shared_config()->{feature}{rbac}) {
+    my $denied = UnivecSDK->test(undef, { feature => { rbac => { active => 1, deny => 1 } } });
+    my $denyerr = eval {
+      my $next = $denied->Model(undef)->stream('list', undef, undef);
+      1 while defined $next->();
+      undef;
+    } // $@;
+    is(ref $denyerr ? $denyerr->{code} : undef, 'rbac_denied',
+      'model: a denied stream raises');
+  }
+}
+
+{
+  my $explain = {};
+  my $ctrl = { explain => $explain };
+  my $next = UnivecSDK->test(undef, undef)->Model(undef)
+    ->stream('list', undef, { ctrl => $ctrl });
+  1 while defined $next->();
+  is_deeply([sort keys %$ctrl], ['explain'], 'model: the stream leaves the caller ctrl');
+  ok($explain == $ctrl->{explain} && 0 < keys %$explain,
+    'model: the caller explain record is filled');
+}
+
+{
+  my $hook = UnivecEntityTestModelFailHook->new;
+  my $client = UnivecSDK->new({ feature => { test => { active => 1 } }, extend => [$hook] });
+
+  my $err = eval { $client->Model(undef)->list(undef, undef); undef } // $@;
+  like("$err", qr/hook failed/, 'model: a dying hook fails the operation');
+  ok(0 < $hook->{unexpected}, 'model: PreUnexpected fired');
+
+  my $fired = $hook->{unexpected};
+  my $out = eval { $client->Model(undef)->list(undef, { throw => 0 }) };
+  ok(!$@ && !defined $out, 'model: under throw false the call returns undef');
+  ok($fired < $hook->{unexpected}, 'model: PreUnexpected fired under throw false');
+}
+
+{
+  my $seed = { entity => { 'model' => { l1 => { id => 'l1' }, l2 => { id => 'l2' } } } };
+  my $items = UnivecSDK->test($seed, undef)->Model(undef)->list(undef, undef);
+  # list resolves to one entity per record; data_get reads the record.
+  is(scalar(@$items), 2, 'model: list answers each seeded record');
+  my $entities = grep {
+    Scalar::Util::blessed($_) && $_->can('data_get') && Voxgig::Struct::ismap($_->data_get)
+  } @$items;
+  is($entities, 2, 'model: each listed item is an entity carrying its record');
+}
+
+SKIP: {
+  skip('feature not present in this SDK: validate', 1)
+    unless UnivecConfig::shared_config()->{feature}{validate};
+  my $client = UnivecSDK->test(undef, { feature => { validate => { active => 1 } } });
+  my $err = eval { $client->Model(undef)->list({ 'executionProvider' => 1 }, undef); undef } // $@;
+  is(ref $err ? $err->{code} : undef, 'validate_failed',
+    'model: an invalid request fails with validate_failed');
 }
 
 BASIC_FLOW: {
@@ -29,13 +125,6 @@ BASIC_FLOW: {
       pass('model: basic flow skipped via sdk-test-control.json');
       last BASIC_FLOW;
     }
-  }
-  # The basic flow consumes synthetic IDs from the fixture. In live mode
-  # without an *_ENTID env override, those IDs hit the live API and 4xx.
-  if ($setup->{synthetic_only}) {
-    note('live entity test uses synthetic IDs from fixture - set UNIVEC_TEST_MODEL_ENTID JSON to run live');
-    pass('model: basic flow skipped (synthetic IDs only)');
-    last BASIC_FLOW;
   }
   my $client = $setup->{client};
   my %V;
@@ -85,10 +174,8 @@ sub model_basic_setup {
     }
   );
 
-  # Detect ENTID env override before env_override consumes it. When live
-  # mode is on without a real override, the basic test runs against
-  # synthetic IDs from the fixture and 4xx's. Surface this so the test can
-  # skip.
+  # Whether *_ENTID supplied the idmap, read before env_override consumes
+  # it: without it, the ids a live flow binds are the fixture's synthetic ones.
   my $entid_env_raw = $ENV{'UNIVEC_TEST_MODEL_ENTID'};
   my $idmap_overridden = (defined $entid_env_raw && $entid_env_raw =~ /^\s*\{/) ? 1 : 0;
 

@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures, opNeedsAction, bodyNote, javaMap, javaMapOf } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -7,48 +7,41 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { scalaVarName } from './utility_scala'
+import { scalaVarName, scalaListMatch, scalaLit } from './utility_scala'
 
 
 // Type names come from the shared canonToType 'scala' column (single source of truth).
 
-// A type-correct Scala literal for a field's canonical type.
-function scalaLit(type: any, placeholder: string = 'example'): string {
-  const k = canonScalarKey(type)
-  if ('INTEGER' === k) return '1L'
-  if ('NUMBER' === k) return '1.0'
-  if ('BOOLEAN' === k) return 'true'
-  if ('ARRAY' === k) return 'java.util.List.of()'
-  if ('OBJECT' === k) return 'java.util.Map.of()'
-  return `"${placeholder}"`
-}
-
-
 const OP_SIGNATURES: Record<string, { sig: string, returns: string, desc: string }> = {
   load: {
     sig: 'load(reqmatch, ctrl) -> Object',
-    returns: 'the entity data',
-    desc: 'Load a single entity matching the given criteria. Returns the entity data and raises on error.',
+    returns: 'the entity',
+    desc: 'Load a single entity matching the given criteria. Returns the entity, whose record `data()` reads, and raises on error.',
   },
   list: {
     sig: 'list(reqmatch, ctrl) -> Object',
-    returns: 'an aggregate list of entities',
-    desc: 'List entities matching the given criteria. The match is optional — call `list(null, null)` to list all records. Returns an aggregate list and raises on error.',
+    returns: 'a list of entities, one per record',
+    desc: 'List entities matching the given criteria. The match is optional — call `list(null, null)` to list all records. Returns a list of entities, one per record, and raises on error.',
   },
   create: {
     sig: 'create(reqdata, ctrl) -> Object',
-    returns: 'the created entity data',
-    desc: 'Create a new entity with the given data. Returns the created entity data and raises on error.',
+    returns: 'the created entity',
+    desc: 'Create a new entity with the given data. Returns the created entity and raises on error.',
   },
   update: {
     sig: 'update(reqdata, ctrl) -> Object',
-    returns: 'the updated entity data',
-    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity data and raises on error.',
+    returns: 'the updated entity',
+    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity and raises on error.',
+  },
+  patch: {
+    sig: 'patch(reqdata, ctrl) -> Object',
+    returns: 'the patched entity',
+    desc: 'Change part of an existing entity: only the fields given are sent. The data must include the entity `id`. Returns the patched entity and raises on error.',
   },
   remove: {
     sig: 'remove(reqmatch, ctrl) -> Object',
-    returns: 'the removed entity data',
-    desc: 'Remove the entity matching the given criteria. Raises on error.',
+    returns: 'the removed entity',
+    desc: 'Remove the entity matching the given criteria. Returns the entity, marked as deleted, and raises on error.',
   },
 }
 
@@ -217,7 +210,7 @@ val ${eVar} = client.${accessor}(null)
         // Field operations breakdown
         const hasFieldOps = fields.some((f: any) => f.op && Object.keys(f.op).length > 0)
         if (hasFieldOps) {
-          const opcols = ['load', 'list', 'create', 'update', 'remove']
+          const opcols = ['load', 'list', 'create', 'update', 'patch', 'remove']
             .filter((op: string) => opnames.includes(op) && ent.op[op]?.active !== false)
           Content(`### Field Usage by Operation
 
@@ -258,15 +251,19 @@ ${info.desc}
 
 `)
 
+          if (opNeedsAction(ent.op[opname])) {
+            return
+          }
+
           if ('load' === opname || 'remove' === opname) {
             const matchItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
               .sort((a: any, b: any) =>
                 (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
             const arg = 0 < matchItems.length
-              ? `java.util.Map.of(${matchItems.map((it: any) =>
+              ? javaMapOf(matchItems.map((it: any) =>
                 `"${it.name}", ${scalaLit(it.type,
-                  it.name === idF ? ent.name + '_id' : it.name)}`).join(', ')})`
+                  it.name === idF ? ent.name + '_id' : it.name)}`), 'java.util.')
               : 'null'
             Content(`\`\`\`scala
 val result = client.${accessor}(null).${opname}(${arg}, null)
@@ -276,8 +273,8 @@ val result = client.${accessor}(null).${opname}(${arg}, null)
           }
           else if ('list' === opname) {
             Content(`\`\`\`scala
-val results = client.${accessor}(null).list(null, null)
-println(results)
+val results = client.${accessor}(null).list(${scalaListMatch(ent)}, null).asInstanceOf[java.util.List[SdkEntity]]
+results.forEach(item => println(item.data()))
 \`\`\`
 
 `)
@@ -285,12 +282,13 @@ println(results)
           else if ('create' === opname) {
             const createItems = opRequestShape(ent, 'create').items
               .filter((it: any) => !it.optional)
+            const createMap = javaMap(createItems.length, 'java.util.')
             Content(`\`\`\`scala
-val result = client.${accessor}(null).create(java.util.Map.of(
+val result = client.${accessor}(null).create(${createMap.open}
 `)
             createItems.map((it: any, i: number) => {
               const comma = i < createItems.length - 1 ? ',' : ''
-              Content(`    "${it.name}", ${scalaLit(it.type, 'example_' + it.name)}${comma}  // ${canonToType(it.type, target.name)}
+              Content(`    ${createMap.pair(`"${it.name}", ${scalaLit(it.type, 'example_' + it.name)}`)}${comma}  // ${canonToType(it.type, target.name)}
 `)
             })
             Content(`), null)
@@ -298,22 +296,31 @@ val result = client.${accessor}(null).create(java.util.Map.of(
 
 `)
           }
-          else if ('update' === opname) {
-            const updateItems = opRequestShape(ent, 'update').items
+          else if ('update' === opname || 'patch' === opname) {
+            const updateItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
               .sort((a: any, b: any) =>
                 (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
+            const updateMap = javaMap(updateItems.length, 'java.util.')
             const updateLines = updateItems.map((it: any, i: number) => {
               const comma = i < updateItems.length - 1 ? ',' : ''
-              return `    "${it.name}", ${scalaLit(it.type,
-                it.name === idF ? ent.name + '_id' : it.name)}${comma}\n`
+              return `    ${updateMap.pair(`"${it.name}", ${scalaLit(it.type,
+                it.name === idF ? ent.name + '_id' : it.name)}`)}${comma}\n`
             }).join('')
             Content(`\`\`\`scala
-val result = client.${accessor}(null).update(java.util.Map.of(
+val result = client.${accessor}(null).${opname}(${updateMap.open}
 ${updateLines}), null)
 \`\`\`
 
 `)
+          }
+
+          if ('create' === opname || 'update' === opname || 'patch' === opname) {
+            const note = bodyNote(ent.op[opname], {
+              values: 'an `Array[Byte]`, a `String` or an `InputStream`',
+              once: 'an `InputStream`',
+            })
+            if ('' !== note) Content(note)
           }
         })
       }

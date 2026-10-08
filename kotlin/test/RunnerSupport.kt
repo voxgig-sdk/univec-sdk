@@ -287,6 +287,96 @@ object RunnerSupport {
     return SdkError(code, msg, null)
   }
 
+  // A live check that did not pass, as main.kit.test.live.strict decides:
+  // strict fails the test, lenient skips it with the same reason.
+  fun liveMiss(strict: Boolean, reason: String) {
+    if (strict) {
+      org.junit.jupiter.api.Assertions.fail<Unit>(reason)
+    }
+    org.junit.jupiter.api.Assumptions.abort<Unit>(reason)
+  }
+
+  // An account holding no record for the test to read skips either way.
+  fun liveEmpty(reason: String) {
+    org.junit.jupiter.api.Assumptions.abort<Unit>(reason)
+  }
+
+  // A live list response's records: the body, or the first list an
+  // envelope holds.
+  fun liveList(data: Any?): List<Any?>? {
+    if (data is List<*>) {
+      return data as List<Any?>
+    }
+    if (data is Map<*, *>) {
+      for (value in TreeMap(data as Map<String, Any?>).values) {
+        if (value is List<*>) {
+          return value as List<Any?>
+        }
+      }
+    }
+    return null
+  }
+
+  // A live response for a message: the SDK's error, or else its status and
+  // content type, never its body.
+  fun liveDescribe(result: Map<String, Any?>?): String {
+    if (result == null) {
+      return "no response"
+    }
+    val err = result["err"]
+    if (err is Throwable) {
+      return err.message ?: err.toString()
+    }
+    if (err != null) {
+      return err.toString()
+    }
+    var out = "HTTP " + result["status"]
+    val headers = result["headers"]
+    if (headers is Map<*, *>) {
+      for ((k, v) in headers) {
+        if ("content-type".equals(k.toString(), ignoreCase = true) && v != null) {
+          out += " " + v.toString().split(";")[0].trim()
+        }
+      }
+    }
+    return out
+  }
+
+  // The record a create-less flow reads live: the first its list returns,
+  // put where the flow reads the fixture's existing records.
+  fun liveExisting(data: MutableMap<String, Any?>, strict: Boolean, name: String, list: () -> Any?) {
+    var found: Any? = null
+    try {
+      found = list()
+    } catch (e: RuntimeException) {
+      liveMiss(strict, "Live list discovery failed: " + e.message)
+    }
+    if (found !is List<*>) {
+      liveMiss(strict, "Live list discovery returned no list")
+    }
+    val items = found as List<Any?>
+    if (items.isEmpty()) {
+      liveEmpty("The account has no " + name + " record to load")
+    }
+    val first = items[0]
+    val record = if (first is Entity) first.data() else first
+    var existing = data["existing"]
+    if (existing !is MutableMap<*, *>) {
+      existing = linkedMapOf<String, Any?>()
+      data["existing"] = existing
+    }
+    (existing as MutableMap<String, Any?>)[name] = linkedMapOf<String, Any?>("live01" to record)
+  }
+
+  // In a lenient live run a failing check skips, observing the live API.
+  fun liveObserve(err: Throwable, live: Boolean, strict: Boolean) {
+    if (strict || !live || err is org.opentest4j.TestAbortedException) {
+      throw err
+    }
+    org.junit.jupiter.api.Assumptions.abort<Unit>(
+      "live run, main.kit.test.live.strict is false: " + err.message)
+  }
+
   // entityListToData extracts data maps from a list of Entity objects.
   fun entityListToData(list: List<Any?>?): MutableList<Any?> {
     val out = mutableListOf<Any?>()

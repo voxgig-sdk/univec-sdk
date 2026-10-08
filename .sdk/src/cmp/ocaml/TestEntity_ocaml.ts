@@ -3,6 +3,8 @@ import {
   Content,
   File,
   cmp,
+  invalidRequest,
+  opReachable,
 } from '@voxgig/sdkgen'
 
 import { ocamlString, ocamlVarName } from './utility_ocaml'
@@ -17,9 +19,8 @@ const TestEntity = cmp(function TestEntity(props: any) {
   const { target, entity } = props
 
   const fn = ocamlVarName(entity.name)
-  const opnames = Object.keys(entity.op || {})
-  const hasList = opnames.includes('list')
-  const hasLoad = opnames.includes('load')
+  const hasList = opReachable(entity.op?.list, [])
+  const hasLoad = opReachable(entity.op?.load, ['id'])
   const hasId = null != entity.id
   const id = entity.name + '01'
 
@@ -118,9 +119,93 @@ let () =
           (List.length (List.of_seq (cent.e_stream "list" (empty_map ()) Noval))) 2
       end)
 `)
+
+      // Failure paths: the stream, the caller's ctrl, and a raising hook.
+      Content(`
+let () =
+  test "${ocamlString(entity.name)}.stream_error" (fun () ->
+      let offline = jo [("net", jo [("offline", Bool true)])] in
+      let ent = Sdk_client.${fn} (Sdk_client.test_with offline Noval) Noval in
+      let err = (try ignore (List.of_seq (ent.e_stream "list" (empty_map ()) Noval)); None
+                 with e -> Some e) in
+      check "the transport failure raises from the stream"
+        (match err with
+         | Some (Sdk_error_exc er) -> Sdk_runtime.substr_contains er.err_msg "offline"
+         | _ -> false);
+      let quiet = jo [("ctrl", jo [("throw", Bool false)])] in
+      let ent2 = Sdk_client.${fn} (Sdk_client.test_with offline Noval) Noval in
+      check_int "throw false ends the stream quietly"
+        (List.length (List.of_seq (ent2.e_stream "list" (empty_map ()) quiet))) 0;
+      if Harness.has_feature "rbac" then begin
+        let denied = Sdk_client.test_with Noval
+            (jo [("feature", jo [("rbac", jo [("active", Bool true); ("deny", Bool true)])])]) in
+        let dent = Sdk_client.${fn} denied Noval in
+        let derr = (try ignore (List.of_seq (dent.e_stream "list" (empty_map ()) Noval)); None
+                    with e -> Some e) in
+        check_str "the rbac denial raises from the stream"
+          (match derr with Some (Sdk_error_exc er) -> er.err_code | _ -> "<no SDK error>") "rbac_denied"
+      end)
+
+let () =
+  test "${ocamlString(entity.name)}.stream_ctrl" (fun () ->
+      let explain = empty_map () in
+      let ctrl = jo [("explain", explain)] in
+      let ent = Sdk_client.${fn} (Sdk_client.test ()) Noval in
+      ignore (List.of_seq (ent.e_stream "list" (empty_map ()) (jo [("ctrl", ctrl)])));
+      check "the stream left the caller's ctrl its own" (keysof ctrl = ["explain"]);
+      check "the caller's explain record is its own" (getp ctrl "explain" == explain);
+      check "the caller's explain record is filled" (List.length (keysof explain) > 0))
+
+let () =
+  test "${ocamlString(entity.name)}.unexpected" (fun () ->
+      let seen = ref 0 in
+      let hook : feature =
+        { f_name = "failhook"; f_version = "0.0.1"; f_active = true; f_options = Noval;
+          f_init = (fun _ _ -> ());
+          f_hook = (fun name _ ->
+              match name with
+              | "PreSpec" -> failwith "${ocamlString(entity.name)} hook failed"
+              | "PreUnexpected" -> incr seen
+              | _ -> ()) } in
+      let client = Sdk_client.test () in
+      client.cl_features <- client.cl_features @ [hook];
+      let ent = Sdk_client.${fn} client Noval in
+      let err = (try ignore (ent.e_list (empty_map ()) Noval); None with e -> Some e) in
+      check "the hook's failure is raised"
+        (match err with Some (Failure m) -> Sdk_runtime.substr_contains m "hook failed" | _ -> false);
+      check "PreUnexpected fired" (!seen > 0);
+      let fired = !seen in
+      check_int "throw false resolves to nothing"
+        (List.length (ent.e_list (empty_map ()) (jo [("throw", Bool false)]))) 0;
+      check "PreUnexpected fired under throw false" (!seen > fired))
+`)
+    }
+
+    const bad = invalidRequest(entity)
+    if (null != bad) {
+      const args = Object.entries(bad.args)
+        .map(([k, v]) => '("' + ocamlString(k) + '", ' + ocamlValue(v) + ')').join('; ')
+      Content(`
+let () =
+  test "${ocamlString(entity.name)}.validate" (fun () ->
+      if Harness.has_feature "validate" then begin
+        let client = Sdk_client.test_with Noval
+            (jo [("feature", jo [("validate", jo [("active", Bool true)])])]) in
+        let ent = Sdk_client.${fn} client Noval in
+        let err = (try ignore (ent.e_${bad.op} (jo [${args}]) Noval); None with e -> Some e) in
+        check_str "validate refuses an invalid request"
+          (match err with Some (Sdk_error_exc er) -> er.err_code | _ -> "<no SDK error>") "validate_failed"
+      end)
+`)
     }
   })
 })
+
+
+function ocamlValue(v: any): string {
+  return 'number' === typeof v ? 'Num ' + v + '.' :
+    'boolean' === typeof v ? 'Bool ' + v : 'Str "' + ocamlString(String(v)) + '"'
+}
 
 
 export {

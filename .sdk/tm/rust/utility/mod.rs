@@ -21,6 +21,7 @@ pub mod make_response;
 pub mod make_result;
 pub mod make_spec;
 pub mod make_url;
+pub mod media;
 pub mod param;
 pub mod prepare_auth;
 pub mod prepare_body;

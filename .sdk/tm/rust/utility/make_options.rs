@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use crate::core::context::Context;
 use crate::core::helpers::{get_str, getp, getpath, ja, jo, setp, to_map};
+use crate::utility::clean;
 use crate::utility::voxgigstruct as vs;
 use crate::utility::voxgigstruct::Value;
 
@@ -57,6 +58,26 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
     };
 
     let optspec = crate::core::schema::optspec();
+
+    // The secret registry exists BEFORE validation, fed from the raw input.
+    // Its block is Rc-shared: what is registered into `cleanopts` here is
+    // what `opts.__derived__.clean` carries out below.
+    let cleancfg = clean::make_clean_config(&vs::merge(
+        &ja(vec![
+            Value::empty_map(),
+            vs::clone(&getp(&optspec, "clean")),
+            clean_block(&cfgopts),
+            clean_block(&opts),
+        ]),
+        None,
+    ));
+    let cleanopts = jo(vec![("__derived__", jo(vec![("clean", cleancfg.clone())]))]);
+    clean::clean_add_sensitive_opts(&cleanopts, &without(&opts, &["clean"]));
+    for src in [&cfgopts, &opts] {
+        for value in clean::splitvalues(&getpath(&["clean", "values"], src)) {
+            clean::clean_add_opts(&cleanopts, &value);
+        }
+    }
 
     // Preserve system.fetch before merge/validate (validation strips it).
     let sys_fetch = getpath(&["system", "fetch"], &opts);
@@ -145,19 +166,6 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
         }
     }
 
-    let clean_keys = match getpath(&["clean", "keys"], &opts) {
-        Value::Str(s) => s,
-        _ => "key,token,id".to_string(),
-    };
-
-    let filtered: Vec<String> = clean_keys
-        .split(',')
-        .map(|p| p.trim())
-        .filter(|p| !p.is_empty())
-        .map(|p| vs::esc_re(&Value::str(p)))
-        .collect();
-    let keyre = filtered.join("|");
-
     // Resolve the feature add-order: an explicit List order (above) wins;
     // otherwise order the map test-first, then the remaining names sorted, so
     // the outcome is deterministic and `test` is always the base transport.
@@ -188,18 +196,65 @@ pub fn make_options_util(ctx: &Rc<Context>) -> Value {
     let order_list =
         Value::list(feature_order.into_iter().map(|n| Value::str(n)).collect());
 
-    let derived_clean = if keyre.is_empty() {
-        Value::empty_map()
-    } else {
-        jo(vec![("keyre", Value::str(keyre))])
-    };
     setp(
         &opts,
         "__derived__",
-        jo(vec![("clean", derived_clean), ("featureorder", order_list)]),
+        jo(vec![("clean", cleancfg), ("featureorder", order_list)]),
     );
 
+    // Again over the merged result: the config's own defaults can carry one.
+    clean::clean_add_sensitive_opts(&opts, &without(&opts, &["clean", "__derived__"]));
+
     opts
+}
+
+// A copy of the clean block, or an empty one: merge lets a missing value
+// replace everything merged before it, schema defaults included.
+fn clean_block(opts: &Value) -> Value {
+    match getp(opts, "clean") {
+        Value::Map(_) => vs::clone(&getp(opts, "clean")),
+        _ => Value::empty_map(),
+    }
+}
+
+// The options to scan for secrets. The feature map is keyed by feature
+// names, not field names, so it is scanned as a list: `secrets` must not
+// make every setting of that feature a secret. Entity blocks hold entity
+// settings and seeded records, never a credential, so none is scanned, and
+// nor are rbac's rules, keyed by entity and operation names.
+fn without(val: &Value, keys: &[&str]) -> Value {
+    let out = Value::empty_map();
+    if let Value::Map(m) = val {
+        for (k, v) in m.borrow().iter() {
+            if "entity" == k.as_str() || keys.contains(&k.as_str()) {
+                continue;
+            }
+            let v = match (k.as_str(), v) {
+                ("feature", Value::Map(fm)) => {
+                    Value::list(fm.borrow().iter().map(|(fk, fv)| plain(fv, fk)).collect())
+                }
+                ("test", _) => plain(v, ""),
+                _ => v.clone(),
+            };
+            setp(&out, k, v);
+        }
+    }
+    out
+}
+
+fn plain(val: &Value, name: &str) -> Value {
+    match val {
+        Value::Map(m) => {
+            let out = Value::empty_map();
+            for (k, v) in m.borrow().iter() {
+                if "entity" != k.as_str() && !("rbac" == name && "rules" == k.as_str()) {
+                    setp(&out, k, v.clone());
+                }
+            }
+            out
+        }
+        _ => val.clone(),
+    }
 }
 
 /// Read a string option (helper shared by prepare utilities).

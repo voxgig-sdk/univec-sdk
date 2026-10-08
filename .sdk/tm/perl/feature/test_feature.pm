@@ -15,6 +15,17 @@ require(Cwd::abs_path("$__dir/base_feature.pm"));
 
 package UnivecTestFeature;
 
+# The key a list's response transform
+# ["`$EACH`", "body", { "`$MERGE`" => "`.<key>`" }] reads each item's record under.
+sub item_envelope_key {
+  my ($spec) = @_;
+  return undef unless ref($spec) eq 'ARRAY' && 3 == @$spec &&
+    '`$EACH`' eq ($spec->[0] // '') && 'body' eq ($spec->[1] // '') && ref($spec->[2]) eq 'HASH';
+  my $merge = $spec->[2]{'`$MERGE`'};
+  return undef unless defined $merge && !ref($merge) && $merge =~ /^`\.([^.`\$]+)`$/;
+  return $1;
+}
+
 our @ISA = ('UnivecBaseFeature');
 
 sub new {
@@ -65,6 +76,8 @@ sub init {
     return $data unless defined $fctx && defined $fctx->{point};
     my $tm = UnivecHelpers::gp($fctx->{point}, 'transform');
     my $spec = UnivecHelpers::gp($tm, 'res');
+    my $key = item_envelope_key($spec);
+    return [ map { +{ $key => $_ } } @$data ] if defined $key && ref($data) eq 'ARRAY';
     return $data unless defined $spec && !ref($spec);
     # Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
     # GraphQL ops unwrap `body.data.<field>`, not just one envelope property.
@@ -133,7 +146,7 @@ sub init {
       my $out = Voxgig::Struct::clone($found);
       return $respond->($fctx, 200, $out, undef);
     }
-    elsif ('update' eq $op->{name}) {
+    elsif ('update' eq $op->{name} || 'patch' eq $op->{name}) {
       # Match the existing entity by id only (or its alias). reqdata also
       # contains the new field values, which would otherwise cause select
       # to filter out the entity we want to update. When reqdata has no id,
@@ -158,7 +171,7 @@ sub init {
       return $respond->($fctx, 404, undef, { 'statusText' => 'Not found' })
         unless UnivecHelpers::rb_truthy($ent);
       if (Voxgig::Struct::ismap($ent) && Voxgig::Struct::ismap($fctx->{reqdata})) {
-        Voxgig::Struct::merge([$ent, $fctx->{reqdata}]);
+        Voxgig::Struct::merge([$ent, _record($fctx->{reqdata})]);
       }
       Voxgig::Struct::delprop($ent, '$KEY');
       my $out = Voxgig::Struct::clone($ent);
@@ -183,7 +196,7 @@ sub init {
         int(rand(0x10000)), int(rand(0x10000)),
         int(rand(0x10000)), int(rand(0x10000))) unless defined $id;
 
-      my $ent = Voxgig::Struct::clone($fctx->{reqdata});
+      my $ent = Voxgig::Struct::clone(_record($fctx->{reqdata}));
       if (Voxgig::Struct::ismap($ent)) {
         $ent->{id} = $id;
         $entmap->{"$id"} = $ent if defined $id && !ref $id;
@@ -214,6 +227,16 @@ sub init {
 # {min,max}), a budget of first-N failures ("failTimes" -> "failStatus"),
 # first-N connection errors ("errorTimes"), or a hard "offline" outage.
 # Counter-driven, so simulations are deterministic across a test.
+# The record the mock keeps: the request data without `$body`, which only the
+# wire carries.
+sub _record {
+  my ($reqdata) = @_;
+  return $reqdata unless ref $reqdata eq 'HASH';
+  my %out = %$reqdata;
+  delete $out{'$body'};
+  return \%out;
+}
+
 sub make_netsim {
   my ($self, $net, $inner) = @_;
   $self->{netcalls} = 0;

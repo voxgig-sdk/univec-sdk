@@ -107,9 +107,9 @@ my $convert = $client->Convert;
 
 ### Operations
 
-#### `create($reqdata, $ctrl) -> hashref`
+#### `create($reqdata, $ctrl) -> ConvertEntity`
 
-Create a new entity with the given data. Returns the created entity data and dies on error.
+Create a new entity with the given data. Returns the created entity and dies on error.
 
 ```perl
 my $result = $client->Convert->create({
@@ -164,9 +164,9 @@ my $embed = $client->Embed;
 
 ### Operations
 
-#### `create($reqdata, $ctrl) -> hashref`
+#### `create($reqdata, $ctrl) -> EmbedEntity`
 
-Create a new entity with the given data. Returns the created entity data and dies on error.
+Create a new entity with the given data. Returns the created entity and dies on error.
 
 ```perl
 my $result = $client->Embed->create({
@@ -222,9 +222,9 @@ my $ephemeral_key = $client->EphemeralKey;
 
 ### Operations
 
-#### `create($reqdata, $ctrl) -> hashref`
+#### `create($reqdata, $ctrl) -> EphemeralKeyEntity`
 
-Create a new entity with the given data. Returns the created entity data and dies on error.
+Create a new entity with the given data. Returns the created entity and dies on error.
 
 ```perl
 my $result = $client->EphemeralKey->create({
@@ -289,12 +289,12 @@ my $model = $client->Model;
 
 #### `list($reqmatch, $ctrl) -> arrayref`
 
-List entities matching the given criteria. The match is optional — call `list` with no argument to list all records. Returns an arrayref and dies on error.
+List entities matching the given criteria. The match is optional — call `list` with no argument to list all records. Returns an arrayref of entities, one per record (`data_get` reads each record), and dies on error.
 
 ```perl
 my $results = $client->Model->list;
 for my $model (@$results) {
-    print "$model->{id}\n";
+    print $model->data_get->{id}, "\n";
 }
 ```
 
@@ -980,6 +980,7 @@ Timeout.
 | Option | Type |
 |---|---|
 | `clearTimer` | function |
+| `now` | function |
 | `setTimer` | function |
 
 These take no default: the feature behaves one way when you supply them and

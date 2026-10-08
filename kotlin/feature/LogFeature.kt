@@ -82,11 +82,15 @@ class LogFeature : BaseFeature("log", "0.0.1", true) {
       msg.append(" spec=").append(spec.method).append(" ").append(spec.path)
     }
 
+    // A log line leaves the pipeline, so it carries the cleaned text.
+    val u = ctx.utility
+    val line = if (u == null) msg.toString() else u.clean(ctx, msg.toString()).toString()
+
     when (level) {
-      "debug" -> logger.fine(msg.toString())
-      "warn" -> logger.warning(msg.toString())
-      "error" -> logger.severe(msg.toString())
-      else -> logger.info(msg.toString())
+      "debug" -> logger.fine(line)
+      "warn" -> logger.warning(line)
+      "error" -> logger.severe(line)
+      else -> logger.info(line)
     }
   }
 }

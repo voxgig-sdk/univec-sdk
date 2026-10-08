@@ -32,6 +32,9 @@ class UnivecFetcher
     {
         $method_str = strtoupper($fetchdef['method'] ?? 'GET');
         $body_str = $fetchdef['body'] ?? null;
+        if (is_resource($body_str)) {
+            $body_str = stream_get_contents($body_str);
+        }
         $headers = $fetchdef['headers'] ?? [];
 
         $header_lines = [];
@@ -83,7 +86,15 @@ class UnivecFetcher
         }
 
         $context = stream_context_create($opts);
+        error_clear_last();
         $response_body = @file_get_contents($fullurl, false, $context);
+
+        // A request that got no answer fails the operation. The stream
+        // wrapper's warning names the URL, which is left out.
+        if ($response_body === false) {
+            $warning = error_get_last()['message'] ?? 'request failed';
+            return [null, preg_replace('/^file_get_contents\(.*?\):\s*/', '', $warning)];
+        }
 
         $status = 0;
         $status_text = '';
@@ -108,10 +119,13 @@ class UnivecFetcher
         }
 
         $json_body = null;
-        if ($response_body !== false && $response_body !== '') {
+        $unreadable = false;
+        if (trim($response_body) !== '') {
             $decoded = json_decode($response_body, true);
             if (json_last_error() === JSON_ERROR_NONE) {
                 $json_body = $decoded;
+            } else {
+                $unreadable = true;
             }
         }
 
@@ -121,7 +135,8 @@ class UnivecFetcher
                 'statusText' => $status_text,
                 'headers' => $resp_headers,
                 'json' => function () use ($json_body) { return $json_body; },
-                'body' => $response_body !== false ? $response_body : '',
+                'body' => $response_body,
+                'unreadable' => $unreadable,
             ],
             null,
         ];
@@ -201,10 +216,13 @@ class UnivecFetcher
         }
 
         $json_body = null;
-        if ($response_body !== '' && $response_body !== false) {
+        $unreadable = false;
+        if ($response_body !== false && trim((string)$response_body) !== '') {
             $decoded = json_decode($response_body, true);
             if (json_last_error() === JSON_ERROR_NONE) {
                 $json_body = $decoded;
+            } else {
+                $unreadable = true;
             }
         }
 
@@ -215,6 +233,7 @@ class UnivecFetcher
                 'headers' => $resp_kv,
                 'json' => function () use ($json_body) { return $json_body; },
                 'body' => (string)$response_body,
+                'unreadable' => $unreadable,
             ],
             null,
         ];
@@ -239,9 +258,10 @@ class UnivecFetcher
         // fall through to the default HTTP fetcher. The options builder
         // sometimes materializes `system.fetch` as an empty stdClass even
         // when the user didn't set one — that's a placeholder, not a value.
-        $is_empty_obj = ($sys_fetch instanceof \stdClass) && empty(get_object_vars($sys_fetch));
-        $is_empty_arr = is_array($sys_fetch) && empty($sys_fetch);
-        if ($sys_fetch === null || $is_empty_obj || $is_empty_arr) {
+        if (self::usesDefault($ctx)) {
+            if (null !== $ctx->spec) {
+                $ctx->spec->headers = self::sentHeaders($ctx->spec->headers);
+            }
             return self::defaultHttpFetch($fullurl, $fetchdef);
         }
         if (is_callable($sys_fetch)) {
@@ -249,5 +269,27 @@ class UnivecFetcher
         }
 
         return [null, $ctx->make_error('fetch_invalid', 'system.fetch is not a valid function')];
+    }
+
+    public static function usesDefault(UnivecContext $ctx): bool
+    {
+        $sys_fetch = \Voxgig\Struct\Struct::getpath($ctx->client->options_map(), 'system.fetch');
+        $is_empty_obj = ($sys_fetch instanceof \stdClass) && empty(get_object_vars($sys_fetch));
+        $is_empty_arr = is_array($sys_fetch) && empty($sys_fetch);
+        return $sys_fetch === null || $is_empty_obj || $is_empty_arr;
+    }
+
+    // The headers the default transport sends: the request's own, with its
+    // agent when they name none. A request's headers travel by value, so the
+    // transport cannot record the agent where the response is read.
+    public static function sentHeaders(array $headers): array
+    {
+        foreach ($headers as $k => $v) {
+            if (is_string($v) && strcasecmp((string)$k, 'user-agent') === 0) {
+                return $headers;
+            }
+        }
+        $headers['user-agent'] = self::DEFAULT_USER_AGENT;
+        return $headers;
     }
 }

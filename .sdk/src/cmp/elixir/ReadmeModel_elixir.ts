@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, isAuthActive } from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, elixirAccessor, entityCollection } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -21,13 +21,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `(entity, reqmatch, ctrl \\\\ nil) :: map()` | Load a single entity by match criteria. Raises on error. |',
-    list: '| `list` | `(entity, reqmatch \\\\ nil, ctrl \\\\ nil) :: list()` | List entities matching the criteria. Raises on error. |',
-    create: '| `create` | `(entity, reqdata, ctrl \\\\ nil) :: map()` | Create a new entity. Raises on error. |',
-    update: '| `update` | `(entity, reqdata, ctrl \\\\ nil) :: map()` | Update an existing entity. Raises on error. |',
-    remove: '| `remove` | `(entity, reqmatch \\\\ nil, ctrl \\\\ nil) :: map()` | Remove an entity. Raises on error. |',
+    load: '| `load` | `(entity, reqmatch, ctrl \\\\ nil) :: entity` | Load a single entity by match criteria, and return it. Raises on error. |',
+    list: '| `list` | `(entity, reqmatch \\\\ nil, ctrl \\\\ nil) :: list()` | List entities matching the criteria, one per record. Raises on error. |',
+    create: '| `create` | `(entity, reqdata, ctrl \\\\ nil) :: entity` | Create a new entity, and return it. Raises on error. |',
+    update: '| `update` | `(entity, reqdata, ctrl \\\\ nil) :: entity` | Update an existing entity, and return it. Raises on error. |',
+    patch: '| `patch` | `(entity, reqdata, ctrl \\\\ nil) :: entity` | Change part of an existing entity, and return it. Raises on error. |',
+    remove: '| `remove` | `(entity, reqmatch \\\\ nil, ctrl \\\\ nil) :: entity` | Remove an entity, and return it marked as deleted. Raises on error. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -72,7 +73,7 @@ Creates a test-mode client with mock transport. Both arguments may be \`nil\`.
 
   each(entityList, (ent: any) => {
     const article = /^[aeiou]/i.test(ent.Name) ? 'an' : 'a'
-    Content(`| \`${ent.name}\` | \`(client, entopts \\\\ nil) :: entity\` | Create ${article} ${ent.Name} entity handle. |
+    Content(`| \`${elixirAccessor(ent, entityCollection(model))}\` | \`(client, entopts \\\\ nil) :: entity\` | Create ${article} ${ent.Name} entity handle. |
 `)
   })
 
@@ -93,9 +94,10 @@ ${opRows}
 
 ### Result shape
 
-Entity operations return the bare result data (a value node — a map for
-single-entity ops, a list for \`list\`) and raise a \`${Name}.Error\` on
-failure. Wrap calls in \`try\`/\`rescue\` to handle errors.
+Entity operations return the entity, and \`list\` a list of entities, one per
+record; an entity module's \`data_get/1\` reads an entity's record. They raise
+a \`${Name}.Error\` on failure, so wrap calls in \`try\`/\`rescue\` to handle
+errors.
 
 The \`direct/2\` escape hatch never raises — it returns a result node you
 branch on via \`Voxgig.Struct.getprop(result, "ok")\`:

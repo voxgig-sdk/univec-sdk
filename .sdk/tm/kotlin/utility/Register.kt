@@ -7,6 +7,7 @@ object Register {
 
   fun registerAll(u: Utility) {
     u.clean = ::clean
+    u.cleanAdd = ::cleanAdd
     u.done = ::done
     u.makeError = ::makeError
     u.featureAdd = ::featureAdd

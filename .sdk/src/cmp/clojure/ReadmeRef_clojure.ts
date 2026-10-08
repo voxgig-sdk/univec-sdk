@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures, opNeedsAction, bodyNote } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -7,10 +7,13 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
+import { cljListMatch } from './utility_clojure'
+
 
 // A type-correct Clojure literal for a field's canonical type.
 function cljLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'nil'
   if ('INTEGER' === k || 'NUMBER' === k) return '1'
   if ('BOOLEAN' === k) return 'true'
   if ('ARRAY' === k) return '(vs/jt)'
@@ -34,29 +37,34 @@ function cljType(type: any): string {
 
 const OP_SIGNATURES: Record<string, { sig: string, returns: string, desc: string }> = {
   load: {
-    sig: '(load ent reqmatch ctrl) -> map',
-    returns: 'the entity data',
-    desc: 'Load a single entity matching the given criteria. Returns the entity data and raises on error.',
+    sig: '(load ent reqmatch ctrl) -> entity',
+    returns: 'the entity',
+    desc: 'Load a single entity matching the given criteria. Returns the entity, whose record `((:data-get ent))` reads, and raises on error.',
   },
   list: {
     sig: '(list ent reqmatch ctrl) -> vector',
-    returns: 'a vector of entities',
-    desc: 'List entities matching the given criteria. The match is optional — call with `nil` to list all records. Returns a vector and raises on error.',
+    returns: 'a vector of entities, one per record',
+    desc: 'List entities matching the given criteria. The match is optional — call with `nil` to list all records. Returns a vector of entities, one per record, and raises on error.',
   },
   create: {
-    sig: '(create ent reqdata ctrl) -> map',
-    returns: 'the created entity data',
-    desc: 'Create a new entity with the given data. Returns the created entity data and raises on error.',
+    sig: '(create ent reqdata ctrl) -> entity',
+    returns: 'the created entity',
+    desc: 'Create a new entity with the given data. Returns the created entity and raises on error.',
   },
   update: {
-    sig: '(update ent reqdata ctrl) -> map',
-    returns: 'the updated entity data',
-    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity data and raises on error.',
+    sig: '(update ent reqdata ctrl) -> entity',
+    returns: 'the updated entity',
+    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity and raises on error.',
+  },
+  patch: {
+    sig: '(patch ent reqdata ctrl) -> entity',
+    returns: 'the patched entity',
+    desc: 'Change part of an existing entity: only the fields given are sent. The data must include the entity `id`. Returns the patched entity and raises on error.',
   },
   remove: {
-    sig: '(remove ent reqmatch ctrl) -> map',
-    returns: 'the removed entity data',
-    desc: 'Remove the entity matching the given criteria. Raises on error.',
+    sig: '(remove ent reqmatch ctrl) -> entity',
+    returns: 'the removed entity',
+    desc: 'Remove the entity matching the given criteria. Returns the entity, marked as deleted, and raises on error.',
   },
 }
 
@@ -221,7 +229,7 @@ Prepare a fetch definition without sending. Returns the \`fetchdef\` and raises 
         // Field operations breakdown
         const hasFieldOps = fields.some((f: any) => f.op && Object.keys(f.op).length > 0)
         if (hasFieldOps) {
-          const opcols = ['load', 'list', 'create', 'update', 'remove']
+          const opcols = ['load', 'list', 'create', 'update', 'patch', 'remove']
             .filter((op: string) => opnames.includes(op) && ent.op[op]?.active !== false)
           Content(`### Field Usage by Operation
 
@@ -262,6 +270,10 @@ ${info.desc}
 
 `)
 
+          if (opNeedsAction(ent.op[opname])) {
+            return
+          }
+
           if ('load' === opname || 'remove' === opname) {
             const matchItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
@@ -280,8 +292,8 @@ ${info.desc}
           }
           else if ('list' === opname) {
             Content(`\`\`\`clojure
-(doseq [${eLow} (e-${eLow}/list (api/${eLow} client nil) nil nil)]
-  (println ${eLow}))
+(doseq [${eLow} (e-${eLow}/list (api/${eLow} client nil) ${cljListMatch(ent)} nil)]
+  (println ((:data-get ${eLow}))))
 \`\`\`
 
 `)
@@ -304,8 +316,8 @@ ${info.desc}
 
 `)
           }
-          else if ('update' === opname) {
-            const updateItems = opRequestShape(ent, 'update').items
+          else if ('update' === opname || 'patch' === opname) {
+            const updateItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
               .sort((a: any, b: any) =>
                 (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
@@ -314,14 +326,22 @@ ${info.desc}
                 it.name === idF ? ent.name + '_id' : it.name)}\n`).join('')
             Content(`\`\`\`clojure
 (def result
-  (e-${eLow}/update (api/${eLow} client nil)
+  (e-${eLow}/${opname} (api/${eLow} client nil)
     (vs/jm
-${updateLines}      ;; Fields to update
+${updateLines}      ;; ${'patch' === opname ? 'Only the fields to change' : 'Fields to update'}
       )
     nil))
 \`\`\`
 
 `)
+          }
+
+          if ('create' === opname || 'update' === opname || 'patch' === opname) {
+            const note = bodyNote(ent.op[opname], {
+              values: 'a byte array, a `String` or an `InputStream`',
+              once: 'an `InputStream`',
+            })
+            if ('' !== note) Content(note)
           }
         })
       }

@@ -4,6 +4,9 @@ import * as Path from 'node:path'
 
 import {
   camelify,
+  canonScalarKey,
+  requiredItems,
+  javaMapOf,
 } from '@voxgig/sdkgen'
 
 import {
@@ -109,8 +112,30 @@ function jsonAppendLines(value: any, bufname: string): string {
     .join('')
 }
 
+// Map.of and Map.entry reject a null value, so NULL keeps the placeholder.
+function javaLit(type: any, placeholder: string = 'example'): string {
+  const k = canonScalarKey(type)
+  if ('INTEGER' === k) return '1L'
+  if ('NUMBER' === k) return '1.0'
+  if ('BOOLEAN' === k) return 'true'
+  if ('ARRAY' === k) return 'List.of()'
+  if ('OBJECT' === k) return 'Map.of()'
+  return `"${placeholder}"`
+}
+
+
+// A list's required parameters as its match.
+function javaListMatch(entity: any): string {
+  const items = requiredItems(entity, 'list')
+  return 0 < items.length
+    ? javaMapOf(items.map((it: any) => `${JSON.stringify(it.name)}, ${javaLit(it.type)}`))
+    : 'null'
+}
+
 
 export {
+  javaLit,
+  javaListMatch,
   cleanModel,
   javaPackage,
   javaVarName,

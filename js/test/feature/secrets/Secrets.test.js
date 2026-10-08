@@ -282,9 +282,9 @@ describe('secrets', () => {
     assert.equal(stub.sent, 0,
       'a request must not go out unauthenticated because a provider broke,' +
       ' but one reached the transport: ' + wire(stub))
-    assert.ok(res instanceof Error,
-      'expected the provider Error, got: ' + JSON.stringify(res))
-    assert.match(String(res.message), /vault unreachable/)
+    assert.ok(res && false === res.ok && res.err instanceof Error,
+      'expected the provider Error as err, got: ' + JSON.stringify(res))
+    assert.match(String(res.err.message), /vault unreachable/)
 
     // CONTROL, which makes that zero mean REFUSED rather than UNWIRED: the
     // same construction with a WORKING provider must reach the same
@@ -308,9 +308,9 @@ describe('secrets', () => {
     assert.equal(stub.sent, 0,
       'a graphql request must not go out unauthenticated,' +
       ' but one reached the transport: ' + wire(stub))
-    assert.ok(res instanceof Error,
-      'expected the provider Error, got: ' + JSON.stringify(res))
-    assert.match(String(res.message), /vault unreachable/)
+    assert.ok(res && false === res.ok && res.err instanceof Error,
+      'expected the provider Error as err, got: ' + JSON.stringify(res))
+    assert.match(String(res.err.message), /vault unreachable/)
 
     const control = countingFetch()
     const ok = await rawSdk(control, WORKINGPROVIDER).graphql('{ thing }', {})
@@ -869,7 +869,7 @@ describe('secrets exchange', () => {
 
     const res = await sdk.direct({ path: '/thing' })
 
-    assert.ok(res instanceof Error || (res && false === res.ok),
+    assert.ok(res && false === res.ok && null != res.err,
       'expected a failure, got: ' + JSON.stringify(res))
     assert.equal(stub.api().length, 0,
       'a request must not go out unauthenticated because the chain was empty')

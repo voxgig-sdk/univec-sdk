@@ -339,7 +339,7 @@ let () =
         ignore (op h ~op:"list" ());
         check_int "entries" (size (getp (track h "debug") "entries")) 1;
         check_int "seen" (List.length !seen) 2;
-        check_vstr "redacted" (getp (getp (List.nth !seen 0) "headers") "authorization") "<redacted>");
+        check_vstr "redacted" (getp (getp (List.nth !seen 0) "headers") "authorization") "[redacted]");
     test "debug.captures_failures" (fun () ->
         let h = make_client [("netsim", jo [("failTimes", Num 1.); ("failStatus", Num 500.)]); ("debug", empty_map ())] in
         ignore (op h ~op:"load" ());
@@ -350,7 +350,7 @@ let () =
         let h = make_client [("debug", jo [("now", vfunc0 (fun () -> Num 7.)); ("redact", ja [Str "x-secret"])])] in
         ignore (op h ~op:"load" ~headers:[("x-secret", Str "hide"); ("x-ok", Str "show")] ());
         let e0 = getelem (getp (track h "debug") "entries") (Num 0.) in
-        check_vstr "secret" (getp (getp e0 "headers") "x-secret") "<redacted>";
+        check_vstr "secret" (getp (getp e0 "headers") "x-secret") "[redacted]";
         check_vstr "ok hdr" (getp (getp e0 "headers") "x-ok") "show";
         check_vnum "duration" (getp e0 "durationMs") 0.);
     test "debug.inactive" (fun () ->

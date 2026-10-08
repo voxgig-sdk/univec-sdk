@@ -24,7 +24,7 @@ public static class SdkSchema
             ["allow"] = new Dictionary<string, object?>
             {
                 ["method"] = "GET,PUT,POST,PATCH,DELETE,OPTIONS",
-                ["op"] = "create,update,load,list,remove,command,direct,graphql",
+                ["op"] = "create,update,patch,load,list,remove,command,direct,graphql",
             },
             ["apikey"] = "",
             ["auth"] = new Dictionary<string, object?>
@@ -37,7 +37,12 @@ public static class SdkSchema
             ["base"] = "http://localhost:8000",
             ["clean"] = new Dictionary<string, object?>
             {
-                ["keys"] = "key,token,id",
+                ["active"] = true,
+                ["hint"] = "0",
+                ["keys"] = "key,secret,token,password,passwd,authorization,cookie,credential,signature",
+                ["mask"] = "[redacted]",
+                ["min"] = "4",
+                ["values"] = "",
             },
             ["entity"] = new Dictionary<string, object?>
             {
@@ -940,6 +945,12 @@ public static class SdkSchema
                             "`$NIL`",
                         },
                         ["clearTimer"] = new List<object?>
+                        {
+                            "`$ONE`",
+                            "`$FUNCTION`",
+                            "`$NIL`",
+                        },
+                        ["now"] = new List<object?>
                         {
                             "`$ONE`",
                             "`$FUNCTION`",

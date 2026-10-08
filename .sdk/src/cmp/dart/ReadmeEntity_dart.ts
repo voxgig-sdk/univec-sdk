@@ -28,11 +28,12 @@ function listMatchArg(ent: any): string {
 
 
 const OP_DESC: Record<string, { method: string, desc: string }> = {
-  load:   { method: 'load(match)',   desc: 'Load a single entity by match criteria.' },
-  list:   { method: 'list()',        desc: 'List entities, optionally matching the given criteria.' },
-  create: { method: 'create(data)',  desc: 'Create a new entity with the given data.' },
-  update: { method: 'update(data)',  desc: 'Update an existing entity.' },
-  remove: { method: 'remove(match)', desc: 'Remove the matching entity.' },
+  load:   { method: 'load(match)',   desc: 'Load a single entity by match criteria. Returns the entity.' },
+  list:   { method: 'list()',        desc: 'List entities, optionally matching the given criteria. Returns one entity per record.' },
+  create: { method: 'create(data)',  desc: 'Create a new entity with the given data. Returns the entity.' },
+  update: { method: 'update(data)',  desc: 'Update an existing entity. Returns the entity.' },
+  patch:  { method: 'patch(data)',   desc: 'Change part of an existing entity. Returns the entity.' },
+  remove: { method: 'remove(match)', desc: 'Remove the matching entity. Returns the entity, marked as deleted.' },
 }
 
 

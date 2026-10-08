@@ -16,7 +16,7 @@ keeps the cognitive load low.
 
 ## Install
 This package is not yet published to [Hex](https://hex.pm). Install it from
-the GitHub release tag (`elixir/vX.Y.Z`, see [Releases](https://github.com/voxgig-sdk/univec-sdk/releases))
+the GitHub release tag (`elixir/vX.Y.Z`, see [Tags](https://github.com/voxgig-sdk/univec-sdk/tags))
 by adding a git dependency to your `mix.exs`:
 
 ```elixir
@@ -58,7 +58,7 @@ sdk = Univec.new(H.deep(%{"apikey" => System.get_env("UNIVEC_APIKEY")}))
 ```elixir
 convert = Univec.convert(sdk)
 
-# Create — returns the bare created record
+# Create — returns the created entity
 created = Univec.Entity.Convert.create(convert, H.deep(%{"embeddings" => [], "source_model" => "example_source_model", "target_model" => "example_target_model"}))
 
 ```
@@ -71,14 +71,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -87,8 +88,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -145,10 +146,12 @@ alias Univec.Helpers, as: H
 
 sdk = Univec.test()
 
-# Entity ops return the bare record (raise on error).
+# Entity ops return the entity, and list one per record (raise on error).
 model = Univec.model(sdk)
-records = Univec.Entity.Model.list(model, H.deep(%{}))
-IO.inspect(records)
+models = Univec.Entity.Model.list(model, H.deep(%{}))
+for i <- 0..(Voxgig.Struct.size(models) - 1)//1 do
+  IO.puts(Voxgig.Struct.jsonify(Univec.Entity.Model.data_get(Voxgig.Struct.getelem(models, i))))
+end
 ```
 
 ### Use a custom fetch function
@@ -240,8 +243,8 @@ Every entity's `Univec.Entity.<Name>` module shares the same interface.
 
 | Function | Signature | Description |
 | --- | --- | --- |
-| `list` | `(entity, reqmatch \\ nil, ctrl \\ nil) :: list()` | List entities matching the criteria. Raises on error. |
-| `create` | `(entity, reqdata, ctrl \\ nil) :: map()` | Create a new entity. Raises on error. |
+| `list` | `(entity, reqmatch \\ nil, ctrl \\ nil) :: list()` | List entities matching the criteria, one per record. Raises on error. |
+| `create` | `(entity, reqdata, ctrl \\ nil) :: entity` | Create a new entity, and return it. Raises on error. |
 | `data_get` | `(entity) :: map()` | Get entity data. |
 | `data_set` | `(entity, data)` | Set entity data. |
 | `match_get` | `(entity) :: map()` | Get entity match criteria. |
@@ -251,9 +254,10 @@ Every entity's `Univec.Entity.<Name>` module shares the same interface.
 
 ### Result shape
 
-Entity operations return the bare result data (a value node — a map for
-single-entity ops, a list for `list`) and raise a `Univec.Error` on
-failure. Wrap calls in `try`/`rescue` to handle errors.
+Entity operations return the entity, and `list` a list of entities, one per
+record; an entity module's `data_get/1` reads an entity's record. They raise
+a `Univec.Error` on failure, so wrap calls in `try`/`rescue` to handle
+errors.
 
 The `direct/2` escape hatch never raises — it returns a result node you
 branch on via `Voxgig.Struct.getprop(result, "ok")`:
@@ -355,7 +359,7 @@ Create a handle: `convert = Univec.convert(sdk)`
 
 ```elixir
 convert = Univec.convert(sdk)
-record = Univec.Entity.Convert.create(convert, Univec.Helpers.deep(%{
+convert = Univec.Entity.Convert.create(convert, Univec.Helpers.deep(%{
   "embeddings" => [],  # list()
   "source_model" => "example_source_model",  # String.t()
   "target_model" => "example_target_model",  # String.t()
@@ -385,7 +389,7 @@ Create a handle: `embed = Univec.embed(sdk)`
 
 ```elixir
 embed = Univec.embed(sdk)
-record = Univec.Entity.Embed.create(embed, Univec.Helpers.deep(%{
+embed = Univec.Entity.Embed.create(embed, Univec.Helpers.deep(%{
   "embeddings" => [],  # list()
   "model" => "example_model",  # String.t()
   "texts" => [],  # list()
@@ -416,7 +420,7 @@ Create a handle: `ephemeral_key = Univec.ephemeral_key(sdk)`
 
 ```elixir
 ephemeral_key = Univec.ephemeral_key(sdk)
-record = Univec.Entity.EphemeralKey.create(ephemeral_key, Univec.Helpers.deep(%{
+ephemeral_key = Univec.Entity.EphemeralKey.create(ephemeral_key, Univec.Helpers.deep(%{
   "dailyLimit" => 1,  # integer()
   "dailyUsed" => 1,  # integer()
   "key" => "example_key",  # String.t()
@@ -454,7 +458,7 @@ Create a handle: `model = Univec.model(sdk)`
 
 ```elixir
 model = Univec.model(sdk)
-records = Univec.Entity.Model.list(model)
+models = Univec.Entity.Model.list(model)
 ```
 
 ## Features
@@ -842,7 +846,8 @@ that every later pipeline stage observes — the immutable-Elixir way to honour
 the shared-mutable hook contract.
 
 Build inputs from native Elixir maps with `Univec.Helpers.deep/1`,
-and read fields off results with `Voxgig.Struct.getprop/2`.
+and read fields off a record, which an entity's `data_get/1` returns, with
+`Voxgig.Struct.getprop/2`.
 
 ### Module structure
 

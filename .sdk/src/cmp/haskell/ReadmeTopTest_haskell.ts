@@ -29,7 +29,7 @@ const ReadmeTopTest = cmp(function ReadmeTopTest(props: any) {
 
   Content(`\`\`\`haskell
 import qualified SdkClient as Sdk
-import VoxgigStruct (Value (..), emptyMap)
+import VoxgigStruct (Value (..), emptyMap, stringify)
 import SdkHelpers (jo)
 
 main :: IO ()
@@ -52,7 +52,7 @@ main = do
         ? `jo [${items.map((it: any) =>
           `("${it.name}", ${it.name === idF ? 'VStr "test01"' : hsLit(it.type)})`).join(', ')}]`
         : 'emptyMap'
-    } else if ('create' === primaryOp || 'update' === primaryOp) {
+    } else if ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp) {
       const items = opRequestShape(exampleEntity, primaryOp).items
         .filter((it: any) => it.name !== idF && it.name !== 'id')
       const required = items.filter((it: any) => !it.optional)
@@ -65,7 +65,9 @@ main = do
   arg <- ${argExpr}
   ctrl <- emptyMap
   ${resVar} <- Sdk.${opCap} ent arg ctrl
-  print ${resVar}
+  ${'list' === primaryOp
+    ? `mapM_ (\\en -> putStrLn =<< stringify =<< Sdk.eDataGet en) ${resVar}`
+    : `putStrLn =<< stringify =<< Sdk.eDataGet ${resVar}`}
 `)
   }
 

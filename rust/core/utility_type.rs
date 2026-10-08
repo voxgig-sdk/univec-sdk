@@ -56,8 +56,25 @@ impl Utility {
         u::clean::clean_util(ctx, val)
     }
 
+    pub fn clean_str(&self, ctx: &Rc<Context>, val: &str) -> String {
+        u::clean::clean_str(ctx, val)
+    }
+
+    /// Register a secret value the SDK will mask from now on.
+    pub fn clean_add(&self, ctx: &Rc<Context>, value: &str) {
+        u::clean::clean_add(ctx, value)
+    }
+
+    pub fn clean_key(&self, ctx: &Rc<Context>, key: &str) -> bool {
+        u::clean::clean_key(ctx, key)
+    }
+
     pub fn done(&self, ctx: &Rc<Context>) -> Result<Value, UnivecError> {
         u::done::done_util(ctx)
+    }
+
+    pub fn clean_explain(&self, ctx: &Rc<Context>) {
+        u::done::clean_explain_util(ctx)
     }
 
     pub fn make_error(

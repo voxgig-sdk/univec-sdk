@@ -2,6 +2,7 @@
 
 using System.Text.Json;
 
+using UnivecSdk.Feature;
 using Voxgig.Struct;
 using Xunit;
 
@@ -9,6 +10,12 @@ namespace UnivecSdk.Test;
 
 public class EphemeralKeyEntityTest
 {
+    // main.kit.test.live.strict is true (the default is true): a live
+    // request that fails, or a live test missing an input it needs,
+    // fails the test.
+    // An account with no record for a test to read skips it either way.
+    private const bool LIVE_STRICT = true;
+
     [Fact]
     public void Instance()
     {
@@ -33,13 +40,6 @@ public class EphemeralKeyEntityTest
                 return; // skipped via sdk-test-control.json
             }
         }
-        // The basic flow consumes synthetic IDs from the fixture. In live
-        // mode without an *_ENTID env override, those IDs hit the live API
-        // and 4xx; set UNIVEC_TEST_EPHEMERAL_KEY_ENTID JSON to run live.
-        if (setup.SyntheticOnly)
-        {
-            return;
-        }
         var client = setup.Client;
 
         // CREATE
@@ -52,6 +52,21 @@ public class EphemeralKeyEntityTest
         ephemeralKeyRef01Data = Helpers.ToMapAny(ephemeralKeyRef01DataResult is IEntity ce ? ce.Data() : ephemeralKeyRef01DataResult);
         Assert.True(ephemeralKeyRef01Data != null, "expected create result to be a map");
 
+    }
+
+    [Fact]
+    public void Validate()
+    {
+        if (!Fh.HasFeature("validate"))
+        {
+            Console.WriteLine("skip: feature not present in this SDK: validate");
+            return;
+        }
+        var client = UnivecSDK.TestSDK(null,
+            new Dictionary<string, object?> { ["feature"] = new Dictionary<string, object?> { ["validate"] = new Dictionary<string, object?> { ["active"] = true } } });
+        var err = Assert.ThrowsAny<UnivecError>(() => client.EphemeralKey().Create(
+            new Dictionary<string, object?> { ["dailyLimit"] = "x", ["dailyUsed"] = 1, ["key"] = "x", ["resetsAt"] = "x" }, null));
+        Assert.Equal("validate_failed", err.Code);
     }
 
     private static EntityTestSetup EphemeralKeyBasicSetup(
@@ -93,9 +108,8 @@ public class EphemeralKeyEntityTest
                 },
             });
 
-        // Detect ENTID env override before EnvOverride consumes it. When
-        // live mode is on without a real override, the basic test runs
-        // against synthetic IDs from the fixture and 4xx's.
+        // Whether *_ENTID supplied the idmap, read before EnvOverride consumes
+        // it: without it, the ids a live flow binds are the fixture's synthetic ones.
         var entidEnvRaw = Environment.GetEnvironmentVariable(
             "UNIVEC_TEST_EPHEMERAL_KEY_ENTID") ?? "";
         var idmapOverridden = entidEnvRaw != "" &&

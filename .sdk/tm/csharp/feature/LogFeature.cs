@@ -104,6 +104,9 @@ public class LogFeature : BaseFeature
             attrs["spec"] = ctx.Spec.Method + " " + ctx.Spec.Path;
         }
 
-        _logger(level, "hook", attrs);
+        // A log line leaves the pipeline, so it carries the cleaned record: a
+        // path can hold a query credential, and a logger serialises whatever
+        // it is handed.
+        _logger(level, "hook", Fclean(ctx, attrs));
     }
 }

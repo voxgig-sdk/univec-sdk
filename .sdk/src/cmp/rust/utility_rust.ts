@@ -4,7 +4,7 @@ import {
   walk,
 } from '@voxgig/struct'
 
-import { sdkName } from '@voxgig/sdkgen'
+import { sdkName, canonScalarKey, requiredItems } from '@voxgig/sdkgen'
 
 
 // Rust keywords (strict + reserved) that are illegal as an identifier.
@@ -150,7 +150,19 @@ function rustRawString(s: string): string {
   return 'r' + hashes + '"' + s + '"' + hashes
 }
 
+// A list's required route and query parameters, as the match it is called with.
+function rustListMatch(entity: any): string {
+  const lit = (type: any): string =>
+    (({ NULL: 'Value::Null', INTEGER: 'Value::Num(1.0)', NUMBER: 'Value::Num(1.0)', BOOLEAN: 'Value::Bool(true)', ARRAY: 'Value::empty_list()', OBJECT: 'Value::empty_map()' }) as any)[canonScalarKey(type)] ?? 'Value::str("example")'
+  const items = requiredItems(entity, 'list')
+  return 0 < items.length
+    ? `jo(vec![${items.map((it: any) => `(${JSON.stringify(it.name)}, ${lit(it.type)})`).join(', ')}])`
+    : 'Value::Noval'
+}
+
+
 export {
+  rustListMatch,
   rustMethodName,
   rustRawString,
   clean,

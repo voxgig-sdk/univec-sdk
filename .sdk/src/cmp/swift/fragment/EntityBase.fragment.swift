@@ -80,6 +80,10 @@ open class ProjectNameEntityBase: Entity {
     throw unsupportedOp("update", name)
   }
 
+  open func patch(_ reqdata: VMap?, _ ctrl: VMap?) throws -> Value {
+    throw unsupportedOp("patch", name)
+  }
+
   open func remove(_ reqmatch: VMap?, _ ctrl: VMap?) throws -> Value {
     throw unsupportedOp("remove", name)
   }
@@ -188,7 +192,11 @@ open class ProjectNameEntityBase: Entity {
 
     let signal = opts.entries["signal"]?.asNative as? @Sendable () -> Bool
 
-    let ctrl = opts.entries["ctrl"]?.asMap ?? VMap()
+    // A copy: the caller's ctrl gains no key, and explain stays its own record.
+    let ctrl = VMap()
+    if let given = opts.entries["ctrl"]?.asMap {
+      ctrl.entries = given.entries
+    }
     ctrl.entries["stream"] = .map(opts)
 
     var ctxmap: [String: Any?] = [
@@ -231,5 +239,15 @@ open class ProjectNameEntityBase: Entity {
       }
       continuation.finish()
     }
+  }
+}
+
+// An entity prints as its data, as ts and go do: `match` can hold a query
+// credential from the response match, and `dump` walks every stored property.
+extension ProjectNameEntityBase: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+  public var description: Swift.String { name + " " + jsonify(.map(data), indent: 0) }
+  public var debugDescription: Swift.String { description }
+  public var customMirror: Swift.Mirror {
+    Swift.Mirror(self, children: ["name": name, "data": jsonify(.map(data), indent: 0)])
   }
 }

@@ -101,12 +101,19 @@ class TelemetryFeature extends BaseFeature("telemetry", "0.0.1", true) {
     span.put("durationMs", java.lang.Long.valueOf(dur))
     span.put("ok", java.lang.Boolean.valueOf(ok))
 
+    val out =
+      if (ctx.utility == null || ctx.utility.clean == null) span
+      else {
+        val c = Helpers.toMapAny(ctx.utility.clean(ctx, span))
+        if (c == null) span else c
+      }
+
     this.activeSpans -= 1
-    this.spans.add(span)
+    this.spans.add(out)
 
     this.options.get("exporter") match {
       case c: java.util.function.Consumer[_] =>
-        c.asInstanceOf[java.util.function.Consumer[JMap[String, Object]]].accept(span)
+        c.asInstanceOf[java.util.function.Consumer[JMap[String, Object]]].accept(out)
       case _ =>
     }
   }

@@ -51,12 +51,31 @@ defmodule Univec.Pipeline do
 
       Utility.done(ctx)
     rescue
-      e ->
-        Utility.feature_hook(ctx, "PreUnexpected")
-
-        reraise(e, __STACKTRACE__)
+      e -> unexpected(ctx, e, __STACKTRACE__)
     catch
       {:sdk_ret, v} -> v
+    end
+  end
+
+  # The catch path every entity call leaves through: an error a hook raised
+  # never passed through make_error. Nil when the caller switched throwing off.
+  def unexpected(ctx, e, st) do
+    # What a hook raises here must not escape the cleaning below.
+    {e, st} =
+      try do
+        Utility.feature_hook(ctx, "PreUnexpected")
+
+        {e, st}
+      rescue
+        hookerr -> {hookerr, __STACKTRACE__}
+      end
+
+    Utility.clean_explain(ctx)
+
+    if S.getprop(S.getprop(ctx, "ctrl"), "throw_err") == false do
+      nil
+    else
+      reraise(Utility.clean_exception(ctx, e), st)
     end
   end
 end

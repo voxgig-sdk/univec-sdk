@@ -54,7 +54,7 @@ defmodule Univec.Feature.Debug do
           "method", if(spec != nil, do: S.getprop(spec, "method"), else: nil),
           "url",
           if(spec != nil, do: H.or_(S.getprop(spec, "url"), S.getprop(spec, "path")), else: nil),
-          "headers", redact(f, if(spec != nil, do: S.getprop(spec, "headers"), else: nil)),
+          "headers", redact(f, ctx, if(spec != nil, do: S.getprop(spec, "headers"), else: nil)),
           "start", F.now(f),
           "status", nil,
           "ok", nil,
@@ -137,6 +137,11 @@ defmodule Univec.Feature.Debug do
         S.setprop(entry, "status", S.getprop(result, "status"))
       end
 
+      # The whole entry leaves through the buffer and the callback: the url
+      # and the error message can carry a query credential the header mask
+      # never saw.
+      entry = F.clean(ctx, entry)
+
       client = S.getprop(f, "client")
       buf = S.getprop(S.getprop(client, "_debug"), "entries")
       F.list_push(buf, entry)
@@ -158,32 +163,27 @@ defmodule Univec.Feature.Debug do
     end
   end
 
-  defp redact(f, headers) do
+  # The core clean rules apply (clean.keys, every registered value); the
+  # feature's own `redact` list ADDS header names on top of them.
+  defp redact(f, ctx, headers) do
     if headers == nil do
       S.jm([])
     else
       patterns =
-        opt_list(S.getprop(F.opts(f), "redact"), [
-          "authorization",
-          "cookie",
-          "set-cookie",
-          "api-key",
-          "apikey",
-          "x-api-key",
-          "idempotency-key"
-        ])
+        opt_list(S.getprop(F.opts(f), "redact"), [])
+        |> Enum.map(fn p -> String.downcase(to_string(p)) end)
 
       out = S.jm([])
 
       Enum.each(H.entries(headers), fn {k, v} ->
         if String.downcase(to_string(k)) in patterns do
-          S.setprop(out, k, "<redacted>")
+          S.setprop(out, k, "[redacted]")
         else
           S.setprop(out, k, v)
         end
       end)
 
-      out
+      F.clean(ctx, out)
     end
   end
 

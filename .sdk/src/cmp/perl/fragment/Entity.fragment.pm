@@ -52,6 +52,19 @@ sub get_name {
   return $self->{_name};
 }
 
+# The entity serialises and prints as its data (clean honours TO_JSON),
+# never as the client it holds or the match it absorbed: a query
+# credential comes back in resmatch.
+sub TO_JSON {
+  my ($self) = @_;
+  return Voxgig::Struct::clone($self->{_data});
+}
+
+sub to_string {
+  my ($self) = @_;
+  return 'EntityName ' . Voxgig::Struct::jsonify($self->{_data});
+}
+
 sub make {
   my ($self) = @_;
   my $opts = { %{ $self->{_entopts} } };
@@ -114,6 +127,8 @@ sub match_get {
 
 # #UpdateOp
 
+# #PatchOp
+
 # #RemoveOp
 
 # Streaming operation. Runs `action` (an op name, e.g. 'list') through the
@@ -123,7 +138,7 @@ sub match_get {
 # result). When the streaming feature is active the result carries a `stream`
 # coderef and this yields from it (honouring chunkSize / chunkDelay); else it
 # falls back to yielding the materialised items so stream() always yields.
-# Yielded records are unwrapped to bare hashrefs (matching list()).
+# An entity is yielded as its record, the hashref its data_get returns.
 #
 # $callopts parameterises the call:
 #   - ctrl:   per-call pipeline control (threaded onto the op ctx);
@@ -136,8 +151,9 @@ sub stream {
   my $utility = $self->{_utility};
   $callopts = ProjectNameHelpers::to_map($callopts) || {};
   my $signal = ProjectNameHelpers::gp($callopts, 'signal');
-  my $ctrl = ProjectNameHelpers::to_map(
-    ProjectNameHelpers::gp($callopts, 'ctrl')) || {};
+  # A copy: the caller's ctrl gains no key, and explain stays its own record.
+  my $ctrl = { %{ ProjectNameHelpers::to_map(
+    ProjectNameHelpers::gp($callopts, 'ctrl')) || {} } };
   $ctrl->{stream} = $callopts;
 
   my $ctx = $utility->{make_context}->({
@@ -179,13 +195,35 @@ sub stream {
 
   # Inbound: prefer the streaming feature's incremental iterator; else fall
   # back to the materialised items so stream() always yields.
+  # Each pull runs the source, so what it dies with leaves through the same
+  # catch path as the operation, and ends the stream.
   if ($result && ref $result->{stream} eq 'CODE') {
     my $src = $result->{stream};
     return sub {
       return undef if $aborted->();
-      my $item = $src->();
-      return undef unless defined $item;
-      return $unwrap->($item);
+      my $item = eval {
+        my $next = $src->();
+        defined $next ? $unwrap->($next) : undef;
+      };
+      if (my $operr = $@) {
+        $src = sub { return undef };
+        $ctx->{ctrl}{err} = $operr;
+
+        # What a hook dies with here must not escape the cleaning below.
+        my $fired = eval {
+          $utility->{feature_hook}->($ctx, 'PreUnexpected');
+          1;
+        };
+        if (!$fired) {
+          $operr = $@;
+          $ctx->{ctrl}{err} = $operr;
+        }
+
+        my $e = $self->_unexpected($ctx, $operr);
+        die $e if defined $e;
+        return undef;
+      }
+      return $item;
     };
   }
 
@@ -260,11 +298,49 @@ sub _run_op {
     $out;
   };
   if (my $operr = $@) {
-    # #PreUnexpected-Hook
+    $ctx->{ctrl}{err} = $operr;
 
-    die $operr;
+    # What a hook dies with here must not escape the cleaning below.
+    my $fired = eval {
+      # #PreUnexpected-Hook
+      1;
+    };
+    if (!$fired) {
+      $operr = $@;
+      $ctx->{ctrl}{err} = $operr;
+    }
+
+    my $e = $self->_unexpected($ctx, $operr);
+    die $e if defined $e;
+    return undef;
   }
   return $out;
+}
+
+# An exception the pipeline did not build still leaves through the
+# caller: it is cleaned, and so is the explain record it interrupted.
+# Answers undef when throwing is disabled, as the pipeline's own errors do.
+sub _unexpected {
+  my ($self, $ctx, $err) = @_;
+  my $clean = $self->{_utility}{clean};
+  my $explain = $ctx->{ctrl}{explain};
+  if (Voxgig::Struct::ismap($explain)) {
+    $self->{_utility}{clean_explain}->($ctx);
+    my $msg = "$err";
+    $msg =~ s/\s+\z//;
+    my $cleanerr = $clean->($ctx, {
+      'message' => $msg,
+      'class' => (Scalar::Util::blessed($err) || ref($err) || 'die'),
+    });
+    if (!Voxgig::Struct::ismap($explain->{err})) {
+      $explain->{err} = $cleanerr;
+    }
+    elsif (($explain->{err}{message} // '') ne $cleanerr->{message}) {
+      $explain->{unexpected} = $cleanerr;
+    }
+  }
+  return undef if defined $ctx->{ctrl}{throw_err} && !$ctx->{ctrl}{throw_err};
+  return $clean->($ctx, $err);
 }
 
 1;

@@ -93,6 +93,24 @@ fn fixIds(_: Allocator, key: ?[]const u8, val: Value, _: Value, path: []const []
     return val;
 }
 
+// The key a list's response transform
+// ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record
+// under; null for any other transform.
+fn item_envelope_key(restf: Value) ?[]const u8 {
+    if (restf != .array) return null;
+    const spec = restf.array.data.items;
+    if (spec.len != 3) return null;
+    if (spec[0] != .string or !std.mem.eql(u8, spec[0].string, "`$EACH`")) return null;
+    if (spec[1] != .string or !std.mem.eql(u8, spec[1].string, "body")) return null;
+    const merge = h.getp(spec[2], "`$MERGE`");
+    if (merge != .string) return null;
+    const m = merge.string;
+    if (m.len < 4 or !std.mem.startsWith(u8, m, "`.") or !std.mem.endsWith(u8, m, "`")) return null;
+    const key = m[2 .. m.len - 1];
+    if (std.mem.indexOfAny(u8, key, ".`$") != null) return null;
+    return key;
+}
+
 // THE MOCK HAS TO AGREE WITH THE MODEL.
 //
 // A point carrying `transform.res: `body.item`` describes an API that answers
@@ -107,6 +125,13 @@ fn fixIds(_: Allocator, key: ?[]const u8, val: Value, _: Value, path: []const []
 fn envelope(ctx: *Context, data: Value) Value {
     if (data == .null) return data;
     const restf = h.getpath(&.{ "transform", "res" }, ctx.point);
+    if (item_envelope_key(restf)) |key| {
+        if (data == .array) {
+            const out = h.olist();
+            for (data.array.data.items) |item| out.array.append(h.jo(&.{.{ key, item }})) catch {};
+            return out;
+        }
+    }
     if (restf != .string) return data;
     const spec = restf.string;
     // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
@@ -181,17 +206,19 @@ fn pick_point(points: Value) Value {
     return point;
 }
 
+// Each name is read from its arg: this struct port's `$EACH` transform answers
+// null for every `$KEY.name`, where the other ports answer the names.
 fn reqd_names(point: Value, kind: []const u8) Value {
     const args_path = h.getpath(&.{ "args", kind }, point);
     const reqd_args = vs.select(h.A(), args_path, h.jo(&.{.{ "reqd", h.vbool(true) }})) catch return h.olist();
-    // transform reports collected injection errors beside the value; .out is
-    // the value itself, errors or not.
-    const tres = vs.transform(h.A(), reqd_args, h.ja(&.{
-        h.vstr("`$EACH`"),
-        h.vstr(""),
-        h.vstr("`$KEY.name`"),
-    })) catch return h.olist();
-    return tres.out;
+    const names = h.olist();
+    if (reqd_args == .array) {
+        for (reqd_args.array.data.items) |arg| {
+            const name = h.getp(arg, "name");
+            if (name == .string) names.array.append(name) catch {};
+        }
+    }
+    return names;
 }
 
 fn build_args(ctx: *Context, args: Value) Value {
@@ -271,7 +298,7 @@ fn test_fetch(entity: Value, ctx: *Context, _: []const u8, _: Value) err.E!Value
             for (found.array.data.items) |item| h.del_prop(item, h.vstr("$KEY"));
         }
         return respond(ctx, 200, h.clone(found), &.{});
-    } else if (std.mem.eql(u8, op.name, "update")) {
+    } else if (std.mem.eql(u8, op.name, "update") or std.mem.eql(u8, op.name, "patch")) {
         const reqdata = ctx.reqdata;
         var update_match = h.omap();
         if (reqdata == .object) {
@@ -292,7 +319,10 @@ fn test_fetch(entity: Value, ctx: *Context, _: []const u8, _: Value) err.E!Value
             return respond(ctx, 404, h.vnull(), &.{.{ "statusText", h.vstr("Not found") }});
         }
         if (ent == .object and reqdata == .object) {
-            ent = h.merge(h.ja(&.{ ent, reqdata }));
+            // `$body` travels on the wire alone; the record is the rest.
+            const rec = h.clone(reqdata);
+            h.del_prop(rec, h.vstr("$body"));
+            ent = h.merge(h.ja(&.{ ent, rec }));
         }
         h.del_prop(ent, h.vstr("$KEY"));
         return respond(ctx, 200, h.clone(ent), &.{});
@@ -319,6 +349,7 @@ fn test_fetch(entity: Value, ctx: *Context, _: []const u8, _: Value) err.E!Value
         }
         const ent = h.clone(ctx.reqdata);
         if (ent == .object) {
+            h.del_prop(ent, h.vstr("$body"));
             h.setp(ent, "id", id);
             if (id == .string) h.setp(entmap, id.string, ent);
             h.del_prop(ent, h.vstr("$KEY"));

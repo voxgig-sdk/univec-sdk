@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable, invalidRequest } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -86,18 +86,21 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
 import java.util.{ArrayList, LinkedHashMap, List => JList, Map => JMap}
 
-import ${scalapackage}.core.{Helpers, SdkEntity, ${SDK}}
+import ${scalapackage}.core.{Config, Context, Helpers, SdkEntity, SdkError, ${SDK}}
+import ${scalapackage}.feature.BaseFeature
 import ${scalapackage}.utility.struct.Struct
 
 object ${EntityName}EntityTest {
 
+  import SdkTestSupport.{B, I, jl, om}
+${failureTests(SDK, entity, accessor)}
   def run(rep: SdkTestReport): Unit = {
     rep.scope("${ENTLOWER}.instance") {
       val testsdk = ${SDK}.testSDK()
       val ent = testsdk.${accessor}(null)
       rep.check("${ENTLOWER}.instance", ent != null, "expected non-null ${ENTLOWER} entity")
     }
-
+${failureScopes(SDK, entity, accessor)}
     rep.scope("${ENTLOWER}.basic") {
       val entityData = Helpers.toMapAny(SdkTestSupport.readJson(
           "../.sdk/test/entity/${ENTLOWER}/${EntityName}TestData.json"))
@@ -410,6 +413,113 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A failed operation throws from a stream as it does from the operation: a
+// transport failure, and a hook that rejects the call. A throwing hook fires
+// PreUnexpected, under throw false too. The caller's ctrl stays its own. An
+// invalid request fails with validate's own error, before it is sent.
+function failureTests(SDK: string, entity: ModelEntity, accessor: string): string {
+  const hasList = opReachable((entity.op as any)?.list, [])
+  if (!hasList && null == invalidRequest(entity)) {
+    return ''
+  }
+  return `
+  private def hasFeature(name: String): Boolean = {
+    val fm = Helpers.toMapAny(Config.sharedConfig().get("feature"))
+    fm != null && fm.get(name) != null
+  }
+${hasList ? `
+  final class FailHook extends BaseFeature("failhook", "0.0.1", true) {
+    var unexpected = 0
+    override def preSpec(ctx: Context): Unit = throw new RuntimeException("${entity.name} hook failed")
+    override def preUnexpected(ctx: Context): Unit = unexpected += 1
+  }
+` : ''}`
+}
+
+
+function failureScopes(SDK: string, entity: ModelEntity, accessor: string): string {
+  const name = entity.name
+  let out = ''
+
+  if (opReachable((entity.op as any)?.list, [])) {
+    out += `
+    rep.scope("${name}.stream.error") {
+      val offline = om("net" -> om("offline" -> B(true)))
+      val err = try {
+        ${SDK}.testSDK(offline, null).${accessor}(null).stream("list", null, null).toList
+        null
+      } catch { case e: RuntimeException => e }
+      rep.check("${name}.stream.error", err != null && String.valueOf(err.getMessage).contains("offline"),
+        "expected the transport failure to raise from the stream, got " + err)
+
+      ${SDK}.testSDK(offline, null).${accessor}(null)
+        .stream("list", null, om("ctrl" -> om("throw" -> B(false)))).toList
+
+      if (hasFeature("rbac")) {
+        val denied = ${SDK}.testSDK(null,
+          om("feature" -> om("rbac" -> om("active" -> B(true), "deny" -> B(true)))))
+        val denyerr = try {
+          denied.${accessor}(null).stream("list", null, null).toList
+          null
+        } catch { case e: SdkError => e }
+        rep.check("${name}.stream.denied", denyerr != null && "rbac_denied" == denyerr.code,
+          "expected the rbac denial to raise from the stream, got " + denyerr)
+      }
+    }
+
+    rep.scope("${name}.stream.ctrl") {
+      val explain = new LinkedHashMap[String, Object]()
+      val ctrl = om("explain" -> explain)
+      ${SDK}.testSDK().${accessor}(null).stream("list", null, om("ctrl" -> ctrl)).toList
+      rep.check("${name}.stream.ctrl", 1 == ctrl.size() && (explain eq ctrl.get("explain")),
+        "the stream changed the caller's ctrl")
+      rep.check("${name}.stream.explain", !explain.isEmpty(), "the caller's explain record was not filled")
+    }
+
+    rep.scope("${name}.unexpected") {
+      val hook = new FailHook()
+      val client = new ${SDK}(om("feature" -> om("test" -> om("active" -> B(true))), "extend" -> jl(hook)))
+      val err = try {
+        client.${accessor}(null).list(null, null)
+        null
+      } catch { case e: RuntimeException => e }
+      rep.check("${name}.unexpected.raise", err != null && String.valueOf(err.getMessage).contains("hook failed"),
+        "expected the hook's failure, got " + err)
+      rep.check("${name}.unexpected.fired", hook.unexpected > 0, "PreUnexpected did not fire")
+
+      val fired = hook.unexpected
+      client.${accessor}(null).list(null, om("throw" -> B(false)))
+      rep.check("${name}.unexpected.nothrow", hook.unexpected > fired,
+        "PreUnexpected did not fire under throw false")
+    }
+`
+  }
+
+  const bad = invalidRequest(entity)
+  if (null != bad) {
+    const args = Object.entries(bad.args)
+      .map(([k, v]) => JSON.stringify(k) + ' -> ' +
+        ('number' === typeof v ? 'I(' + v + ')' : 'boolean' === typeof v ? 'B(' + v + ')' : JSON.stringify(v)))
+      .join(', ')
+    out += `
+    rep.scope("${name}.validate") {
+      if (hasFeature("validate")) {
+        val client = ${SDK}.testSDK(null, om("feature" -> om("validate" -> om("active" -> B(true)))))
+        val err = try {
+          client.${accessor}(null).${bad.op}(om(${args}), null)
+          null
+        } catch { case e: SdkError => e }
+        rep.check("${name}.validate", err != null && "validate_failed" == err.code,
+          "expected validate_failed, got " + err)
+      }
+    }
+`
+  }
+
+  return out
 }
 
 

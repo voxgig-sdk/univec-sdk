@@ -151,7 +151,7 @@ int main(void) {
 `)
       for (let i = 0; i < listParams.length; i++) {
         const placeholder = 'direct0' + (i + 1)
-        Content(`    setp(params, "${listParams[i].name}", v_str("${placeholder}"));
+        Content(`    setp(params, "${listParams[i].n}", v_str("${placeholder}"));
 `)
       }
       Content(`    PNError* err = NULL;
@@ -188,7 +188,7 @@ int main(void) {
 `)
       for (let i = 0; i < loadParams.length; i++) {
         const placeholder = 'direct0' + (i + 1)
-        Content(`    setp(params, "${loadParams[i].name}", v_str("${placeholder}"));
+        Content(`    setp(params, "${loadParams[i].n}", v_str("${placeholder}"));
 `)
       }
       Content(`    PNError* err = NULL;

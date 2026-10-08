@@ -1,7 +1,7 @@
 
 const { Result } = require('../Result')
 
-const { clean } = require('./CleanUtility')
+const { clean, setMessage } = require('./CleanUtility')
 const { clone, delprop } = require('./StructUtility')
 
 function makeError(ctx, err) {
@@ -18,9 +18,25 @@ function makeError(ctx, err) {
   err = undefined === err ? reserr : err
   err = err || ctx.error('unknown', 'unknown error')
 
+  // A hook or fetcher may reject with a plain value; clean returns a masked
+  // copy of that rather than changing it, so the copy is what leaves.
+  if (!(err instanceof Error)) {
+    const copy = clean(ctx, err)
+    const text = 'string' === typeof copy ? copy : String(copy?.message ?? 'unknown error')
+    err = Object.assign(new Error(text), 'object' === typeof copy ? copy : {})
+  }
+
   const errmsg = err.message || 'unknown error'
-  const msg = 'UnivecSDK: ' + op.name + ': ' + errmsg
-  err.message = clean(ctx, msg)
+  setMessage(err, 'UnivecSDK: ' + op.name + ': ' + errmsg)
+
+  // The context stays reachable for a debugger, but not for a serialiser:
+  // a transport error carries none, and a pipeline error's is enumerable
+  // only until here.
+  if (null != err.ctx) {
+    Object.defineProperty(err, 'ctx', { value: err.ctx, enumerable: false, writable: true })
+  }
+
+  clean(ctx, err)
 
   if (result.err) {
     delprop(result, 'err')

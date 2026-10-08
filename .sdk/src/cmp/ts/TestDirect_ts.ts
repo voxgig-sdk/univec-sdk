@@ -21,7 +21,7 @@ import {
   serverVariables,
   isHttpBasicAuth,
   jsProp,
-  jsOptProp, envName, envToken, liveStrict,
+  jsOptProp, envName, envToken, liveStrict, liveStrictNote,
   jsKey,
   pointParts,
   hasLiveScenarios,
@@ -94,6 +94,9 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
         Slot({ name: 'directSetup' }, () => {
           Content(`
+${liveStrictNote(strict, '//')}
+const LIVE_STRICT = ${strict}
+
 function liveScenariosActive() { return ${hasLiveScenarios(model)} && process.env.${PROJECTNAME}_TEST_LIVE === 'TRUE' }
 function directSetup(mockres?: any) {
   const calls: any[] = []
@@ -160,11 +163,11 @@ function unwrapListData(data: any): any[] | null {
         Slot({ name: 'direct' }, () => {
 
           if (hasLoad) {
-            generateDirectLoad(model, entity, strict)
+            generateDirectLoad(model, entity)
           }
 
           if (hasList) {
-            generateDirectList(model, entity, strict)
+            generateDirectList(model, entity)
           }
         })
 
@@ -178,7 +181,6 @@ function generateDirectGraphql(
   opname: 'load' | 'list',
   entity: ModelEntity,
   point: any,
-  strict: boolean,
 ) {
   const doc: string = point.gq.doc
   const vars: any[] = point.gq.vars || []
@@ -201,7 +203,7 @@ function generateDirectGraphql(
   })
 
   const skipMissingLine = 0 < liveIdKeys.length
-    ? `    if (skipIfMissingIds(t, setup, ${JSON.stringify(liveIdKeys)})) return\n`
+    ? `    if (skipIfMissingIds(t, setup, ${JSON.stringify(liveIdKeys)}, LIVE_STRICT)) return\n`
     : ''
 
   const varAsserts = vars.map((_v: any, i: number) =>
@@ -214,31 +216,7 @@ function generateDirectGraphql(
       assert(calls[0].init.method === 'POST')
 ${varAsserts}`
 
-  const checks = strict ?
-    `    if (setup.live) {
-      // STRICT live mode: a non-2xx is a real failure - this project owns
-      // the server it points at, so there is nothing to be lenient about.
-      //
-      // What is NOT asserted here is the MOCK's own fixtures. \`direct01\`
-      // is a scripted id and \`calls\` records the mock transport; neither
-      // exists on a live run, so asserting them made strict mode mean
-      // "compare the live server against the mock's script" - a suite that
-      // could not pass against any real API, including this project's own.
-      assert(result.ok === true,
-        'Live request failed: HTTP ' + result.status)
-      assert(result.status >= 200 && result.status < 300)
-      assert(null != result.data)
-    } else {
-${offlineChecks}    }` :
-    `    if (setup.live) {
-      // Live mode is lenient: synthetic ids frequently fail server-side
-      // validation. Skip rather than fail when the call doesn't come back
-      // clean.
-      if (!result.ok || result.status < 200 || result.status >= 300) {
-        return
-      }
-    } else {
-${offlineChecks}    }`
+  const checks = liveChecks(opname, 'null != result.data', 'no data', offlineChecks)
 
   Content(`
   test('direct-${opname}-${entity.name}', async (t: any) => {
@@ -262,7 +240,7 @@ ${checks}
 }
 
 
-function generateDirectLoad(model: Model, entity: ModelEntity, strict: boolean) {
+function generateDirectLoad(model: Model, entity: ModelEntity) {
   const loadOp = entity.op?.load
   const loadPoint: ModelPoint | undefined = loadOp?.points?.[0]
 
@@ -271,7 +249,7 @@ function generateDirectLoad(model: Model, entity: ModelEntity, strict: boolean) 
   }
 
   if ('graphql' === (loadPoint as any).kind) {
-    generateDirectGraphql('load', entity, loadPoint, strict)
+    generateDirectGraphql('load', entity, loadPoint)
     return
   }
 
@@ -367,7 +345,7 @@ ${loadParams.map((p: any, i: number) => `      ${jsProp('params', p.n)} = 'direc
     // so the test can succeed without ENTID env var. Ancestor params, if
     // any, still need ENTID overrides because the list call itself can need
     // them embedded.
-    liveIdKeys = liveAncestorParams.map((lp: any) => lp.key)
+    liveIdKeys = [...new Set([...liveListParams, ...liveAncestorParams].map((lp: any) => lp.key))]
     const listParamLines = liveListParams.map((lp: any) =>
       `        ${lp.name}: setup.idmap['${lp.key}'],`).join('\n')
     const ancestorParamLines = liveAncestorParams.map((lp: any) =>
@@ -384,15 +362,19 @@ ${liveQueryPrefix}      const listResult: any = await client.direct({
 ${listParamLines}
         },
       })
-      assert(listResult.ok && listResult.status >= 200 && listResult.status < 300,
-        'Live list discovery failed')
+      if (!listResult.ok || listResult.status < 200 || listResult.status >= 300) {
+        return void liveMiss(t, LIVE_STRICT, 'Live list discovery failed: ' + describeLive(listResult))
+      }
       const listArr = unwrapListData(listResult.data)
-      if (null == listArr || listArr.length === 0) {
-        throw new Error('Live load blocked: discovery returned no entities')
+      if (null == listArr) {
+        return void liveMiss(t, LIVE_STRICT, 'Live list discovery returned no list: ' + describeLive(listResult))
+      }
+      if (0 === listArr.length) {
+        return void liveEmpty(t, 'The account has no ${entity.name} record to load')
       }
       const candidateId = ${jsOptProp('listArr[0]', idParamName)} ?? listArr[0]?.id
       if (null == candidateId) {
-        throw new Error('Live load blocked: discovery returned no usable identity')
+        return void liveMiss(t, LIVE_STRICT, 'Live load blocked: discovery returned no usable identity')
       }
       ${jsProp('params', idParamName)} = candidateId
 ${ancestorParamLines}
@@ -400,15 +382,15 @@ ${ancestorParamLines}
 ${loadParams.map((p: any, i: number) => `      ${jsProp('params', p.n)} = 'direct0${i + 1}'`).join('\n')}
     }`
   } else if (hasLiveQuery || loadParams.length > 0) {
-    // Synthetic-only fallback: if there are load params with no examples
-    // and no list to bootstrap from, the live request would 4xx on
-    // undefined values. Mark the path-param keys so the test skips when
-    // ENTID overrides aren't supplied.
-    if (loadParams.length > 0) {
-      liveIdKeys = loadParams.map((p: any) => p.n + '01')
-    }
+    // With no examples and no list to discover from, the ids come from the
+    // *_ENTID variable; without them the test is blocked.
+    const liveLoadParams = loadParams.map((p: any) => ({
+      name: p.n, key: p.n === 'id' ? entity.name + '01' : p.n.replace(/_id$/, '') + '01',
+    }))
+    liveIdKeys = liveLoadParams.map((lp: any) => lp.key)
     liveParamsBlock = `    if (setup.live) {
-${liveQueryPrefix.replace(/\n$/, '')}
+${liveQueryPrefix}${liveLoadParams.map((lp: any) =>
+      `      ${jsProp('params', lp.name)} = setup.idmap['${lp.key}']`).join('\n')}
     } else {
 ${loadParams.map((p: any, i: number) => `      ${jsProp('params', p.n)} = 'direct0${i + 1}'`).join('\n')}
     }`
@@ -417,14 +399,9 @@ ${loadParams.map((p: any, i: number) => `      ${jsProp('params', p.n)} = 'direc
   }
 
   const skipMissingLine = liveIdKeys.length > 0
-    ? `    if (skipIfMissingIds(t, setup, ${JSON.stringify(liveIdKeys)})) return\n`
+    ? `    if (skipIfMissingIds(t, setup, ${JSON.stringify(liveIdKeys)}, LIVE_STRICT)) return\n`
     : ''
 
-  // Live-mode leniency is a MODEL decision (main.kit.test.live.strict).
-  // The default stays lenient: a fleet SDK generated against an arbitrary
-  // public API 4xxes on synthetic IDs, and asserting would mean permanent
-  // red. A project that owns its test server wants the opposite — without
-  // it, the suite passes with nothing listening on the port.
   const offlineChecks = `      assert(result.ok === true)
       assert(result.status === 200)
       assert(null != result.data)
@@ -433,31 +410,7 @@ ${loadParams.map((p: any, i: number) => `      ${jsProp('params', p.n)} = 'direc
       assert(calls[0].init.method === 'GET')
 ${paramAsserts}`
 
-  const loadChecks = strict ?
-    `    if (setup.live) {
-      // STRICT live mode: a non-2xx is a real failure - this project owns
-      // the server it points at, so there is nothing to be lenient about.
-      //
-      // What is NOT asserted here is the MOCK's own fixtures. \`direct01\`
-      // is a scripted id and \`calls\` records the mock transport; neither
-      // exists on a live run, so asserting them made strict mode mean
-      // "compare the live server against the mock's script" - a suite that
-      // could not pass against any real API, including this project's own.
-      assert(result.ok === true,
-        'Live request failed: HTTP ' + result.status)
-      assert(result.status >= 200 && result.status < 300)
-      assert(null != result.data)
-    } else {
-${offlineChecks}    }` :
-    `    if (setup.live) {
-      // Live mode is lenient: synthetic IDs frequently 4xx. Skip rather
-      // than fail when the load endpoint isn't reachable with the IDs we
-      // can construct from setup.idmap.
-      if (!result.ok || result.status < 200 || result.status >= 300) {
-        return
-      }
-    } else {
-${offlineChecks}    }`
+  const loadChecks = liveChecks('load', 'null != result.data', 'no data', offlineChecks)
 
   Content(`
   test('direct-load-${entity.name}', async (t: any) => {
@@ -483,7 +436,7 @@ ${loadChecks}
 }
 
 
-function generateDirectList(model: Model, entity: ModelEntity, strict: boolean) {
+function generateDirectList(model: Model, entity: ModelEntity) {
   const listOp = entity.op?.list
   const listPoint: ModelPoint | undefined = listOp?.points?.[0]
 
@@ -492,7 +445,7 @@ function generateDirectList(model: Model, entity: ModelEntity, strict: boolean) 
   }
 
   if ('graphql' === (listPoint as any).kind) {
-    generateDirectGraphql('list', entity, listPoint, strict)
+    generateDirectGraphql('list', entity, listPoint)
     return
   }
 
@@ -543,7 +496,7 @@ ${mockLines}
     ? liveParams.map((lp: any) => lp.key)
     : []
   const skipMissingLine = liveIdKeys.length > 0
-    ? `    if (skipIfMissingIds(t, setup, ${JSON.stringify(liveIdKeys)})) return\n`
+    ? `    if (skipIfMissingIds(t, setup, ${JSON.stringify(liveIdKeys)}, LIVE_STRICT)) return\n`
     : ''
 
   const offlineChecks = `      assert(result.ok === true)
@@ -556,35 +509,8 @@ ${mockLines}
       assert(calls[0].init.method === 'GET')
 ${paramAsserts}`
 
-  const listChecks = strict ?
-    `    if (setup.live) {
-      // STRICT live mode: a non-2xx is a real failure - this project owns
-      // the server it points at, so there is nothing to be lenient about.
-      //
-      // What is NOT asserted here is the MOCK's own fixtures. \`direct01\`
-      // is a scripted id and \`calls\` records the mock transport; neither
-      // exists on a live run, so asserting them made strict mode mean
-      // "compare the live server against the mock's script" - a suite that
-      // could not pass against any real API, including this project's own.
-      assert(result.ok === true,
-        'Live request failed: HTTP ' + result.status)
-      assert(result.status >= 200 && result.status < 300)
-      assert(Array.isArray(unwrapListData(result.data)), 'Expected live list response')
-    } else {
-${offlineChecks}    }` :
-    `    if (setup.live) {
-      // Live mode is lenient: synthetic IDs frequently 4xx and the list-
-      // response shape varies wildly across public APIs. Skip rather than
-      // fail when the call doesn't return a usable list.
-      if (!result.ok || result.status < 200 || result.status >= 300) {
-        return
-      }
-      const listArr = unwrapListData(result.data)
-      if (!Array.isArray(listArr)) {
-        return
-      }
-    } else {
-${offlineChecks}    }`
+  const listChecks = liveChecks('list', 'Array.isArray(unwrapListData(result.data))', 'no list',
+    offlineChecks)
 
   Content(`
   test('direct-list-${entity.name}', async (t: any) => {
@@ -604,6 +530,21 @@ ${paramsBlock}
 ${listChecks}
   })
 `)
+}
+
+
+// A live run asserts what any server answers, never the mock's own script
+// (`direct01`, `calls`), and never a record count.
+function liveChecks(opname: string, usable: string, unusable: string, offline: string): string {
+  return `    if (setup.live) {
+      if (!result.ok || result.status < 200 || result.status >= 300) {
+        return void liveMiss(t, LIVE_STRICT, 'Live ${opname} failed: ' + describeLive(result))
+      }
+      if (!(${usable})) {
+        return void liveMiss(t, LIVE_STRICT, 'Live ${opname} returned ${unusable}: ' + describeLive(result))
+      }
+    } else {
+${offline}    }`
 }
 
 

@@ -628,7 +628,7 @@ describe('secrets exchange', () => {
 
     const res = await sdk.direct({ path: '/thing' })
 
-    assert.ok(res instanceof Error || (res && false === res.ok),
+    assert.ok(res && false === res.ok && null != res.err,
       'expected a failure, got: ' + JSON.stringify(res))
     assert.equal(stub.api().length, 0,
       'a request must not go out unauthenticated because the chain was empty')

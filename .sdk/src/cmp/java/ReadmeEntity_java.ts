@@ -1,27 +1,15 @@
 
-import { cmp, each, Content, canonToType, canonKey, canonScalarKey, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, entityIdField, opRequestShape, opNeedsAction, javaMap, javaMapOf } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { javaVarName } from './utility_java'
+import { javaVarName, javaListMatch, javaLit } from './utility_java'
 
 
 // Type names come from the shared canonToType 'java' column (single source of truth).
-
-// A type-correct, JSON-serialisable Java literal for a field's canonical type.
-function javaLit(type: any, placeholder: string = 'example'): string {
-  const k = canonScalarKey(type)
-  if ('INTEGER' === k) return '1L'
-  if ('NUMBER' === k) return '1.0'
-  if ('BOOLEAN' === k) return 'true'
-  if ('ARRAY' === k) return 'List.of()'
-  if ('OBJECT' === k) return 'Map.of()'
-  return `"${placeholder}"`
-}
-
 
 // Operation method spelling for Java: camelCase methods over the loose object
 // model. The op descriptions are language-agnostic.
@@ -30,6 +18,7 @@ const OP_DESC: Record<string, { method: string, desc: string }> = {
   list:   { method: 'list(null, null)',    desc: 'List entities, optionally matching the given criteria.' },
   create: { method: 'create(data, null)',  desc: 'Create a new entity with the given data.' },
   update: { method: 'update(data, null)',  desc: 'Update an existing entity.' },
+  patch:  { method: 'patch(data, null)',   desc: 'Change part of an existing entity.' },
   remove: { method: 'remove(match, null)', desc: 'Remove the matching entity.' },
 }
 
@@ -55,6 +44,8 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 
   publishedEntities.map((entity: any) => {
     const opnames = Object.keys(entity.op || {})
+    // An op that needs an action has no plain call to show.
+    const callable = opnames.filter((o: string) => !opNeedsAction(entity.op[o]))
     const fields = Object.values(entity.fields || {})
     const idF = entityIdField(entity)
     // Sanitise the local variable name — a camelCased Java keyword gets a
@@ -112,7 +103,7 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
 `)
     }
 
-    if (opnames.includes('load')) {
+    if (callable.includes('load')) {
       // The id key plus every REQUIRED match key (parent path params like
       // page_id) — the same shape the runtime resolves path params from, so
       // the example always works.
@@ -121,9 +112,9 @@ const ReadmeEntity = cmp(function ReadmeEntity(props: any) {
         .sort((a: any, b: any) =>
           (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
       const loadArg = 0 < loadItems.length
-        ? `Map.of(${loadItems.map((it: any) =>
+        ? javaMapOf(loadItems.map((it: any) =>
           `"${it.name}", ${javaLit(it.type,
-            it.name === idF ? entity.name + '_id' : it.name)}`).join(', ')})`
+            it.name === idF ? entity.name + '_id' : it.name)}`))
         : 'null'
       Content(`#### Example: Load
 
@@ -134,30 +125,31 @@ Object ${eVar} = client.${accessor}(null).load(${loadArg}, null);
 `)
     }
 
-    if (opnames.includes('list')) {
+    if (callable.includes('list')) {
       Content(`#### Example: List
 
 \`\`\`java
-Object ${eVar}List = client.${accessor}(null).list(null, null);
+Object ${eVar}List = client.${accessor}(null).list(${javaListMatch(entity)}, null);
 \`\`\`
 
 `)
     }
 
-    if (opnames.includes('create')) {
+    if (callable.includes('create')) {
       // Members come from the SAME shape the runtime validates
       // (opRequestShape): every required member must appear — including a
       // required id and parent keys like page_id — with a real literal.
       const createItems = opRequestShape(entity, 'create').items
         .filter((it: any) => !it.optional)
+      const createMap = javaMap(createItems.length)
       Content(`#### Example: Create
 
 \`\`\`java
-Object ${eVar} = client.${accessor}(null).create(Map.of(
+Object ${eVar} = client.${accessor}(null).create(${createMap.open}
 `)
       createItems.map((it: any, i: number) => {
         const comma = i < createItems.length - 1 ? ',' : ''
-        Content(`    "${it.name}", ${javaLit(it.type, 'example_' + it.name)}${comma}  // ${canonToType(it.type, target.name)}
+        Content(`    ${createMap.pair(`"${it.name}", ${javaLit(it.type, 'example_' + it.name)}`)}${comma}  // ${canonToType(it.type, target.name)}
 `)
       })
       Content(`), null);

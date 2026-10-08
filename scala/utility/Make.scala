@@ -33,6 +33,7 @@ object MakeError {
     val spec = ctx.spec
 
     if (ctx.ctrl.explain != null) {
+      Clean.cleanExplain(ctx)
       val errRecord = new LinkedHashMap[String, Object]()
       errRecord.put("message", msg)
       ctx.ctrl.explain.put("err", errRecord)
@@ -44,6 +45,7 @@ object MakeError {
     val sdkErr = new SdkError(code, msg, ctx)
     sdkErr.result = Clean.clean(ctx, result)
     sdkErr.spec = Clean.clean(ctx, spec)
+    sdkErr.status = result.status
 
     ctx.ctrl.err = sdkErr
 
@@ -62,6 +64,64 @@ object MakeError {
 }
 
 object MakePoint {
+  private val PathParam = "\\{([^{}/]+)\\}".r
+
+  // A terminal parameter marks a record route (/boards/{id}); a
+  // cross-reference ends in the relationship's name (/posts/{id}/author).
+  // Failing that, the shallower path wins. The same rule runs at generation
+  // time, in helpers/opShape.ts — both sides must move together.
+  private def partsLen(p: JMap[String, Object]): Int =
+    Struct.getprop(p, "parts") match {
+      case parts: JList[_] => parts.size()
+      case _ => 0
+    }
+
+  private def terminalParam(p: JMap[String, Object]): Boolean =
+    Struct.getprop(p, "parts") match {
+      case parts: JList[_] if parts.size() > 0 =>
+        parts.get(parts.size() - 1) match {
+          case s: String => s.startsWith("{")
+          case _ => false
+        }
+      case _ => false
+    }
+
+  private def ownPoint(points: Seq[JMap[String, Object]]): JMap[String, Object] = {
+    var best = points.head
+    for (cand <- points) {
+      val candTerm = terminalParam(cand)
+      val bestTerm = terminalParam(best)
+      if (candTerm != bestTerm) {
+        if (candTerm) best = cand
+      } else if (partsLen(cand) < partsLen(best)) {
+        best = cand
+      }
+    }
+    best
+  }
+
+  // The path parameters of a point that neither the call nor the entity gives
+  // a value for, looked up as param looks them up.
+  private def unfilled(ctx: Context, point: JMap[String, Object]): Seq[String] =
+    Struct.getprop(point, "parts") match {
+      case parts: JList[_] =>
+        val missing = scala.collection.mutable.ArrayBuffer[String]()
+        val it = parts.iterator()
+        while (it.hasNext) {
+          it.next() match {
+            case text: String =>
+              text match {
+                case PathParam(name) =>
+                  if (Param.value(ctx, point, name) == null) missing += name
+                case _ =>
+              }
+            case _ =>
+          }
+        }
+        missing.toSeq
+      case _ => Seq.empty
+    }
+
   def makePoint(ctx: Context): JMap[String, Object] = {
     val outPoint = ctx.out.get("point")
     if (outPoint != null) {
@@ -77,8 +137,9 @@ object MakePoint {
     val op = ctx.op
     val options = ctx.options
 
-    val allowOp = Struct.getpath(options, java.util.List.of("allow", "op")) match { case s: String => s; case _ => "" }
-    if (!allowOp.contains(op.name)) {
+    val allowOpRaw = Struct.getpath(options, java.util.List.of("allow", "op"))
+    val allowOp = allowOpRaw match { case s: String => s; case _ => "" }
+    if (!Helpers.allowed(allowOpRaw, op.name)) {
       throw ctx.makeError("point_op_allow",
         "Operation \"" + op.name + "\" not allowed by SDK option allow.op value: \"" + allowOp + "\"")
     }
@@ -144,39 +205,25 @@ object MakePoint {
               Struct.stringify(unmatchedAction) + "\" is not valid.")
         }
 
-        // A terminal parameter marks a record route (/boards/{id}); a
-        // cross-reference ends in the relationship's name
-        // (/posts/{id}/author). Failing that, the shallower path wins. The
-        // same rule runs at generation time, in helpers/opShape.ts — both
-        // sides must move together.
-        def partsLen(p: JMap[String, Object]): Int =
-          Struct.getprop(p, "parts") match {
-            case parts: JList[_] => parts.size()
-            case _ => 0
-          }
-        def terminalParam(p: JMap[String, Object]): Boolean =
-          Struct.getprop(p, "parts") match {
-            case parts: JList[_] if parts.size() > 0 =>
-              parts.get(parts.size() - 1) match {
-                case s: String => s.startsWith("{")
-                case _ => false
-              }
-            case _ => false
-          }
-
-        point = op.points.get(0)
-        var j = 0
-        while (j < op.points.size()) {
-          val cand = op.points.get(j)
-          val candTerm = terminalParam(cand)
-          val bestTerm = terminalParam(point)
-          if (candTerm != bestTerm) {
-            if (candTerm) point = cand
-          } else if (partsLen(cand) < partsLen(point)) {
-            point = cand
-          }
-          j += 1
+        // A call without an action falls back to a point without one, as
+        // generation does, and only to a route the call can fill.
+        val all = (0 until op.points.size()).map(op.points.get(_))
+        val plain = all.filter(cand =>
+          Struct.getprop(Helpers.toMapAny(Struct.getprop(cand, "select")), "$action", null) == null)
+        if (plain.isEmpty) {
+          throw ctx.makeError("point_action_required",
+            "Operation \"" + op.name + "\" has only action endpoints; pass $action to choose one.")
         }
+
+        val fillable = plain.filter(cand => unfilled(ctx, cand).isEmpty)
+
+        if (fillable.isEmpty) {
+          throw ctx.makeError("point_no_match",
+            "Operation \"" + op.name + "\" has no endpoint whose path parameters are all given (missing: " +
+              unfilled(ctx, ownPoint(plain)).mkString(", ") + ").")
+        }
+
+        point = ownPoint(fillable)
       }
 
       if (reqselector != null) {
@@ -199,6 +246,9 @@ object MakePoint {
 }
 
 object MakeOptions {
+
+  // A {name} placeholder in a templated server URL (an OpenAPI server variable).
+  private val SERVER_VAR = "\\{([A-Za-z0-9_]+)\\}".r
 
   /**
    * Replaces one utility member from `options.utility`, matching the ts
@@ -266,6 +316,29 @@ object MakeOptions {
     // null check, which cannot distinguish them.
     val authSuppressed = options.containsKey("auth") && null == options.get("auth")
 
+    var config = ctx.config
+    if (config == null) config = new LinkedHashMap[String, Object]()
+    var cfgopts = Helpers.toMapAny(config.get("options"))
+    if (cfgopts == null) cfgopts = new LinkedHashMap[String, Object]()
+
+    // The secret registry exists BEFORE validation, fed from the raw input, so
+    // the constructor's own rejection of a mistyped credential is clean too.
+    // An absent layer is left out: merge lets a null replace everything before it.
+    val cleanlist = new ArrayList[Object]()
+    cleanlist.add(new LinkedHashMap[String, Object]())
+    for (layer <- List(Schema.optspec.get("clean"), cfgopts.get("clean"), options.get("clean"))
+        if layer != null) {
+      cleanlist.add(Struct.clone(layer))
+    }
+    val cleancfg = Clean.makeCleanConfig(Struct.merge(cleanlist))
+    addSensitiveOptions(cleancfg, options, "clean")
+    for (block <- List(cfgopts.get("clean"), options.get("clean"))) {
+      val bm = Helpers.toMapAny(block)
+      for (raw <- Clean.splitvalues(if (bm == null) null else bm.get("values"))) {
+        Clean.registerValue(cleancfg, raw)
+      }
+    }
+
     var opts = Struct.clone(options).asInstanceOf[JMap[String, Object]]
 
     if (authSuppressed) opts.remove("auth")
@@ -298,11 +371,6 @@ object MakeOptions {
       case _ =>
     }
 
-    var config = ctx.config
-    if (config == null) config = new LinkedHashMap[String, Object]()
-    var cfgopts = Helpers.toMapAny(config.get("options"))
-    if (cfgopts == null) cfgopts = new LinkedHashMap[String, Object]()
-
     // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
     //
     // Built from the model: `main.kit.optspec` for the standard options, plus
@@ -330,9 +398,17 @@ object MakeOptions {
     mergeList.add(opts)
     val merged = Struct.merge(mergeList)
 
+    // Errors are collected, not thrown, so a mistyped option is not rejected.
     val vopts = new LinkedHashMap[String, Object]()
     vopts.put("errs", new ArrayList[Object]())
-    val validated = Struct.validate(merged, optspec, vopts)
+    val validated =
+      try Struct.validate(merged, optspec, vopts)
+      catch {
+        // A rejection quotes the value it rejected.
+        case err: RuntimeException =>
+          val text = if (err.getMessage == null) String.valueOf(err) else err.getMessage
+          throw new SdkError("options_invalid", Clean.cleanWith(cleancfg, text).asInstanceOf[String], ctx)
+      }
     opts = validated.asInstanceOf[JMap[String, Object]]
 
     // Restore the suppression the optspec default would otherwise erase.
@@ -345,16 +421,37 @@ object MakeOptions {
       else { val sm = new LinkedHashMap[String, Object](); sm.put("fetch", sysFetch); opts.put("system", sm) }
     }
 
-    // Derived clean config.
-    var cleanKeys = "key,token,id"
-    Struct.getpath(opts, java.util.List.of("clean", "keys")) match { case s: String => cleanKeys = s; case _ => }
-
-    val filtered = new ArrayList[String]()
-    for (p0 <- cleanKeys.split(",")) {
-      val p = p0.trim
-      if ("" != p) filtered.add(Struct.escre(p))
+    // A templated base URL takes each {name} from options.server. An empty
+    // value cannot make a working URL, so it fails construction, except in
+    // test mode, where it becomes test-<name>.
+    opts.get("base") match {
+      case base: String if base.contains("{") =>
+        val testmode =
+          java.lang.Boolean.TRUE == Struct.getpath(opts, java.util.List.of("test", "active")) ||
+            java.lang.Boolean.TRUE == Struct.getpath(opts, java.util.List.of("feature", "test", "active"))
+        val server = Helpers.toMapAny(opts.get("server"))
+        val sdkname = Struct.getpath(config, java.util.List.of("main", "name")) match {
+          case s: String if s.nonEmpty => s
+          case _ => "SDK"
+        }
+        val resolved = SERVER_VAR.replaceAllIn(base, (m: scala.util.matching.Regex.Match) => {
+          val name = m.group(1)
+          val value = (if (server == null) null else server.get(name)) match {
+            case s: String => s
+            case _ => ""
+          }
+          val filled =
+            if ("" != value) value
+            else if (testmode) "test-" + name
+            else throw new SdkError("server_var_required",
+              sdkname + ": the server variable '" + name + "' is required: the API base URL is '" +
+                base + "' - pass options.put(\"server\", java.util.Map.of(\"" + name +
+                "\", \"...\")) in the SDK options", ctx)
+          scala.util.matching.Regex.quoteReplacement(filled)
+        })
+        opts.put("base", resolved)
+      case _ =>
     }
-    val keyre = String.join("|", filtered)
 
     // Resolve the feature add-order: an explicit list order (above) wins;
     // otherwise order the map test-first, then the remaining names sorted, so
@@ -374,13 +471,48 @@ object MakeOptions {
     }
 
     val derived = new LinkedHashMap[String, Object]()
-    val derivedClean = new LinkedHashMap[String, Object]()
-    if ("" != keyre) derivedClean.put("keyre", keyre)
-    derived.put("clean", derivedClean)
+    derived.put("clean", cleancfg)
     derived.put("featureorder", featureorder)
     opts.put("__derived__", derived)
 
+    // Again over the merged result: the config's own defaults can carry one.
+    addSensitiveOptions(cleancfg, opts, "clean", "__derived__")
+
     opts
+  }
+
+  // A feature's name is not a field name: a feature called `secrets` does not
+  // make every one of its options a secret. Entity blocks (entity settings,
+  // seeded records) hold no credential, and nor do rbac's rules, keyed by
+  // entity and operation names.
+  private def addSensitiveOptions(cfg: CleanConfig, m: JMap[String, Object], keys: String*): Unit = {
+    val top = omit(m, (keys :+ "feature" :+ "entity")*)
+    if (top.containsKey("test")) top.put("test", plain(top.get("test"), null))
+    Clean.addSensitiveWith(cfg, top)
+    m.get("feature") match {
+      case fm: JMap[_, _] =>
+        fm.asInstanceOf[JMap[Object, Object]].forEach((k, v) => Clean.addSensitiveWith(cfg, plain(v, String.valueOf(k))))
+      case fl: JList[_] => fl.forEach { v =>
+        val name = v match {
+          case vm: JMap[_, _] => vm.get("name") match { case s: String => s; case _ => null }
+          case _ => null
+        }
+        Clean.addSensitiveWith(cfg, plain(v.asInstanceOf[Object], name))
+      }
+      case other => Clean.addSensitiveWith(cfg, other)
+    }
+  }
+
+  private def plain(block: Object, name: String): Object = block match {
+    case bm: JMap[_, _] if "rbac" == name => omit(bm.asInstanceOf[JMap[String, Object]], "entity", "rules")
+    case bm: JMap[_, _] => omit(bm.asInstanceOf[JMap[String, Object]], "entity")
+    case other => other
+  }
+
+  private def omit(m: JMap[String, Object], keys: String*): JMap[String, Object] = {
+    val out = new LinkedHashMap[String, Object](m)
+    keys.foreach(k => out.remove(k))
+    out
   }
 }
 
@@ -402,10 +534,7 @@ object MakeFetchDef {
     fetchdef.put("headers", spec.headers)
 
     if (spec.body != null) {
-      spec.body match {
-        case _: JMap[_, _] => fetchdef.put("body", Struct.jsonify(spec.body))
-        case _ => fetchdef.put("body", spec.body)
-      }
+      fetchdef.put("body", Media.requestBody(ctx.point, spec.body))
     }
 
     fetchdef
@@ -549,7 +678,20 @@ object MakeUrl {
     joinParts.add(spec.suffix)
     var url = Struct.join(joinParts, "/", true)
 
+    // A route the definition ends with a slash keeps it: a server such as a
+    // Django REST one redirects or refuses the route without it.
+    val orig = if (ctx.point == null) null else Struct.getprop(ctx.point, "orig", null)
+    orig match {
+      case o: String if o.endsWith("/") && (spec.suffix == null || spec.suffix.isEmpty) && !url.endsWith("/") =>
+        url = url + "/"
+      case _ =>
+    }
+
     val resmatch = new LinkedHashMap[String, Object]()
+
+    // Sent with the request, never recorded as the entity's match.
+    val authquery: JList[String] =
+      if (spec.authquery == null) new java.util.ArrayList[String]() else spec.authquery
 
     val pit = Struct.items(spec.params).iterator()
     while (pit.hasNext) {
@@ -563,6 +705,14 @@ object MakeUrl {
       }
     }
 
+    // A placeholder left in the route would send the request to the wrong route.
+    // The base's own placeholders are server variables, resolved with the options.
+    val base = if (null == spec.base) "" else spec.base.replaceAll("/+$", "")
+    val unfilled = "\\{[^{}/]+\\}".r.findAllIn(url.stripPrefix(base)).toList
+    if (unfilled.nonEmpty) {
+      throw ctx.makeError("url_param_missing", "URL path has no value for " + unfilled.mkString(", ") + ".")
+    }
+
     var qsep = "?"
     val qit = Struct.items(spec.query).iterator()
     while (qit.hasNext) {
@@ -572,7 +722,7 @@ object MakeUrl {
       if (v != null) {
         url += qsep + Struct.escurl(key) + "=" + Struct.escurl(Struct.stringify(v))
         qsep = "&"
-        resmatch.put(key, v)
+        if (!authquery.contains(key)) resmatch.put(key, v)
       }
     }
 

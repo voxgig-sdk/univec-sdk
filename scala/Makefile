@@ -15,11 +15,17 @@ build:
 #
 # Main classes are NAMED here rather than globbed, so a per-feature suite has
 # to be listed. SecretsTestMain drives the feature through the `extend` seam
-# and so runs in every scala SDK, model-activated or not.
+# and so runs in every scala SDK, model-activated or not. SdkCleanTestMain is
+# the canary sweep: no credential leaves the SDK in any form. SdkServerTestMain
+# checks how a templated base URL takes its server variables.
+# SdkConcurrencyTestMain races first requests on one client.
 test:
 	scala-cli run . --main-class OmniSmoke
 	scala-cli run . --main-class SdkTestMain
 	scala-cli run . --main-class SdkEntityTestMain
+	scala-cli run . --main-class SdkCleanTestMain
+	scala-cli run . --main-class SdkServerTestMain
+	scala-cli run . --main-class SdkConcurrencyTestMain
 	scala-cli run . --main-class SecretsTestMain
 	scala-cli run . --main-class Runner -- ../.sdk/test/test.json
 	scala-cli run . --main-class PrimaryCorpusMain -- ../.sdk/test/test.json

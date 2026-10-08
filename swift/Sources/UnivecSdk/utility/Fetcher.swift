@@ -43,22 +43,24 @@ private let manualRedirectSession = URLSession(
   delegate: ManualRedirectDelegate(), delegateQueue: nil)
 
 func defaultHttpFetch(_ fullurl: String, _ fetchdef: VMap) throws -> Value {
+  // A request that cannot be sent fails the operation.
   guard let url = URL(string: fullurl) else {
-    let m = VMap()
-    m.entries["status"] = .int(0)
-    m.entries["statusText"] = .string("bad url")
-    m.entries["headers"] = .map(VMap())
-    m.entries["json"] = .nat({ () -> Value in .noval } as NativeCall0)
-    m.entries["body"] = .string("")
-    return .map(m)
+    throw UnivecError("fetch_transport", "the URL could not be parsed", nil)
   }
 
   var req = URLRequest(url: url)
   req.httpMethod = gp(fetchdef, "method").asString ?? "GET"
 
-  if let body = gp(fetchdef, "body").asString, body != "" {
-    req.httpBody = body.data(using: .utf8)
+  let body = gp(fetchdef, "body")
+  if let text = body.asString, text != "" {
+    req.httpBody = text.data(using: .utf8)
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+  } else if case .native(let ref) = body {
+    if let data = ref.value as? Data {
+      req.httpBody = data
+    } else if let bytes = ref.value as? [UInt8] {
+      req.httpBody = Data(bytes)
+    }
   }
 
   var hasUA = false
@@ -70,8 +72,13 @@ func defaultHttpFetch(_ fullurl: String, _ fetchdef: VMap) throws -> Value {
       }
     }
   }
+  // The default User-Agent is recorded with the headers the request sent.
   if !hasUA {
-    req.setValue("Mozilla/5.0 (compatible; UnivecSDK/1.0)", forHTTPHeaderField: "User-Agent")
+    let agent = "Mozilla/5.0 (compatible; UnivecSDK/1.0)"
+    req.setValue(agent, forHTTPHeaderField: "User-Agent")
+    if let sent = gp(fetchdef, "headers").asMap {
+      sent.entries["user-agent"] = .string(agent)
+    }
   }
 
   // Also per request, so no store reached another way can rewrite the
@@ -110,8 +117,9 @@ func defaultHttpFetch(_ fullurl: String, _ fetchdef: VMap) throws -> Value {
   }
 
   var jsonBody: Value = .noval
-  if !bodyText.isEmpty {
-    if let parsed = try? JSON.parse(bodyText) { jsonBody = parsed }
+  var unreadable = false
+  if !bodyText.allSatisfy({ $0.isWhitespace }) {
+    if let parsed = try? JSON.parse(bodyText) { jsonBody = parsed } else { unreadable = true }
   }
   let captured = jsonBody
 
@@ -121,6 +129,7 @@ func defaultHttpFetch(_ fullurl: String, _ fetchdef: VMap) throws -> Value {
   m.entries["headers"] = .map(resheaders)
   m.entries["json"] = .nat({ () -> Value in captured } as NativeCall0)
   m.entries["body"] = .string(bodyText)
+  m.entries["unreadable"] = .bool(unreadable)
   return .map(m)
 }
 

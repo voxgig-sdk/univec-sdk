@@ -108,11 +108,13 @@ func (f *TelemetryFeature) close(ctx *core.Context, ok bool) {
 	span["durationMs"] = dur
 	span["ok"] = ok
 
+	out := fclean(ctx, span)
+
 	f.ActiveSpans--
-	f.Spans = append(f.Spans, span)
+	f.Spans = append(f.Spans, out)
 
 	if exporter, ok := f.options["exporter"].(func(map[string]any)); ok {
-		exporter(span)
+		exporter(out)
 	}
 }
 

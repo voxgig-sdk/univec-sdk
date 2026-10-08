@@ -269,34 +269,61 @@
                       (t/is-deep (vec (vs/getpath o "__derived__.featureorder")) ["cache" "retry"] "sorted")))))
 
       ;; ---- prepare-auth ----
-      (let [auth-ctx (fn [opts headers]
+      ;; The credential's container and name are this API's own, so the cases
+      ;; read them from a probe run. A nil probe means a public API. `basic`
+      ;; is false so an HTTP Basic SDK places the key as it is.
+      (let [auth-ctx (fn [opts spec]
                        (let [c (fake-client-opts opts)
                              ctx (core/make-context (vs/jm "client" c "utility" utility "opname" "load") nil)]
-                         (core/oset! ctx :spec (when headers (core/make-spec (vs/jm "headers" headers "step" "s"))))
-                         ctx))]
+                         (core/oset! ctx :spec spec)
+                         ctx))
+            auth (fn [prefix] (vs/jm "prefix" prefix "basic" false))
+            bags (fn [] (core/make-spec (vs/jm "headers" (vs/jm) "query" (vs/jm) "step" "s")))
+            bag (fn [spec where] (core/oget spec (if (= "query" where) :query :headers)))
+            ;; A cookie credential rides the header bag as `<scheme>=K`.
+            cookie-pair? (fn [v] (and (string? v) (some? (re-matches #"[^=;]+=K" v))))
+            probe (fn [opts]
+                    (let [spec (bags) ctx (auth-ctx opts spec)]
+                      ((core/uget ctx :prepare-auth) ctx)
+                      (some (fn [where]
+                              (when-let [name (first (vs/keysof (bag spec where)))]
+                                (let [value (mget (bag spec where) name)]
+                                  {:where where :name name :value value
+                                   :pair (if (and (= "headers" where) (= "cookie" name) (cookie-pair? value))
+                                           (subs value 0 (dec (count value))) "")})))
+                            ["headers" "query"])))
+            cred (probe (vs/jm "apikey" "K" "auth" (auth "Bearer")))
+            placed (fn [opts seed]
+                     (let [spec (bags)]
+                       (when (and cred seed)
+                         (.put ^java.util.Map (bag spec (:where cred)) (:name cred) (str (:pair cred) seed)))
+                       (let [ctx (auth-ctx opts spec)]
+                         ((core/uget ctx :prepare-auth) ctx)
+                         (when cred (mget (bag spec (:where cred)) (:name cred))))))]
         (chk "auth-guards-missing-spec"
-             (fn [] (let [ctx (auth-ctx (vs/jm "auth" (vs/jm "prefix" "") "apikey" "K") nil)]
+             (fn [] (let [ctx (auth-ctx (vs/jm "auth" (auth "") "apikey" "K") nil)]
                       (t/is-eq (:code (second ((core/uget ctx :prepare-auth) ctx))) "auth_no_spec" "no spec"))))
-        (chk "auth-apikey-with-prefix-space-joined"
-             (fn [] (let [ctx (auth-ctx (vs/jm "apikey" "K" "auth" (vs/jm "prefix" "Bearer")) (vs/jm))]
-                      ((core/uget ctx :prepare-auth) ctx)
-                      (t/is-eq (mget (core/oget (core/oget ctx :spec) :headers) "authorization") "Bearer K" "joined"))))
+        ;; Without this every case below could pass on the public-API path.
+        (chk "auth-probe-finds-the-credential"
+             (fn [] (t/is-eq (some? cred)
+                             (some? (probe (vs/jm "apikey" "K" "secret" "S"
+                                                  "auth" (vs/jm "prefix" "Bearer" "basic" true))))
+                             "probe")))
+        (chk "auth-apikey-placed-where-this-api-puts-it"
+             (fn [] (cond
+                      (nil? cred) (t/is-nil (placed (vs/jm "apikey" "K" "auth" (auth "Bearer")) nil) "public API")
+                      (not= "" (:pair cred)) (t/is-true (cookie-pair? (:value cred)) (str "cookie: " (:value cred)))
+                      ;; A query parameter has nowhere to put a scheme name.
+                      :else (t/is-eq (:value cred) (if (= "query" (:where cred)) "K" "Bearer K") "placed"))))
         (chk "auth-raw-apikey"
-             (fn [] (let [ctx (auth-ctx (vs/jm "apikey" "K" "auth" (vs/jm "prefix" "")) (vs/jm))]
-                      ((core/uget ctx :prepare-auth) ctx)
-                      (t/is-eq (mget (core/oget (core/oget ctx :spec) :headers) "authorization") "K" "raw"))))
+             (fn [] (t/is-eq (placed (vs/jm "apikey" "K" "auth" (auth "")) nil)
+                             (when cred (str (:pair cred) "K")) "raw")))
         (chk "auth-empty-apikey-drops"
-             (fn [] (let [ctx (auth-ctx (vs/jm "apikey" "" "auth" (vs/jm "prefix" "Bearer")) (vs/jm "authorization" "stale"))]
-                      ((core/uget ctx :prepare-auth) ctx)
-                      (t/is-nil (mget (core/oget (core/oget ctx :spec) :headers) "authorization") "dropped"))))
+             (fn [] (t/is-nil (placed (vs/jm "apikey" "" "auth" (auth "Bearer")) "stale") "dropped")))
         (chk "auth-public-api-drops"
-             (fn [] (let [ctx (auth-ctx (vs/jm "apikey" "K") (vs/jm "authorization" "stale"))]
-                      ((core/uget ctx :prepare-auth) ctx)
-                      (t/is-nil (mget (core/oget (core/oget ctx :spec) :headers) "authorization") "dropped"))))
+             (fn [] (t/is-nil (placed (vs/jm "apikey" "K") "stale") "dropped")))
         (chk "auth-missing-apikey-drops"
-             (fn [] (let [ctx (auth-ctx (vs/jm "auth" (vs/jm "prefix" "Bearer")) (vs/jm "authorization" "stale"))]
-                      ((core/uget ctx :prepare-auth) ctx)
-                      (t/is-nil (mget (core/oget (core/oget ctx :spec) :headers) "authorization") "dropped")))))
+             (fn [] (t/is-nil (placed (vs/jm "auth" (auth "Bearer")) "stale") "dropped"))))
 
       ;; ---- result helpers ----
       (chk "result-headers-non-hash-empty"

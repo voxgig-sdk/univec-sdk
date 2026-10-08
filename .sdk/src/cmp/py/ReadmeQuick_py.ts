@@ -1,17 +1,11 @@
 
-import { cmp, each, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, matchArg, idLiteral , serverVariables} from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, envName, canonKey, canonScalarKey, opRequestShape, entityIdField, entityDataIdField, entityOps, safeVarName, exampleVarName, serverVariables, listMatchArg } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
   nom,
 } from '@voxgig/apidef'
-
-
-function listMatchArg(ent: any): string {
-  const idF = entityIdField(ent)
-  return matchArg('py', ent, 'list', idF, idLiteral(ent, 'list', idF))
-}
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -75,6 +69,7 @@ client = ${ctor}
     // placeholder would not parse).
     const pyLit = (type: any, placeholder: string = 'example'): string => {
       const k = canonScalarKey(type)
+      if ('NULL' === k) return 'None'
       if ('INTEGER' === k || 'NUMBER' === k) return '1'
       if ('BOOLEAN' === k) return 'True'
       if ('ARRAY' === k) return '[]'
@@ -85,14 +80,14 @@ client = ${ctor}
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`list()\` returns a \`list\` of records (each a \`dict\`) and raises on
-error — iterate it directly.
+\`list()\` returns a \`list\` of entities, one per record, and raises on
+error; an entity's \`data_get()\` reads its record (a \`dict\`).
 
 \`\`\`python
 try:
-    ${eVar}s = client.${eName}().list(${listMatchArg(exampleEntity)})
+    ${eVar}s = client.${eName}().list(${listMatchArg('py', exampleEntity)})
     for ${eVar} in ${eVar}s:
-        print(${eVar})
+        print(${eVar}.data_get())
 except Exception as err:
     print(f"list failed: {err}")
 \`\`\`
@@ -125,7 +120,7 @@ ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
 \`\`\`python
 try:
     ${neVar} = client.${neName}().load({${neMatch.join(', ')}})
-    print(${neVar})
+    print(${neVar}.data_get())
 except Exception as err:
     print(f"load failed: {err}")
 \`\`\`
@@ -150,7 +145,7 @@ except Exception as err:
 \`\`\`python
 try:
     ${eVar} = client.${eName}().load(${loadArg})
-    print(${eVar})
+    print(${eVar}.data_get())
 except Exception as err:
     print(f"load failed: {err}")
 \`\`\`
@@ -181,7 +176,8 @@ except Exception as err:
       ? `created.data_get()["${dataIdF}"]`
       : pyLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`python
@@ -195,8 +191,15 @@ created = client.${eName}().create({${examplePairs('create').join(', ')}})
       if (opnames.includes('update')) {
         const updatePairs = (idF ? [`"${idF}": ${idValueFor('update')}`] : []).concat(examplePairs('update'))
         const fromCreated = null != dataIdF && opnames.includes('create')
-        Content(`# Update${fromCreated ? " — the created record's id is a plain dict key" : ''}
+        Content(`# Update${fromCreated ? " — the created entity's record holds its id" : ''}
 client.${eName}().update({${updatePairs.join(', ')}})
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`"${idF}": ${idValueFor('patch')}`] : []).concat(examplePairs('patch'))
+        Content(`# Patch — sends only the fields given
+client.${eName}().patch({${patchPairs.join(', ')}})
 
 `)
       }

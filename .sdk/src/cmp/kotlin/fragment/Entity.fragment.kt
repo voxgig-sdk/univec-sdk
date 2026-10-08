@@ -24,5 +24,7 @@ class EntyClass(clientIn: SdkClient, entoptsIn: MutableMap<String, Any?>?) :
 
 // #UpdateOp
 
+// #PatchOp
+
 // #RemoveOp
 }

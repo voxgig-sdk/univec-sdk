@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, opRequestShape, entityIdField, entityDataIdField, entityOps } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, opRequestShape, entityIdField, entityDataIdField, entityOps, elixirAccessor, entityCollection, exampleVarName } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { elixirLit } from './utility_elixir'
+import { elixirLit, elixirListArgs } from './utility_elixir'
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -46,7 +46,8 @@ sdk = ${ctor}
   if (exampleEntity) {
     const eName = nom(exampleEntity, 'Name')
     const article = /^[aeiou]/i.test(eName) ? 'an' : 'a'
-    const eVar = exampleEntity.name
+    const eVar = exampleVarName(exampleEntity.name, 'elixir')
+    const eCall = elixirAccessor(exampleEntity, entityCollection(model))
     const opnames = entityOps(exampleEntity)
     const idF = entityIdField(exampleEntity)
     const dataIdF = entityDataIdField(exampleEntity)
@@ -54,13 +55,17 @@ sdk = ${ctor}
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`list/2\` returns a list value node and raises on error.
+\`list/2\` returns a \`Voxgig.Struct\` list of entities, one per record, and
+raises on error; \`Voxgig.Struct.getelem/2\` reads an item, and \`data_get/1\`
+an entity's record.
 
 \`\`\`elixir
 try do
-  ${eVar} = ${Name}.${eVar}(sdk)
-  records = ${Name}.Entity.${eName}.list(${eVar})
-  IO.inspect(records)
+  ${eVar} = ${Name}.${eCall}(sdk)
+  ${eVar}s = ${Name}.Entity.${eName}.list(${eVar}${elixirListArgs(exampleEntity, Name)})
+  for i <- 0..(Voxgig.Struct.size(${eVar}s) - 1)//1 do
+    IO.puts(Voxgig.Struct.jsonify(${Name}.Entity.${eName}.data_get(Voxgig.Struct.getelem(${eVar}s, i))))
+  end
 rescue
   err -> IO.puts("list failed: " <> inspect(err))
 end
@@ -72,7 +77,8 @@ end
     if (nestedEntity) {
       const neName = nom(nestedEntity, 'Name')
       const neArticle = /^[aeiou]/i.test(neName) ? 'an' : 'a'
-      const neVar = nestedEntity.name
+      const neVar = exampleVarName(nestedEntity.name, 'elixir')
+      const neCall = elixirAccessor(nestedEntity, entityCollection(model))
 
       const neIdF = entityIdField(nestedEntity)
       const neRequired = opRequestShape(nestedEntity, 'load').items
@@ -89,13 +95,14 @@ end
       Content(`### 3. Load ${neArticle} ${neName.toLowerCase()}
 
 ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
-\`load/2\` returns the bare record and raises on error.
+\`load/2\` returns the entity and raises on error; \`data_get/1\` reads its
+record.
 
 \`\`\`elixir
 try do
-  ${neVar} = ${Name}.${neVar}(sdk)
-  record = ${Name}.Entity.${neName}.load(${neVar}, H.deep(%{${neMatch.join(', ')}}))
-  IO.inspect(record)
+  ${neVar} = ${Name}.${neCall}(sdk)
+  ${neVar} = ${Name}.Entity.${neName}.load(${neVar}, H.deep(%{${neMatch.join(', ')}}))
+  IO.puts(Voxgig.Struct.jsonify(${Name}.Entity.${neName}.data_get(${neVar})))
 rescue
   err -> IO.puts("load failed: " <> inspect(err))
 end
@@ -116,13 +123,14 @@ end
 
       Content(`### 3. Load ${article} ${eName.toLowerCase()}
 
-\`load/2\` returns the bare record and raises on error.
+\`load/2\` returns the entity and raises on error; \`data_get/1\` reads its
+record.
 
 \`\`\`elixir
 try do
-  ${eVar} = ${Name}.${eVar}(sdk)
-  record = ${Name}.Entity.${eName}.load(${eVar}, ${loadArg})
-  IO.inspect(record)
+  ${eVar} = ${Name}.${eCall}(sdk)
+  ${eVar} = ${Name}.Entity.${eName}.load(${eVar}, ${loadArg})
+  IO.puts(Voxgig.Struct.jsonify(${Name}.Entity.${eName}.data_get(${eVar})))
 rescue
   err -> IO.puts("load failed: " <> inspect(err))
 end
@@ -150,18 +158,19 @@ end
       return it && it.type
     }
     const idValueFor = (opname: string): string => (null != dataIdF && opnames.includes('create'))
-      ? `Voxgig.Struct.getprop(created, "${dataIdF}")`
+      ? `Voxgig.Struct.getprop(${Name}.Entity.${eName}.data_get(created), "${dataIdF}")`
       : elixirLit(idParamType(opname), 'example_id')
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`elixir
-${eVar} = ${Name}.${eVar}(sdk)
+${eVar} = ${Name}.${eCall}(sdk)
 
 `)
       if (opnames.includes('create')) {
-        Content(`# Create — returns the bare created record
+        Content(`# Create — returns the created entity
 created = ${Name}.Entity.${eName}.create(${eVar}, H.deep(%{${examplePairs('create').join(', ')}}))
 
 `)
@@ -170,6 +179,13 @@ created = ${Name}.Entity.${eName}.create(${eVar}, H.deep(%{${examplePairs('creat
         const updatePairs = (idF ? [`"${idF}" => ${idValueFor('update')}`] : []).concat(examplePairs('update'))
         Content(`# Update
 ${Name}.Entity.${eName}.update(${eVar}, H.deep(%{${updatePairs.join(', ')}}))
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`"${idF}" => ${idValueFor('patch')}`] : []).concat(examplePairs('patch'))
+        Content(`# Patch — sends only the fields given
+${Name}.Entity.${eName}.patch(${eVar}, H.deep(%{${patchPairs.join(', ')}}))
 
 `)
       }

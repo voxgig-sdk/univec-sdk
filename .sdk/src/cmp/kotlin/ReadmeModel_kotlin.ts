@@ -24,13 +24,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `(reqmatch, ctrl) -> Any?` | Load a single entity by match criteria. Raises on error. |',
-    list: '| `list` | `(reqmatch, ctrl) -> Any?` | List entities matching the criteria (an aggregate list). Raises on error. |',
-    create: '| `create` | `(reqdata, ctrl) -> Any?` | Create a new entity. Raises on error. |',
-    update: '| `update` | `(reqdata, ctrl) -> Any?` | Update an existing entity. Raises on error. |',
-    remove: '| `remove` | `(reqmatch, ctrl) -> Any?` | Remove an entity. Raises on error. |',
+    load: '| `load` | `(reqmatch, ctrl) -> Any?` | Load a single entity by match criteria, and return it. Raises on error. |',
+    list: '| `list` | `(reqmatch, ctrl) -> Any?` | List entities matching the criteria, one per record. Raises on error. |',
+    create: '| `create` | `(reqdata, ctrl) -> Any?` | Create a new entity, and return it. Raises on error. |',
+    update: '| `update` | `(reqdata, ctrl) -> Any?` | Update an existing entity, and return it. Raises on error. |',
+    patch: '| `patch` | `(reqdata, ctrl) -> Any?` | Change part of an existing entity, and return it. Raises on error. |',
+    remove: '| `remove` | `(reqmatch, ctrl) -> Any?` | Remove an entity, and return it marked as deleted. Raises on error. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -93,9 +94,10 @@ ${opRows}
 
 ### Result shape
 
-Entity operations return the ENTITY (call data() for the record) (a \`Map\` for single-entity
-ops, an aggregate \`List\` for \`list\`) as \`Any?\` and raise on error. Wrap
-calls in \`try\`/\`catch\` to handle failures.
+Entity operations return the entity, and \`list\` a list of entities, one per
+record, as \`Any?\`; an entity is an \`SdkEntity\`, whose \`data()\` reads its
+record. They raise on error, so wrap calls in \`try\`/\`catch\` to handle
+failures.
 
 The \`direct()\` escape hatch never raises — it returns a result
 \`MutableMap<String, Any?>\` you branch on via \`result["ok"]\`:

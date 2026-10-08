@@ -13,17 +13,6 @@
 
 #define DEBUG_ENTRY_KEY "debug_entry"
 
-static const char* DEBUG_DEFAULT_REDACT[] = {
-  "authorization",
-  "cookie",
-  "set-cookie",
-  "api-key",
-  "apikey",
-  "x-api-key",
-  "idempotency-key",
-};
-#define DEBUG_DEFAULT_REDACT_LEN (sizeof(DEBUG_DEFAULT_REDACT) / sizeof(DEBUG_DEFAULT_REDACT[0]))
-
 typedef struct {
   Feature base;
   char* name;
@@ -35,47 +24,43 @@ typedef struct {
   voxgig_value* entries; // List of Value
 } DebugFeature;
 
-// True when lowercase(key) == pat (pat compared as-is, mirroring rust
-// `k.to_lowercase() == *p`).
+// Case-insensitive equality.
 static bool eq_lower(const char* key, const char* pat) {
   size_t i = 0;
   for (; key[i] != '\0' && pat[i] != '\0'; i++) {
-    if ((char)tolower((unsigned char)key[i]) != pat[i]) return false;
+    if (tolower((unsigned char)key[i]) != tolower((unsigned char)pat[i])) return false;
   }
   return key[i] == '\0' && pat[i] == '\0';
 }
 
-// patterns = fopt_str_list(options,"redact") or DEBUG_DEFAULT_REDACT.
+// The feature's own `redact` list; the core clean rules apply beside it.
 static bool is_redacted(DebugFeature* df, const char* key) {
   voxgig_value* rl = getp(df->options, "redact");
-  if (voxgig_is_list(rl)) {
-    voxgig_list* l = voxgig_as_list(rl);
-    for (size_t i = 0; i < l->len; i++) {
-      voxgig_value* pv = l->items[i];
-      if (voxgig_is_string(pv) && eq_lower(key, voxgig_as_string(pv))) return true;
-    }
-    return false;
-  }
-  for (size_t i = 0; i < DEBUG_DEFAULT_REDACT_LEN; i++) {
-    if (eq_lower(key, DEBUG_DEFAULT_REDACT[i])) return true;
+  if (!voxgig_is_list(rl)) return false;
+  voxgig_list* l = voxgig_as_list(rl);
+  for (size_t i = 0; i < l->len; i++) {
+    voxgig_value* pv = l->items[i];
+    if (voxgig_is_string(pv) && eq_lower(key, voxgig_as_string(pv))) return true;
   }
   return false;
 }
 
-static voxgig_value* debug_redact(DebugFeature* df, voxgig_value* headers) {
+// The core clean rules apply (clean.keys, every registered value); the
+// feature's own `redact` list ADDS header names on top of them.
+static voxgig_value* debug_redact(DebugFeature* df, Context* ctx, voxgig_value* headers) {
   voxgig_value* out = v_map();
   if (voxgig_is_map(headers)) {
     voxgig_map* m = voxgig_as_map(headers);
     for (size_t i = 0; i < m->len; i++) {
       const char* k = m->entries[i].key;
       if (is_redacted(df, k)) {
-        setp(out, k, v_str("<redacted>"));
+        setp(out, k, v_str("[redacted]"));
       } else {
         setp(out, k, m->entries[i].value); // v.clone(): setp retains
       }
     }
   }
-  return out;
+  return clean_util(ctx, out);
 }
 
 static char* dot_join(const char* a, const char* b) {
@@ -112,6 +97,11 @@ static void debug_finish(DebugFeature* df, Context* ctx, bool ok) {
     }
   }
 
+  // The whole entry leaves through the buffer and the callback: the url and
+  // the error message can carry a query credential the header mask above
+  // never saw.
+  entry = clean_util(ctx, entry);
+
   voxgig_list_push(voxgig_as_list(df->entries), voxgig_retain(entry));
   int64_t max = fopt_int(df->options, "max", 100);
   while (voxgig_list_len(voxgig_as_list(df->entries)) > (size_t)max) {
@@ -144,7 +134,7 @@ static void debug_pre_request(DebugFeature* df, Context* ctx) {
     } else {
       setp(entry, "url", v_str(s->path ? s->path : ""));
     }
-    setp(entry, "headers", debug_redact(df, s->headers));
+    setp(entry, "headers", debug_redact(df, ctx, s->headers));
   }
   ctx_out_extra_set(ctx, DEBUG_ENTRY_KEY, entry);
 }

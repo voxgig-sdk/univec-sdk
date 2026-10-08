@@ -10,6 +10,11 @@
 (def OPTION-APIKEY "apikey")
 (def NOT-FOUND "__NOTFOUND__")
 
+;; The client's auth.name option, when set, replaces the name the API declares.
+(defn- prepare-auth-name [options]
+  (let [given (vs/getpath options "auth.name")]
+    (if (and (string? given) (not= "" given)) (.toLowerCase ^String given java.util.Locale/ROOT) HEADER-AUTH)))
+
 (defn u-prepare-auth [ctx]
   (let [spec (oget ctx :spec)]
     (if (nil? spec) [nil (ctx-error ctx "auth_no_spec" "Expected context spec property to be defined.")]
@@ -18,11 +23,14 @@
           (if (nil? (vs/getprop options "auth"))
             ;; Public APIs that need no auth omit the options.auth block entirely.
             (do (vs/delprop headers HEADER-AUTH) [spec nil])
-            (let [apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
+            (let [cred (prepare-auth-name options)
+                  apikey (vs/getprop options OPTION-APIKEY NOT-FOUND)]
+              ;; A credential left under the declared name would travel beside the renamed one.
+              (when (not= cred HEADER-AUTH) (vs/delprop headers HEADER-AUTH))
               (if (or (nil? apikey) (and (string? apikey) (or (= apikey NOT-FOUND) (= apikey ""))))
-                (vs/delprop headers HEADER-AUTH)
+                (vs/delprop headers cred)
                 (let [auth-prefix (or (vs/getpath options "auth.prefix") "")
                       apikey-val (if (string? apikey) apikey "")]
-                  (.put ^java.util.Map headers HEADER-AUTH
+                  (.put ^java.util.Map headers cred
                         (if (= auth-prefix "") apikey-val (str auth-prefix " " apikey-val)))))
               [spec nil]))))))

@@ -1,6 +1,26 @@
 
 import { Context, Response } from '../types'
 
+
+// Several CDNs refuse a library's own agent, so outside a browser a request
+// without one carries the browser-shaped agent most other targets send.
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; UnivecSDK/1.0)'
+
+
+function defaultUserAgent(fetchdef: Record<string, any>) {
+  if (null == (globalThis as any).process?.versions?.node) {
+    return
+  }
+  const headers = fetchdef.headers = fetchdef.headers || {}
+  for (const name of Object.keys(headers)) {
+    if ('user-agent' === name.toLowerCase()) {
+      return
+    }
+  }
+  headers['user-agent'] = DEFAULT_USER_AGENT
+}
+
+
 // Make HTTP call using library. Replace this utility for mocking etc.
 async function fetcher(
   ctx: Context,
@@ -24,6 +44,8 @@ async function fetcher(
 
   const fetch = options.system.fetch
 
+  defaultUserAgent(fetchdef)
+
   const response = await fetch(fullurl, fetchdef)
 
   return response
@@ -31,5 +53,6 @@ async function fetcher(
 
 
 export {
-  fetcher
+  fetcher,
+  DEFAULT_USER_AGENT,
 }

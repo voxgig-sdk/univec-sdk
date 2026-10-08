@@ -57,6 +57,22 @@ public:
   }
 
 private:
+  // The key a list's response transform
+  // ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record
+  // under; empty for any other transform.
+  static std::string itemEnvelopeKey(const Value& restf) {
+    if (!restf.is_list()) return "";
+    const List& spec = *restf.as_list();
+    if (3 != spec.size() || !spec[0].is_string() || "`$EACH`" != spec[0].as_string() ||
+        !spec[1].is_string() || "body" != spec[1].as_string()) return "";
+    Value merge = getp(spec[2], Value("`$MERGE`"));
+    if (!merge.is_string()) return "";
+    std::string m = merge.as_string();
+    if (m.size() < 4 || 0 != m.compare(0, 2, "`.") || '`' != m[m.size() - 1]) return "";
+    std::string key = m.substr(2, m.size() - 3);
+    return std::string::npos == key.find_first_of(".`$") ? key : "";
+  }
+
   // THE MOCK HAS TO AGREE WITH THE MODEL. A point carrying
   // `transform.res: `body.item`` describes an API that answers {"item": {...}}
   // and the response transform unwraps that key on the way back. Returning the
@@ -66,6 +82,16 @@ private:
     if (is_nullish(data) || !ctx) return data;
     Value tm = getp(ctx->point, "transform");
     Value restf = getp(tm, "res");
+    std::string key = itemEnvelopeKey(restf);
+    if (!key.empty() && data.is_list()) {
+      Value out = vlist();
+      for (const auto& item : *data.as_list()) {
+        Value wrapped = vmap();
+        map_put(wrapped, key, item);
+        out.as_list()->push_back(wrapped);
+      }
+      return out;
+    }
     if (!restf.is_string()) return data;
     std::string spec = restf.as_string();
     // Rebuild whatever nesting the transform unwraps. Multi-segment on purpose:
@@ -148,7 +174,7 @@ private:
       }
       Value out = Struct::clone(outlist);
       return respond(ctx, 200, out, Value::undef());
-    } else if (op->name == "update") {
+    } else if (op->name == "update" || op->name == "patch") {
       Value updateMatch = vmap();
       if (ctx->reqdata.is_map()) {
         if (map_contains(ctx->reqdata, "id")) {
@@ -173,7 +199,10 @@ private:
       // update miss: 404, never another record
       if (is_nullish(ent)) return respond(ctx, 404, Value(nullptr), extra1("statusText", Value("Not found")));
       if (ent.is_map() && ctx->reqdata.is_map()) {
-        Struct::merge(vlist({ent, ctx->reqdata}));
+        // `$body` travels on the wire alone; the record is the rest.
+        Value rec = Struct::clone(ctx->reqdata);
+        Struct::delprop(rec, Value("$body"));
+        Struct::merge(vlist({ent, rec}));
       }
       Struct::delprop(ent, Value("$KEY"));
       Value out = Struct::clone(ent);
@@ -203,6 +232,7 @@ private:
       }
       Value ent = Struct::clone(ctx->reqdata);
       if (ent.is_map()) {
+        Struct::delprop(ent, Value("$body"));
         map_put(ent, "id", id);
         if (id.is_string()) map_put(entmap, id.as_string(), ent);
         Struct::delprop(ent, Value("$KEY"));

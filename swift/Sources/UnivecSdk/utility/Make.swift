@@ -4,6 +4,36 @@
 
 import Foundation
 
+// The {name} placeholders in a text, in order.
+func pathPlaceholders(_ text: String) -> [String] {
+  var out: [String] = []
+  var open: String.Index? = nil
+  for i in text.indices {
+    let ch = text[i]
+    if ch == "{" {
+      open = i
+    } else if ch == "}" || ch == "/" {
+      if ch == "}", let o = open, text.index(after: o) < i {
+        out.append(String(text[o...i]))
+      }
+      open = nil
+    }
+  }
+  return out
+}
+
+// The path parameters of a point that neither the call nor the entity gives a
+// value for, looked up as paramUtil looks them up.
+private func unfilledParams(_ ctx: Context, _ point: VMap) -> [String] {
+  var missing: [String] = []
+  for part in gp(point, "parts").asList?.items ?? [] {
+    guard let text = part.asString, pathPlaceholders(text) == [text] else { continue }
+    let name = String(text.dropFirst().dropLast())
+    if isNil(paramValue(ctx, point, name)) { missing.append(name) }
+  }
+  return missing
+}
+
 func makePointUtil(_ ctx: Context) throws -> VMap? {
   if let stored = ctx.out["point"], let sp = stored {
     // A PrePoint feature hook (e.g. rbac) may short-circuit the operation by
@@ -16,7 +46,7 @@ func makePointUtil(_ ctx: Context) throws -> VMap? {
   let options = ctx.options
 
   let allowOp = gpath(options, "allow", "op").asString ?? ""
-  if !allowOp.contains(op.name) {
+  if !allowed(gpath(options, "allow", "op"), op.name) {
     throw ctx.makeError("point_op_allow",
       "Operation \"\(op.name)\" not allowed by SDK option allow.op value: \"\(allowOp)\"")
   }
@@ -100,18 +130,38 @@ func makePointUtil(_ ctx: Context) throws -> VMap? {
         return (last.asString ?? "").hasPrefix("{")
       }
 
-      point = op.points.first
-      for candidate in op.points {
-        guard let best = point else { break }
-        let candTerm = terminalParam(candidate)
-        let bestTerm = terminalParam(best)
-        if candTerm != bestTerm {
-          if candTerm { point = candidate }
+      func ownPoint(_ points: [VMap]) -> VMap {
+        var best = points[0]
+        for candidate in points {
+          let candTerm = terminalParam(candidate)
+          let bestTerm = terminalParam(best)
+          if candTerm != bestTerm {
+            if candTerm { best = candidate }
+          }
+          else if partsLen(candidate) < partsLen(best) {
+            best = candidate
+          }
         }
-        else if partsLen(candidate) < partsLen(best) {
-          point = candidate
-        }
+        return best
       }
+
+      // A call without an action falls back to a point without one, as
+      // generation does, and only to a route the call can fill.
+      let plain = op.points.filter { isNil(gp(gp($0, "select"), "$action")) }
+      if plain.isEmpty {
+        throw ctx.makeError("point_action_required",
+          "Operation \"\(op.name)\" has only action endpoints; pass $action to choose one.")
+      }
+
+      let fillable = plain.filter { unfilledParams(ctx, $0).isEmpty }
+
+      if fillable.isEmpty {
+        throw ctx.makeError("point_no_match",
+          "Operation \"\(op.name)\" has no endpoint whose path parameters are all given (missing: " +
+          unfilledParams(ctx, ownPoint(plain)).joined(separator: ", ") + ").")
+      }
+
+      point = ownPoint(fillable)
     }
 
     let reqAction = gp(reqselector, "$action")
@@ -161,7 +211,7 @@ func makeSpecUtil(_ ctx: Context) throws -> Spec {
   ctx.spec!.method = utility.prepareMethod(ctx)
 
   let allowMethod = gpath(options, "allow", "method").asString ?? ""
-  if !allowMethod.contains(ctx.spec!.method) {
+  if !allowed(gpath(options, "allow", "method"), ctx.spec!.method) {
     throw ctx.makeError("spec_method_allow",
       "Method \"\(ctx.spec!.method)\" not allowed by SDK option allow.method value: \"\(allowMethod)\"")
   }
@@ -192,7 +242,12 @@ func makeSpecUtil(_ ctx: Context) throws -> Spec {
     explain.entries["spec"] = .nat(ctx.spec!)
   }
 
+  // Whatever prepareAuth sets in the query, under whichever name, is the
+  // credential; a key it leaves as it was is the caller's.
+  let query = ctx.spec!.query.entries
+
   let spec = try utility.prepareAuth(ctx)
+  spec.authquery = spec.query.entries.keys.filter { query[$0] != spec.query.entries[$0] }
   ctx.spec = spec
   return spec
 }
@@ -208,6 +263,16 @@ func makeUrlUtil(_ ctx: Context) throws -> String {
   var url = join(jtp(spec.base, spec.prefix, spec.path, spec.suffix), "/", true)
   let resmatch = VMap()
 
+  // Sent with the request, never recorded as the entity's match.
+  let authquery = spec.authquery
+
+  // A route the definition ends with a slash keeps it: a server such as a
+  // Django REST one redirects or refuses the route without it.
+  if let orig = gp(ctx.point, "orig").asString, orig.hasSuffix("/"), spec.suffix.isEmpty,
+     !url.hasSuffix("/") {
+    url += "/"
+  }
+
   for item in items(.map(spec.params)) {
     let key = item[0].asString ?? ""
     let val = item[1]
@@ -218,6 +283,17 @@ func makeUrlUtil(_ ctx: Context) throws -> String {
     }
   }
 
+  // A placeholder left in the route would send the request to the wrong route.
+  // The base's own placeholders are server variables, resolved with the options.
+  var base = spec.base
+  while base.hasSuffix("/") { base.removeLast() }
+  let route = !base.isEmpty && url.hasPrefix(base) ? String(url.dropFirst(base.count)) : url
+  let unfilled = pathPlaceholders(route)
+  if !unfilled.isEmpty {
+    throw ctx.makeError("url_param_missing",
+      "URL path has no value for " + unfilled.joined(separator: ", ") + ".")
+  }
+
   var qsep = "?"
   for item in items(.map(spec.query)) {
     let key = item[0].asString ?? ""
@@ -225,7 +301,9 @@ func makeUrlUtil(_ ctx: Context) throws -> String {
     if !isNil(val) {
       url += qsep + escurl(.string(key)) + "=" + escurl(.string(stringify(val)))
       qsep = "&"
-      resmatch.entries[key] = val
+      if !authquery.contains(key) {
+        resmatch.entries[key] = val
+      }
     }
   }
 
@@ -251,11 +329,7 @@ func makeFetchDefUtil(_ ctx: Context) throws -> VMap {
   fetchdef.entries["headers"] = .map(spec.headers)
 
   if !isNil(spec.body) {
-    if spec.body.isMap {
-      fetchdef.entries["body"] = .string(jsonify(spec.body, indent: 0))
-    } else {
-      fetchdef.entries["body"] = spec.body
-    }
+    fetchdef.entries["body"] = requestBody(ctx.point, spec.body)
   }
 
   return fetchdef

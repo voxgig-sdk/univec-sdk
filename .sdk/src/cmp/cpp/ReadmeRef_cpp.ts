@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures, opNeedsAction, bodyNote } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -7,7 +7,7 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { cppVarName } from './utility_cpp'
+import { cppVarName, cppListMatch } from './utility_cpp'
 
 
 // Type names come from the shared canonToType 'cpp' column (single source of truth).
@@ -15,6 +15,7 @@ import { cppVarName } from './utility_cpp'
 // A type-correct C++ literal for a field's canonical type.
 function cppLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Value(nullptr)'
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value(1)'
   if ('BOOLEAN' === k) return 'Value(true)'
   if ('ARRAY' === k) return 'vlist()'
@@ -25,29 +26,34 @@ function cppLit(type: any, placeholder: string = 'example'): string {
 
 const OP_SIGNATURES: Record<string, { sig: string, returns: string, desc: string }> = {
   load: {
-    sig: 'load(reqmatch, ctrl) -> Value',
-    returns: 'the entity data',
-    desc: 'Load a single entity matching the given criteria. Returns the entity data and throws on error.',
+    sig: 'load(reqmatch, ctrl) -> SdkEntityPtr',
+    returns: 'the entity',
+    desc: 'Load a single entity matching the given criteria. Returns the entity, whose record `data()` reads, and throws on error.',
   },
   list: {
-    sig: 'list(reqmatch, ctrl) -> Value',
+    sig: 'list(reqmatch, ctrl) -> std::vector<SdkEntityPtr>',
     returns: 'a list of entities',
-    desc: 'List entities matching the given criteria. The match is optional — pass `Value::undef()` to list all records. Returns a Value list and throws on error.',
+    desc: 'List entities matching the given criteria. The match is optional — pass `Value::undef()` to list all records. Returns one entity per record and throws on error.',
   },
   create: {
-    sig: 'create(reqdata, ctrl) -> Value',
-    returns: 'the created entity data',
-    desc: 'Create a new entity with the given data. Returns the created entity data and throws on error.',
+    sig: 'create(reqdata, ctrl) -> SdkEntityPtr',
+    returns: 'the created entity',
+    desc: 'Create a new entity with the given data. Returns the created entity and throws on error.',
   },
   update: {
-    sig: 'update(reqdata, ctrl) -> Value',
-    returns: 'the updated entity data',
-    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity data and throws on error.',
+    sig: 'update(reqdata, ctrl) -> SdkEntityPtr',
+    returns: 'the updated entity',
+    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity and throws on error.',
+  },
+  patch: {
+    sig: 'patch(reqdata, ctrl) -> SdkEntityPtr',
+    returns: 'the patched entity',
+    desc: 'Change part of an existing entity: only the fields given are sent. The data must include the entity `id`. Returns the patched entity and throws on error.',
   },
   remove: {
-    sig: 'remove(reqmatch, ctrl) -> Value',
-    returns: 'the removed entity data',
-    desc: 'Remove the entity matching the given criteria. Throws on error.',
+    sig: 'remove(reqmatch, ctrl) -> SdkEntityPtr',
+    returns: 'the removed entity',
+    desc: 'Remove the entity matching the given criteria. Returns the entity, marked as deleted, and throws on error.',
   },
 }
 
@@ -214,7 +220,7 @@ auto ${acc} = client->${acc}();
         // Field operations breakdown
         const hasFieldOps = fields.some((f: any) => f.op && Object.keys(f.op).length > 0)
         if (hasFieldOps) {
-          const opcols = ['load', 'list', 'create', 'update', 'remove']
+          const opcols = ['load', 'list', 'create', 'update', 'patch', 'remove']
             .filter((op: string) => opnames.includes(op) && ent.op[op]?.active !== false)
           Content(`### Field Usage by Operation
 
@@ -255,6 +261,10 @@ ${info.desc}
 
 `)
 
+          if (opNeedsAction(ent.op[opname])) {
+            return
+          }
+
           if ('load' === opname || 'remove' === opname) {
             const matchItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
@@ -266,16 +276,17 @@ ${info.desc}
                   it.name === idF ? ent.name + '_id' : it.name)}}`).join(', ')}})`
               : 'Value::undef()'
             Content(`\`\`\`cpp
-Value result = client->${acc}()->${opname}(${arg}, Value::undef());
+SdkEntityPtr result = client->${acc}()->${opname}(${arg}, Value::undef());
+std::cout << Struct::jsonify(result->data()) << std::endl;
 \`\`\`
 
 `)
           }
           else if ('list' === opname) {
             Content(`\`\`\`cpp
-Value results = client->${acc}()->list(Value::undef(), Value::undef());
-for (const auto& ${acc} : *results.as_list()) {
-  std::cout << Struct::jsonify(${acc}) << std::endl;
+std::vector<SdkEntityPtr> results = client->${acc}()->list(${cppListMatch(ent)}, Value::undef());
+for (const auto& ${acc} : results) {
+  std::cout << Struct::jsonify(${acc}->data()) << std::endl;
 }
 \`\`\`
 
@@ -285,7 +296,7 @@ for (const auto& ${acc} : *results.as_list()) {
             const createItems = opRequestShape(ent, 'create').items
               .filter((it: any) => !it.optional)
             Content(`\`\`\`cpp
-Value result = client->${acc}()->create(vmap({
+SdkEntityPtr result = client->${acc}()->create(vmap({
 `)
             createItems.map((it: any) => {
               Content(`    {"${it.name}", ${cppLit(it.type, 'example_' + it.name)}},  // ${canonToType(it.type, target.name)}
@@ -296,8 +307,8 @@ Value result = client->${acc}()->create(vmap({
 
 `)
           }
-          else if ('update' === opname) {
-            const updateItems = opRequestShape(ent, 'update').items
+          else if ('update' === opname || 'patch' === opname) {
+            const updateItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
               .sort((a: any, b: any) =>
                 (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
@@ -305,12 +316,19 @@ Value result = client->${acc}()->create(vmap({
               `    {"${it.name}", ${cppLit(it.type,
                 it.name === idF ? ent.name + '_id' : it.name)}},\n`).join('')
             Content(`\`\`\`cpp
-Value result = client->${acc}()->update(vmap({
-${updateLines}    // Fields to update
+SdkEntityPtr result = client->${acc}()->${opname}(vmap({
+${updateLines}    // ${'patch' === opname ? 'Only the fields to change' : 'Fields to update'}
 }), Value::undef());
 \`\`\`
 
 `)
+          }
+
+          if ('create' === opname || 'update' === opname || 'patch' === opname) {
+            const note = bodyNote(ent.op[opname], {
+              values: 'a `std::string` holding the bytes',
+            })
+            if ('' !== note) Content(note)
           }
         })
       }

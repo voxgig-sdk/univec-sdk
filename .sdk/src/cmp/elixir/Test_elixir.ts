@@ -8,6 +8,7 @@ import { cmp, each, Folder, File, Content, entityCollection } from '@voxgig/sdkg
 
 import { TestEntity } from './TestEntity_elixir'
 import { TestDirect } from './TestDirect_elixir'
+import { TestClean } from './TestClean_elixir'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_elixir'
 
 
@@ -38,6 +39,9 @@ end
       TestEntity({ target, entity })
       TestDirect({ target, entity })
     })
+
+    // The canary sweep (test/clean_test.exs), picked up by `mix test`.
+    TestClean({ target, entity })
 
     // Validate the documented elixir examples in the README/REFERENCE docs.
     ReadmeExamplesTest({ target })

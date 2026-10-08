@@ -4,6 +4,7 @@
 
 #include "sdk.h"
 
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>   // snprintf
 #include <stdlib.h>
@@ -77,6 +78,26 @@ voxgig_value* getpath2(voxgig_value* store, const char* a, const char* b) {
 voxgig_value* getpath3(voxgig_value* store, const char* a, const char* b, const char* c) {
   const char* keys[4] = {a, b, c, NULL};
   return getpath_c(store, keys);
+}
+
+bool allow_list_has(voxgig_value* names, const char* item) {
+  if (!voxgig_is_string(names) || NULL == item || '\0' == item[0]) return false;
+  size_t want = strlen(item);
+  const char* p = voxgig_as_string(names);
+  for (;;) {
+    const char* end = strchr(p, ',');
+    const char* s = p;
+    const char* e = end ? end : p + strlen(p);
+    while (s < e && isspace((unsigned char)*s)) s++;
+    while (e > s && isspace((unsigned char)e[-1])) e--;
+    if ((size_t)(e - s) == want) {
+      size_t i = 0;
+      while (i < want && toupper((unsigned char)s[i]) == toupper((unsigned char)item[i])) i++;
+      if (i == want) return true;
+    }
+    if (!end) return false;
+    p = end + 1;
+  }
 }
 
 void setp(voxgig_value* val, const char* key, voxgig_value* newval) {

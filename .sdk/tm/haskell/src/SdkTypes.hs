@@ -119,6 +119,7 @@ data Entity = Entity
   , eList    :: Value -> Value -> IO [Entity]
   , eCreate  :: Value -> Value -> IO Entity
   , eUpdate  :: Value -> Value -> IO Entity
+  , ePatch   :: Value -> Value -> IO Entity
   , eRemove  :: Value -> Value -> IO Entity
   -- | 'eRemove' resolves to the entity, marked. The instance KEEPS the data
   -- it held — a caller can still read what was deleted — but it is no longer

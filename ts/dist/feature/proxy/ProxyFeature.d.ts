@@ -9,6 +9,7 @@ declare class ProxyFeature extends BaseFeature {
     _options: any;
     _url?: string;
     _noProxy: string[];
+    _ctx?: Context;
     init(ctx: Context, options: FeatureOptions): void | Promise<any>;
     _route(this: any, url: string, fetchdef: any): any;
     _bypass(this: any, url: string): boolean;

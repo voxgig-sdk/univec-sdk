@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable, invalidRequest } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -20,7 +20,8 @@ import {
   getMatchEntries,
   isAuthActive, envName, envToken,
   serverVarEnv,
-  serverVariables
+  serverVariables,
+  liveFlowNeeds, liveStrict, liveStrictNote,
 } from '@voxgig/sdkgen'
 
 
@@ -41,6 +42,55 @@ type GenCtx = {
 }
 
 type OpGen = (ctx: GenCtx, step: ModelEntityFlowStep, index: number) => void
+
+
+// The live prologue of a flow built from offline fixtures: blocked without
+// the ids it binds, a create-less load reading the first listed record, and
+// a lenient run observing its checks rather than failing on them.
+function liveFlowGate(entity: any, needs: any, entidEnv: string, strict: boolean,
+  hasSteps: boolean): string {
+  let out = ''
+  if (0 < needs.keys.length) {
+    out += `        if (setup.Live)
+        {
+            foreach (var liveKey in new[] { ${needs.keys.map((k: string) => JSON.stringify(k)).join(', ')} })
+            {
+                if (setup.SyntheticOnly || StructUtils.GetProp(setup.Idmap, liveKey) == null)
+                {
+                    TestRunner.LiveMiss(LIVE_STRICT, "Live entity test blocked: needs " + liveKey + " via ${entidEnv}");
+                    return;
+                }
+            }
+        }
+`
+  }
+  if (null != needs.blocked) {
+    out += `        if (setup.Live)
+        {
+            TestRunner.LiveMiss(LIVE_STRICT, "Live entity test blocked: " + ${JSON.stringify(needs.blocked)});
+            return;
+        }
+`
+  }
+  if (!hasSteps) {
+    return out
+  }
+  out += '        var client = setup.Client;\n'
+  if (null != needs.discover) {
+    const match = Object.entries(needs.discover)
+      .map(([k, v]: any) => ` [${JSON.stringify(k)}] = setup.Idmap[${JSON.stringify(v)}],`).join('')
+    out += `        if (setup.Live && !TestRunner.LiveExisting(setup.Data, LIVE_STRICT, ${JSON.stringify(entity.name)},
+            () => client.${entity.Name}().List(new Dictionary<string, object?> {${match} }, null)))
+        {
+            return;
+        }
+`
+  }
+  if (!strict) {
+    out += '        try\n        {\n'
+  }
+  return out + '\n'
+}
 
 
 const TestEntity = cmp(function TestEntity(props: any) {
@@ -95,6 +145,10 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const genCtx: GenCtx = { model, entity, flow: basicflow, PROJUPPER }
 
+  const strict = liveStrict(model, target.name)
+  const needs = liveFlowNeeds(entity, basicflow)
+  const entidEnvVar = `${PROJUPPER}_TEST_${ENTUPPER}_ENTID`
+
   const opNames = Array.from(new Set(
     (allSteps as any[]).map((s: any) => s.o).filter(Boolean)))
   const opsList = opNames.map(o => `"${o}"`).join(', ')
@@ -124,6 +178,7 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
 using System.Text.Json;
 
+using ${Name}Sdk.Feature;
 using Voxgig.Struct;
 using Xunit;
 
@@ -131,6 +186,9 @@ namespace ${Name}Sdk.Test;
 
 public class ${entity.Name}EntityTest
 {
+${liveStrictNote(strict, '//', '    ')}
+    private const bool LIVE_STRICT = ${strict};
+
     [Fact]
     public void Instance()
     {
@@ -143,14 +201,7 @@ public class ${entity.Name}EntityTest
     public void Basic()
     {
         var setup = ${entity.Name}BasicSetup(null);
-${skipBlock}        // The basic flow consumes synthetic IDs from the fixture. In live
-        // mode without an *_ENTID env override, those IDs hit the live API
-        // and 4xx; set ${PROJUPPER}_TEST_${ENTUPPER}_ENTID JSON to run live.
-        if (setup.SyntheticOnly)
-        {
-            return;
-        }
-${allSteps.length > 0 ? '        var client = setup.Client;\n\n' : ''}`)
+${skipBlock}${liveFlowGate(entity, needs, entidEnvVar, strict, allSteps.length > 0)}`)
 
     // Check if the flow has a create step; if not, bootstrap entity data
     const flowHasCreate = allSteps.some((s: any) => s.o === 'create')
@@ -176,11 +227,18 @@ ${allSteps.length > 0 ? '        var client = setup.Client;\n\n' : ''}`)
       }
     })
 
-    Content(`    }
+    Content(`${strict || 0 === allSteps.length ? '' : `        }
+        catch (Exception liveErr)
+        {
+            TestRunner.LiveObserve(liveErr, setup.Live, LIVE_STRICT);
+        }
+`}    }
 
 `)
 
-    const flowHasList = allSteps.some((s: any) => s.o === 'list')
+    // The stream test lists with no match, so a bare call must reach a route.
+    const flowHasList = allSteps.some((s: any) => s.o === 'list') &&
+      opReachable((entity.op as any)?.list, [])
     if (flowHasList) {
       Content(`    [Fact]
     public async Task Stream()
@@ -227,6 +285,8 @@ ${allSteps.length > 0 ? '        var client = setup.Client;\n\n' : ''}`)
 `)
     }
 
+    Content(failureTests(Name, entity, opReachable((entity.op as any)?.list, [])))
+
     // Generate setup function
     Content(`    private static EntityTestSetup ${entity.Name}BasicSetup(
         Dictionary<string, object?>? extra)
@@ -267,9 +327,8 @@ ${allSteps.length > 0 ? '        var client = setup.Client;\n\n' : ''}`)
                 },
             });
 
-        // Detect ENTID env override before EnvOverride consumes it. When
-        // live mode is on without a real override, the basic test runs
-        // against synthetic IDs from the fixture and 4xx's.
+        // Whether *_ENTID supplied the idmap, read before EnvOverride consumes
+        // it: without it, the ids a live flow binds are the fixture's synthetic ones.
         var entidEnvRaw = Environment.GetEnvironmentVariable(
             "${PROJUPPER}_TEST_${ENTUPPER}_ENTID") ?? "";
         var idmapOverridden = entidEnvRaw != "" &&
@@ -638,6 +697,119 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A failed operation throws from a stream as it does from the operation: a
+// transport failure, and a hook that rejects the call. A throwing hook fires
+// PreUnexpected, under throw false too. The caller's ctrl stays its own. An
+// invalid request fails with validate's own error, before it is sent.
+function failureTests(Name: string, entity: ModelEntity, hasList: boolean): string {
+  const Entity = entity.Name
+  const map = (body: string) => 'new Dictionary<string, object?> { ' + body + ' }'
+  let out = ''
+
+  if (hasList) {
+    out += `    private sealed class FailHook : BaseFeature
+    {
+        public int Unexpected;
+
+        public FailHook()
+        {
+            Name = "failhook";
+            Version = "0.0.1";
+            Active = true;
+        }
+
+        public override void PreSpec(Context ctx) =>
+            throw new Exception("${entity.name} hook failed");
+
+        public override void PreUnexpected(Context ctx) => Unexpected++;
+    }
+
+    [Fact]
+    public async Task StreamError()
+    {
+        var offline = ${map('["net"] = ' + map('["offline"] = true'))};
+        var err = await Assert.ThrowsAnyAsync<Exception>(async () =>
+        {
+            await foreach (var _ in ${Name}SDK.TestSDK(offline, null).${Entity}().Stream("list", null, null)) { }
+        });
+        Assert.Contains("offline", err.Message);
+
+        await foreach (var _ in ${Name}SDK.TestSDK(offline, null).${Entity}().Stream("list", null,
+            ${map('["ctrl"] = ' + map('["throw"] = false'))})) { }
+
+        if (Fh.HasFeature("rbac"))
+        {
+            var denied = ${Name}SDK.TestSDK(null,
+                ${map('["feature"] = ' + map('["rbac"] = ' + map('["active"] = true, ["deny"] = true')))});
+            var denyerr = await Assert.ThrowsAnyAsync<${Name}Error>(async () =>
+            {
+                await foreach (var _ in denied.${Entity}().Stream("list", null, null)) { }
+            });
+            Assert.Equal("rbac_denied", denyerr.Code);
+        }
+    }
+
+    [Fact]
+    public async Task StreamCtrl()
+    {
+        var explain = new Dictionary<string, object?>();
+        var ctrl = new Dictionary<string, object?> { ["explain"] = explain };
+        await foreach (var _ in ${Name}SDK.TestSDK(null, null).${Entity}().Stream("list", null,
+            ${map('["ctrl"] = ctrl')})) { }
+        Assert.Equal(new[] { "explain" }, ctrl.Keys.ToArray());
+        Assert.Same(explain, ctrl["explain"]);
+        Assert.NotEmpty(explain);
+    }
+
+    [Fact]
+    public void Unexpected()
+    {
+        var hook = new FailHook();
+        var client = new ${Name}SDK(new Dictionary<string, object?>
+        {
+            ["feature"] = ${map('["test"] = ' + map('["active"] = true'))},
+            ["extend"] = new List<object?> { hook },
+        });
+
+        var err = Assert.ThrowsAny<Exception>(() => client.${Entity}().List(null, null));
+        Assert.Contains("hook failed", err.Message);
+        Assert.True(hook.Unexpected > 0);
+
+        var fired = hook.Unexpected;
+        client.${Entity}().List(null, ${map('["throw"] = false')});
+        Assert.True(hook.Unexpected > fired);
+    }
+
+`
+  }
+
+  const bad = invalidRequest(entity)
+  if (null != bad) {
+    const args = Object.entries(bad.args)
+      .map(([k, v]) => '[' + JSON.stringify(k) + '] = ' + JSON.stringify(v)).join(', ')
+    const Op = bad.op[0].toUpperCase() + bad.op.slice(1)
+    out += `    [Fact]
+    public void Validate()
+    {
+        if (!Fh.HasFeature("validate"))
+        {
+            Console.WriteLine("skip: feature not present in this SDK: validate");
+            return;
+        }
+        var client = ${Name}SDK.TestSDK(null,
+            ${map('["feature"] = ' + map('["validate"] = ' + map('["active"] = true')))});
+        var err = Assert.ThrowsAny<${Name}Error>(() => client.${Entity}().${Op}(
+            ${map(args)}, null));
+        Assert.Equal("validate_failed", err.Code);
+    }
+
+`
+  }
+
+  return out
 }
 
 

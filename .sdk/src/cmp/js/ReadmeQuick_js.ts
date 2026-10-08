@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, isAuthActive, packageName, envName, opRequestShape, entityIdField, entityOps, safeVarName, exampleVarName, jsKey, matchArg, idLiteral } from '@voxgig/sdkgen'
+import { cmp, each, Content, isAuthActive, packageName, envName, opRequestShape, entityIdField, entityOps, safeVarName, exampleVarName, jsKey, matchArg, listMatchArg } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -8,12 +8,6 @@ import {
 } from '@voxgig/apidef'
 
 import { exampleValue } from './utility_js'
-
-
-function listMatchArg(ent: any): string {
-  const idF = entityIdField(ent)
-  return matchArg('ts', ent, 'list', idF, idLiteral(ent, 'list', idF))
-}
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -84,7 +78,7 @@ const client = ${ctor}
 
 \`\`\`js
 const ${eVar} = await client.${eName}().load(${matchArg('load')})
-console.log(${eVar})
+console.log(${eVar}.data())
 \`\`\`
 `)
     }
@@ -94,9 +88,9 @@ console.log(${eVar})
 ### List ${eName} Records
 
 \`\`\`js
-const ${eVar}s = await client.${eName}().list(${listMatchArg(exampleEntity)})
+const ${eVar}s = await client.${eName}().list(${listMatchArg('js', exampleEntity)})
 for (const ${eVar} of ${eVar}s) {
-  console.log(${eVar})
+  console.log(${eVar}.data())
 }
 \`\`\`
 `)
@@ -110,7 +104,7 @@ for (const ${eVar} of ${eVar}s) {
 
 \`\`\`js
 const created = await client.${eName}().create({${createBody}})
-console.log(created)
+console.log(created.data())
 \`\`\`
 `)
     }
@@ -125,7 +119,24 @@ console.log(created)
 
 \`\`\`js
 const updated = await client.${eName}().update({${updateBody}})
-console.log(updated)
+console.log(updated.data())
+\`\`\`
+`)
+    }
+
+    if (opnames.includes('patch')) {
+      const patchLines = (idF
+        ? [`  ${idF}: ${exampleValue(exampleEntity, exampleEntity.op && exampleEntity.op.patch, idF, exampleEntity.name + '_id')},`]
+        : []).concat(exampleFields('patch'))
+      const patchBody = patchLines.length ? '\n' + patchLines.join('\n') + '\n' : ''
+      Content(`
+### Patch a ${eName}
+
+Sends only the fields given.
+
+\`\`\`js
+const patched = await client.${eName}().patch({${patchBody}})
+console.log(patched.data())
 \`\`\`
 `)
     }

@@ -46,7 +46,7 @@ const Entity = cmp(function Entity(props: any) {
           // implementation (an override). Otherwise leave the base-class
           // method, which throws unsupportedOp at runtime.
           const opfrags =
-            (['load', 'list', 'create', 'update', 'remove']
+            (['load', 'list', 'create', 'update', 'patch', 'remove']
               .reduce((a: any, opname: string) =>
               (a['#' + camelify(opname) + 'Op'] =
                 !opnames.includes(opname) ?

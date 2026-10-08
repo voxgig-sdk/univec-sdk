@@ -109,8 +109,15 @@ defmodule ProjectName do
 
     path0 = H.or_(S.getprop(fetchargs, "path"), "")
     path = if is_binary(path0), do: path0, else: ""
-    method0 = H.or_(S.getprop(fetchargs, "method"), "GET")
-    method = if is_binary(method0), do: method0, else: "GET"
+    method = String.upcase(H.str_or(S.getprop(fetchargs, "method"), "GET"))
+    allow_method = S.getpath(options, "allow.method")
+
+    if not Utility.allowed?(allow_method, method) do
+      raise Context.make_error(ctx, "spec_method_allow",
+              "Method \"" <> method <> "\" not allowed by SDK option allow.method value: \"" <>
+                H.str_or(allow_method, "") <> "\"")
+    end
+
     params = H.or_(H.to_map(S.getprop(fetchargs, "params")), S.jm([]))
     query = H.or_(H.to_map(S.getprop(fetchargs, "query")), S.jm([]))
 
@@ -166,8 +173,7 @@ defmodule ProjectName do
 
   # Is this raw-access op permitted by the SDK's allow.op option?
   defp op_allowed?(client, op) do
-    allow = S.getpath(S.getprop(client, "options"), "allow.op")
-    is_binary(allow) and String.contains?(allow, op)
+    Utility.allowed?(S.getpath(S.getprop(client, "options"), "allow.op"), op)
   end
 
   defp op_denied(client, op) do
@@ -209,7 +215,7 @@ defmodule ProjectName do
 
         cond do
           fetch_err != nil ->
-            S.jm(["ok", false, "err", fetch_err])
+            S.jm(["ok", false, "err", Utility.clean(ctx, fetch_err)])
 
           fetched == nil ->
             S.jm(["ok", false, "err", Context.make_error(ctx, "direct_no_response", "response: undefined")])
@@ -240,7 +246,25 @@ defmodule ProjectName do
                 end
               end
 
-            S.jm(["ok", status >= 200 and status < 300, "status", status, "headers", headers, "data", json_data])
+            body_err =
+              if not no_body and S.getprop(fetched, "unreadable") == true do
+                failed =
+                  if status >= 200 and status < 300,
+                    do: nil,
+                    else:
+                      Context.make_error(ctx, "request_status",
+                        "request: " <> to_string(status) <> ": " <> to_string(H.or_(S.getprop(fetched, "statusText"), "")))
+
+                Utility.unreadable_body(ctx, status, headers, S.getprop(fetched, "body"),
+                  S.getprop(fetchdef, "headers"), failed)
+              end
+
+            out =
+              S.jm(["ok", body_err == nil and status >= 200 and status < 300,
+                    "status", status, "headers", headers, "data", json_data])
+
+            if body_err != nil, do: S.setprop(out, "err", Utility.clean(ctx, body_err))
+            out
 
           true ->
             S.jm(["ok", false, "err", Context.make_error(ctx, "direct_invalid", "invalid response type")])

@@ -6,12 +6,13 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { ocamlVarName } from './utility_ocaml'
+import { ocamlListMatch, ocamlOpField, ocamlVarName } from './utility_ocaml'
 
 
 // A type-correct OCaml `value` literal for a field's canonical type.
 function ocamlLit(type: any): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Null'
   if ('INTEGER' === k || 'NUMBER' === k) return '(Num 1.)'
   if ('BOOLEAN' === k) return '(Bool true)'
   if ('ARRAY' === k) return '(empty_list ())'
@@ -37,15 +38,11 @@ let () =
   if (exampleEntity && primaryOp) {
     const fn = ocamlVarName(exampleEntity.name)
     const idF = entityIdField(exampleEntity)
-    const field =
-      'load' === primaryOp ? 'e_load' :
-        'list' === primaryOp ? 'e_list' :
-          'create' === primaryOp ? 'e_create' :
-            'update' === primaryOp ? 'e_update' : 'e_remove'
+    const field = ocamlOpField(primaryOp)
     const isMatchOp = 'load' === primaryOp || 'remove' === primaryOp
     let arg = 'Noval'
     if ('list' === primaryOp) {
-      arg = '(empty_map ())'
+      arg = ocamlListMatch(exampleEntity)
     } else if (isMatchOp) {
       // Every REQUIRED match key (id first).
       const items = opRequestShape(exampleEntity, primaryOp).items
@@ -56,7 +53,7 @@ let () =
         ? `(jo [${items.map((it: any) =>
           `("${it.name}", ${it.name === idF ? '(Str "test01")' : ocamlLit(it.type)})`).join('; ')}])`
         : '(empty_map ())'
-    } else if ('create' === primaryOp || 'update' === primaryOp) {
+    } else if ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp) {
       const items = opRequestShape(exampleEntity, primaryOp).items
         .filter((it: any) => it.name !== idF && it.name !== 'id')
       const required = items.filter((it: any) => !it.optional)

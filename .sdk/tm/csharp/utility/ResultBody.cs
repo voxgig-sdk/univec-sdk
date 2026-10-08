@@ -15,6 +15,11 @@ public static partial class SdkUtility
             {
                 result.Body = response.JsonFunc();
             }
+            if (response is { Unreadable: true })
+            {
+                result.Err = Response.UnreadableBody(ctx, result.Status, result.Headers,
+                    response.Body, ctx.Spec?.Headers, result.Err);
+            }
         }
 
         return result!;

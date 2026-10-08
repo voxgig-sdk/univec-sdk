@@ -1,5 +1,5 @@
 
-import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures } from '@voxgig/sdkgen'
+import { cmp, each, Content, canonToType, canonKey, canonScalarKey, File, isAuthActive, entityIdField, opRequestShape , targetFeatures, opNeedsAction, bodyNote } from '@voxgig/sdkgen'
 import { ReadmeRefFeatures } from '@voxgig/sdkgen'
 
 import {
@@ -7,7 +7,7 @@ import {
   getModelPath,
 } from '@voxgig/apidef'
 
-import { swiftVarName } from './utility_swift'
+import { swiftVarName, swiftListMatch } from './utility_swift'
 
 
 // Type names come from the shared canonToType 'swift' column (single source of truth).
@@ -15,6 +15,7 @@ import { swiftVarName } from './utility_swift'
 // A type-correct Swift `Value` literal for a field's canonical type.
 function swiftLit(type: any, placeholder: string = 'example'): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return '.null'
   if ('INTEGER' === k) return '.int(1)'
   if ('NUMBER' === k) return '.double(1.0)'
   if ('BOOLEAN' === k) return '.bool(true)'
@@ -27,28 +28,33 @@ function swiftLit(type: any, placeholder: string = 'example'): string {
 const OP_SIGNATURES: Record<string, { sig: string, returns: string, desc: string }> = {
   load: {
     sig: 'load(reqmatch, ctrl) throws -> Value',
-    returns: 'the entity data',
-    desc: 'Load a single entity matching the given criteria. Returns the entity data and throws on error.',
+    returns: 'the entity',
+    desc: 'Load a single entity matching the given criteria. Returns the entity, whose record `data()` reads, as a native `Value` that `asNative as? Entity` unwraps, and throws on error.',
   },
   list: {
     sig: 'list(reqmatch, ctrl) throws -> Value',
-    returns: 'a Value list of entities',
-    desc: 'List entities matching the given criteria. The match is optional — call `list(nil, nil)` to list all records. Returns a Value list and throws on error.',
+    returns: 'a `Value` list of entities, one per record',
+    desc: 'List entities matching the given criteria. The match is optional — call `list(nil, nil)` to list all records. Returns a `Value` list of entities, one per record, and throws on error.',
   },
   create: {
     sig: 'create(reqdata, ctrl) throws -> Value',
-    returns: 'the created entity data',
-    desc: 'Create a new entity with the given data. Returns the created entity data and throws on error.',
+    returns: 'the created entity',
+    desc: 'Create a new entity with the given data. Returns the created entity and throws on error.',
   },
   update: {
     sig: 'update(reqdata, ctrl) throws -> Value',
-    returns: 'the updated entity data',
-    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity data and throws on error.',
+    returns: 'the updated entity',
+    desc: 'Update an existing entity. The data must include the entity `id`. Returns the updated entity and throws on error.',
+  },
+  patch: {
+    sig: 'patch(reqdata, ctrl) throws -> Value',
+    returns: 'the patched entity',
+    desc: 'Change part of an existing entity: only the fields given are sent. The data must include the entity `id`. Returns the patched entity and throws on error.',
   },
   remove: {
     sig: 'remove(reqmatch, ctrl) throws -> Value',
-    returns: 'the removed entity data',
-    desc: 'Remove the entity matching the given criteria. Throws on error.',
+    returns: 'the removed entity',
+    desc: 'Remove the entity matching the given criteria. Returns the entity, marked as deleted, and throws on error.',
   },
 }
 
@@ -216,7 +222,7 @@ let ${eVar} = client.${accessor}()
         // Field operations breakdown
         const hasFieldOps = fields.some((f: any) => f.op && Object.keys(f.op).length > 0)
         if (hasFieldOps) {
-          const opcols = ['load', 'list', 'create', 'update', 'remove']
+          const opcols = ['load', 'list', 'create', 'update', 'patch', 'remove']
             .filter((op: string) => opnames.includes(op) && ent.op[op]?.active !== false)
           Content(`### Field Usage by Operation
 
@@ -257,6 +263,10 @@ ${info.desc}
 
 `)
 
+          if (opNeedsAction(ent.op[opname])) {
+            return
+          }
+
           if ('load' === opname || 'remove' === opname) {
             const matchItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
@@ -275,8 +285,12 @@ let result = try client.${accessor}().${opname}(${arg}, nil)
           }
           else if ('list' === opname) {
             Content(`\`\`\`swift
-let results = try client.${accessor}().list(nil, nil)
-print(results)
+let results = try client.${accessor}().list(${swiftListMatch(ent)}, nil)
+for item in results.asList?.items ?? [] {
+    if let entity = item.asNative as? Entity {
+        print(entity.data())
+    }
+}
 \`\`\`
 
 `)
@@ -297,8 +311,8 @@ let result = try client.${accessor}().create(VMap([
 
 `)
           }
-          else if ('update' === opname) {
-            const updateItems = opRequestShape(ent, 'update').items
+          else if ('update' === opname || 'patch' === opname) {
+            const updateItems = opRequestShape(ent, opname).items
               .filter((it: any) => !it.optional || it.name === idF)
               .sort((a: any, b: any) =>
                 (a.name === idF ? 0 : 1) - (b.name === idF ? 0 : 1))
@@ -308,11 +322,18 @@ let result = try client.${accessor}().create(VMap([
                 it.name === idF ? ent.name + '_id' : it.name)})${comma}\n`
             }).join('')
             Content(`\`\`\`swift
-let result = try client.${accessor}().update(VMap([
+let result = try client.${accessor}().${opname}(VMap([
 ${updateLines}]), nil)
 \`\`\`
 
 `)
+          }
+
+          if ('create' === opname || 'update' === opname || 'patch' === opname) {
+            const note = bodyNote(ent.op[opname], {
+              values: 'a `String`, or `Data` or `[UInt8]` as a `.nat` value',
+            })
+            if ('' !== note) Content(note)
           }
         })
       }

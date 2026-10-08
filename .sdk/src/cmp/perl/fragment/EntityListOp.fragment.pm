@@ -5,8 +5,8 @@
 # reqmatch: match filter hashref (any subset of EntityName fields;
 # EntityNameListMatch shape); defaults to undef, treated as an empty match
 # that lists all. ctrl: optional per-call control.
-# Returns the matching EntityName items as an arrayref; dies with
-# ProjectNameError on failure.
+# Returns the matching EntityName items as an arrayref of entities, one per
+# record (data_get reads the record); dies with ProjectNameError on failure.
 sub list {
   my ($self, $reqmatch, $ctrl) = @_;
   my $utility = $self->{_utility};
@@ -25,17 +25,6 @@ sub list {
     }
     return;
   });
-
-  # list yields the BARE arrayref of records - each an accessible hashref -
-  # so callers can index $item->{id} directly, matching py/lua/go/rb.
-  # make_result wraps each entry as an Entity instance for internal use;
-  # unwrap those back to their bare record hashrefs here (load/create/etc.
-  # are unaffected).
-  if (Voxgig::Struct::islist($records)) {
-    $records = [map {
-      (Scalar::Util::blessed($_) && $_->can('data_get')) ? $_->data_get : $_
-    } @$records];
-  }
 
   return $records;
 }

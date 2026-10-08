@@ -22,13 +22,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `(reqmatch, ctrl) -> Value` | Load a single entity by match criteria. Throws on error. |',
-    list: '| `list` | `(reqmatch, ctrl) -> Value` | List entities matching the criteria (a Value list). Throws on error. |',
-    create: '| `create` | `(reqdata, ctrl) -> Value` | Create a new entity. Throws on error. |',
-    update: '| `update` | `(reqdata, ctrl) -> Value` | Update an existing entity. Throws on error. |',
-    remove: '| `remove` | `(reqmatch, ctrl) -> Value` | Remove an entity. Throws on error. |',
+    load: '| `load` | `(reqmatch, ctrl) -> SdkEntityPtr` | Load a single entity by match criteria. Throws on error. |',
+    list: '| `list` | `(reqmatch, ctrl) -> std::vector<SdkEntityPtr>` | List entities matching the criteria, one per record. Throws on error. |',
+    create: '| `create` | `(reqdata, ctrl) -> SdkEntityPtr` | Create a new entity. Throws on error. |',
+    update: '| `update` | `(reqdata, ctrl) -> SdkEntityPtr` | Update an existing entity. Throws on error. |',
+    patch: '| `patch` | `(reqdata, ctrl) -> SdkEntityPtr` | Change part of an existing entity. Throws on error. |',
+    remove: '| `remove` | `(reqmatch, ctrl) -> SdkEntityPtr` | Remove an entity, which is returned marked as deleted. Throws on error. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -97,9 +98,9 @@ ${opRows}
 
 ### Result shape
 
-Entity operations return the bare result data (a map \`Value\` for
-single-entity ops, a list \`Value\` for \`list\`) and throw
-\`sdk::SdkErrorPtr\` on error. Wrap calls in \`try\`/\`catch\` to handle
+Entity operations return the entity, and \`list\` a \`std::vector\` of
+entities, one per record; \`data()\` reads an entity's record. They throw
+\`sdk::SdkErrorPtr\` on error, so wrap calls in \`try\`/\`catch\` to handle
 failures.
 
 The \`direct()\` escape hatch never throws — it returns a result \`Value\`

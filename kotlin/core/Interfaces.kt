@@ -25,6 +25,8 @@ interface SdkEntity : Entity {
 
   fun update(reqdata: MutableMap<String, Any?>?, ctrl: MutableMap<String, Any?>?): Any?
 
+  fun patch(reqdata: MutableMap<String, Any?>?, ctrl: MutableMap<String, Any?>?): Any?
+
   fun remove(reqmatch: MutableMap<String, Any?>?, ctrl: MutableMap<String, Any?>?): Any?
 
   // Runs `action` through the pipeline and returns a Sequence over result

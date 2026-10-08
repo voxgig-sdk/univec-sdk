@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { csVarName } from './utility_csharp'
+import { csVarName, csListMatch } from './utility_csharp'
 
 
 const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
@@ -37,6 +37,7 @@ const ReadmeQuick = cmp(function ReadmeQuick(props: any) {
 
 \`\`\`csharp
 using ${model.const.Name}Sdk;
+using Voxgig.Struct;
 
 var client = ${ctor};
 \`\`\`
@@ -57,6 +58,7 @@ var client = ${ctor};
     // A type-correct C# literal for a param.
     const csLit = (type: any, placeholder: string = 'example'): string => {
       const k = canonScalarKey(type)
+      if ('NULL' === k) return 'null'
       if ('INTEGER' === k) return '1L'
       if ('NUMBER' === k) return '1.0'
       if ('BOOLEAN' === k) return 'true'
@@ -68,14 +70,17 @@ var client = ${ctor};
     if (opnames.includes('list')) {
       Content(`### 2. List ${eName.toLowerCase()} records
 
-\`List(null)\` returns an aggregate list of records (as \`object?\`) and raises
-on error.
+\`List(null)\` returns a list of entities, one per record (as \`object?\`), and
+raises on error; an entity's \`Data()\` reads its record.
 
 \`\`\`csharp
 try
 {
-    var ${eVar}List = client.${eName}().List(null);
-    Console.WriteLine(${eVar}List);
+    var ${eVar}List = (List<object?>)client.${eName}().List(${csListMatch(exampleEntity)})!;
+    foreach (var ${eVar}Item in ${eVar}List)
+    {
+        Console.WriteLine(StructUtils.Jsonify(((IEntity)${eVar}Item!).Data()));
+    }
 }
 catch (Exception err)
 {
@@ -108,13 +113,14 @@ catch (Exception err)
       Content(`### 3. Load ${neArticle} ${neName.toLowerCase()}
 
 ${neName} is nested under ${parentName}, so provide the \`${parentParam}\`.
-\`Load()\` returns the bare record (as \`object?\`) and raises on error.
+\`Load()\` returns the entity (as \`object?\`) and raises on error; an entity's
+\`Data()\` reads its record.
 
 \`\`\`csharp
 try
 {
-    var ${neVar} = client.${neName}().Load(new Dictionary<string, object?> { ${neMatch.join(', ')} });
-    Console.WriteLine(${neVar});
+    var ${neVar} = (IEntity)client.${neName}().Load(new Dictionary<string, object?> { ${neMatch.join(', ')} })!;
+    Console.WriteLine(StructUtils.Jsonify(${neVar}.Data()));
 }
 catch (Exception err)
 {
@@ -138,13 +144,14 @@ catch (Exception err)
 
       Content(`### 3. Load ${article} ${eName.toLowerCase()}
 
-\`Load()\` returns the bare record (as \`object?\`) and raises on error.
+\`Load()\` returns the entity (as \`object?\`) and raises on error; an entity's
+\`Data()\` reads its record.
 
 \`\`\`csharp
 try
 {
-    var ${eVar} = client.${eName}().Load(${loadArg});
-    Console.WriteLine(${eVar});
+    var ${eVar} = (IEntity)client.${eName}().Load(${loadArg})!;
+    Console.WriteLine(StructUtils.Jsonify(${eVar}.Data()));
 }
 catch (Exception err)
 {
@@ -174,13 +181,14 @@ catch (Exception err)
       return it && it.type
     }
 
-    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('remove')) {
+    if (opnames.includes('create') || opnames.includes('update') || opnames.includes('patch') ||
+      opnames.includes('remove')) {
       Content(`### 4. Create, update, and remove
 
 \`\`\`csharp
 `)
       if (opnames.includes('create')) {
-        Content(`// Create — returns the bare created record (as object?)
+        Content(`// Create — returns the created entity (as object?)
 var created = client.${eName}().Create(new Dictionary<string, object?> { ${examplePairs('create').join(', ')} });
 
 `)
@@ -190,6 +198,14 @@ var created = client.${eName}().Create(new Dictionary<string, object?> { ${examp
           .concat(examplePairs('update'))
         Content(`// Update — supply the id in the match/data
 client.${eName}().Update(new Dictionary<string, object?> { ${updatePairs.join(', ')} });
+
+`)
+      }
+      if (opnames.includes('patch')) {
+        const patchPairs = (idF ? [`["${idF}"] = ${csLit(idParamType('patch'), 'example_id')}`] : [])
+          .concat(examplePairs('patch'))
+        Content(`// Patch — sends only the fields given
+client.${eName}().Patch(new Dictionary<string, object?> { ${patchPairs.join(', ')} });
 
 `)
       }

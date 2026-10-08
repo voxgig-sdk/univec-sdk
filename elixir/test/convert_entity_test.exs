@@ -4,23 +4,6 @@ defmodule Univec.ConvertEntityTest do
   use ExUnit.Case
 
   alias Voxgig.Struct, as: S
-  alias Univec.Helpers, as: H
-  alias Univec.Json
-
-  defp fixture do
-    Json.parse(File.read!("../.sdk/test/entity/convert/ConvertTestData.json"))
-  end
-
-  defp mk_sdk do
-    existing = H.or_(S.getpath(fixture(), "existing"), S.jm([]))
-    Univec.test(S.jm(["entity", existing]))
-  end
-
-  defp first_id do
-    existing = H.or_(S.getpath(fixture(), "existing.convert"), S.jm([]))
-    keys = S.keysof(existing)
-    if keys == [], do: nil, else: hd(keys)
-  end
 
   test "should create instance" do
     sdk = Univec.test()
@@ -35,5 +18,18 @@ defmodule Univec.ConvertEntityTest do
     made = Univec.EntityBase.data_get(created)
     assert S.ismap(made)
     assert S.getprop(made, "id") != nil
+  end
+
+  test "should refuse an invalid request" do
+    if Univec.FeatureHarness.has_feature("validate") do
+      client = Univec.test(nil, S.jm(["feature", S.jm(["validate", S.jm(["active", true])])]))
+
+      err =
+        assert_raise Univec.Error, fn ->
+          Univec.Entity.Convert.create(Univec.convert(client), S.jm(["embeddings", "x", "source_model", 1, "target_model", "x"]))
+        end
+
+      assert err.code == "validate_failed"
+    end
   end
 end

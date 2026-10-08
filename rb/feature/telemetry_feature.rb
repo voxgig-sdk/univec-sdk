@@ -86,16 +86,18 @@ class UnivecTelemetryFeature < UnivecBaseFeature
     span["durationMs"] = [0, span["end"] - span["start"]].max
     span["ok"] = ok
 
+    out = ctx.utility.clean.call(ctx, span)
+
     t = _telemetry
     unless t.nil?
       t["active"] -= 1
-      t["spans"] << span
+      t["spans"] << out
     end
 
     exporter = @options["exporter"]
     if exporter.is_a?(Proc)
       begin
-        exporter.call(span)
+        exporter.call(out)
       rescue StandardError
       end
     end

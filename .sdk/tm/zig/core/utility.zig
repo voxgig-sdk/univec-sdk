@@ -86,9 +86,25 @@ pub const Utility = struct {
         _ = self;
         return clean_util(ctx, val);
     }
+    pub fn clean_str(self: *Utility, ctx: *Context, val: []const u8) []const u8 {
+        _ = self;
+        return clean_str_util(ctx, val);
+    }
+    pub fn clean_add(self: *Utility, ctx: *Context, value: []const u8) void {
+        _ = self;
+        clean_add_util(ctx, value);
+    }
+    pub fn clean_key(self: *Utility, ctx: *Context, key: []const u8) bool {
+        _ = self;
+        return clean_key_util(ctx, key);
+    }
     pub fn done(self: *Utility, ctx: *Context) E!Value {
         _ = self;
         return done_util(ctx);
+    }
+    pub fn clean_explain(self: *Utility, ctx: *Context) void {
+        _ = self;
+        clean_explain_util(ctx);
     }
     pub fn make_error(self: *Utility, ctx: *Context) E!Value {
         _ = self;
@@ -160,33 +176,332 @@ pub const Utility = struct {
 // clean / done / make_error
 // ============================================================================
 
-pub fn clean_util(ctx: *Context, val: Value) Value {
-    _ = ctx;
-    return val;
+// Everything that leaves the pipeline passes through clean; inside it data
+// stays raw, so a hook can still read the header it must add to. The zig
+// port of tm/ts/src/utility/CleanUtility.ts. The derived clean block is a
+// Value map (`options.__derived__.clean`) whose `values` list is MUTABLE:
+// features register secrets after make_options.
+
+const CLEAN_MAXDEPTH: usize = 32;
+const CLEAN_CIRCULAR = "[circular]";
+// The schema's own default, for a context that reaches clean before any
+// options exist.
+const CLEAN_DEFAULT_KEYS = "key,secret,token,password,passwd,authorization,cookie,credential,signature";
+
+const CleanCfg = struct {
+    active: bool,
+    keys: Value,
+    values: Value,
+    mask: []const u8,
+    hint: i64,
+    min: i64,
+};
+
+fn clean_normkey(key: []const u8) []const u8 {
+    var out: std.ArrayList(u8) = .empty;
+    for (key) |c| {
+        if (c == '-' or c == '_') continue;
+        out.append(h.A(), std.ascii.toLower(c)) catch {};
+    }
+    return out.toOwnedSlice(h.A()) catch key;
 }
-pub fn clean_str(ctx: *Context, val: []const u8) []const u8 {
-    _ = ctx;
-    return val;
+
+fn clean_count(v: Value, dflt: i64) i64 {
+    return switch (v) {
+        .integer => |i| if (i >= 0) i else dflt,
+        .float => |f| if (f >= 0) @as(i64, @intFromFloat(@floor(f))) else dflt,
+        .string => |s| blk: {
+            const n = std.fmt.parseFloat(f64, std.mem.trim(u8, s, " \t")) catch break :blk dflt;
+            break :blk if (n >= 0) @as(i64, @intFromFloat(@floor(n))) else dflt;
+        },
+        else => dflt,
+    };
+}
+
+pub fn make_clean_config(cleanopts: Value) Value {
+    const keys_src: []const u8 = switch (h.getp(cleanopts, "keys")) {
+        .string => |s| s,
+        else => CLEAN_DEFAULT_KEYS,
+    };
+    const keys = h.olist();
+    var it = std.mem.splitScalar(u8, keys_src, ',');
+    while (it.next()) |p| {
+        const k = clean_normkey(std.mem.trim(u8, p, " \t"));
+        if (k.len != 0) keys.array.append(h.vstr(k)) catch {};
+    }
+    const active = switch (h.getp(cleanopts, "active")) {
+        .bool => |b| b,
+        else => true,
+    };
+    const mask: []const u8 = switch (h.getp(cleanopts, "mask")) {
+        .string => |s| s,
+        else => "[redacted]",
+    };
+    return h.jo(&.{
+        .{ "active", h.vbool(active) },
+        .{ "keys", keys },
+        .{ "values", h.olist() },
+        .{ "mask", h.vstr(mask) },
+        .{ "hint", h.vnum(clean_count(h.getp(cleanopts, "hint"), 0)) },
+        .{ "min", h.vnum(@max(1, clean_count(h.getp(cleanopts, "min"), 4))) },
+    });
+}
+
+// The comma-separated `clean.values` option, or a list of strings.
+pub fn clean_splitvalues(values: Value) [][]const u8 {
+    var out: std.ArrayList([]const u8) = .empty;
+    switch (values) {
+        .array => |l| {
+            for (l.data.items) |v| {
+                if (v == .string) out.append(h.A(), v.string) catch {};
+            }
+        },
+        .string => |s| {
+            var it = std.mem.splitScalar(u8, s, ',');
+            while (it.next()) |p| {
+                const t = std.mem.trim(u8, p, " \t");
+                if (t.len != 0) out.append(h.A(), t) catch {};
+            }
+        },
+        else => {},
+    }
+    return out.toOwnedSlice(h.A()) catch &.{};
+}
+
+// A context without options (make_error accepts a bare one) still masks by
+// the schema defaults.
+fn clean_config(ctx: *Context) Value {
+    const derived = h.getpath(&.{ "__derived__", "clean" }, ctx.options);
+    if (derived == .object and h.getp(derived, "values") == .array) return derived;
+    return make_clean_config(h.getp(schema.shared_optspec(), "clean"));
+}
+
+fn clean_view(cfg: Value) CleanCfg {
+    return .{
+        .active = h.get_bool(cfg, "active") orelse true,
+        .keys = h.getp(cfg, "keys"),
+        .values = h.getp(cfg, "values"),
+        .mask = h.get_str(cfg, "mask") orelse "[redacted]",
+        .hint = h.get_i64(cfg, "hint") orelse 0,
+        .min = @max(1, h.get_i64(cfg, "min") orelse 4),
+    };
+}
+
+fn clean_base64(text: []const u8) []const u8 {
+    const enc = std.base64.standard.Encoder;
+    const buf = h.A().alloc(u8, enc.calcSize(text.len)) catch return "";
+    return enc.encode(buf, text);
+}
+
+fn clean_json_escape(text: []const u8) []const u8 {
+    const quoted = h.jsonify_compact(h.vstr(text));
+    if (quoted.len >= 2 and quoted[0] == '"' and quoted[quoted.len - 1] == '"') {
+        return quoted[1 .. quoted.len - 1];
+    }
+    return text;
+}
+
+fn clean_values_has(values: Value, s: []const u8) bool {
+    if (values != .array) return false;
+    for (values.array.data.items) |v| {
+        if (v == .string and std.mem.eql(u8, v.string, s)) return true;
+    }
+    return false;
+}
+
+fn clean_longer_first(_: void, a: Value, b: Value) bool {
+    const al: usize = if (a == .string) a.string.len else 0;
+    const bl: usize = if (b == .string) b.string.len else 0;
+    return al > bl;
+}
+
+// Register a value with the encoded forms it travels in.
+pub fn clean_add_cfg(cfg: Value, value: []const u8) void {
+    const c = clean_view(cfg);
+    if (c.values != .array) return;
+    if (@as(i64, @intCast(value.len)) < c.min) return;
+    const forms = [_][]const u8{ value, clean_base64(value), h.esc_url(value), clean_json_escape(value) };
+    var changed = false;
+    for (forms) |form| {
+        if (form.len == 0 or @as(i64, @intCast(form.len)) < c.min) continue;
+        if (clean_values_has(c.values, form)) continue;
+        c.values.array.append(h.vstr(form)) catch {};
+        changed = true;
+    }
+    if (changed) std.mem.sort(Value, c.values.array.data.items, {}, clean_longer_first);
+}
+
+pub fn clean_add_util(ctx: *Context, value: []const u8) void {
+    clean_add_cfg(clean_config(ctx), value);
+}
+
+fn clean_mask_value(c: CleanCfg, value: []const u8) []const u8 {
+    if (0 < c.hint and @as(i64, @intCast(value.len)) > 2 * c.hint) {
+        const keep: usize = @intCast(c.hint);
+        return fmt("{s}{s}", .{ c.mask, value[value.len - keep ..] });
+    }
+    return c.mask;
+}
+
+fn clean_string(c: CleanCfg, text: []const u8) []const u8 {
+    var out = text;
+    if (c.values != .array) return out;
+    for (c.values.array.data.items) |v| {
+        if (v != .string or v.string.len == 0) continue;
+        if (std.mem.indexOf(u8, out, v.string) != null) {
+            out = std.mem.replaceOwned(u8, h.A(), out, v.string, clean_mask_value(c, v.string)) catch out;
+        }
+    }
+    return out;
+}
+
+fn clean_sensitive_key(c: CleanCfg, key: ?[]const u8) bool {
+    const k = key orelse return false;
+    if (c.keys != .array) return false;
+    const nk = clean_normkey(k);
+    for (c.keys.array.data.items) |kv| {
+        if (kv == .string and kv.string.len != 0 and std.mem.indexOf(u8, nk, kv.string) != null) return true;
+    }
+    return false;
+}
+
+fn clean_seen(seen: []const usize, id: usize) bool {
+    for (seen) |s| {
+        if (s == id) return true;
+    }
+    return false;
+}
+
+// A registered value used as a property name is masked like any other
+// string; names that mask alike take a counter, so none is lost.
+fn clean_name(c: CleanCfg, out: Value, key: []const u8) []const u8 {
+    const name = clean_string(c, key);
+    if (std.mem.eql(u8, name, key) or out.object.get(name) == null) return name;
+    var i: usize = 1;
+    while (out.object.get(fmt("{s}#{d}", .{ name, i })) != null) i += 1;
+    return fmt("{s}#{d}", .{ name, i });
+}
+
+// A masked plain-data copy: functions dropped, cycles cut, and nothing
+// shared with the live value, whose spec must stay raw.
+fn clean_snapshot(c: CleanCfg, val: Value, key: ?[]const u8, depth: usize, seen: *std.ArrayList(usize)) Value {
+    switch (val) {
+        .null => return val,
+        .string => |s| return h.vstr(if (clean_sensitive_key(c, key)) clean_mask_value(c, s) else clean_string(c, s)),
+        .function => return h.vnull(),
+        .bool, .integer, .float, .number_string => return if (clean_sensitive_key(c, key)) h.vstr(c.mask) else val,
+        .object => |m| {
+            const id = @intFromPtr(m);
+            if (CLEAN_MAXDEPTH <= depth or clean_seen(seen.items, id)) return h.vstr(CLEAN_CIRCULAR);
+            if (clean_sensitive_key(c, key)) return h.vstr(c.mask);
+            seen.append(h.A(), id) catch {};
+            defer _ = seen.pop();
+            const out = h.omap();
+            var it = m.iterator();
+            while (it.next()) |kv| {
+                if (kv.value_ptr.* == .function) continue;
+                const v = clean_snapshot(c, kv.value_ptr.*, kv.key_ptr.*, depth + 1, seen);
+                h.setp(out, clean_name(c, out, kv.key_ptr.*), v);
+            }
+            return out;
+        },
+        .array => |l| {
+            const id = @intFromPtr(l);
+            if (CLEAN_MAXDEPTH <= depth or clean_seen(seen.items, id)) return h.vstr(CLEAN_CIRCULAR);
+            if (clean_sensitive_key(c, key)) return h.vstr(c.mask);
+            seen.append(h.A(), id) catch {};
+            defer _ = seen.pop();
+            const out = h.olist();
+            for (l.data.items) |item| {
+                out.array.append(clean_snapshot(c, item, null, depth + 1, seen)) catch {};
+            }
+            return out;
+        },
+    }
+}
+
+pub fn clean_util(ctx: *Context, val: Value) Value {
+    const c = clean_view(clean_config(ctx));
+    if (!c.active) return val;
+    var seen: std.ArrayList(usize) = .empty;
+    return clean_snapshot(c, val, null, 0, &seen);
+}
+
+pub fn clean_str_util(ctx: *Context, val: []const u8) []const u8 {
+    const c = clean_view(clean_config(ctx));
+    if (!c.active) return val;
+    return clean_string(c, val);
+}
+
+pub fn clean_key_util(ctx: *Context, key: []const u8) bool {
+    return clean_sensitive_key(clean_view(clean_config(ctx)), key);
+}
+
+// Every scalar under a sensitive name, at any depth and of any shape, is
+// registered: a credential mistyped as a map or a number is still a
+// credential.
+pub fn clean_add_sensitive_cfg(cfg: Value, val: Value) void {
+    var seen: std.ArrayList(usize) = .empty;
+    clean_add_sensitive_in(cfg, clean_view(cfg), val, false, 0, &seen);
+}
+
+pub fn clean_add_sensitive_util(ctx: *Context, val: Value) void {
+    clean_add_sensitive_cfg(clean_config(ctx), val);
+}
+
+fn clean_add_sensitive_in(cfg: Value, c: CleanCfg, val: Value, under: bool, depth: usize, seen: *std.ArrayList(usize)) void {
+    if (CLEAN_MAXDEPTH <= depth) return;
+    switch (val) {
+        .string, .integer, .float, .number_string => {
+            if (under) clean_add_cfg(cfg, h.scalar_str(val));
+        },
+        .object => |m| {
+            const id = @intFromPtr(m);
+            if (clean_seen(seen.items, id)) return;
+            seen.append(h.A(), id) catch {};
+            var it = m.iterator();
+            while (it.next()) |kv| {
+                const sub = under or clean_sensitive_key(c, kv.key_ptr.*);
+                clean_add_sensitive_in(cfg, c, kv.value_ptr.*, sub, depth + 1, seen);
+            }
+        },
+        .array => |l| {
+            const id = @intFromPtr(l);
+            if (clean_seen(seen.items, id)) return;
+            seen.append(h.A(), id) catch {};
+            for (l.data.items) |item| clean_add_sensitive_in(cfg, c, item, under, depth + 1, seen);
+        },
+        else => {},
+    }
 }
 
 pub fn done_util(ctx: *Context) E!Value {
-    {
-        const c = ctx.ctrl;
-        if (c.has_explain()) {
-            const explain = clean_util(ctx, c.explain);
-            if (h.getp(explain, "result") == .object) {
-                const rm = h.to_map(h.getp(explain, "result"));
-                h.del_prop(rm, h.vstr("err"));
-            }
-            c.explain = explain;
-        }
-    }
+    clean_explain_util(ctx);
 
     if (ctx.result) |res| {
         if (res.ok) return res.resdata;
     }
 
     return make_error_util(ctx);
+}
+
+// Clean the explain record in place. The caller holds this map, so the
+// masked entries replace its own; with clean off the cleaned record is that
+// map, already current.
+pub fn clean_explain_util(ctx: *Context) void {
+    const c = ctx.ctrl;
+    if (!c.has_explain()) return;
+    const explain = c.explain;
+    const cleaned = clean_util(ctx, explain);
+    if (cleaned == .object and cleaned.object != explain.object) {
+        explain.object.data.clearRetainingCapacity();
+        var it = cleaned.object.iterator();
+        while (it.next()) |kv| h.setp(explain, kv.key_ptr.*, kv.value_ptr.*);
+    }
+    // explain.result is a to_value snapshot, never the live result.
+    if (h.getp(explain, "result") == .object) {
+        h.del_prop(h.to_map(h.getp(explain, "result")), h.vstr("err"));
+    }
 }
 
 pub fn make_error_util(ctx: *Context) E!Value {
@@ -207,11 +522,13 @@ pub fn make_error_util(ctx: *Context) E!Value {
 
     const errmsg = the_err.msg;
     const msg0 = fmt("UnivecSDK: {s}: {s}", .{ opname, errmsg });
-    const msg = clean_str(ctx, msg0);
+    const msg = clean_str_util(ctx, msg0);
 
     result.err = null;
 
     const spec_val: Value = if (ctx.spec) |s| s.to_value() else h.vnull();
+
+    clean_explain_util(ctx);
 
     const c = ctx.ctrl;
     if (c.has_explain()) {
@@ -219,7 +536,8 @@ pub fn make_error_util(ctx: *Context) E!Value {
     }
 
     const sdk_err = err.UnivecError.make("", msg);
-    sdk_err.code = the_err.code;
+    // A hook's own error supplies the code as well as the message.
+    sdk_err.code = clean_str_util(ctx, the_err.code);
     sdk_err.result = clean_util(ctx, result.to_value());
     sdk_err.spec = clean_util(ctx, spec_val);
 
@@ -304,6 +622,54 @@ fn mo_str_less(_: void, a: []const u8, b: []const u8) bool {
     return std.mem.order(u8, a, b) == .lt;
 }
 
+fn mo_plain(val: Value, name: ?[]const u8) Value {
+    if (val != .object) return val;
+    const rbac = if (name) |n| std.mem.eql(u8, n, "rbac") else false;
+    const out = h.omap();
+    var it = val.object.iterator();
+    while (it.next()) |kv| {
+        const k = kv.key_ptr.*;
+        if (std.mem.eql(u8, k, "entity") or (rbac and std.mem.eql(u8, k, "rules"))) continue;
+        h.setp(out, k, kv.value_ptr.*);
+    }
+    return out;
+}
+
+// The options to scan for secrets. The feature map is keyed by feature
+// names, not field names, so it is scanned as a list: `secrets` must not
+// make every setting of that feature a secret. Entity blocks hold entity
+// settings and seeded records, never a credential, so none is scanned, and
+// nor are rbac's rules, keyed by entity and operation names. The raw scan
+// still sees the feature list form, whose entries each carry `name`.
+fn mo_without(opts: Value, keys: []const []const u8) Value {
+    const out = h.omap();
+    if (opts != .object) return out;
+    var it = opts.object.iterator();
+    outer: while (it.next()) |kv| {
+        const key = kv.key_ptr.*;
+        if (std.mem.eql(u8, key, "entity")) continue;
+        for (keys) |k| {
+            if (std.mem.eql(u8, key, k)) continue :outer;
+        }
+        const v = kv.value_ptr.*;
+        if (std.mem.eql(u8, key, "feature") and (v == .object or v == .array)) {
+            const list = h.olist();
+            if (v == .object) {
+                var fit = v.object.iterator();
+                while (fit.next()) |f| list.array.append(mo_plain(f.value_ptr.*, f.key_ptr.*)) catch {};
+            } else {
+                for (v.array.data.items) |f| list.array.append(mo_plain(f, h.get_str(f, "name"))) catch {};
+            }
+            h.setp(out, key, list);
+        } else if (std.mem.eql(u8, key, "test")) {
+            h.setp(out, key, mo_plain(v, null));
+        } else {
+            h.setp(out, key, v);
+        }
+    }
+    return out;
+}
+
 pub fn make_options_util(ctx: *Context) Value {
     const options: Value = switch (ctx.options) {
         .object => ctx.options,
@@ -339,6 +705,26 @@ pub fn make_options_util(ctx: *Context) Value {
 
     var opts = h.clone(options);
 
+    const config = ctx.config;
+    const cfgopts: Value = switch (h.to_map(h.getp(config, "options"))) {
+        .object => h.to_map(h.getp(config, "options")),
+        else => h.omap(),
+    };
+
+    // The secret registry exists BEFORE validation, fed from the raw input, so
+    // the constructor's own rejection of a mistyped credential is clean too.
+    const cfgclean = h.to_map(h.getp(cfgopts, "clean"));
+    const rawclean = h.to_map(h.getp(opts, "clean"));
+    const cleancfg = make_clean_config(h.merge(h.ja(&.{
+        h.omap(),
+        h.clone(h.getp(schema.shared_optspec(), "clean")),
+        if (cfgclean == .object) h.clone(cfgclean) else h.omap(),
+        if (rawclean == .object) h.clone(rawclean) else h.omap(),
+    })));
+    clean_add_sensitive_cfg(cleancfg, mo_without(opts, &.{"clean"}));
+    for (clean_splitvalues(h.getp(cfgclean, "values"))) |raw| clean_add_cfg(cleancfg, raw);
+    for (clean_splitvalues(h.getp(rawclean, "values"))) |raw| clean_add_cfg(cleancfg, raw);
+
     if (auth_suppressed) h.del_prop(opts, h.vstr("auth"));
 
     // Feature add-order. options.feature may be an ordered list of
@@ -363,12 +749,6 @@ pub fn make_options_util(ctx: *Context) Value {
         }
         h.setp(opts, "feature", fmap);
     }
-
-    const config = ctx.config;
-    const cfgopts: Value = switch (h.to_map(h.getp(config, "options"))) {
-        .object => h.to_map(h.getp(config, "options")),
-        else => h.omap(),
-    };
 
     // THE OPTION SPEC IS GENERATED, NOT WRITTEN HERE.
     //
@@ -478,20 +858,6 @@ pub fn make_options_util(ctx: *Context) Value {
         }
     }
 
-    // Derived clean config.
-    const clean_keys: []const u8 = switch (h.getpath(&.{ "clean", "keys" }, opts)) {
-        .string => |s| s,
-        else => "key,token,id",
-    };
-
-    var parts: std.ArrayList([]const u8) = .empty;
-    var it = std.mem.splitScalar(u8, clean_keys, ',');
-    while (it.next()) |p| {
-        const t = std.mem.trim(u8, p, " \t");
-        if (t.len != 0) parts.append(h.A(), h.esc_re(t)) catch {};
-    }
-    const keyre = std.mem.join(h.A(), "|", parts.items) catch "";
-
     // Resolve the feature add-order: an explicit list order (above) wins;
     // otherwise order the map test-first, then the remaining names sorted, so
     // the outcome is deterministic and `test` is always the base transport.
@@ -513,11 +879,13 @@ pub fn make_options_util(ctx: *Context) Value {
         }
     }
 
-    const derived_clean = if (keyre.len == 0) h.omap() else h.jo(&.{.{ "keyre", h.vstr(keyre) }});
     h.setp(opts, "__derived__", h.jo(&.{
-        .{ "clean", derived_clean },
+        .{ "clean", cleancfg },
         .{ "featureorder", feature_order },
     }));
+
+    // Again over the merged result: the config's own defaults can carry one.
+    clean_add_sensitive_cfg(cleancfg, mo_without(opts, &.{ "clean", "__derived__" }));
 
     return opts;
 }
@@ -549,6 +917,38 @@ fn point_terminal_param(point: Value) bool {
     return 0 < last.string.len and '{' == last.string[0];
 }
 
+fn own_point(points: []const Value) Value {
+    var best = points[0];
+    for (points) |cand| {
+        const cand_term = point_terminal_param(cand);
+        const best_term = point_terminal_param(best);
+        if (cand_term != best_term) {
+            if (cand_term) best = cand;
+        } else if (point_parts_len(cand) < point_parts_len(best)) {
+            best = cand;
+        }
+    }
+    return best;
+}
+
+// The path parameters of a point that neither the call nor the entity gives a
+// value for, looked up as param_util looks them up.
+fn unfilled_params(ctx: *Context, point: Value) [][]const u8 {
+    var missing: std.ArrayList([]const u8) = .empty;
+    const parts = h.getp(point, "parts");
+    if (parts == .array) {
+        for (parts.array.data.items) |part| {
+            if (part != .string) continue;
+            const text = part.string;
+            if (text.len < 3 or '{' != text[0] or '}' != text[text.len - 1] or
+                std.mem.indexOfAny(u8, text[1 .. text.len - 1], "{}/") != null) continue;
+            const name = text[1 .. text.len - 1];
+            if (h.is_noval(param_value(ctx, point, name))) missing.append(h.A(), name) catch {};
+        }
+    }
+    return missing.toOwnedSlice(h.A()) catch &.{};
+}
+
 pub fn make_point_util(ctx: *Context) E!Value {
     if (ctx.out_get("point")) |ov| {
         switch (ov) {
@@ -570,7 +970,7 @@ pub fn make_point_util(ctx: *Context) E!Value {
         .string => |s| s,
         else => "",
     };
-    if (std.mem.indexOf(u8, allow_op, op.name) == null) {
+    if (!h.allow_list_has(h.getpath(&.{ "allow", "op" }, options), op.name)) {
         return ctx.fail("point_op_allow", fmt("Operation \"{s}\" not allowed by SDK option allow.op value: \"{s}\"", .{ op.name, allow_op }));
     }
 
@@ -641,23 +1041,28 @@ pub fn make_point_util(ctx: *Context) E!Value {
                 return ctx.fail("point_action_invalid", fmt("Operation \"{s}\" action \"{s}\" is not valid.", .{ op.name, h.stringify(unmatched_action) }));
             }
 
-            // A terminal parameter marks a record route (/boards/{id}); a
-            // cross-reference ends in the relationship's name
-            // (/posts/{id}/author). Failing that, the shallower path wins.
-            // The same rule runs at generation time, in helpers/opShape.ts —
-            // both sides must move together.
-            point = h.get_elem(points, h.vnum(0), h.vnull());
+            // A call without an action falls back to a point without one, as
+            // generation does, and only to a route the call can fill.
+            var plain: std.ArrayList(Value) = .empty;
             var j: i64 = 0;
             while (j < plen) : (j += 1) {
                 const cand = h.get_elem(points, h.vnum(j), h.vnull());
-                const cand_term = point_terminal_param(cand);
-                const best_term = point_terminal_param(point);
-                if (cand_term != best_term) {
-                    if (cand_term) point = cand;
-                } else if (point_parts_len(cand) < point_parts_len(point)) {
-                    point = cand;
-                }
+                if (h.is_noval(h.getp(h.to_map(h.getp(cand, "select")), "$action"))) plain.append(h.A(), cand) catch {};
             }
+            if (0 == plain.items.len) {
+                return ctx.fail("point_action_required", fmt("Operation \"{s}\" has only action endpoints; pass $action to choose one.", .{op.name}));
+            }
+            var fillable: std.ArrayList(Value) = .empty;
+            for (plain.items) |cand| {
+                if (0 == unfilled_params(ctx, cand).len) fillable.append(h.A(), cand) catch {};
+            }
+
+            if (0 == fillable.items.len) {
+                const missing = std.mem.join(h.A(), ", ", unfilled_params(ctx, own_point(plain.items))) catch "";
+                return ctx.fail("point_no_match", fmt("Operation \"{s}\" has no endpoint whose path parameters are all given (missing: {s}).", .{ op.name, missing }));
+            }
+
+            point = own_point(fillable.items);
         }
 
         const req_action = h.getp(reqselector, "$action");
@@ -715,7 +1120,7 @@ pub fn make_spec_util(ctx: *Context) E!*Spec {
         .string => |s| s,
         else => "",
     };
-    if (std.mem.indexOf(u8, allow_method, method) == null) {
+    if (!h.allow_list_has(h.getpath(&.{ "allow", "method" }, options), method)) {
         return ctx.fail("spec_method_allow", fmt("Method \"{s}\" not allowed by SDK option allow.method value: \"{s}\"", .{ method, allow_method }));
     }
 
@@ -748,9 +1153,27 @@ pub fn make_spec_util(ctx: *Context) E!*Spec {
     const c = ctx.ctrl;
     if (c.has_explain()) h.setp(c.explain, "spec", spec.to_value());
 
+    const query = h.clone(spec.query);
     const spec2 = try prepare_auth_util(ctx);
+    spec2.note_authquery(query);
     ctx.spec = spec2;
     return spec2;
+}
+
+// The {name} placeholders in a text, in order.
+fn placeholders(text: []const u8) [][]const u8 {
+    var out: std.ArrayList([]const u8) = .empty;
+    var i: usize = 0;
+    while (i < text.len) : (i += 1) {
+        if ('{' != text[i]) continue;
+        const rest = text[i + 1 ..];
+        const n = std.mem.indexOfAny(u8, rest, "{}/") orelse rest.len;
+        if (0 < n and n < rest.len and '}' == rest[n]) {
+            out.append(h.A(), text[i .. i + n + 2]) catch {};
+            i += n + 1;
+        }
+    }
+    return out.toOwnedSlice(h.A()) catch &.{};
 }
 
 pub fn make_url_util(ctx: *Context) E![]const u8 {
@@ -763,6 +1186,15 @@ pub fn make_url_util(ctx: *Context) E![]const u8 {
         h.vstr(spec.path),
         h.vstr(spec.suffix),
     }), "/", true) catch "";
+
+    // A route the definition ends with a slash keeps it: a server such as a
+    // Django REST one redirects or refuses the route without it.
+    const orig = h.getp(ctx.point, "orig");
+    if (orig == .string and std.mem.endsWith(u8, orig.string, "/") and spec.suffix.len == 0 and
+        !std.mem.endsWith(u8, url, "/"))
+    {
+        url = std.mem.concat(h.A(), u8, &.{ url, "/" }) catch url;
+    }
 
     const resmatch = h.omap();
 
@@ -780,6 +1212,16 @@ pub fn make_url_util(ctx: *Context) E![]const u8 {
         }
     }
 
+    // A placeholder left in the route would send the request to the wrong route.
+    // The base's own placeholders are server variables, resolved with the options.
+    var blen = spec.base.len;
+    while (0 < blen and '/' == spec.base[blen - 1]) blen -= 1;
+    const route = if (std.mem.startsWith(u8, url, spec.base[0..blen])) url[blen..] else url;
+    const unfilled = placeholders(route);
+    if (0 < unfilled.len) {
+        return ctx.fail("url_param_missing", fmt("URL path has no value for {s}.", .{std.mem.join(h.A(), ", ", unfilled) catch ""}));
+    }
+
     var qsep: []const u8 = "?";
     if (spec.query == .object) {
         var it = spec.query.object.iterator();
@@ -789,7 +1231,8 @@ pub fn make_url_util(ctx: *Context) E![]const u8 {
             if (!h.is_noval(val)) {
                 url = fmt("{s}{s}{s}={s}", .{ url, qsep, h.esc_url(key), h.esc_url(h.scalar_str(val)) });
                 qsep = "&";
-                h.setp(resmatch, key, val);
+                // Sent with the request, never recorded as the entity's match.
+                if (!spec.authquery_has(key)) h.setp(resmatch, key, val);
             }
         }
     }
@@ -813,9 +1256,16 @@ pub fn make_fetch_def_util(ctx: *Context) E!Value {
     h.setp(fetchdef, "method", h.vstr(spec.method));
     h.setp(fetchdef, "headers", spec.headers);
 
+    // A map or a list is JSON, and so is a scalar on a point that declares a
+    // JSON body. Anything else goes as given.
     const body = spec.body;
     if (!h.is_noval(body)) {
-        if (body == .object) {
+        const encode = switch (body) {
+            .object, .array => true,
+            .string, .integer, .float, .number_string, .bool => is_json_request(ctx.point),
+            else => false,
+        };
+        if (encode) {
             h.setp(fetchdef, "body", h.vstr(h.jsonify_compact(body)));
         } else {
             h.setp(fetchdef, "body", body);
@@ -960,13 +1410,6 @@ pub fn make_result_util(ctx: *Context) E!*SdkResult {
 // ============================================================================
 
 pub fn param_util(ctx: *Context, paramdef: Value) Value {
-    const point = ctx.point;
-    const spec = ctx.spec;
-    const mtch = ctx.mtch;
-    const reqmatch = ctx.reqmatch;
-    const data = ctx.data;
-    const reqdata = ctx.reqdata;
-
     const pt = h.typify(paramdef);
 
     const key: []const u8 = if (0 != ((@as(i64, vs.T_string)) & pt))
@@ -977,30 +1420,38 @@ pub fn param_util(ctx: *Context, paramdef: Value) Value {
     else
         (h.get_str(paramdef, "name") orelse "");
 
-    var akey: []const u8 = "";
-    if (!h.is_noval(point)) {
-        const alias = h.to_map(h.getp(point, "alias"));
-        if (!h.is_noval(alias)) {
-            if (h.get_str(alias, key)) |ak| akey = ak;
-        }
-    }
-
-    var val = h.getp(reqmatch, key);
-    if (h.is_noval(val)) val = h.getp(mtch, key);
-
-    if (h.is_noval(val) and akey.len != 0) {
-        if (spec) |sp| {
+    const akey = param_alias(ctx.point, key);
+    if (akey.len != 0 and h.is_noval(h.getp(ctx.reqmatch, key)) and h.is_noval(h.getp(ctx.mtch, key))) {
+        if (ctx.spec) |sp| {
             h.setp(sp.alias, akey, h.vstr(key));
         }
-        val = h.getp(reqmatch, akey);
     }
 
-    if (h.is_noval(val)) val = h.getp(reqdata, key);
-    if (h.is_noval(val)) val = h.getp(data, key);
+    return param_value(ctx, ctx.point, key);
+}
+
+// The name a point gives a parameter in the call, if it renames it.
+fn param_alias(point: Value, key: []const u8) []const u8 {
+    if (h.is_noval(point)) return "";
+    const alias = h.to_map(h.getp(point, "alias"));
+    if (h.is_noval(alias)) return "";
+    return h.get_str(alias, key) orelse "";
+}
+
+// The value the call or its entity gives a point's parameter, under its name
+// or the point's alias for it.
+pub fn param_value(ctx: *Context, point: Value, key: []const u8) Value {
+    const akey = param_alias(point, key);
+
+    var val = h.getp(ctx.reqmatch, key);
+    if (h.is_noval(val)) val = h.getp(ctx.mtch, key);
+    if (h.is_noval(val) and akey.len != 0) val = h.getp(ctx.reqmatch, akey);
+    if (h.is_noval(val)) val = h.getp(ctx.reqdata, key);
+    if (h.is_noval(val)) val = h.getp(ctx.data, key);
 
     if (h.is_noval(val) and akey.len != 0) {
-        val = h.getp(reqdata, akey);
-        if (h.is_noval(val)) val = h.getp(data, akey);
+        val = h.getp(ctx.reqdata, akey);
+        if (h.is_noval(val)) val = h.getp(ctx.data, akey);
     }
 
     return val;
@@ -1039,20 +1490,222 @@ pub fn prepare_method_util(ctx: *Context) []const u8 {
     return "";
 }
 
+// One argument a point declares, with the name it travels under and the value
+// the call passes for it.
+const CallArg = struct { name: []const u8, wire: []const u8, val: Value };
+
+// The arguments a point declares in one location, query or header, each with
+// the name it travels under and the value this call passes in its match or
+// else its data. Unlike a path parameter, the entity's stored match and data
+// never supply one.
+fn call_args(ctx: *Context, kind: []const u8) []CallArg {
+    var out: std.ArrayList(CallArg) = .empty;
+    const defs: Value = h.getpath(&.{ "args", kind }, ctx.point);
+    if (defs == .array) {
+        for (defs.array.data.items) |ad| {
+            const name = h.getp(ad, "name");
+            if (name != .string or name.string.len == 0) continue;
+            const orig = h.getp(ad, "orig");
+            const wire: []const u8 = if (orig == .string and orig.string.len != 0) orig.string else name.string;
+            var val = h.getp(ctx.reqmatch, name.string);
+            if (h.is_noval(val)) val = h.getp(ctx.reqdata, name.string);
+            out.append(h.A(), .{ .name = name.string, .wire = wire, .val = val }) catch {};
+        }
+    }
+    return out.toOwnedSlice(h.A()) catch &.{};
+}
+
+// ============================================================================
+// media
+// ============================================================================
+
+// The media types a point declares: `response` (the model's `rs`) for the
+// Accept header, and `body` (the model's `rb`) for the request body.
+
+// The data key holding a raw request body. Like `$action`, it can never be a
+// declared argument name.
+pub const RAW_BODY = "$body";
+
+pub fn is_json_media(media: []const u8) bool {
+    const semi = std.mem.indexOfScalar(u8, media, ';') orelse media.len;
+    const m = std.mem.trim(u8, media[0..semi], " \t");
+    return std.ascii.eqlIgnoreCase(m, "application/json") or
+        std.ascii.eqlIgnoreCase(m, "text/json") or
+        (m.len >= 5 and std.ascii.eqlIgnoreCase(m[m.len - 5 ..], "+json"));
+}
+
+fn media_text(v: Value) ?[]const u8 {
+    return if (v == .string and v.string.len != 0) v.string else null;
+}
+
+// The declared JSON type alone, else every declared type in the model's
+// order; null when no success response declares a body.
+pub fn accept_of(point: Value) ?[]const u8 {
+    const res = h.getp(point, "response");
+    const media = media_text(h.getp(res, "media")) orelse return null;
+    if (media_text(h.getp(res, "kind"))) |kind| {
+        if (std.mem.eql(u8, kind, "json")) return media;
+    }
+    var out: std.ArrayList(u8) = .empty;
+    out.appendSlice(h.A(), media) catch return media;
+    const alts = h.getp(res, "alternatives");
+    if (alts == .array) {
+        for (alts.array.data.items) |alt| {
+            const m = media_text(h.getp(alt, "media")) orelse continue;
+            out.appendSlice(h.A(), ", ") catch return media;
+            out.appendSlice(h.A(), m) catch return media;
+        }
+    }
+    return out.toOwnedSlice(h.A()) catch media;
+}
+
+pub fn is_raw_request(point: Value) bool {
+    const kind = media_text(h.getp(h.getp(point, "body"), "kind")) orelse return false;
+    return std.mem.eql(u8, kind, "raw");
+}
+
+pub fn is_json_request(point: Value) bool {
+    const kind = media_text(h.getp(h.getp(point, "body"), "kind")) orelse return false;
+    return std.mem.eql(u8, kind, "json");
+}
+
+fn has_media_header(headers: Value, name: []const u8) bool {
+    var kit = headers.object.iterator();
+    while (kit.next()) |kv| {
+        if (std.ascii.eqlIgnoreCase(kv.key_ptr.*, name)) return true;
+    }
+    return false;
+}
+
+// A caller's accept wins. A declared request type replaces each JSON
+// content-type, the SDK default, and leaves any other the caller set.
+pub fn media_headers(point: Value, headers: Value) void {
+    if (headers != .object) return;
+    if (accept_of(point)) |accept| {
+        if (!has_media_header(headers, "accept")) h.setp(headers, "accept", h.vstr(accept));
+    }
+
+    const body = h.getp(point, "body");
+    const kind = media_text(h.getp(body, "kind")) orelse return;
+    const media = media_text(h.getp(body, "media")) orelse return;
+    if (!std.mem.eql(u8, kind, "raw") and !std.mem.eql(u8, kind, "json")) return;
+    while (true) {
+        var kit = headers.object.iterator();
+        const json: ?[]const u8 = while (kit.next()) |kv| {
+            const v = kv.value_ptr.*;
+            if (std.ascii.eqlIgnoreCase(kv.key_ptr.*, "content-type") and
+                v == .string and is_json_media(v.string)) break kv.key_ptr.*;
+        } else null;
+        _ = headers.object.fetchOrderedRemove(json orelse break);
+    }
+    if (!has_media_header(headers, "content-type")) h.setp(headers, "content-type", h.vstr(media));
+}
+
+// A string of text or bytes, sent as it is.
+pub fn raw_body(reqdata: Value) Value {
+    return h.getp(reqdata, RAW_BODY);
+}
+
 pub fn prepare_headers_util(ctx: *Context) Value {
     const options: Value = if (ctx.client) |client| client.options_map() else ctx.options;
 
     const headers = h.getp(options, "headers");
-    if (h.is_noval(headers)) return h.omap();
-
-    return switch (h.clone(headers)) {
+    const out: Value = if (h.is_noval(headers)) h.omap() else switch (h.clone(headers)) {
         .object => h.clone(headers),
         else => h.omap(),
     };
+    media_headers(ctx.point, out);
+
+    // A header argument replaces a default of the same name, whatever its case.
+    for (call_args(ctx, "header")) |arg| {
+        if (h.is_noval(arg.val)) continue;
+        const key = std.ascii.allocLowerString(h.A(), arg.wire) catch arg.wire;
+        while (true) {
+            var kit = out.object.iterator();
+            const same: ?[]const u8 = while (kit.next()) |kv| {
+                if (std.ascii.eqlIgnoreCase(kv.key_ptr.*, key)) break kv.key_ptr.*;
+            } else null;
+            _ = out.object.fetchOrderedRemove(same orelse break);
+        }
+        h.setp(out, key, h.vstr(h.stringify(arg.val)));
+    }
+
+    // A cookie argument travels in the cookie header, form serialized and
+    // percent-encoded, replacing a cookie of the same name among those the
+    // caller's headers already send.
+    var sent: std.ArrayList(CallArg) = .empty;
+    for (call_args(ctx, "cookie")) |arg| {
+        if (!h.is_noval(arg.val)) sent.append(h.A(), arg) catch {};
+    }
+    if (0 < sent.items.len) {
+        var names: std.ArrayList([]const u8) = .empty;
+        for (sent.items) |arg| {
+            if (arg.val == .object) {
+                for (h.keysof_vec(arg.val)) |key| names.append(h.A(), h.esc_url(key)) catch {};
+            } else {
+                names.append(h.A(), arg.wire) catch {};
+            }
+        }
+        var kept: std.ArrayList([]const u8) = .empty;
+        while (true) {
+            var kit = out.object.iterator();
+            const same: ?[]const u8 = while (kit.next()) |kv| {
+                if (std.ascii.eqlIgnoreCase(kv.key_ptr.*, "cookie")) break kv.key_ptr.*;
+            } else null;
+            const removed = out.object.fetchOrderedRemove(same orelse break) orelse break;
+            if (removed.value != .string) continue;
+            for (h.cookie_keep(removed.value.string, names.items)) |cookie| kept.append(h.A(), cookie) catch {};
+        }
+        for (sent.items) |arg| {
+            const pair = cookie_pair(arg.wire, arg.val);
+            if (0 < pair.len) kept.append(h.A(), pair) catch {};
+        }
+        if (0 < kept.items.len) {
+            const joined = std.mem.join(h.A(), "; ", kept.items) catch "";
+            h.setp(out, "cookie", h.vstr(joined));
+        }
+    }
+
+    return out;
+}
+
+fn keyLessThan(_: void, a: []const u8, b: []const u8) bool {
+    return std.mem.lessThan(u8, a, b);
+}
+
+// The form style of a cookie parameter: a list repeats the name, a map sends
+// its own keys, and every value is percent-encoded.
+fn cookie_pair(wire: []const u8, val: Value) []const u8 {
+    var pairs: std.ArrayList([]const u8) = .empty;
+    switch (val) {
+        .array => |items| {
+            for (items.data.items) |item| {
+                const text = h.esc_url(h.stringify(item));
+                const pair = std.fmt.allocPrint(h.A(), "{s}={s}", .{ wire, text }) catch continue;
+                pairs.append(h.A(), pair) catch {};
+            }
+        },
+        .object => {
+            const keys = h.keysof_vec(val);
+            std.mem.sort([]const u8, keys, {}, keyLessThan);
+            for (keys) |key| {
+                const text = h.esc_url(h.stringify(h.getp(val, key)));
+                const pair = std.fmt.allocPrint(h.A(), "{s}={s}", .{ h.esc_url(key), text }) catch continue;
+                pairs.append(h.A(), pair) catch {};
+            }
+        },
+        else => {
+            const text = h.esc_url(h.stringify(val));
+            const pair = std.fmt.allocPrint(h.A(), "{s}={s}", .{ wire, text }) catch return "";
+            pairs.append(h.A(), pair) catch {};
+        },
+    }
+    return std.mem.join(h.A(), "; ", pairs.items) catch "";
 }
 
 pub fn prepare_body_util(ctx: *Context) Value {
     if (std.mem.eql(u8, ctx.op.input, "data")) {
+        if (is_raw_request(ctx.point)) return raw_body(ctx.reqdata);
         return transform_request_util(ctx);
     }
     return h.vnull();
@@ -1094,6 +1747,16 @@ pub fn prepare_path_util(ctx: *Context) []const u8 {
     return vs.join(h.A(), parts, "/", true) catch "";
 }
 
+// Whether a list of argument definitions names this key.
+fn names_key(defs: Value, key: []const u8) bool {
+    if (defs != .array) return false;
+    for (defs.array.data.items) |d| {
+        const name = h.getp(d, "name");
+        if (name == .string and std.mem.eql(u8, name.string, key)) return true;
+    }
+    return false;
+}
+
 pub fn prepare_query_util(ctx: *Context) Value {
     const point = ctx.point;
     const reqmatch: Value = switch (ctx.reqmatch) {
@@ -1104,6 +1767,16 @@ pub fn prepare_query_util(ctx: *Context) Value {
         .array => h.getp(point, "params"),
         else => h.olist(),
     };
+    // A path parameter travels in the path. The generated config lists them
+    // as args.params, which prepare_params reads; params is the older list.
+    const aparams: Value = h.getpath(&.{ "args", "params" }, point);
+    // A header or cookie parameter travels in the headers, which prepare_headers
+    // fills, unless a query parameter shares its name: then both are sent.
+    const aheader: Value = h.getpath(&.{ "args", "header" }, point);
+    const acookie: Value = h.getpath(&.{ "args", "cookie" }, point);
+    // A query parameter travels under the name the definition gives it, its
+    // orig, which the model may have renamed for the caller.
+    const aquery: Value = h.getpath(&.{ "args", "query" }, point);
 
     const out = h.omap();
     if (reqmatch == .object) {
@@ -1120,8 +1793,35 @@ pub fn prepare_query_util(ctx: *Context) Value {
                     }
                 }
             }
-            if (!h.is_noval(val) and !std.mem.eql(u8, key, "$action") and !contained) h.setp(out, key, val);
+            if (!contained) contained = names_key(aparams, key) or
+                ((names_key(aheader, key) or names_key(acookie, key)) and !names_key(aquery, key));
+            var wire: []const u8 = key;
+            if (aquery == .array) {
+                for (aquery.array.data.items) |qd| {
+                    const name = h.getp(qd, "name");
+                    const orig = h.getp(qd, "orig");
+                    if (name == .string and orig == .string and orig.string.len != 0 and
+                        std.mem.eql(u8, name.string, key))
+                    {
+                        wire = orig.string;
+                        break;
+                    }
+                }
+            }
+            if (!h.is_noval(val) and !std.mem.eql(u8, key, "$action") and !contained) h.setp(out, wire, val);
         }
+    }
+
+    // A create or update passes its query arguments in its data.
+    for (call_args(ctx, "query")) |arg| {
+        var contained = h.is_noval(arg.val) or names_key(aparams, arg.name) or
+            ((names_key(aheader, arg.name) or names_key(acookie, arg.name)) and !names_key(aquery, arg.name));
+        if (params == .array) {
+            for (params.array.data.items) |v| {
+                if (v == .string and std.mem.eql(u8, v.string, arg.name)) contained = true;
+            }
+        }
+        if (!contained) h.setp(out, arg.wire, arg.val);
     }
     return out;
 }
@@ -1370,21 +2070,130 @@ pub fn result_body_util(ctx: *Context) ?*SdkResult {
             if (json == .function and !h.is_noval(body)) {
                 res.body = h.call_json(json);
             }
+            if (resp.unreadable) {
+                const sent: Value = if (ctx.spec) |sp| sp.headers else h.vnull();
+                res.err = unreadable_body(ctx, res.status, res.headers, body, sent, res.err);
+            }
         }
     }
     return result;
 }
 
+const PREVIEW_LENGTH = 160;
+
+// A body that is not JSON. An HTTP failure keeps its own error, with the
+// response described; otherwise the code tells a wrong content type from
+// malformed JSON.
+pub fn unreadable_body(
+    ctx: *Context,
+    status: i64,
+    headers: Value,
+    text: Value,
+    sent: Value,
+    failed: ?*err.UnivecError,
+) *err.UnivecError {
+    const ctype = body_header(headers, "content-type");
+    const agent = clean_str_util(ctx, body_header(sent, "user-agent"));
+    const detail = fmt("HTTP {d}, content-type {s}, user-agent {s}{s}", .{
+        status,
+        if (ctype.len == 0) "none" else ctype,
+        if (agent.len == 0) "transport default" else agent,
+        if (h.is_noval(text) or text == .null) "" else fmt(", body: {s}", .{body_preview(ctx, text)}),
+    });
+
+    if (failed) |f| {
+        f.msg = fmt("{s} ({s})", .{ f.msg, detail });
+        return f;
+    }
+    if (ctype.len == 0 or std.ascii.indexOfIgnoreCase(ctype, "json") != null) {
+        return ctx.make_error("response_json_invalid", fmt("response: body is not valid JSON ({s})", .{detail}));
+    }
+    return ctx.make_error("response_content_type", fmt("response: expected JSON, got {s} ({s})", .{ ctype, detail }));
+}
+
+fn body_header(headers: Value, name: []const u8) []const u8 {
+    if (headers == .object) {
+        var it = headers.object.iterator();
+        while (it.next()) |kv| {
+            if (std.ascii.eqlIgnoreCase(kv.key_ptr.*, name)) {
+                return switch (kv.value_ptr.*) {
+                    .string => |sv| sv,
+                    else => h.stringify(kv.value_ptr.*),
+                };
+            }
+        }
+    }
+    return "";
+}
+
+// Cleaned whole: a secret the bound would split could leave its prefix.
+fn body_preview(ctx: *Context, text: Value) []const u8 {
+    const raw: []const u8 = switch (text) {
+        .string => |sv| sv,
+        else => h.stringify(text),
+    };
+    var spaced: std.ArrayList(u8) = .empty;
+    var space = false;
+    for (raw) |c| {
+        if (std.ascii.isWhitespace(c)) {
+            space = spaced.items.len > 0;
+            continue;
+        }
+        if (space) {
+            spaced.append(h.A(), ' ') catch {};
+            space = false;
+        }
+        spaced.append(h.A(), c) catch {};
+    }
+    const flat = clean_str_util(ctx, spaced.items);
+    var points: usize = 0;
+    var end: usize = 0;
+    while (end < flat.len) : (end += 1) {
+        if ((flat[end] & 0xC0) == 0x80) continue;
+        if (points == PREVIEW_LENGTH) return fmt("{s}...", .{flat[0..end]});
+        points += 1;
+    }
+    return flat;
+}
+
 // `$action` selects the point (see make_point_util); it is never an API
 // field, so the body is a copy without it. The caller's map is left untouched.
 fn strip_action(reqdata: Value) Value {
+    return omit_keys(reqdata, &.{}, true);
+}
+
+// A header, cookie or query argument travels where prepare_headers_util or
+// prepare_query_util sends it, so the body is built from the request data
+// without it, unless the point marks it as a field the body keeps.
+fn routed_arg_names(ctx: *Context) [][]const u8 {
+    var names: std.ArrayList([]const u8) = .empty;
+    for ([_][]const u8{ "header", "cookie", "query" }) |kind| {
+        for (call_args(ctx, kind)) |arg| {
+            if (!field_arg(ctx, arg.name)) names.append(h.A(), arg.name) catch {};
+        }
+    }
+    return names.toOwnedSlice(h.A()) catch &.{};
+}
+
+fn dropped(key: []const u8, routed: []const []const u8, action: bool) bool {
+    if (action) return std.mem.eql(u8, key, "$action");
+    for (routed) |name| {
+        if (std.mem.eql(u8, name, key)) return true;
+    }
+    return false;
+}
+
+fn omit_keys(reqdata: Value, routed: []const []const u8, action: bool) Value {
     if (reqdata != .object) return reqdata;
-    if (reqdata.object.get("$action") == null) return reqdata;
-    const body = h.omap();
+    var found = false;
     var it = reqdata.object.iterator();
-    while (it.next()) |kv| {
+    while (it.next()) |kv| found = found or dropped(kv.key_ptr.*, routed, action);
+    if (!found) return reqdata;
+    const body = h.omap();
+    var bit = reqdata.object.iterator();
+    while (bit.next()) |kv| {
         const key = kv.key_ptr.*;
-        if (!std.mem.eql(u8, key, "$action")) h.setp(body, key, kv.value_ptr.*);
+        if (!dropped(key, routed, action)) h.setp(body, key, kv.value_ptr.*);
     }
     return body;
 }
@@ -1395,17 +2204,32 @@ pub fn transform_request_util(ctx: *Context) Value {
 
     if (spec) |sp| sp.step = "reqform";
 
+    const reqdata = omit_keys(ctx.reqdata, routed_arg_names(ctx), false);
+
     const transform = h.to_map(h.getp(point, "transform"));
-    if (h.is_noval(transform)) return strip_action(ctx.reqdata);
+    if (h.is_noval(transform)) return strip_action(reqdata);
 
     const reqform = h.getp(transform, "req");
-    if (h.is_noval(reqform)) return strip_action(ctx.reqdata);
+    if (h.is_noval(reqform)) return strip_action(reqdata);
 
-    const store = h.jo(&.{.{ "reqdata", ctx.reqdata }});
+    const store = h.jo(&.{.{ "reqdata", reqdata }});
     // transform now reports collected injection errors beside the value; .out
     // is what it used to return on its own, errors or not.
-    const tres = vs.transform(h.A(), store, reqform) catch return strip_action(ctx.reqdata);
+    const tres = vs.transform(h.A(), store, reqform) catch return strip_action(reqdata);
     return strip_action(tres.out);
+}
+
+fn field_arg(ctx: *Context, name: []const u8) bool {
+    for ([_][]const u8{ "header", "cookie", "query" }) |kind| {
+        const defs: Value = h.getpath(&.{ "args", kind }, ctx.point);
+        if (defs != .array) continue;
+        for (defs.array.data.items) |ad| {
+            const n = h.getp(ad, "name");
+            const f = h.getp(ad, "field");
+            if (n == .string and std.mem.eql(u8, n.string, name) and f == .bool and f.bool) return true;
+        }
+    }
+    return false;
 }
 
 pub fn transform_response_util(ctx: *Context) Value {

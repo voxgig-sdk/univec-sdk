@@ -195,9 +195,10 @@ end
 
 -- The entity accessors this SDK generated, found from the client's own
 -- config: this file is a TEMPLATE and no project's entity names are known
--- here. Accessors are PascalCase methods on the SDK class.
+-- here. Accessors are PascalCase methods on the SDK class, which is the
+-- client's metatable: its __index is a function that hides the options.
 local function entity_accessors(client)
-  local class = getmetatable(client).__index
+  local class = getmetatable(client)
   local out = {}
   for name, _ in pairs(client:options_map().entity or {}) do
     local flat = name:gsub("_", ""):lower()

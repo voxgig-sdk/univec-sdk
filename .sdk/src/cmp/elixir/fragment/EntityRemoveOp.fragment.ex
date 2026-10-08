@@ -1,8 +1,9 @@
 # EJECT-START
 
-  # Returns the removed entityname entity map (ProjectName.Types.entityname/0)
-  # on success; pipeline errors surface as the error value built by
-  # Utility.make_error (shape is utility-configurable), hence term().
+  # Returns the removed entityname entity, marked as deleted, whose data_get/1
+  # reads the record it held (ProjectName.Types.entityname/0), on success;
+  # pipeline errors surface as the error value built by Utility.make_error
+  # (shape is utility-configurable), hence term().
   @spec remove(map(), ProjectName.Types.entityname_remove_match() | nil, map() | nil) :: term()
   def remove(ent, reqmatch \\ nil, ctrl \\ nil) do
     reqmatch = if reqmatch == nil, do: S.jm([]), else: reqmatch

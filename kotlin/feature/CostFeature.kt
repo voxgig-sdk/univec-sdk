@@ -297,15 +297,18 @@ class CostFeature : BaseFeature("cost", "0.0.1", true) {
     bump(this.ops, "$entity.$opname", amount)
     bump(this.actors, actor, amount)
 
+    // The record leaves through `last` and the sink, so its text is cleaned.
+    val cs = { s: String -> ctx.utility?.clean?.invoke(ctx, s)?.toString() ?: s }
+
     this.seq++
     val record = CostRecord()
     record.seq = this.seq
-    record.entity = entity
-    record.op = opname
-    record.actor = actor
+    record.entity = cs(entity)
+    record.op = cs(opname)
+    record.actor = cs(actor)
     record.amount = amount
-    record.currency = this.currency
-    record.source = source
+    record.currency = cs(this.currency)
+    record.source = cs(source)
     record.attempts = pending.attempts
     this.last = record
 

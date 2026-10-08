@@ -23,13 +23,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `(Entity*, reqmatch, ctrl, PNError**) -> voxgig_value*` | Load a single entity by match criteria. |',
-    list: '| `list` | `(Entity*, reqmatch, ctrl, PNError**) -> voxgig_value*` | List entities matching the criteria (a List). |',
-    create: '| `create` | `(Entity*, reqdata, ctrl, PNError**) -> voxgig_value*` | Create a new entity. |',
-    update: '| `update` | `(Entity*, reqdata, ctrl, PNError**) -> voxgig_value*` | Update an existing entity. |',
-    remove: '| `remove` | `(Entity*, reqmatch, ctrl, PNError**) -> voxgig_value*` | Remove an entity. |',
+    load: '| `load` | `(Entity*, reqmatch, ctrl, PNError**) -> Entity*` | Load a single entity by match criteria. |',
+    list: '| `list` | `(Entity*, reqmatch, ctrl, PNError**) -> Entity**` | List entities matching the criteria: a `NULL`-terminated array, one per record. |',
+    create: '| `create` | `(Entity*, reqdata, ctrl, PNError**) -> Entity*` | Create a new entity. |',
+    update: '| `update` | `(Entity*, reqdata, ctrl, PNError**) -> Entity*` | Update an existing entity. |',
+    patch: '| `patch` | `(Entity*, reqdata, ctrl, PNError**) -> Entity*` | Change part of an existing entity. |',
+    remove: '| `remove` | `(Entity*, reqmatch, ctrl, PNError**) -> Entity*` | Remove an entity, which is returned marked as deleted. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -93,10 +94,10 @@ ${opRows}
 
 ### Result shape
 
-Entity operations return the bare result data (a \`voxgig_value\` map for
-single-entity ops, a List for \`list\`) and set \`*err\` to a \`PNError*\` on
-failure. Always initialise \`PNError* err = NULL;\` and check it after the
-call.
+Entity operations return the entity, and \`list\` a \`NULL\`-terminated array
+of entities, one per record; \`vt->data\` reads an entity's record. On
+failure they return \`NULL\` and set \`*err\` to a \`PNError*\`. Always
+initialise \`PNError* err = NULL;\` and check it after the call.
 
 The \`sdk_direct()\` escape hatch never sets \`*err\` for a non-2xx response —
 it returns a result map you branch on via \`getp(result, "ok")\`:

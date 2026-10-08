@@ -22,13 +22,14 @@ const ReadmeModel = cmp(function ReadmeModel(props: any) {
   entityList.forEach((e: any) => Object.keys(e.op || {})
     .forEach((o: string) => { if (e.op[o] && e.op[o].active !== false) opUnion.add(o) }))
   const opRowDefs: Record<string, string> = {
-    load: '| `load` | `(reqmatch, [ctrl]) -> Future<dynamic>` | Load a single entity by match criteria. Throws on error. |',
-    list: '| `list` | `(reqmatch, [ctrl]) -> Future<List>` | List entities matching the criteria (a list of entity instances). Throws on error. |',
-    create: '| `create` | `(reqdata, [ctrl]) -> Future<dynamic>` | Create a new entity. Throws on error. |',
-    update: '| `update` | `(reqdata, [ctrl]) -> Future<dynamic>` | Update an existing entity. Throws on error. |',
-    remove: '| `remove` | `(reqmatch, [ctrl]) -> Future<dynamic>` | Remove an entity. Throws on error. |',
+    load: '| `load` | `(reqmatch, [ctrl]) -> Future<dynamic>` | Load a single entity by match criteria. Returns the entity. Throws on error. |',
+    list: '| `list` | `(reqmatch, [ctrl]) -> Future<List>` | List entities matching the criteria. Returns one entity per record. Throws on error. |',
+    create: '| `create` | `(reqdata, [ctrl]) -> Future<dynamic>` | Create a new entity. Returns the entity. Throws on error. |',
+    update: '| `update` | `(reqdata, [ctrl]) -> Future<dynamic>` | Update an existing entity. Returns the entity. Throws on error. |',
+    patch: '| `patch` | `(reqdata, [ctrl]) -> Future<dynamic>` | Change part of an existing entity. Returns the entity. Throws on error. |',
+    remove: '| `remove` | `(reqmatch, [ctrl]) -> Future<dynamic>` | Remove an entity. Returns the entity, marked as deleted. Throws on error. |',
   }
-  const opRows = ['load', 'list', 'create', 'update', 'remove']
+  const opRows = ['load', 'list', 'create', 'update', 'patch', 'remove']
     .filter((o) => opUnion.has(o)).map((o) => opRowDefs[o]).join('\n')
 
   const apikeyOptionRow = isAuthActive(model)
@@ -94,9 +95,10 @@ ${opRows}
 
 ### Result shape
 
-Entity operations return the ENTITY (call data() for the record) (a \`Map\` for single-entity
-ops, a \`List\` of entity instances for \`list\`) and throw on error. Wrap calls
-in \`try\`/\`catch\` to handle failures.
+Entity operations return the entity, not the raw record — \`list\` a \`List\`
+of entities, one per record — and throw on error. An entity's \`data()\` reads
+its record. \`remove\` returns the entity marked as deleted (\`deleted()\`); it
+keeps the data it held. Wrap calls in \`try\`/\`catch\` to handle failures.
 
 The \`direct()\` escape hatch never throws — it returns a result \`Map\` you
 branch on via \`result['ok']\`:

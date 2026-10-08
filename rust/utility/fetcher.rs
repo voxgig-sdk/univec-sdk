@@ -54,7 +54,8 @@ fn default_http_fetch(fullurl: &str, fetchdef: &Value) -> Result<Value, UnivecEr
     let mut req = agent.request(&method, fullurl);
 
     let mut has_ua = false;
-    if let Value::Map(m) = getp(fetchdef, "headers") {
+    let sent_headers = getp(fetchdef, "headers");
+    if let Value::Map(m) = &sent_headers {
         for (k, v) in m.borrow().iter() {
             if let Value::Str(sv) = v {
                 if k.eq_ignore_ascii_case("user-agent") {
@@ -65,16 +66,20 @@ fn default_http_fetch(fullurl: &str, fetchdef: &Value) -> Result<Value, UnivecEr
         }
     }
     // Default User-Agent — some CDNs block library defaults. Use a
-    // Mozilla-shaped UA unless the caller already set one.
+    // Mozilla-shaped UA unless the caller already set one, and record it with
+    // the headers the request sent.
     if !has_ua {
-        req = req.set("User-Agent", "Mozilla/5.0 (compatible; UnivecSDK/1.0)");
+        let agent = "Mozilla/5.0 (compatible; UnivecSDK/1.0)";
+        req = req.set("User-Agent", agent);
+        if let Value::Map(_) = &sent_headers {
+            setp(&sent_headers, "user-agent", Value::str(agent));
+        }
     }
 
-    let body = get_str(fetchdef, "body").filter(|b| !b.is_empty());
-
-    let sent = match body {
-        Some(b) => req.send_string(&b),
-        None => req.call(),
+    let body = getp(fetchdef, "body");
+    let sent = match crate::utility::media::body_bytes(&body) {
+        Some(bytes) if !bytes.is_empty() => req.send_bytes(&bytes),
+        _ => req.call(),
     };
 
     // ureq reports non-2xx as Err(Status) — unwrap those back into normal
@@ -101,11 +106,13 @@ fn default_http_fetch(fullurl: &str, fetchdef: &Value) -> Result<Value, UnivecEr
         .into_string()
         .map_err(|e| UnivecError::new("fetch_body", &format!("{}", e)))?;
 
-    let json_body = if body_txt.is_empty() {
-        Value::Noval
+    let parsed = if body_txt.trim().is_empty() {
+        Ok(Value::Noval)
     } else {
-        crate::utility::jsonparse::json_parse(&body_txt).unwrap_or(Value::Noval)
+        crate::utility::jsonparse::json_parse(&body_txt)
     };
+    let unreadable = parsed.is_err();
+    let json_body = parsed.unwrap_or(Value::Noval);
 
     Ok(jo(vec![
         ("status", Value::Num(status as f64)),
@@ -113,6 +120,7 @@ fn default_http_fetch(fullurl: &str, fetchdef: &Value) -> Result<Value, UnivecEr
         ("headers", headers),
         ("json", json_thunk(json_body)),
         ("body", Value::str(body_txt)),
+        ("unreadable", Value::Bool(unreadable)),
     ]))
 }
 

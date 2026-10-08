@@ -15,10 +15,26 @@ import {
   serverVarEnv,
   serverVariables,
   pointParts,
+  liveStrict,
+  liveStrictNote,
 } from '@voxgig/sdkgen'
 
 
 import { rustVarName } from './utility_rust'
+
+
+// Blocked without the ids its request needs, rather than sent without them.
+function liveKeysBlock(keys: string[], entidEnvVar: string): string {
+  return 0 === keys.length ? '' : `    if setup.live {
+        for live_key in [${keys.map((k) => JSON.stringify(k)).join(', ')}] {
+            if getp(&setup.idmap, live_key).is_noval() {
+                live_miss(LIVE_STRICT, &format!("Live test blocked: needs {} via ${entidEnvVar}", live_key));
+                return;
+            }
+        }
+    }
+`
+}
 
 
 // Replace raw OpenAPI parameter names in path parts with model parameter
@@ -126,6 +142,10 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   const entidEnvVar = `${PROJECTNAME}_TEST_${envToken(entity.name)}_ENTID`
 
+  // The *_ENTID key a live test reads a parameter's value from.
+  const liveKey = (param: any): string =>
+    ('id' === param.n ? entity.name : param.n.replace(/_id$/, '')) + '01'
+
   const evar = rustVarName(entity.name)
 
   File({ name: entity.name + '_direct_test.' + target.ext }, () => {
@@ -144,7 +164,10 @@ use common::*;
 
 use ${rustcrate}::core::helpers::{getp, ja, jo, json_thunk, setp, to_int, to_map};
 use ${rustcrate}::utility::voxgigstruct as vs;
-use ${rustcrate}::{Value, ${model.const.Name}SDK};
+use ${rustcrate}::{json_parse, Value, ${model.const.Name}SDK};
+
+${liveStrictNote(liveStrict(model, target.name), '//')}
+const LIVE_STRICT: bool = ${liveStrict(model, target.name)};
 
 struct ${entity.Name}DirectSetup {
     client: Rc<${model.const.Name}SDK>,
@@ -222,13 +245,7 @@ fn ${evar}_direct_setup(mockres: Value) -> ${entity.Name}DirectSetup {
 
     // ---- list test ----
     if (hasList && listPoint) {
-      // Live params: idmap keys per param.
-      const listLiveParams = listParams.map((p: any) => {
-        const key = p.n === 'id'
-          ? entity.name + '01'
-          : p.n.replace(/_id$/, '') + '01'
-        return { name: p.n, key }
-      })
+      const listLiveParams = listParams.map((p: any) => ({ name: p.n, key: liveKey(p) }))
 
       Content(`
 #[test]
@@ -250,53 +267,40 @@ fn ${evar}_direct_list() {
         );
         return;
     }
-`)
-
-      if (listLiveParams.length > 0) {
-        Content(`    if setup.live {
-        for live_key in [${listLiveParams.map((lp: any) => `"${lp.key}"`).join(', ')}] {
-            if getp(&setup.idmap, live_key).is_noval() {
-                eprintln!("skip: live test needs {} via *_ENTID env var (synthetic IDs only)", live_key);
-                return;
-            }
-        }
-    }
-`)
-      }
-
-      Content(`    let client = setup.client.clone();
+${liveKeysBlock(listLiveParams.map((lp: any) => lp.key), entidEnvVar)}    let client = setup.client.clone();
 
     let params = Value::empty_map();
 `)
       listLiveParams.forEach((lp: any, i: number) => {
-        const placeholder = 'direct0' + (i + 1)
         Content(`    if setup.live {
         setp(&params, "${lp.name}", getp(&setup.idmap, "${lp.key}"));
     } else {
-        setp(&params, "${lp.name}", Value::str("${placeholder}"));
+        setp(&params, "${lp.name}", Value::str("direct0${i + 1}"));
     }
 `)
       })
 
       Content(`
-    let result = client
-        .direct(jo(vec![
-            ("path", Value::str("${listPath}")),
-            ("method", Value::str("GET")),
-            ("params", params.clone()),
-        ]))
-        .expect("direct failed");
-
-    if setup.live {
-        // Live mode is lenient: synthetic IDs frequently 4xx and the
-        // list-response shape varies wildly across public APIs.
-        if getp(&result, "ok") != Value::Bool(true) {
-            eprintln!("skip: list call not ok (likely synthetic IDs against live API)");
+    let result = match client.direct(jo(vec![
+        ("path", Value::str("${listPath}")),
+        ("method", Value::str("GET")),
+        ("params", params.clone()),
+    ])) {
+        Ok(result) => result,
+        Err(err) if setup.live => {
+            live_miss(LIVE_STRICT, &format!("Live list failed: {}", err));
             return;
         }
-        let status = to_int(&getp(&result, "status"));
-        if !(200..300).contains(&status) {
-            eprintln!("skip: expected 2xx status, got {}", status);
+        Err(err) => panic!("direct failed: {}", err),
+    };
+
+    if setup.live {
+        if !live_ok(&result) {
+            live_miss(LIVE_STRICT, &format!("Live list failed: {}", live_describe(&result)));
+            return;
+        }
+        if live_list(&getp(&result, "data")).is_none() {
+            live_miss(LIVE_STRICT, &format!("Live list returned no list: {}", live_describe(&result)));
             return;
         }
     } else {
@@ -343,13 +347,13 @@ fn ${evar}_direct_list() {
 
     // ---- load test ----
     if (hasLoad && loadPoint) {
-      // idmap keys consumed by load in live mode.
-      const loadLiveParams = loadParams.map((p: any) => {
-        const key = p.n === 'id'
-          ? entity.name + '01'
-          : p.n.replace(/_id$/, '') + '01'
-        return { name: p.n, key }
-      })
+      const examples = 0 < loadParams.length &&
+        loadParams.every((p: any) => undefined !== p.ex && null !== p.ex)
+      const discover = !examples && hasList && 0 < loadParams.length
+      const idParam = loadParams.find((p: any) => 'id' === p.n)?.n ?? loadParams[0]?.n ?? 'id'
+      const loadLiveIdKeys: string[] = examples ? [] :
+        discover ? listParams.map(liveKey).concat(loadParams.filter((p: any) => idParam !== p.n).map(liveKey)) :
+          loadParams.map(liveKey)
 
       Content(`
 #[test]
@@ -368,53 +372,94 @@ fn ${evar}_direct_load() {
         );
         return;
     }
-`)
-
-      if (loadLiveParams.length > 0) {
-        Content(`    if setup.live {
-        for live_key in [${loadLiveParams.map((lp: any) => `"${lp.key}"`).join(', ')}] {
-            if getp(&setup.idmap, live_key).is_noval() {
-                eprintln!("skip: live test needs {} via *_ENTID env var (synthetic IDs only)", live_key);
-                return;
-            }
-        }
-    }
-`)
-      }
-
-      Content(`    let client = setup.client.clone();
+${liveKeysBlock([...new Set(loadLiveIdKeys)], entidEnvVar)}    let client = setup.client.clone();
 
     let params = Value::empty_map();
-`)
-
-      loadLiveParams.forEach((lp: any, i: number) => {
-        const placeholder = 'direct0' + (i + 1)
-        Content(`    if setup.live {
-        setp(&params, "${lp.name}", getp(&setup.idmap, "${lp.key}"));
-    } else {
-        setp(&params, "${lp.name}", Value::str("${placeholder}"));
-    }
-`)
-      })
-
-      Content(`
-    let result = client
-        .direct(jo(vec![
-            ("path", Value::str("${loadPath}")),
-            ("method", Value::str("GET")),
-            ("params", params.clone()),
-        ]))
-        .expect("direct failed");
-
     if setup.live {
-        // Live mode is lenient: synthetic IDs frequently 4xx.
-        if getp(&result, "ok") != Value::Bool(true) {
-            eprintln!("skip: load call not ok (likely synthetic IDs against live API)");
+`)
+      if (examples) {
+        for (const p of loadParams) {
+          Content(`        setp(&params, "${p.n}", json_parse(r##"${JSON.stringify(p.ex)}"##).unwrap_or(Value::Noval));
+`)
+        }
+      }
+      else if (discover) {
+        Content(`        let list_result = match client.direct(jo(vec![
+            ("path", Value::str("${listPath}")),
+            ("method", Value::str("GET")),
+            ("params", jo(vec![${listParams.map((p: any) => `("${p.n}", getp(&setup.idmap, "${liveKey(p)}"))`).join(', ')}])),
+        ])) {
+            Ok(list_result) => list_result,
+            Err(err) => {
+                live_miss(LIVE_STRICT, &format!("Live list discovery failed: {}", err));
+                return;
+            }
+        };
+        if !live_ok(&list_result) {
+            live_miss(LIVE_STRICT, &format!("Live list discovery failed: {}", live_describe(&list_result)));
             return;
         }
-        let status = to_int(&getp(&result, "status"));
-        if !(200..300).contains(&status) {
-            eprintln!("skip: expected 2xx status, got {}", status);
+        let records = match live_list(&getp(&list_result, "data")) {
+            Some(records) => records,
+            None => {
+                live_miss(LIVE_STRICT, &format!("Live list discovery returned no list: {}", live_describe(&list_result)));
+                return;
+            }
+        };
+        let first = vs::get_elem(&records, &Value::Num(0.0), Value::Noval);
+        if first.is_noval() {
+            live_empty("The account has no ${entity.name} record to load");
+            return;
+        }
+        let mut found = getp(&first, "${idParam}");
+        if found.is_noval() {
+            found = getp(&first, "id");
+        }
+        if found.is_noval() {
+            live_miss(LIVE_STRICT, "Live load blocked: discovery returned no usable identity");
+            return;
+        }
+        setp(&params, "${idParam}", found);
+`)
+        for (const p of loadParams.filter((p: any) => idParam !== p.n)) {
+          Content(`        setp(&params, "${p.n}", getp(&setup.idmap, "${liveKey(p)}"));
+`)
+        }
+      }
+      else {
+        for (const p of loadParams) {
+          Content(`        setp(&params, "${p.n}", getp(&setup.idmap, "${liveKey(p)}"));
+`)
+        }
+      }
+      Content(`    } else {
+`)
+      loadParams.forEach((p: any, i: number) => {
+        Content(`        setp(&params, "${p.n}", Value::str("direct0${i + 1}"));
+`)
+      })
+      Content(`    }
+
+    let result = match client.direct(jo(vec![
+        ("path", Value::str("${loadPath}")),
+        ("method", Value::str("GET")),
+        ("params", params.clone()),
+    ])) {
+        Ok(result) => result,
+        Err(err) if setup.live => {
+            live_miss(LIVE_STRICT, &format!("Live load failed: {}", err));
+            return;
+        }
+        Err(err) => panic!("direct failed: {}", err),
+    };
+
+    if setup.live {
+        if !live_ok(&result) {
+            live_miss(LIVE_STRICT, &format!("Live load failed: {}", live_describe(&result)));
+            return;
+        }
+        if getp(&result, "data").is_noval() {
+            live_miss(LIVE_STRICT, &format!("Live load returned no data: {}", live_describe(&result)));
             return;
         }
     } else {

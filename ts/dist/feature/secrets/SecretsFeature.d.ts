@@ -14,6 +14,7 @@ declare class SecretsFeature extends BaseFeature {
     _buying?: Promise<string>;
     init(ctx: Context, fopts: FeatureOptions): void;
     sekreto(): any;
+    _register(value: any): void;
     PreSpec(_ctx: Context): Promise<void>;
     resolve(): Promise<void>;
     private _resolveonce;

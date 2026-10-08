@@ -54,6 +54,14 @@ const utility_1 = require("../../utility");
         const ent = testsdk.EphemeralKey();
         (0, node_assert_1.default)(null != ent);
     });
+    (0, node_test_1.test)('validate', async (t) => {
+        if (null == __1.config.feature?.validate) {
+            t.skip('feature not present in this SDK: validate');
+            return;
+        }
+        const client = __1.UnivecSDK.test(undefined, { feature: { validate: { active: true } } });
+        await node_assert_1.default.rejects(client.EphemeralKey().create({ "dailyLimit": "x", "dailyUsed": 1, "key": "x", "resetsAt": "x" }), (err) => 'validate_failed' === err.code);
+    });
     (0, node_test_1.test)('basic', async (t) => {
         const live = 'TRUE' === process.env.UNIVEC_TEST_LIVE;
         for (const op of ['create']) {
@@ -66,7 +74,7 @@ const utility_1 = require("../../utility");
         }
         const setup = basicSetup();
         if (setup.live) {
-            return (0, live_entity_1.runLiveEntity)(setup, { "active": true, "alias": { "field": {} }, "fields": { "dailyLimit": { "a": true, "h": "Daily Limit", "n": "dailyLimit", "r": true, "sh": "Calls permitted per day.", "t": "`$INTEGER`", "key$": "dailyLimit", "index$": 0 }, "dailyUsed": { "a": true, "h": "Daily Used", "n": "dailyUsed", "r": true, "sh": "Calls already used today.", "t": "`$INTEGER`", "key$": "dailyUsed", "index$": 1 }, "key": { "a": true, "h": "Key", "n": "key", "r": true, "sh": "The ephemeral API key, prefixed `eph_`.", "t": "`$STRING`", "key$": "key", "index$": 2 }, "resetsAt": { "a": true, "fo": "date-time", "h": "Resets At", "n": "resetsAt", "r": true, "sh": "When the daily allowance resets.", "t": "`$STRING`", "key$": "resetsAt", "index$": 3 } }, "name": "ephemeral_key", "op": { "create": { "input": "data", "name": "create", "points": [{ "a": true, "co": { "id": "POST /v1/ephemeral/key", "source": "openapi3", "version": 2 }, "g": {}, "k": "http", "li": { "assert": { "nonempty": ["key"] }, "auth": "public", "id": "key", "retention": "No deletion endpoint; issued key is subject to the service daily allowance" }, "m": "POST", "o": "/v1/ephemeral/key", "q": {}, "r": {}, "s": [{ "lit": "v1" }, { "lit": "ephemeral" }, { "lit": "key" }], "t": { "req": "`reqdata`", "res": "`body.data`" }, "index$": 0 }], "key$": "create" } }, "relations": { "ancestors": [] }, "key$": "ephemeral_key", "name__orig": "ephemeral_key", "Name": "EphemeralKey", "name_": "ephemeral_key", "name-": "ephemeral-key", "NAME": "EPHEMERAL_KEY", "index$": 2 }, { "active": true, "entity": "ephemeral_key", "key$": "BasicEphemeralKeyFlow", "kind": "basic", "name": "BasicEphemeralKeyFlow", "param": {}, "step": [{ "a": true, "d": {}, "i": { "ref": "ephemeral_key_ref01" }, "m": {}, "o": "create", "s": [], "v": [], "index$": 0 }] }, 'EphemeralKey', { "POST /v1/ephemeral/key": { "protocol": "http", "requestBody": { "required": false, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false, "index$": 1 }, "example": {} } } }, "parameters": [] } });
+            return (0, live_entity_1.runLiveEntity)(setup, { "active": true, "alias": { "field": {} }, "fields": { "dailyLimit": { "a": true, "h": "Daily Limit", "n": "dailyLimit", "r": true, "sh": "Calls permitted per day.", "t": "`$INTEGER`", "key$": "dailyLimit", "index$": 0 }, "dailyUsed": { "a": true, "h": "Daily Used", "n": "dailyUsed", "r": true, "sh": "Calls already used today.", "t": "`$INTEGER`", "key$": "dailyUsed", "index$": 1 }, "key": { "a": true, "h": "Key", "n": "key", "r": true, "sh": "The ephemeral API key, prefixed `eph_`.", "t": "`$STRING`", "key$": "key", "index$": 2 }, "resetsAt": { "a": true, "fo": "date-time", "h": "Resets At", "n": "resetsAt", "r": true, "sh": "When the daily allowance resets.", "t": "`$STRING`", "key$": "resetsAt", "index$": 3 } }, "name": "ephemeral_key", "op": { "create": { "input": "data", "name": "create", "points": [{ "a": true, "bf": false, "co": { "id": "POST /v1/ephemeral/key", "source": "openapi3", "version": 2 }, "g": {}, "k": "http", "li": { "assert": { "nonempty": ["key"] }, "auth": "public", "id": "key", "retention": "No deletion endpoint; issued key is subject to the service daily allowance" }, "m": "POST", "o": "/v1/ephemeral/key", "q": {}, "r": {}, "rs": { "kind": "json", "media": "application/json" }, "s": [{ "lit": "v1" }, { "lit": "ephemeral" }, { "lit": "key" }], "t": { "req": "`reqdata`", "res": "`body.data`" }, "index$": 0 }], "key$": "create" } }, "relations": { "ancestors": [] }, "key$": "ephemeral_key", "name__orig": "ephemeral_key", "Name": "EphemeralKey", "name_": "ephemeral_key", "name-": "ephemeral-key", "NAME": "EPHEMERAL_KEY", "index$": 2 }, { "active": true, "entity": "ephemeral_key", "key$": "BasicEphemeralKeyFlow", "kind": "basic", "name": "BasicEphemeralKeyFlow", "param": {}, "step": [{ "a": true, "d": {}, "i": { "ref": "ephemeral_key_ref01" }, "m": {}, "o": "create", "s": [], "v": [], "index$": 0 }] }, 'EphemeralKey', { "POST /v1/ephemeral/key": { "protocol": "http", "requestBody": { "required": false, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false, "index$": 1 }, "example": {} } } }, "parameters": [] } }, { strict: LIVE_STRICT, t });
         }
         const client = setup.client;
         const struct = setup.struct;
@@ -79,6 +87,11 @@ const utility_1 = require("../../utility");
         (0, node_assert_1.default)(null != ephemeral_key_ref01_data);
     });
 });
+// main.kit.test.live.strict is true (the default is true): a live
+// request that fails, or a live test missing an input it needs,
+// fails the test.
+// An account with no record for a test to read skips it either way.
+const LIVE_STRICT = true;
 function basicSetup(extra) {
     // TODO: fix test def options
     const options = {}; // null

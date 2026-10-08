@@ -115,15 +115,17 @@ sub _close {
   $span->{durationMs} = $dur > 0 ? $dur : 0;
   $span->{ok} = $ok ? Voxgig::Struct::JTRUE() : Voxgig::Struct::JFALSE();
 
+  my $out = $ctx->{utility}{clean}->($ctx, $span);
+
   my $t = $self->_telemetry;
   if ($t) {
     $t->{active} -= 1;
-    push @{ $t->{spans} }, $span;
+    push @{ $t->{spans} }, $out;
   }
 
   my $exporter = $self->{options}{exporter};
   if (ref $exporter eq 'CODE') {
-    eval { $exporter->($span) };
+    eval { $exporter->($out) };
   }
   return;
 }

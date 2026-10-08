@@ -24,9 +24,9 @@ cd ${target.name} && make
   // Publish pending: C has no central package registry — the release IS the
   // git tag. Build from a source checkout (the vendored voxgig struct means
   // there are no external dependencies to fetch).
-  const { releasesUrl } = repoInfo(model)
+  const { tagsUrl } = repoInfo(model)
   Content(`C has no central package registry — a release is the git tag
-(\`${target.name}/vX.Y.Z\`, see [Releases](${releasesUrl})). Build from a
+(\`${target.name}/vX.Y.Z\`, see [Tags](${tagsUrl})). Build from a
 source checkout with the bundled \`Makefile\`; the voxgig struct library is
 vendored under \`utility/struct\`, so there are no external dependencies to
 fetch:

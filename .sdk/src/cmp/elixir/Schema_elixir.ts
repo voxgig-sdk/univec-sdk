@@ -41,16 +41,26 @@ defmodule ${Name}.Schema do
 
   @entityspec_data ${elixirString(JSON.stringify(entityspec))}
 
-  # Parsed at COMPILE time and held as a literal: the spec is read on every
-  # client construction and never mutated, so parsing per call would be pure
-  # waste, and elixir terms are immutable so sharing carries no risk at all.
-  @optspec ${Name}.Json.parse(@optspec_data)
+  # Parsed once per VM and held in :persistent_term. The parse yields struct
+  # nodes, which are handles into this VM's heap, so a compile-time literal
+  # would point into the heap of whichever VM compiled the module.
+  def optspec, do: memo(:optspec, @optspec_data)
 
-  @entityspec ${Name}.Json.parse(@entityspec_data)
+  def entityspec, do: memo(:entityspec, @entityspec_data)
 
-  def optspec, do: @optspec
+  defp memo(name, data) do
+    key = {__MODULE__, name}
 
-  def entityspec, do: @entityspec
+    case :persistent_term.get(key, nil) do
+      nil ->
+        spec = ${Name}.Json.parse(data)
+        :persistent_term.put(key, spec)
+        spec
+
+      spec ->
+        spec
+    end
+  end
 end
 `)
   })

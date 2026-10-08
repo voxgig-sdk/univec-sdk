@@ -1,3 +1,11 @@
+// Whether a comma-separated allow option names the item: whole names, any case.
+bool allowed(dynamic names, dynamic item) {
+  final want = item is String ? item.toUpperCase() : '';
+  return '' != want &&
+      names is String &&
+      names.split(',').any((name) => name.trim().toUpperCase() == want);
+}
+
 dynamic prepareMethod(dynamic ctx) {
   final op = ctx.op;
   final opname = op.name;

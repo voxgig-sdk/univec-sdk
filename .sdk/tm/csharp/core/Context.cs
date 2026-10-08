@@ -1,5 +1,7 @@
 // Univec SDK - operation context.
 
+using System.Collections.Concurrent;
+
 using Voxgig.Struct;
 
 namespace UnivecSdk;
@@ -17,7 +19,7 @@ public class Context
     public Dictionary<string, object?>? Config;
     public Dictionary<string, object?>? Entopts;
     public Dictionary<string, object?>? Options;
-    public Dictionary<string, Operation> Opmap = new();
+    public ConcurrentDictionary<string, Operation> Opmap = new();
     public Response? Response;
     public Result? Result;
     public Spec? Spec;
@@ -145,7 +147,7 @@ public class Context
         }
 
         // Opmap
-        if (Helpers.GetCtxProp(ctxmap, "opmap") is Dictionary<string, Operation> opm)
+        if (Helpers.GetCtxProp(ctxmap, "opmap") is ConcurrentDictionary<string, Operation> opm)
         {
             Opmap = opm;
         }
@@ -153,7 +155,7 @@ public class Context
         {
             Opmap = basectx.Opmap;
         }
-        Opmap ??= new Dictionary<string, Operation>();
+        Opmap ??= new ConcurrentDictionary<string, Operation>();
 
         // Data maps
         Data = Helpers.ToMapAny(Helpers.GetCtxProp(ctxmap, "data")) ?? new Dictionary<string, object?>();
@@ -226,7 +228,7 @@ public class Context
         var opcfg = StructUtils.GetPath(Config,
             StructUtils.Jt("entity", entname, "op", opname));
 
-        var input = (opname == "update" || opname == "create") ? "data" : "match";
+        var input = (opname == "update" || opname == "create" || opname == "patch") ? "data" : "match";
 
         List<object?>? points = null;
         if (opcfg is Dictionary<string, object?> ocm)
@@ -246,12 +248,45 @@ public class Context
             ["points"] = points,
         });
 
-        Opmap[cacheKey] = op;
-        return op;
+        // Requests on other threads share this cache; every one of them gets
+        // the Operation stored first.
+        return Opmap.GetOrAdd(cacheKey, op);
     }
 
     public UnivecError MakeError(string code, string msg)
     {
         return new UnivecError(code, msg, this);
+    }
+
+    // The record form: what the context says about the operation, never its
+    // client, options or config.
+    internal Dictionary<string, object?> RawRecord()
+    {
+        return new Dictionary<string, object?>
+        {
+            ["id"] = Id,
+            ["op"] = Op,
+            ["spec"] = Spec,
+            ["entity"] = Entity?.GetName(),
+            ["result"] = Result,
+            ["response"] = Response,
+            ["meta"] = Meta,
+        };
+    }
+
+    // The serialised context leaves the pipeline (a logger, an error dump), so
+    // it is cleaned; the live fields stay raw for the pipeline's own use.
+    public Dictionary<string, object?> ToRecord()
+    {
+        var record = RawRecord();
+        var clean = Utility?.Clean;
+        return clean == null
+            ? record
+            : clean(this, record) as Dictionary<string, object?> ?? record;
+    }
+
+    public override string ToString()
+    {
+        return "Context " + StructUtils.Jsonify(ToRecord(), 0);
     }
 }

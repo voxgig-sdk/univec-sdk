@@ -329,6 +329,11 @@ const Config = cmp(async function Config(props: any) {
     headers,
     entity: entityOptions,
   }
+  // The declared defaults make_options fills a templated base URL from, as
+  // the data rep carries them.
+  if (null != configDef.options.server) {
+    options.server = configDef.options.server
+  }
   if (authActive) {
     options.auth = { prefix: authPrefix }
     if ('header' !== authIn) {

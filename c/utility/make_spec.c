@@ -39,7 +39,7 @@ Spec* make_spec_util(Context* ctx, PNError** err) {
 
   voxgig_value* allow_method_v = getpath2(options, "allow", "method");
   const char* allow_method = voxgig_is_string(allow_method_v) ? voxgig_as_string(allow_method_v) : "";
-  if (!strstr(allow_method, method)) {
+  if (!allow_list_has(allow_method_v, method)) {
     char buf[512];
     snprintf(buf, sizeof(buf),
              "Method \"%s\" not allowed by SDK option allow.method value: \"%s\"",
@@ -80,8 +80,24 @@ Spec* make_spec_util(Context* ctx, PNError** err) {
     setp(c->explain, "spec", spec_to_value(spec));
   }
 
+  // Whatever prepare_auth sets in the query, under whichever name, is the
+  // credential; a key it leaves as it was is the caller's.
+  voxgig_value* query = v_clone(spec->query);
+
   Spec* spec2 = prepare_auth_util(ctx, err);
   if (*err) return NULL;
+
+  spec2->authquery = voxgig_new_list();
+  if (voxgig_is_map(spec2->query)) {
+    voxgig_map* qm = voxgig_as_map(spec2->query);
+    for (size_t i = 0; i < qm->len; i++) {
+      voxgig_value* was = getp(query, qm->entries[i].key);
+      if (v_is_noval(was) || !v_eq(was, qm->entries[i].value)) {
+        voxgig_list_push(voxgig_as_list(spec2->authquery),
+          voxgig_new_string(qm->entries[i].key));
+      }
+    }
+  }
 
   ctx->spec = spec2;
   return spec2;

@@ -17,6 +17,9 @@ public class Spec
     public object? Body;
     public string Url = "";
     public string Path = "";
+    // The query parameters PrepareAuth placed: the credential, which the
+    // request sends and the entity's match leaves out.
+    public List<string> AuthQuery = new();
 
     public Spec(Dictionary<string, object?>? specmap)
     {

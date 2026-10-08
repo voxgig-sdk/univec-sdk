@@ -28,9 +28,13 @@ voxgig_value* make_fetch_def_util(Context* ctx, PNError** err) {
   setp(fetchdef, "method", v_str(spec->method));
   setp(fetchdef, "headers", v_share(spec->headers));
 
+  // A map or a list is JSON, and so is a scalar on a point that declares a
+  // JSON body. Anything else goes as given.
   voxgig_value* body = spec->body;
   if (!v_is_noval(body)) {
-    if (voxgig_is_map(body)) {
+    bool scalar = voxgig_is_string(body) || voxgig_is_number(body) || voxgig_is_bool(body);
+    bool encode = voxgig_is_node(body) || (scalar && media_is_json_request(ctx->point));
+    if (encode) {
       char* js = voxgig_jsonify(body, NULL);
       setp(fetchdef, "body", v_str(js ? js : ""));
       free(js);

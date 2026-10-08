@@ -9,6 +9,38 @@ import '../base/BaseFeature.dart';
 
 const S_NOT_FOUND = 'Not found';
 
+// The key a list's response transform
+// ["`$EACH`", "body", {"`$MERGE`": "`.<key>`"}] reads each item's record
+// under; null for any other transform.
+String? itemEnvelopeKey(dynamic spec) {
+  if (spec is! List || 3 != spec.length || r'`$EACH`' != spec[0] || 'body' != spec[1]) {
+    return null;
+  }
+  final merge = vs.getprop(spec[2], r'`$MERGE`');
+  if (merge is! String) {
+    return null;
+  }
+  return RegExp(r'^`\.([^.`$]+)`$').firstMatch(merge)?.group(1);
+}
+
+// The answer the response transform `spec` reads `data` back out of.
+dynamic mockEnvelope(dynamic spec, dynamic data) {
+  final itemkey = itemEnvelopeKey(spec);
+  if (null != itemkey && data is List) {
+    return data.map((item) => <String, dynamic>{itemkey: item}).toList();
+  }
+  if (spec is! String) {
+    return data;
+  }
+  // Exactly `body.<key>`; a deeper path is not an envelope this mock can
+  // synthesise, so it is left alone rather than guessed at.
+  final m = RegExp(r'^`body\.([^`.]+)`$').firstMatch(spec);
+  if (null == m) {
+    return data;
+  }
+  return <String, dynamic>{m.group(1)!: data};
+}
+
 class TestFeature extends BaseFeature {
   dynamic _client;
   int _netcalls = 0;
@@ -52,17 +84,7 @@ class TestFeature extends BaseFeature {
       // fields are typed properties, not map keys — vs.getprop on it returns
       // null and the envelope silently never applies.
       final tm = fctx.point.transform;
-      final spec = vs.getprop(tm, 'res');
-      if (spec is! String) {
-        return data;
-      }
-      // Exactly `body.<key>`; a deeper path is not an envelope this mock can
-      // synthesise, so it is left alone rather than guessed at.
-      final m = RegExp(r'^`body\.([^`.]+)`$').firstMatch(spec);
-      if (null == m) {
-        return data;
-      }
-      return <String, dynamic>{m.group(1)!: data};
+      return mockEnvelope(vs.getprop(tm, 'res'), data);
     }
 
     dynamic respond(dynamic fctx, int status, [dynamic data, dynamic res]) {
@@ -112,7 +134,7 @@ class TestFeature extends BaseFeature {
           final out = vs.clone(found);
           return respond(fctx, 200, out);
         }
-      } else if ('update' == op.name) {
+      } else if ('update' == op.name || 'patch' == op.name) {
         final args = self.buildArgs(fctx, op, fctx.reqdata);
         final found = vs.select(entmap, args);
         final ent = vs.getelem(found, 0);

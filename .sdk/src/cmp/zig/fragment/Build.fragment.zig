@@ -57,6 +57,7 @@ pub fn build(b: *std.Build) void {
     const test_files = [_][]const u8{
         "test/struct_corpus.zig",
         "test/generated_test.zig",
+        "test/clean_test.zig",
         "test/pipeline_test.zig",
         "test/feature_test.zig",
         "test/primary_utility_test.zig",
@@ -78,6 +79,24 @@ pub fn build(b: *std.Build) void {
         const run_t = b.addRunArtifact(t);
         run_t.has_side_effects = true;
         test_step.dependOn(&run_t.step);
+    }
+
+    // The canary sweep alone, as `zig build test-clean`: the generator's
+    // compile lane reads the `clean: swept ...` line it prints.
+    {
+        const clean_mod = b.createModule(.{
+            .root_source_file = b.path("test/clean_test.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        clean_mod.addImport("voxgig-struct", struct_mod);
+        clean_mod.addImport("sdk", sdk_mod);
+        clean_mod.addImport("omni", omni_mod);
+        const clean_test = b.addTest(.{ .root_module = clean_mod });
+        const run_clean = b.addRunArtifact(clean_test);
+        run_clean.has_side_effects = true;
+        const clean_step = b.step("test-clean", "Run the canary sweep alone");
+        clean_step.dependOn(&run_clean.step);
     }
     // #FeatureTestSteps
 }

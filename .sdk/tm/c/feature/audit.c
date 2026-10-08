@@ -66,6 +66,8 @@ static void audit_emit(AuditFeature* af, Context* ctx, const char* outcome) {
     setp(record, "status", v_num((double)ctx->result->status));
   }
 
+  record = clean_util(ctx, record);
+
   voxgig_list_push(voxgig_as_list(af->records), voxgig_retain(record));
   int64_t max = fopt_int(af->options, "max", 1000);
   while (voxgig_list_len(voxgig_as_list(af->records)) > (size_t)max) {

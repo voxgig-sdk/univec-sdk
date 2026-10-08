@@ -223,6 +223,7 @@ private:
     map_put(record, "currency", Value(currency));
     map_put(record, "source", Value(source));
     map_put(record, "attempts", Value(p.attempts));
+    record = ctx->utility->clean(ctx, record);
     last = record;
 
     Value sink = getp(options, "sink");

@@ -10,22 +10,25 @@
 
 module SdkRuntime where
 
-import Control.Exception (throwIO)
+import Control.Exception (throwIO, try)
 import Control.Monad (forM_, when)
-import Data.Bits ((.&.))
-import Data.Char (isAlphaNum, toUpper)
+import Data.Bits ((.&.), (.|.), shiftL, shiftR)
+import Data.Char (chr, isAlphaNum, isHexDigit, isSpace, digitToInt, ord, toLower, toUpper)
 import Data.IORef
+import Data.List (dropWhileEnd, intercalate, isInfixOf, isSuffixOf, nub, sortBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
+import Data.Ord (Down (..), comparing)
 import System.IO.Unsafe (unsafePerformIO)
 import Text.Printf (printf)
+import Text.Read (readMaybe)
 
 import VoxgigStruct
-  ( Value (..), InjArg (..), emptyList, emptyMap, mkList, mkMap
+  ( Value (..), InjArg (..), StructError (..), emptyList, emptyMap, mkList, mkMap
   , getprop, getpropAlt, setprop, delprop, getpath, getelem, keysof, listItems
   , items, clone, merge, validate, transform, select, size, isempty
   , isnode, ismap, islist, isfunc, isNoval, isNullish, vint
-  , escurl, escre, stringify, walk, join )
+  , escurl, escre, stringify, walk, join, jsonEncode )
 import SdkTypes
 import SdkHelpers
 
@@ -96,7 +99,7 @@ resolveOp ctx opname = do
         else do
           cfg <- readIORef (cConfig ctx)
           opcfg <- getpathS cfg ("entity." ++ entname ++ ".op." ++ opname)
-          let inpt = if opname == "update" || opname == "create" then "data" else "match"
+          let inpt = if opname `elem` ["update", "create", "patch"] then "data" else "match"
           pts <- case opcfg of
             VMap _ -> do p <- getp opcfg "points"; case p of VList _ -> pure p; _ -> emptyList
             _ -> emptyList
@@ -218,8 +221,342 @@ makeContextImpl cs basectx = do
 -- utilities
 -- ------------------------------------------------------------------
 
+-- ----- clean: what leaves the pipeline is masked -----
+--
+-- Everything that leaves the pipeline passes through cleanUtil; inside it
+-- data stays raw, so a hook can still read the header it must add to. See
+-- the generator's docs/explanation/secret-redaction.md.
+
+cleanMaxDepth :: Int
+cleanMaxDepth = 32
+
+cleanCircular :: String
+cleanCircular = "[circular]"
+
+-- The `clean` block of the option spec (main.kit.optspec.clean in the sdkgen
+-- base model), held here because this pack's targets read no generated
+-- Schema module. Numbers are strings, like every optspec value.
+cleanOptSpec :: IO Value
+cleanOptSpec = jo
+  [ ("active", VBool True)
+  , ("keys", VStr "key,secret,token,password,passwd,authorization,cookie,credential,signature")
+  , ("values", VStr "")
+  , ("mask", VStr "[redacted]")
+  , ("hint", VStr "0")
+  , ("min", VStr "4") ]
+
+normkey :: String -> String
+normkey = filter (\c -> c /= '-' && c /= '_') . lower
+
+splitkeys :: Value -> [String]
+splitkeys v = filter (/= "") (map (normkey . strip) (splitOnChar ',' (vstring v)))
+
+splitvalues :: Value -> IO [String]
+splitvalues v = case v of
+  VList _ -> do its <- listItems v; pure [s | VStr s <- its]
+  VStr s -> pure (filter (/= "") (map strip (splitOnChar ',' s)))
+  _ -> pure []
+
+countOpt :: Value -> Int -> Int
+countOpt v dflt = case v of
+  VNum n | n >= 0 -> clampCount n
+  VStr s -> case readMaybe s :: Maybe Double of
+    Just n | n >= 0 -> clampCount n
+    _ -> dflt
+  _ -> dflt
+
+-- floor of a Double beyond the Int range is undefined, so a count caps.
+clampCount :: Double -> Int
+clampCount n = if n >= fromIntegral (maxBound :: Int) then maxBound else floor n
+
+-- The derived clean block is a map, so features can register into its
+-- `values` list after makeOptions; `keys` holds the normalised names.
+makeCleanConfig :: Value -> IO Value
+makeCleanConfig cleanopts = do
+  opts <- case cleanopts of VMap _ -> pure cleanopts; _ -> emptyMap
+  activeV <- getp opts "active"
+  keysV <- getp opts "keys"
+  maskV <- getp opts "mask"
+  hintV <- getp opts "hint"
+  minV <- getp opts "min"
+  keys <- ja (map VStr (splitkeys keysV))
+  values <- emptyList
+  jo [ ("active", VBool (case activeV of VBool False -> False; _ -> True))
+     , ("keys", keys), ("values", values)
+     , ("mask", VStr (case maskV of VStr m -> m; _ -> "[redacted]"))
+     , ("hint", vint (countOpt hintV 0))
+     , ("min", vint (max 1 (countOpt minV 4))) ]
+
+-- A context without options (makeError accepts a bare one) still masks by
+-- the schema defaults.
+cleanConfigOf :: Context -> IO Value
+cleanConfigOf ctx = do
+  options <- readIORef (cOptions ctx)
+  derived <- case options of VMap _ -> getpathS options "__derived__.clean"; _ -> pure VNoval
+  case derived of
+    VMap _ -> pure derived
+    _ -> makeCleanConfig =<< cleanOptSpec
+
+data CleanRule = CleanRule
+  { crActive :: Bool
+  , crMask   :: String
+  , crHint   :: Int
+  , crKeys   :: [String]
+  , crValues :: [String]
+  }
+
+cfgStrings :: Value -> String -> IO [String]
+cfgStrings cfg k = do
+  v <- getp cfg k
+  case v of { VList _ -> do { its <- listItems v; pure [s | VStr s <- its] }; _ -> pure [] }
+
+cfgInt :: Value -> String -> Int -> IO Int
+cfgInt cfg k d = do v <- getp cfg k; pure (case v of VNum n -> clampCount n; _ -> d)
+
+cleanRule :: Value -> IO CleanRule
+cleanRule cfg = do
+  activeV <- getp cfg "active"
+  mask <- getStrD cfg "mask" "[redacted]"
+  hint <- cfgInt cfg "hint" 0
+  keys <- cfgStrings cfg "keys"
+  values <- cfgStrings cfg "values"
+  pure CleanRule { crActive = case activeV of VBool False -> False; _ -> True
+                 , crMask = mask, crHint = hint, crKeys = keys, crValues = values }
+
+utf8Bytes :: String -> [Int]
+utf8Bytes = concatMap enc
+  where
+    enc c
+      | n < 0x80 = [n]
+      | n < 0x800 = [0xC0 .|. (n `shiftR` 6), 0x80 .|. (n .&. 0x3F)]
+      | n < 0x10000 = [0xE0 .|. (n `shiftR` 12), 0x80 .|. ((n `shiftR` 6) .&. 0x3F), 0x80 .|. (n .&. 0x3F)]
+      | otherwise = [0xF0 .|. (n `shiftR` 18), 0x80 .|. ((n `shiftR` 12) .&. 0x3F), 0x80 .|. ((n `shiftR` 6) .&. 0x3F), 0x80 .|. (n .&. 0x3F)]
+      where n = ord c
+
+base64Encode :: String -> String
+base64Encode s = go (utf8Bytes s)
+  where
+    tbl = ['A' .. 'Z'] ++ ['a' .. 'z'] ++ ['0' .. '9'] ++ "+/"
+    at i = tbl !! (i .&. 63)
+    go (a : b : c : rest) =
+      let n = (a `shiftL` 16) .|. (b `shiftL` 8) .|. c
+      in [at (n `shiftR` 18), at (n `shiftR` 12), at (n `shiftR` 6), at n] ++ go rest
+    go [a, b] =
+      let n = (a `shiftL` 16) .|. (b `shiftL` 8)
+      in [at (n `shiftR` 18), at (n `shiftR` 12), at (n `shiftR` 6), '=']
+    go [a] =
+      let n = a `shiftL` 16
+      in [at (n `shiftR` 18), at (n `shiftR` 12), '=', '=']
+    go [] = []
+
+-- The decoded form, as decodeURIComponent reads it: the escapes are UTF-8
+-- octets, and a malformed escape or sequence has no decoded form.
+percentDecode :: String -> Maybe String
+percentDecode = go []
+  where
+    go acc ('%' : a : b : rest)
+      | isHexDigit a && isHexDigit b = go ((digitToInt a * 16 + digitToInt b) : acc) rest
+    go _ ('%' : _) = Nothing
+    go acc (c : rest) = go (reverse (utf8Bytes [c]) ++ acc) rest
+    go acc [] = utf8Decode (reverse acc)
+
+-- Strict UTF-8: an overlong, surrogate, out-of-range or truncated sequence
+-- is Nothing.
+utf8Decode :: [Int] -> Maybe String
+utf8Decode [] = Just []
+utf8Decode (b : rest)
+  | b < 0x80 = (chr b :) <$> utf8Decode rest
+  | b >= 0xC2 && b < 0xE0 = multi 1 (b .&. 0x1F) 0x80
+  | b >= 0xE0 && b < 0xF0 = multi 2 (b .&. 0x0F) 0x800
+  | b >= 0xF0 && b < 0xF5 = multi 3 (b .&. 0x07) 0x10000
+  | otherwise = Nothing
+  where
+    multi n lead lo = case splitAt n rest of
+      (cs, more) | length cs == n && all (\c -> c .&. 0xC0 == 0x80) cs ->
+        let cp = foldl (\a c -> (a `shiftL` 6) .|. (c .&. 0x3F)) lead cs
+        in if cp < lo || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) then Nothing
+           else (chr cp :) <$> utf8Decode more
+      _ -> Nothing
+
+-- The encoded forms a value travels in.
+cleanForms :: String -> IO [String]
+cleanForms value = do
+  pe <- escurlS value
+  js <- jsonEncode False Nothing (VStr value)
+  let jsIn = if length js >= 2 then init (tail js) else js
+  pure (nub (filter (/= "") [value, base64Encode value, pe, jsIn]))
+
+cleanAddCfg :: Value -> Value -> IO ()
+cleanAddCfg cfg value = do
+  minLen <- cfgInt cfg "min" 4
+  case value of
+    VStr s | length s >= minLen -> do
+      forms <- cleanForms s
+      valuesV <- getp cfg "values"
+      case valuesV of
+        VList r -> do
+          cur <- readIORef r
+          let have = [x | VStr x <- cur]
+              new = [f | f <- forms, length f >= minLen, f `notElem` have]
+          when (not (null new)) $
+            writeIORef r (map VStr (sortBy (comparing (Down . length)) (have ++ new)))
+        _ -> pure ()
+    _ -> pure ()
+
+cleanAddUtil :: Context -> Value -> IO ()
+cleanAddUtil ctx value = do cfg <- cleanConfigOf ctx; cleanAddCfg cfg value
+
+-- The hint is compared as a difference: 2 * hint overflows for a large one.
+maskValue :: CleanRule -> String -> String
+maskValue r value =
+  let h = crHint r
+      n = length value
+  in if h > 0 && n - h > h then crMask r ++ drop (n - h) value else crMask r
+
+cleanStr :: CleanRule -> String -> String
+cleanStr r = \text -> foldl swap text (crValues r)
+  where swap out v = if v `isInfixOf` out then strReplaceAll out v (maskValue r v) else out
+
+sensitiveKey :: [String] -> Value -> Bool
+sensitiveKey keys key = case key of
+  VStr k -> let nk = normkey k in any (`isInfixOf` nk) keys
+  _ -> False
+
+cleanKeyUtil :: Context -> Value -> IO Bool
+cleanKeyUtil ctx key = do cfg <- cleanConfigOf ctx; keys <- cfgStrings cfg "keys"; pure (sensitiveKey keys key)
+
+-- A node already on the path down: struct nodes are reference-stable, so
+-- the IORef is the identity.
+data Seen = SeenL (IORef [Value]) | SeenM (IORef [(String, Value)])
+
+instance Eq Seen where
+  SeenL a == SeenL b = a == b
+  SeenM a == SeenM b = a == b
+  _ == _ = False
+
+-- A masked plain-data copy: functions dropped, cycles cut, and nothing
+-- shared with the live value, whose spec must stay raw.
+snapshot :: CleanRule -> Value -> Int -> [Seen] -> Value -> IO Value
+snapshot r key depth seen v = case v of
+  VNoval -> pure v
+  VNull -> pure v
+  VStr s -> pure (VStr (if sensitive then maskValue r s else cleanStr r s))
+  VFunc _ -> pure VNoval
+  VList ref -> node (SeenL ref) $ do
+    its <- readIORef ref
+    xs <- mapM (\(i, x) -> snapshot r (vint i) (depth + 1) (SeenL ref : seen) x) (zip [0 :: Int ..] its)
+    mkList xs
+  VMap ref -> node (SeenM ref) $ do
+    es <- readIORef ref
+    es' <- mapM (\(k, x) -> do y <- snapshot r (VStr k) (depth + 1) (SeenM ref : seen) x; pure (k, y))
+                [(k, x) | (k, x) <- es, not (isfunc x)]
+    mkMap (cleanNames r es')
+  _ -> pure (if sensitive then VStr (crMask r) else v)
+  where
+    sensitive = sensitiveKey (crKeys r) key
+    node s body
+      | depth >= cleanMaxDepth || s `elem` seen = pure (VStr cleanCircular)
+      | sensitive = pure (VStr (crMask r))
+      | otherwise = body
+
+-- A registered value used as a property name is masked like any other
+-- string; names that mask alike take a counter, so none is lost.
+cleanNames :: CleanRule -> [(String, Value)] -> [(String, Value)]
+cleanNames r = reverse . foldl add []
+  where
+    add out (k, v) =
+      let name = cleanStr r k
+          taken n = any ((== n) . fst) out
+          bump i = let n = name ++ "#" ++ show i in if taken n then bump (i + 1) else n
+      in (if name == k || not (taken name) then name else bump (1 :: Int), v) : out
+
+-- Every scalar under a sensitive name, at any depth and of any shape: a
+-- credential mistyped as a map or a number is still a credential, and the
+-- validation error that rejects it quotes it.
+cleanAddSensitiveCfg :: Value -> Value -> IO ()
+cleanAddSensitiveCfg cfg v0 = do
+  keys <- cfgStrings cfg "keys"
+  let go under depth seen v
+        | depth >= cleanMaxDepth = pure ()
+        | otherwise = case v of
+            VStr _ -> when under (cleanAddCfg cfg v)
+            VNum _ -> when under (do t <- stringify v; cleanAddCfg cfg (VStr t))
+            VList ref | SeenL ref `notElem` seen -> do
+              its <- readIORef ref
+              mapM_ (go under (depth + 1) (SeenL ref : seen)) its
+            VMap ref | SeenM ref `notElem` seen -> do
+              es <- readIORef ref
+              mapM_ (\(k, x) -> go (under || sensitiveKey keys (VStr k)) (depth + 1) (SeenM ref : seen) x) es
+            _ -> pure ()
+  go False (0 :: Int) [] v0
+
+cleanAddSensitiveUtil :: Context -> Value -> IO ()
+cleanAddSensitiveUtil ctx v = do cfg <- cleanConfigOf ctx; cleanAddSensitiveCfg cfg v
+
+-- A shallow copy of a map without the named keys; the values are shared.
+withoutKeys :: [String] -> Value -> IO Value
+withoutKeys ks v = case v of
+  VMap ref -> do es <- readIORef ref; mkMap [(k, x) | (k, x) <- es, k `notElem` ks]
+  _ -> pure v
+
+-- The keys directly under `feature` name features, not fields: `secrets` is
+-- a feature, and its settings are not secrets for sitting under its name.
+-- Entity blocks hold per-entity settings and seeded records, never a credential.
+addSensitiveOptions :: Value -> [String] -> Value -> IO ()
+addSensitiveOptions cfg skip opts = do
+  let opt k = case opts of VMap _ -> getp opts k; _ -> pure VNoval
+      settings v = cleanAddSensitiveCfg cfg =<< withoutKeys ["entity"] v
+  rest <- withoutKeys ("feature" : "entity" : skip) opts
+  test <- opt "test"
+  case (rest, test) of
+    (VMap _, VMap _) -> setp rest "test" =<< withoutKeys ["entity"] test
+    _ -> pure ()
+  cleanAddSensitiveCfg cfg rest
+  feature <- opt "feature"
+  case feature of
+    VMap ref -> readIORef ref >>= mapM_ (settings . snd)
+    VList ref -> readIORef ref >>= mapM_ settings
+    _ -> cleanAddSensitiveCfg cfg feature
+
+cleanWithCfg :: Value -> Value -> IO Value
+cleanWithCfg cfg v = do
+  r <- cleanRule cfg
+  if crActive r then snapshot r VNoval 0 [] v else pure v
+
 cleanUtil :: Context -> Value -> IO Value
-cleanUtil _ v = pure v
+cleanUtil ctx v = do cfg <- cleanConfigOf ctx; cleanWithCfg cfg v
+
+-- The caller holds its own reference to the explain map, so the cleaned
+-- copy is written into that node rather than swapped in beside it.
+overwriteMap :: Value -> Value -> IO ()
+overwriteMap (VMap dst) (VMap src) = readIORef src >>= writeIORef dst
+overwriteMap _ _ = pure ()
+
+cleanExplain :: Context -> IO ()
+cleanExplain ctx = do
+  ctrl <- readIORef (cCtrl ctx)
+  explain <- getp ctrl "explain"
+  case explain of
+    VMap _ -> do cleaned <- cleanUtil ctx explain; overwriteMap explain cleaned
+    _ -> pure ()
+
+-- The serialised context leaves the pipeline (a logger, an error dump), so
+-- it is cleaned; the live fields stay raw for the pipeline's own use.
+contextToValue :: Context -> IO Value
+contextToValue ctx = do
+  op <- readIORef (cOp ctx)
+  opm <- jo [("entity", VStr (opEntity op)), ("name", VStr (opName op)), ("input", VStr (opInput op))]
+  spec <- readIORef (cSpec ctx)
+  result <- readIORef (cResult ctx)
+  response <- readIORef (cResponse ctx)
+  meta <- readIORef (cMeta ctx)
+  ment <- readIORef (cEntity ctx)
+  record <- jo [ ("id", VStr (cId ctx)), ("op", opm), ("spec", spec)
+               , ("entity", maybe VNoval (VStr . eName) ment)
+               , ("result", result), ("response", response), ("meta", meta) ]
+  cleanUtil ctx record
+
+-- ----- make_error / done -----
 
 makeErrorUtil :: Context -> Maybe Value -> IO Value
 makeErrorUtil ctx merr = do
@@ -235,18 +572,23 @@ makeErrorUtil ctx merr = do
       re <- getp result "err"; isE <- isErr re
       if isE then pure re else mkErr "unknown" "unknown error"
   em <- errMsg err
-  let msg = "UnivecSDK: " ++ opname ++ ": " ++ em
+  msgV <- cleanUtil ctx (VStr ("UnivecSDK: " ++ opname ++ ": " ++ em))
+  let msg = vstring msgV
   setp result "err" VNoval
   ctrl <- readIORef (cCtrl ctx)
+  -- The stage errors reach here without passing done, so the explain record
+  -- is cleaned on this path too.
+  cleanExplain ctx
   explain <- getp ctrl "explain"
   case explain of
     VMap _ -> do e2 <- jo [("message", VStr msg)]; setp explain "err" e2
     _ -> pure ()
-  ecode <- errCode err
-  rv <- resultToValue result
+  ecode <- cleanUtil ctx . VStr =<< errCode err
+  -- Cleaned COPIES: masking them can never mask the pipeline's own request.
+  rv <- cleanUtil ctx =<< resultToValue result
   specV <- readIORef (cSpec ctx)
-  sv <- case specV of VMap _ -> specToValue specV; _ -> pure VNoval
-  sdkErr <- jo [ ("__sdkerr__", VBool True), ("code", VStr ecode), ("message", VStr msg)
+  sv <- case specV of VMap _ -> cleanUtil ctx =<< specToValue specV; _ -> pure VNoval
+  sdkErr <- jo [ ("__sdkerr__", VBool True), ("code", ecode), ("message", VStr msg)
                , ("result", rv), ("spec", sv) ]
   setp ctrl "err" sdkErr
   -- Fire PreUnexpected so observability features (metrics, telemetry, audit,
@@ -261,6 +603,7 @@ makeErrorUtil ctx merr = do
 
 doneUtil :: Context -> IO Value
 doneUtil ctx = do
+  cleanExplain ctx
   ctrl <- readIORef (cCtrl ctx)
   explain <- getp ctrl "explain"
   case explain of
@@ -348,9 +691,109 @@ prepareHeadersUtil ctx = do
   cl <- cc ctx
   options <- clientOptionsMap cl
   h <- getp options "headers"
-  case h of
+  base <- case h of
     VNoval -> emptyMap
     _ -> do c <- clone h; case c of VMap _ -> pure c; _ -> emptyMap
+  point <- readIORef (cPoint ctx)
+  out <- mediaHeaders point base
+
+  -- A header argument replaces a default of the same name, whatever its case.
+  hargs <- callArgs ctx "header"
+  forM_ hargs $ \(_, wire, val) -> when (not (isNullish val)) $ do
+    let key = lowerS wire
+    ks <- keysof out
+    forM_ ks $ \k -> when (lowerS k == key) (delp out k)
+    s <- stringify val
+    setp out key (VStr s)
+
+  -- A cookie argument travels in the cookie header, form serialized and
+  -- percent-encoded, replacing a same-named cookie the caller's headers send.
+  cargs <- callArgs ctx "cookie"
+  let sent = filter (\(_, _, val) -> not (isNullish val)) cargs
+  when (not (null sent)) $ do
+    names <- fmap concat $ mapM (\(_, wire, val) -> case val of
+      VMap _ -> keysof val >>= mapM escurlS
+      _ -> pure [wire]) sent
+    ks <- keysof out
+    kept0 <- fmap concat $ mapM (\k -> if lowerS k /= "cookie" then pure [] else do
+      v <- getp out k
+      delp out k
+      pure (case v of VStr s -> cookieKeep s names; _ -> [])) ks
+    pairs <- mapM (\(_, wire, val) -> cookiePair wire val) sent
+    let kept = kept0 ++ filter (/= "") pairs
+    when (not (null kept)) (setp out "cookie" (VStr (intercalate "; " kept)))
+
+  pure out
+
+trimWs :: String -> String
+trimWs = dropWhileEnd isSpace . dropWhile isSpace
+
+lowerS :: String -> String
+lowerS = map toLower
+
+-- The form style of a cookie parameter: a list repeats the name, a map sends
+-- its own keys, and every value is percent-encoded.
+cookiePair :: String -> Value -> IO String
+cookiePair wire val = do
+  let esc v = stringify v >>= escurlS
+  pairs <- case val of
+    VList _ -> do
+      xs <- listItems val
+      mapM (\x -> do e <- esc x; pure (wire ++ "=" ++ e)) xs
+    VMap _ -> do
+      ks <- keysof val
+      mapM (\k -> do v <- getp val k; e <- esc v; ek <- escurlS k; pure (ek ++ "=" ++ e)) ks
+    _ -> do e <- esc val; pure [wire ++ "=" ++ e]
+  pure (intercalate "; " pairs)
+
+-- The caller's cookie pieces with the named cookies removed: a cookie is one
+-- `;`-delimited piece, whatever its value holds.
+cookieKeep :: String -> [String] -> [String]
+cookieKeep header names =
+  [ cookie | piece <- splitOnChar ';' header, let cookie = trimWs piece
+  , cookie /= "", trimWs (takeWhile (/= '=') cookie) `notElem` names ]
+
+isJsonMedia :: String -> Bool
+isJsonMedia t =
+  let media = lowerS (trimWs (takeWhile (/= ';') t))
+  in media == "application/json" || media == "text/json" || "+json" `isSuffixOf` media
+
+-- The declared JSON type alone, else every declared type in model order; nothing without a body.
+acceptOf :: Value -> IO (Maybe String)
+acceptOf point = do
+  res <- getp point "response"
+  media <- getStrD res "media" ""
+  kind <- getStrD res "kind" ""
+  altsV <- getp res "alternatives"
+  alts <- case altsV of VList _ -> listItems altsV; _ -> pure []
+  ms <- mapM (\a -> getStrD a "media" "") alts
+  pure (if media == "" then Nothing
+        else if kind == "json" then Just media
+        else Just (intercalate ", " (media : filter (/= "") ms)))
+
+hasHeader :: Value -> String -> IO Bool
+hasHeader headers name = any ((== name) . lowerS) <$> keysof headers
+
+-- A caller's accept wins. A declared request type replaces each JSON
+-- content-type, the SDK default, and leaves any other the caller set.
+mediaHeaders :: Value -> Value -> IO Value
+mediaHeaders point headers = do
+  accept <- acceptOf point
+  hasAccept <- hasHeader headers "accept"
+  case accept of
+    Just a | not hasAccept -> setp headers "accept" (VStr a)
+    _ -> pure ()
+  body <- getp point "body"
+  kind <- getStrD body "kind" ""
+  media <- getStrD body "media" ""
+  when ((kind == "raw" || kind == "json") && media /= "") $ do
+    ks <- keysof headers
+    forM_ ks $ \k -> when (lowerS k == "content-type") $ do
+      v <- getp headers k
+      when (isJsonMedia (vstring v)) (delp headers k)
+    hasCT <- hasHeader headers "content-type"
+    when (not hasCT) (setp headers "content-type" (VStr media))
+  pure headers
 
 paramUtil :: Context -> Value -> IO Value
 paramUtil ctx paramdef = do
@@ -378,6 +821,28 @@ paramUtil ctx paramdef = do
   if isNoval v5 && not (null akey)
     then do a <- getp reqdata akey; orElse a (getp dat akey)
     else pure v5
+
+-- A declared header, cookie or query argument of the point: the name it
+-- travels under, and the value the call passes in its match or data.
+callArgs :: Context -> String -> IO [(String, String, Value)]
+callArgs ctx kind = do
+  point <- readIORef (cPoint ctx)
+  defs <- argDefs point kind
+  reqmatch <- readIORef (cReqmatch ctx)
+  reqdata <- readIORef (cReqdata ctx)
+  fmap concat $ mapM (\ad -> do
+    name <- getStrD ad "name" ""
+    if name == "" then pure [] else do
+      orig <- getStrD ad "orig" ""
+      mv <- getp reqmatch name
+      val <- if isNullish mv then getp reqdata name else pure mv
+      pure [(name, if orig == "" then name else orig, val)]) defs
+
+argDefs :: Value -> String -> IO [Value]
+argDefs point kind = do
+  args <- getp point "args"
+  al <- case args of VMap _ -> getp args kind; _ -> pure VNoval
+  case al of VList _ -> listItems al; _ -> pure []
 
 prepareParamsUtil :: Context -> IO Value
 prepareParamsUtil ctx = do
@@ -411,18 +876,49 @@ prepareQueryUtil ctx = do
   reqmatch <- case rmV of VMap _ -> pure rmV; _ -> emptyMap
   pl <- getp point "params"
   params <- case pl of VList _ -> listItems pl; _ -> pure []
-  let containsParam s = any (\v -> case v of VStr x -> x == s; _ -> False) params
+  let argNames kind = argDefs point kind >>= mapM (\d -> getStrD d "name" "")
+
+  -- A path parameter travels in the path. The generated config lists them as
+  -- args.params, which prepareParams reads; params is the older list of names.
+  aparams <- argNames "params"
+  let inpath = [s | VStr s <- params] ++ aparams
+
+  -- A query parameter travels under the name the definition gives it, its
+  -- orig, which the model may have renamed for the caller.
+  qdefs <- argDefs point "query"
+  wires <- mapM (\d -> do n <- getStrD d "name" ""; o <- getStrD d "orig" ""; pure (n, o)) qdefs
+  let declared = [n | (n, _) <- wires, n /= ""]
+      wireOf k = case [o | (n, o) <- wires, n == k, o /= ""] of (o : _) -> o; [] -> k
+
+  -- A header or cookie parameter travels in the headers, which prepareHeaders
+  -- fills, unless a query parameter shares its name: then both are sent.
+  hnames <- argNames "header"
+  cnames <- argNames "cookie"
+  let elsewhere = filter (`notElem` declared) (hnames ++ cnames)
+
   out <- emptyMap
   ks <- keysof reqmatch
   forM_ ks $ \k -> do
     v <- getp reqmatch k
-    when (not (isNoval v) && not (containsParam k)) (setp out k v)
+    when (not (isNullish v) && k /= "$action" && k `notElem` inpath && k `notElem` elsewhere)
+      (setp out (wireOf k) v)
+
+  -- A create or update passes its query arguments in its data.
+  qargs <- callArgs ctx "query"
+  forM_ qargs $ \(name, wire, val) ->
+    when (not (isNullish val) && name `notElem` inpath) (setp out wire val)
   pure out
 
 prepareBodyUtil :: Context -> IO Value
 prepareBodyUtil ctx = do
   op <- readIORef (cOp ctx)
-  if opInput op == "data" then transformRequestUtil ctx else pure VNoval
+  if opInput op /= "data" then pure VNoval else do
+    point <- readIORef (cPoint ctx)
+    body <- getp point "body"
+    kind <- getStrD body "kind" ""
+    if kind == "raw"
+      then readIORef (cReqdata ctx) >>= \rd -> getp rd "$body"
+      else transformRequestUtil ctx
 
 -- ------------------------------------------------------------------
 -- graphql (transport)
@@ -587,15 +1083,46 @@ transformRequestUtil ctx = do
   specV <- readIORef (cSpec ctx)
   case specV of VMap _ -> setp specV "step" (VStr "reqform"); _ -> pure ()
   point <- readIORef (cPoint ctx)
-  reqdata <- readIORef (cReqdata ctx)
+  routed <- routedArgNames ctx
+  reqdata <- readIORef (cReqdata ctx) >>= \rd -> omitKeys rd routed
   tr <- toMap <$> getp point "transform"
-  case tr of
+  out <- case tr of
     VMap _ -> do
       reqform <- getp tr "req"
       case reqform of
         VNoval -> pure reqdata
         _ -> do input <- jo [("reqdata", reqdata)]; transform INone input reqform
     _ -> pure reqdata
+  omitKeys out ["$action"]
+
+-- A header, cookie or query argument travels where prepareHeaders or
+-- prepareQuery sends it, so the body is built from the request data without it,
+-- unless the point marks it as a field the body keeps.
+routedArgNames :: Context -> IO [String]
+routedArgNames ctx = do
+  args <- mapM (callArgs ctx) ["header", "cookie", "query"]
+  fields <- fieldArgNames ctx
+  pure [name | (name, _, _) <- concat args, name `notElem` fields]
+
+fieldArgNames :: Context -> IO [String]
+fieldArgNames ctx = do
+  point <- readIORef (cPoint ctx)
+  defs <- concat <$> mapM (argDefs point) ["header", "cookie", "query"]
+  fmap concat $ mapM (\ad -> do
+    name <- getStrD ad "name" ""
+    field <- getp ad "field"
+    pure [name | isTrueV field]) defs
+
+omitKeys :: Value -> [String] -> IO Value
+omitKeys v names = case v of
+  VMap _ -> do
+    ks <- keysof v
+    let hit = filter (`elem` names) ks
+    if null hit then pure v else do
+      c <- clone v
+      forM_ hit (delp c)
+      pure c
+  _ -> pure v
 
 transformResponseUtil :: Context -> IO Value
 transformResponseUtil ctx = do
@@ -670,7 +1197,65 @@ resultBodyUtil ctx = do
       when (isCallable jsn && not (isNoval body)) $ do
         d <- callJson jsn
         setp resultV "body" d
+      unr <- getp responseV "unreadable"
+      case unr of
+        VBool True -> do
+          specV <- readIORef (cSpec ctx)
+          sent <- case specV of VMap _ -> getp specV "headers"; _ -> pure VNoval
+          st <- getp resultV "status"
+          hs <- getp resultV "headers"
+          prev <- getp resultV "err"
+          e <- unreadableBody ctx (toInt st) hs body sent prev
+          setp resultV "err" e
+        _ -> pure ()
     _ -> pure ()
+
+previewLength :: Int
+previewLength = 160
+
+-- A body that is not JSON. An HTTP failure keeps its own error, with the
+-- response described; otherwise the code tells a wrong content type from
+-- malformed JSON.
+unreadableBody :: Context -> Int -> Value -> Value -> Value -> Value -> IO Value
+unreadableBody ctx status headers text sent failed = do
+  ctype <- headerText headers "content-type"
+  agent <- headerText sent "user-agent" >>= cleanText ctx
+  preview <- case text of
+    VNoval -> pure ""
+    VNull -> pure ""
+    _ -> (", body: " ++) <$> bodyPreview ctx text
+  let detail = "HTTP " ++ show status ++ ", content-type " ++ (if null ctype then "none" else ctype)
+        ++ ", user-agent " ++ (if null agent then "transport default" else agent) ++ preview
+  isE <- isErr failed
+  if isE
+    then do
+      m <- errMsg failed
+      setp failed "message" (VStr (m ++ " (" ++ detail ++ ")"))
+      pure failed
+    else if null ctype || "json" `isInfixOf` lowerS ctype
+      then mkErr "response_json_invalid" ("response: body is not valid JSON (" ++ detail ++ ")")
+      else mkErr "response_content_type" ("response: expected JSON, got " ++ ctype ++ " (" ++ detail ++ ")")
+
+headerText :: Value -> String -> IO String
+headerText headers name = case headers of
+  VMap _ -> do
+    ks <- keysof headers
+    case filter (\k -> lowerS k == name) ks of
+      (k : _) -> getp headers k >>= stringify
+      [] -> pure ""
+  _ -> pure ""
+
+cleanText :: Context -> String -> IO String
+cleanText ctx s = do
+  v <- cleanUtil ctx (VStr s)
+  pure (case v of VStr c -> c; _ -> s)
+
+-- Cleaned whole: a secret the bound would split could leave its prefix.
+bodyPreview :: Context -> Value -> IO String
+bodyPreview ctx text = do
+  raw <- stringify text
+  flat <- cleanText ctx (unwords (words raw))
+  pure (if length flat > previewLength then take previewLength flat ++ "..." else flat)
 
 resultHeadersUtil :: Context -> IO ()
 resultHeadersUtil ctx = do
@@ -700,7 +1285,7 @@ makePointUtil ctx = do
       options <- readIORef (cOptions ctx)
       av <- getpathS options "allow.op"
       let allowOp = case av of VStr s -> s; _ -> ""
-      if not (substrContains allowOp (opName op))
+      if not (allowListHas av (opName op))
         then do
           e <- mkErr "point_op_allow"
                  ("Operation \"" ++ opName op ++ "\" not allowed by SDK option allow.op value: \"" ++ allowOp ++ "\"")
@@ -826,7 +1411,7 @@ makeSpecUtil ctx = do
       setp sp "method" (VStr method)
       amv <- getpathS options "allow.method"
       let allowMethod = case amv of VStr s -> s; _ -> ""
-      if not (substrContains allowMethod method)
+      if not (allowListHas amv method)
         then do e <- mkErr "spec_method_allow" ("Method \"" ++ method ++ "\" not allowed by SDK option allow.method value: \"" ++ allowMethod ++ "\""); pure (VNoval, Just e)
         else do
           params <- prepareParamsUtil ctx; setp sp "params" params
@@ -1081,7 +1666,7 @@ optSpecValue = do
   -- reject the SDK's own config; the {name} substitution into base is a
   -- separate concern.
   srv <- jo [("`$CHILD`", VStr "")]
-  allow <- jo [("method", VStr "GET,PUT,POST,PATCH,DELETE,OPTIONS"), ("op", VStr "create,update,load,list,remove,command,direct,graphql")]
+  allow <- jo [("method", VStr "GET,PUT,POST,PATCH,DELETE,OPTIONS"), ("op", VStr "create,update,patch,load,list,remove,command,direct,graphql")]
   entChild <- do a <- emptyMap; jo [("`$OPEN`", VBool True), ("active", VBool False), ("alias", a)]
   ent <- jo [("`$CHILD`", entChild)]
   featChild <- jo [("`$OPEN`", VBool True), ("active", VBool False)]
@@ -1090,7 +1675,7 @@ optSpecValue = do
   sysm <- emptyMap
   testEnt <- jo [("`$OPEN`", VBool True)]
   test <- jo [("active", VBool False), ("entity", testEnt)]
-  clean <- jo [("keys", VStr "key,token,id")]
+  clean <- cleanOptSpec
   jo [ ("apikey", VStr ""), ("base", VStr "http://localhost:8000"), ("prefix", VStr ""), ("suffix", VStr "")
      , ("auth", auth), ("headers", hdrs), ("server", srv), ("allow", allow), ("entity", ent), ("feature", feat)
      , ("utility", utilm), ("system", sysm), ("test", test), ("clean", clean) ]
@@ -1109,6 +1694,25 @@ makeOptionsUtil ctx = do
     _ -> pure ()
   optsC <- clone options
   opts0 <- case optsC of VMap _ -> pure optsC; _ -> emptyMap
+  configV <- readIORef (cConfig ctx)
+  config <- case configV of VMap _ -> pure configV; _ -> emptyMap
+  cfgoptsV <- toMap <$> getp config "options"
+  -- A copy, like optsC: merge writes each merged child back into the map it walks.
+  cfgopts <- case cfgoptsV of VMap _ -> clone cfgoptsV; _ -> emptyMap
+  -- The secret registry exists BEFORE validation, fed from the raw input, so
+  -- the constructor's own rejection of a mistyped credential is clean too.
+  cfgclean <- getp cfgopts "clean"
+  cfgcleanM <- case cfgclean of VMap _ -> clone cfgclean; _ -> emptyMap
+  rawclean <- getp opts0 "clean"
+  rawcleanM <- case rawclean of VMap _ -> clone rawclean; _ -> emptyMap
+  specclean <- cleanOptSpec
+  emc <- emptyMap
+  cleanmerged <- merge =<< ja [emc, specclean, cfgcleanM, rawcleanM]
+  cleancfg <- makeCleanConfig cleanmerged
+  addSensitiveOptions cleancfg ["clean"] opts0
+  cvals <- concat <$> mapM (\cl -> case cl of VMap _ -> splitvalues =<< getp cl "values"; _ -> pure [])
+                          [cfgclean, rawclean]
+  forM_ (map VStr cvals) (cleanAddCfg cleancfg)
   -- Feature add-order. options.feature may be given as an ordered LIST of
   -- {name, active, ...opts} entries (list position = add order) or a
   -- {name => {opts}} map. Normalize a list to a map (so merge/validate/init
@@ -1133,16 +1737,16 @@ makeOptionsUtil ctx = do
       setp opts0 "feature" fmap'
       pure (Just order)
     _ -> pure Nothing
-  configV <- readIORef (cConfig ctx)
-  config <- case configV of VMap _ -> pure configV; _ -> emptyMap
-  cfgoptsV <- toMap <$> getp config "options"
-  cfgopts <- case cfgoptsV of VMap _ -> pure cfgoptsV; _ -> emptyMap
   optspec <- optSpecValue
   sysFetch <- getpathS opts0 "system.fetch"
   em <- emptyMap
   mlist <- ja [em, cfgopts, opts0]
   merged <- merge mlist
-  validated <- validate INone merged optspec
+  attempt <- try (validate INone merged optspec) :: IO (Either StructError Value)
+  validated <- case attempt of
+    Right v -> pure v
+    -- The rejection quotes the offending value.
+    Left (StructError m) -> do r <- cleanRule cleancfg; throwIO (StructError (cleanStr r m))
   opts <- case validated of VMap _ -> pure validated; _ -> emptyMap
   -- Resolve a templated base URL (e.g. https://{tenant_id}.hanko.io).
   -- Every placeholder must resolve to a non-empty value: from options.server
@@ -1197,13 +1801,7 @@ makeOptionsUtil ctx = do
     case sys of
       VMap _ -> setp sys "fetch" sysFetch
       _ -> do s <- jo [("fetch", sysFetch)]; setp opts "system" s
-  ckv <- getpathS opts "clean.keys"
-  let cleanKeys = case ckv of VStr s -> s; _ -> "key,token,id"
-  parts <- fmap concat $ mapM (\p -> let t = strip p in if t == "" then pure [] else do e <- escreS t; pure [e]) (splitOnChar ',' cleanKeys)
-  let keyre = intercalate' "|" parts
-  cleanEmpty <- emptyMap
-  derived <- jo [("clean", cleanEmpty)]
-  when (keyre /= "") $ do cm <- jo [("keyre", VStr keyre)]; setp derived "clean" cm
+  derived <- jo [("clean", cleancfg)]
   -- Resolve the feature add-order: an explicit list order (above) wins;
   -- otherwise order the map test-first, then the remaining names sorted
   -- (keysof returns sorted keys), so the result is deterministic.
@@ -1216,12 +1814,9 @@ makeOptionsUtil ctx = do
   orderList <- ja (map VStr featureOrder)
   setp derived "featureorder" orderList
   setp opts "__derived__" derived
+  -- Again over the merged result: the config's own defaults can carry one.
+  addSensitiveOptions cleancfg ["clean", "__derived__"] opts
   pure opts
-
-intercalate' :: String -> [String] -> String
-intercalate' _ [] = ""
-intercalate' _ [x] = x
-intercalate' sep (x : xs) = x ++ sep ++ intercalate' sep xs
 
 -- ------------------------------------------------------------------
 -- struct api exposure (utility.struct)

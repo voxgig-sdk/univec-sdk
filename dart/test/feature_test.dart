@@ -6,6 +6,7 @@
 import 'harness.dart';
 import 'feature/harness.dart';
 
+import '../lib/UnivecSDK.dart';
 import '../lib/utility/ErrUtility.dart';
 
 class Recording {
@@ -580,7 +581,7 @@ void tests() {
           final entries = h.client.track['debug']['entries'];
           equal(1, entries.length); // ring buffer capped at max
           equal(2, seen.length);
-          equal('<redacted>', seen[0]['headers']['authorization']);
+          equal('[redacted]', seen[0]['headers']['authorization']);
         });
 
         test('captures failures', (t) async {
@@ -793,6 +794,32 @@ void tests() {
               base: 'http://api.test');
           await h.op({'op': 'load'});
           equal(null, rec.calls[0]['fetchdef']['proxy']);
+        });
+
+        test('registers its userinfo, a password holding a colon whole',
+            (t) async {
+          final sdk = UnivecSDK({
+            'feature': {
+              'proxy': {
+                'active': true,
+                'url': 'http://user:abc:def@proxy.local:8080'
+              }
+            }
+          });
+          equal('pw [redacted]', sdk.utility().clean(sdk.rootctx, 'pw abc:def'));
+        });
+
+        test('registers a percent-encoded password decoded as UTF-8',
+            (t) async {
+          final sdk = UnivecSDK({
+            'feature': {
+              'proxy': {
+                'active': true,
+                'url': 'http://user:p%C3%A4ss@proxy.local:8080'
+              }
+            }
+          });
+          equal('pw [redacted]', sdk.utility().clean(sdk.rootctx, 'pw päss'));
         });
       });
     }
@@ -1172,7 +1199,7 @@ void tests() {
           'headers': {'x-secret': 'hide', 'x-ok': 'show'}
         });
         final e = h.client.track['debug']['entries'][0];
-        equal('<redacted>', e['headers']['x-secret']);
+        equal('[redacted]', e['headers']['x-secret']);
         equal('show', e['headers']['x-ok']);
       });
     }

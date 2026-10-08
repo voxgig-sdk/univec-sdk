@@ -3,7 +3,11 @@ const { SDK } = require('..')
 const { runLiveScenarios } = require('./live-scenarios')
 const { loadEnvLocal } = require('./utility')
 loadEnvLocal(__dirname + '/../.env.local')
-test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' }, async () => {
+// main.kit.test.live.strict is true (the default is true): a live
+// request that fails, or a live test missing an input it needs,
+// fails the test.
+// An account with no record for a test to read skips it either way.
+test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' }, async (t) => {
   await runLiveScenarios(SDK, [
   {
     "entity": "convert",
@@ -1721,5 +1725,5 @@ test('live operation coverage', { skip: process.env.UNIVEC_TEST_LIVE !== 'TRUE' 
     },
     "reachable": true
   }
-], 'UNIVEC', { server: {  }, secret: process.env.UNIVEC_SECRET })
+], 'UNIVEC', { server: {  }, secret: process.env.UNIVEC_SECRET }, { strict: true, t })
 })

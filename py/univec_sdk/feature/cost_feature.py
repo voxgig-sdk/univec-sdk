@@ -249,7 +249,7 @@ class UnivecCostFeature(UnivecBaseFeature):
         self._bump(cost["actors"], actor, amount)
 
         self.seq += 1
-        record = {
+        record = ctx.utility.clean(ctx, {
             "seq": self.seq,
             "entity": entity,
             "op": opname,
@@ -258,7 +258,7 @@ class UnivecCostFeature(UnivecBaseFeature):
             "currency": cost["currency"],
             "source": source,
             "attempts": pending["attempts"],
-        }
+        })
         cost["last"] = record
 
         sink = self.options.get("sink")

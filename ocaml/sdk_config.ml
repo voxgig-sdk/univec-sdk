@@ -254,6 +254,7 @@ let make_config () : value =
           ("ms", (Num (30000.))) ]));
         ("optspec", (jo [
           ("clearTimer", (Str "`$FUNCTION`"));
+          ("now", (Str "`$FUNCTION`"));
           ("setTimer", (Str "`$FUNCTION`")) ]));
         ("strict", (Bool false));
         ("transport", (Str "wrap")) ])) ]));
@@ -379,7 +380,10 @@ let make_config () : value =
                         ("where", (jo [
                           ("modelType", (Str "embed")) ])) ]));
                       ("where", (jo [
-                        ("modelType", (Str "convert")) ])) ])) ])) ])) ]);
+                        ("modelType", (Str "convert")) ])) ])) ])) ]));
+                ("response", (jo [
+                  ("kind", (Str "json"));
+                  ("media", (Str "application/json")) ])) ]);
               (jo [
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
@@ -464,7 +468,10 @@ let make_config () : value =
                       ("where", (jo [
                         ("modelType", (Str "convert")) ])) ]));
                     ("texts", (ja [
-                      (Str "SDK live coverage test.") ])) ])) ])) ]);
+                      (Str "SDK live coverage test.") ])) ])) ]));
+                ("response", (jo [
+                  ("kind", (Str "json"));
+                  ("media", (Str "application/json")) ])) ]);
               (jo [
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
@@ -556,7 +563,10 @@ let make_config () : value =
                         ("where", (jo [
                           ("modelType", (Str "embed")) ])) ]));
                       ("where", (jo [
-                        ("modelType", (Str "convert")) ])) ])) ])) ])) ]);
+                        ("modelType", (Str "convert")) ])) ])) ])) ]));
+                ("response", (jo [
+                  ("kind", (Str "json"));
+                  ("media", (Str "application/json")) ])) ]);
               (jo [
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
@@ -647,7 +657,10 @@ let make_config () : value =
                       ("where", (jo [
                         ("modelType", (Str "convert")) ])) ]));
                     ("texts", (ja [
-                      (Str "SDK live coverage test.") ])) ])) ])) ]) ])) ])) ]));
+                      (Str "SDK live coverage test.") ])) ])) ]));
+                ("response", (jo [
+                  ("kind", (Str "json"));
+                  ("media", (Str "application/json")) ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("embed", (jo [
@@ -737,7 +750,10 @@ let make_config () : value =
                       ("where", (jo [
                         ("modelType", (Str "convert")) ])) ]));
                     ("texts", (ja [
-                      (Str "SDK live coverage test.") ])) ])) ])) ]);
+                      (Str "SDK live coverage test.") ])) ])) ]));
+                ("response", (jo [
+                  ("kind", (Str "json"));
+                  ("media", (Str "application/json")) ])) ]);
               (jo [
                 ("kind", (Str "http"));
                 ("method", (Str "POST"));
@@ -806,7 +822,10 @@ let make_config () : value =
                       ("where", (jo [
                         ("modelType", (Str "convert")) ])) ]));
                     ("texts", (ja [
-                      (Str "SDK live coverage test.") ])) ])) ])) ]) ])) ])) ]));
+                      (Str "SDK live coverage test.") ])) ])) ]));
+                ("response", (jo [
+                  ("kind", (Str "json"));
+                  ("media", (Str "application/json")) ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("ephemeral_key", (jo [
@@ -869,7 +888,10 @@ let make_config () : value =
                       (Str "key") ])) ]));
                   ("auth", (Str "public"));
                   ("id", (Str "key"));
-                  ("retention", (Str "No deletion endpoint; issued key is subject to the service daily allowance")) ])) ]) ])) ])) ]));
+                  ("retention", (Str "No deletion endpoint; issued key is subject to the service daily allowance")) ]));
+                ("response", (jo [
+                  ("kind", (Str "json"));
+                  ("media", (Str "application/json")) ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ]));
       ("model", (jo [
@@ -957,7 +979,10 @@ let make_config () : value =
                     ("nonempty", (ja [
                       (Str "") ])) ]));
                   ("auth", (Str "public"));
-                  ("id", (Str "models")) ])) ]) ])) ])) ]));
+                  ("id", (Str "models")) ]));
+                ("response", (jo [
+                  ("kind", (Str "json"));
+                  ("media", (Str "application/json")) ])) ]) ])) ])) ]));
         ("relations", (jo [
           ("ancestors", (empty_list ())) ])) ])) ])) ])
 

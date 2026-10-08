@@ -9,6 +9,7 @@ public static partial class SdkUtility
     public static void RegisterAll(Utility u)
     {
         u.Clean = CleanUtil;
+        u.CleanAdd = CleanAddUtil;
         u.Done = DoneUtil;
         u.MakeError = MakeErrorUtil;
         u.FeatureAdd = FeatureAddUtil;

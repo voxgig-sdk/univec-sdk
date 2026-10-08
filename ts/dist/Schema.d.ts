@@ -12,7 +12,12 @@ declare const OPTSPEC: {
     };
     base: string;
     clean: {
+        active: boolean;
+        hint: string;
         keys: string;
+        mask: string;
+        min: string;
+        values: string;
     };
     entity: {
         "`$CHILD`": {
@@ -208,6 +213,7 @@ declare const OPTSPEC: {
             active: string[];
             ms: string[];
             clearTimer: string[];
+            now: string[];
             setTimer: string[];
         })[];
     };

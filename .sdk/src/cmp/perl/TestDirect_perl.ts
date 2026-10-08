@@ -15,9 +15,25 @@ import {
   serverVarEnv,
   serverVariables,
   pointParts,
+  liveStrict,
+  liveStrictNote,
 } from '@voxgig/sdkgen'
 
 import { perlStringLiteral } from './utility_perl'
+
+
+// Blocked without the ids its request needs, rather than sent with undef.
+function liveKeysBlock(N: string, label: string, block: string, keys: string[],
+  entidEnvVar: string): string {
+  return 0 === keys.length ? '' : `  if ($setup->{live}) {
+    my @missing = grep { !defined $setup->{idmap}{$_} } (${keys.map((k) => `'${k}'`).join(', ')});
+    if (@missing) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live test blocked: needs ' . join(', ', @missing) . ' via ${entidEnvVar}');
+      last ${block};
+    }
+  }
+`
+}
 
 
 function normalizePathParams(
@@ -73,6 +89,7 @@ const TestDirect = cmp(function TestDirect(props: any) {
   const model: Model = ctx$.model
 
   const entity: ModelEntity = props.entity
+  const target = props.target
 
   const N = model.const.Name
   const PROJECTNAME = envName(model)
@@ -152,6 +169,10 @@ const TestDirect = cmp(function TestDirect(props: any) {
 
   const entidEnvVar = `${PROJECTNAME}_TEST_${envToken(entity.name)}_ENTID`
 
+  // The *_ENTID key a live test reads a parameter's value from.
+  const liveKey = (param: any): string =>
+    ('id' === param.n ? entity.name : param.n.replace(/_id$/, '')) + '01'
+
   File({ name: entity.name + '_direct.t' }, () => {
 
     Content(`#!perl
@@ -167,102 +188,63 @@ use Cwd ();
 use ${N}SDK;
 require(Cwd::abs_path("$FindBin::Bin/runner.pm"));
 
+${liveStrictNote(liveStrict(model, target.name), '#')}
+use constant LIVE_STRICT => ${liveStrict(model, target.name) ? 1 : 0};
+
+sub live_ok {
+  my ($result) = @_;
+  my $status = ${N}Helpers::to_int($result->{status});
+  return !defined $result->{err} && $result->{ok} && $status >= 200 && $status < 300;
+}
+
 `)
 
     if (hasList && listPoint) {
-      const listLiveIdKeys: string[] = listParams.map((lp: any) => {
-        return lp.n === 'id'
-          ? entity.name + '01'
-          : lp.n.replace(/_id$/, '') + '01'
-      })
-      const listSkipBlock = listLiveIdKeys.length > 0
-        ? `  if ($setup->{live}) {
-    for my $_live_key (${listLiveIdKeys.map(k => `'${k}'`).join(', ')}) {
-      if (!defined $setup->{idmap}{$_live_key}) {
-        note("live test needs $_live_key via *_ENTID env var (synthetic IDs only)");
-        pass('direct-list-${entity.name}: skipped');
-        last DIRECT_LIST;
-      }
-    }
-  }
-`
-        : ''
+      const label = 'direct-list-' + entity.name
       Content(`DIRECT_LIST: {
   my $setup = ${entity.name}_direct_setup([
     { 'id' => 'direct01' },
     { 'id' => 'direct02' },
   ]);
   my ($_should_skip, $_reason) = ${N}TestRunner::is_control_skipped(
-    'direct', 'direct-list-${entity.name}', $setup->{live} ? 'live' : 'unit');
+    'direct', '${label}', $setup->{live} ? 'live' : 'unit');
   if ($_should_skip) {
     note($_reason || 'skipped via sdk-test-control.json');
-    pass('direct-list-${entity.name}: skipped via sdk-test-control.json');
+    pass('${label}: skipped via sdk-test-control.json');
     last DIRECT_LIST;
   }
-${listSkipBlock}  my $client = $setup->{client};
+${liveKeysBlock(N, label, 'DIRECT_LIST', listParams.map(liveKey), entidEnvVar)}  my $client = $setup->{client};
 
+  my $params = {};
 `)
-
-      if (listParams.length > 0) {
-        Content(`  my $params = {};
+      listParams.forEach((lp: any, i: number) => {
+        Content(`  $params->{'${lp.n}'} = $setup->{live} ? $setup->{idmap}{'${liveKey(lp)}'} : 'direct0${i + 1}';
 `)
-        for (const lp of listParams) {
-          const key = lp.n === 'id'
-            ? entity.name + '01'
-            : lp.n.replace(/_id$/, '') + '01'
-          Content(`  if ($setup->{live}) {
-    $params->{'${lp.n}'} = $setup->{idmap}{'${key}'};
-  }
-  else {
-    $params->{'${lp.n}'} = 'direct01';
-  }
-`)
-        }
-        Content(`
+      })
+      Content(`
   my $result = $client->direct({
     'path' => '${listPath}',
     'method' => 'GET',
     'params' => $params,
   });
-`)
-      } else {
-        Content(`  my $result = $client->direct({
-    'path' => '${listPath}',
-    'method' => 'GET',
-    'params' => {},
-  });
-`)
-      }
-
-      Content(`  if ($setup->{live}) {
-    # Live mode is lenient: synthetic IDs frequently 4xx and the list-
-    # response shape varies wildly across public APIs. Skip rather than
-    # fail when the call doesn't return a usable list.
-    if (defined $result->{err}) {
-      note("list call failed (likely synthetic IDs against live API): $result->{err}");
-      pass('direct-list-${entity.name}: skipped (live)');
+  if ($setup->{live}) {
+    if (!live_ok($result)) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live list failed: ' . ${N}TestRunner::live_describe($result));
       last DIRECT_LIST;
     }
-    unless ($result->{ok}) {
-      note('list call not ok (likely synthetic IDs against live API)');
-      pass('direct-list-${entity.name}: skipped (live)');
+    if (!defined ${N}TestRunner::live_list($result->{data})) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live list returned no list: ' . ${N}TestRunner::live_describe($result));
       last DIRECT_LIST;
     }
-    my $status = ${N}Helpers::to_int($result->{status});
-    if ($status < 200 || $status >= 300) {
-      note("expected 2xx status, got $status");
-      pass('direct-list-${entity.name}: skipped (live)');
-      last DIRECT_LIST;
-    }
-    pass('direct-list-${entity.name}: live ok');
+    pass('${label}: live ok');
   }
   else {
-    ok(!defined $result->{err}, 'direct-list-${entity.name}: no error');
-    ok($result->{ok}, 'direct-list-${entity.name}: ok');
-    is(${N}Helpers::to_int($result->{status}), 200, 'direct-list-${entity.name}: status');
-    ok(Voxgig::Struct::islist($result->{data}), 'direct-list-${entity.name}: data is array');
-    is(scalar @{ $result->{data} }, 2, 'direct-list-${entity.name}: data length');
-    is(scalar @{ $setup->{calls} }, 1, 'direct-list-${entity.name}: 1 call');
+    ok(!defined $result->{err}, '${label}: no error');
+    ok($result->{ok}, '${label}: ok');
+    is(${N}Helpers::to_int($result->{status}), 200, '${label}: status');
+    ok(Voxgig::Struct::islist($result->{data}), '${label}: data is array');
+    is(scalar @{ $result->{data} }, 2, '${label}: data length');
+    is(scalar @{ $setup->{calls} }, 1, '${label}: 1 call');
   }
 }
 
@@ -270,114 +252,103 @@ ${listSkipBlock}  my $client = $setup->{client};
     }
 
     if (hasLoad && loadPoint) {
-      const loadSkipBlock = (loadParams.length > 0 && !loadAllHaveExamples)
-        ? `  if ($setup->{live}) {
-    note('live direct-load needs real ID - set *_ENTID env var with real IDs to run');
-    pass('direct-load-${entity.name}: skipped (live)');
-    last DIRECT_LOAD;
-  }
-`
-        : ''
+      const label = 'direct-load-' + entity.name
+      const discover = !loadAllHaveExamples && hasList && 0 < loadParams.length
+      const idParam = loadParams.find((p: any) => 'id' === p.n)?.n ?? loadParams[0]?.n ?? 'id'
+      const loadLiveIdKeys: string[] = loadAllHaveExamples ? [] :
+        discover ? listParams.map(liveKey).concat(loadParams.filter((p: any) => idParam !== p.n).map(liveKey)) :
+          loadParams.map(liveKey)
       Content(`DIRECT_LOAD: {
   my $setup = ${entity.name}_direct_setup({ 'id' => 'direct01' });
   my ($_should_skip, $_reason) = ${N}TestRunner::is_control_skipped(
-    'direct', 'direct-load-${entity.name}', $setup->{live} ? 'live' : 'unit');
+    'direct', '${label}', $setup->{live} ? 'live' : 'unit');
   if ($_should_skip) {
     note($_reason || 'skipped via sdk-test-control.json');
-    pass('direct-load-${entity.name}: skipped via sdk-test-control.json');
+    pass('${label}: skipped via sdk-test-control.json');
     last DIRECT_LOAD;
   }
-${loadSkipBlock}  my $client = $setup->{client};
+${liveKeysBlock(N, label, 'DIRECT_LOAD', [...new Set(loadLiveIdKeys)], entidEnvVar)}  my $client = $setup->{client};
 
-`)
-
-      const needsQuery = loadParams.length > 0 || loadLiveQueryLines !== ''
-      if (needsQuery) {
-        Content(`  my $params = {};
+  my $params = {};
   my $query = {};
+  if ($setup->{live}) {
+${loadLiveQueryLines ? loadLiveQueryLines + '\n' : ''}`)
+      if (loadAllHaveExamples) {
+        Content(loadExampleLines + '\n')
+      }
+      else if (discover) {
+        Content(`    my $list_result = $client->direct({
+      'path' => '${listPath}',
+      'method' => 'GET',
+      'params' => {${listParams.map((p: any) => `'${p.n}' => $setup->{idmap}{'${liveKey(p)}'}`).join(', ')}},
+    });
+    if (!live_ok($list_result)) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live list discovery failed: ' . ${N}TestRunner::live_describe($list_result));
+      last DIRECT_LOAD;
+    }
+    my $records = ${N}TestRunner::live_list($list_result->{data});
+    if (!defined $records) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live list discovery returned no list: ' . ${N}TestRunner::live_describe($list_result));
+      last DIRECT_LOAD;
+    }
+    if (!@$records) {
+      ${N}TestRunner::live_empty('${label}', 'The account has no ${entity.name} record to load');
+      last DIRECT_LOAD;
+    }
+    my $first = ref $records->[0] eq 'HASH' ? $records->[0] : {};
+    my $found = $first->{'${idParam}'} // $first->{'id'};
+    if (!defined $found) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live load blocked: discovery returned no usable identity');
+      last DIRECT_LOAD;
+    }
+    $params->{'${idParam}'} = $found;
 `)
-        if (loadAllHaveExamples) {
-          Content(`  if ($setup->{live}) {
-`)
-          if (loadLiveQueryLines) Content(loadLiveQueryLines + '\n')
-          Content(loadExampleLines + '\n')
-          Content(`  }
-  else {
-`)
-          for (let i = 0; i < loadParams.length; i++) {
-            Content(`    $params->{'${loadParams[i].n}'} = 'direct0${i + 1}';
-`)
-          }
-          Content(`  }
-`)
-        } else if (loadParams.length > 0) {
-          if (loadLiveQueryLines) {
-            Content(`  if ($setup->{live}) {
-${loadLiveQueryLines}
-  }
-`)
-          }
-          Content(`  unless ($setup->{live}) {
-`)
-          for (let i = 0; i < loadParams.length; i++) {
-            Content(`    $params->{'${loadParams[i].n}'} = 'direct0${i + 1}';
-`)
-          }
-          Content(`  }
-`)
-        } else if (loadLiveQueryLines) {
-          Content(`  if ($setup->{live}) {
-${loadLiveQueryLines}
-  }
+        for (const p of loadParams.filter((p: any) => idParam !== p.n)) {
+          Content(`    $params->{'${p.n}'} = $setup->{idmap}{'${liveKey(p)}'};
 `)
         }
       }
+      else {
+        for (const p of loadParams) {
+          Content(`    $params->{'${p.n}'} = $setup->{idmap}{'${liveKey(p)}'};
+`)
+        }
+      }
+      Content(`  }
+  else {
+`)
+      for (let i = 0; i < loadParams.length; i++) {
+        Content(`    $params->{'${loadParams[i].n}'} = 'direct0${i + 1}';
+`)
+      }
+      Content(`  }
 
-      Content(`
   my $result = $client->direct({
     'path' => '${loadPath}',
     'method' => 'GET',
-`)
-      if (needsQuery) {
-        Content(`    'params' => $params,
+    'params' => $params,
     'query' => $query,
-`)
-      } else {
-        Content(`    'params' => {},
-`)
-      }
-      Content(`  });
+  });
   if ($setup->{live}) {
-    # Live mode is lenient: synthetic IDs frequently 4xx. Skip rather
-    # than fail when the load endpoint isn't reachable with the IDs
-    # we can construct from setup idmap.
-    if (defined $result->{err}) {
-      note("load call failed (likely synthetic IDs against live API): $result->{err}");
-      pass('direct-load-${entity.name}: skipped (live)');
+    if (!live_ok($result)) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live load failed: ' . ${N}TestRunner::live_describe($result));
       last DIRECT_LOAD;
     }
-    unless ($result->{ok}) {
-      note('load call not ok (likely synthetic IDs against live API)');
-      pass('direct-load-${entity.name}: skipped (live)');
+    if (!defined $result->{data}) {
+      ${N}TestRunner::live_miss(LIVE_STRICT, '${label}', 'Live load returned no data: ' . ${N}TestRunner::live_describe($result));
       last DIRECT_LOAD;
     }
-    my $status = ${N}Helpers::to_int($result->{status});
-    if ($status < 200 || $status >= 300) {
-      note("expected 2xx status, got $status");
-      pass('direct-load-${entity.name}: skipped (live)');
-      last DIRECT_LOAD;
-    }
-    pass('direct-load-${entity.name}: live ok');
+    pass('${label}: live ok');
   }
   else {
-    ok(!defined $result->{err}, 'direct-load-${entity.name}: no error');
-    ok($result->{ok}, 'direct-load-${entity.name}: ok');
-    is(${N}Helpers::to_int($result->{status}), 200, 'direct-load-${entity.name}: status');
-    ok(defined $result->{data}, 'direct-load-${entity.name}: data');
+    ok(!defined $result->{err}, '${label}: no error');
+    ok($result->{ok}, '${label}: ok');
+    is(${N}Helpers::to_int($result->{status}), 200, '${label}: status');
+    ok(defined $result->{data}, '${label}: data');
     if (Voxgig::Struct::ismap($result->{data})) {
-      is($result->{data}{id}, 'direct01', 'direct-load-${entity.name}: id');
+      is($result->{data}{id}, 'direct01', '${label}: id');
     }
-    is(scalar @{ $setup->{calls} }, 1, 'direct-load-${entity.name}: 1 call');
+    is(scalar @{ $setup->{calls} }, 1, '${label}: 1 call');
   }
 }
 
@@ -405,11 +376,12 @@ sub ${entity.name}_direct_setup {
     my $client = ${N}SDK->new({
       %{ ${N}TestRunner::live_client_options() },${apikeyLiveField}${serverLiveField}
     });
+    my $idmap = $env->{'${entidEnvVar}'};
     return {
       'client' => $client,
       'calls' => $calls,
       'live' => 1,
-      'idmap' => {},
+      'idmap' => ref $idmap eq 'HASH' ? $idmap : {},
     };
   }
 

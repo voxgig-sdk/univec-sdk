@@ -1,5 +1,5 @@
 
-import { cmp, Content, isAuthActive, envName, entityIdField, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, entityIdField, opRequestShape, elixirAccessor, entityCollection, exampleVarName } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -7,7 +7,7 @@ import {
   nom,
 } from '@voxgig/apidef'
 
-import { elixirLit } from './utility_elixir'
+import { elixirLit, elixirListArgs } from './utility_elixir'
 
 
 const ReadmeTopQuick = cmp(function ReadmeTopQuick(props: any) {
@@ -32,18 +32,21 @@ sdk = ${ctor}
 
   if (exampleEntity) {
     const eName = nom(exampleEntity, 'Name')
-    const eVar = exampleEntity.name
+    const eVar = exampleVarName(exampleEntity.name, 'elixir')
+    const eCall = elixirAccessor(exampleEntity, entityCollection(model))
     const opnames = Object.keys(exampleEntity.op || {})
     const idF = entityIdField(exampleEntity)
 
-    Content(`${eVar} = ${Name}.${eVar}(sdk)
+    Content(`${eVar} = ${Name}.${eCall}(sdk)
 `)
 
     if (opnames.includes('list')) {
       Content(`
-# List all ${eName.toLowerCase()} records (raises on error)
-records = ${Name}.Entity.${eName}.list(${eVar})
-IO.inspect(records)
+# List all ${eName.toLowerCase()}s (a list of entities, one per record; raises on error)
+${eVar}s = ${Name}.Entity.${eName}.list(${eVar}${elixirListArgs(exampleEntity, Name)})
+for i <- 0..(Voxgig.Struct.size(${eVar}s) - 1)//1 do
+  IO.puts(Voxgig.Struct.jsonify(${Name}.Entity.${eName}.data_get(Voxgig.Struct.getelem(${eVar}s, i))))
+end
 `)
     }
 
@@ -64,9 +67,9 @@ IO.inspect(records)
             it.name === idF ? 'example_id' : 'example_' + it.name)}`).join(', ')}})`
         : eVar
       Content(`
-# Load a specific ${eName.toLowerCase()} (returns the record, raises on error)
-record = ${Name}.Entity.${eName}.load(${loadArgs})
-IO.inspect(record)
+# Load a specific ${eName.toLowerCase()} (returns the entity, raises on error)
+${eVar} = ${Name}.Entity.${eName}.load(${loadArgs})
+IO.puts(Voxgig.Struct.jsonify(${Name}.Entity.${eName}.data_get(${eVar})))
 `)
     }
   }

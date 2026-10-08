@@ -15,7 +15,7 @@ keeps the cognitive load low.
 
 ## Install
 This package is not yet published to NuGet. Install it from the GitHub
-release tag (`csharp/vX.Y.Z`, see [Releases](https://github.com/voxgig-sdk/univec-sdk/releases)) or
+release tag (`csharp/vX.Y.Z`, see [Tags](https://github.com/voxgig-sdk/univec-sdk/tags)) or
 from a source checkout — build the library and add a project reference:
 
 ```bash
@@ -32,6 +32,7 @@ loading a specific record.
 
 ```csharp
 using UnivecSdk;
+using Voxgig.Struct;
 
 var client = new UnivecSDK(new Dictionary<string, object?>
 {
@@ -42,7 +43,7 @@ var client = new UnivecSDK(new Dictionary<string, object?>
 ### 4. Create, update, and remove
 
 ```csharp
-// Create — returns the bare created record (as object?)
+// Create — returns the created entity (as object?)
 var created = client.Convert().Create(new Dictionary<string, object?> { ["embeddings"] = new List<object?>(), ["source_model"] = "example_source_model", ["target_model"] = "example_target_model" });
 
 ```
@@ -55,14 +56,15 @@ Entity operations reject on failure, so wrap them in `try` / `catch`:
 ```ts
 try {
   const models = await client.Model().list()
-  console.log(models)
+  console.log(models.map((item) => item.data()))
 } catch (err) {
   console.error('list failed:', err)
 }
 ```
 
 The low-level `direct()` method does **not** throw — it returns the
-value or an `Error`, so check the result before using it:
+result envelope. Branch on `ok`; on failure `status` holds the HTTP status
+(for error responses) and `err` holds the error:
 
 ```ts
 const result = await client.direct({
@@ -71,8 +73,8 @@ const result = await client.direct({
   params: { id: 'example_id' },
 })
 
-if (result instanceof Error) {
-  throw result
+if (!result.ok) {
+  console.error('request failed:', result.status, result.err)
 }
 ```
 
@@ -130,10 +132,12 @@ Create a mock client for unit testing — no server required:
 ```csharp
 var client = UnivecSDK.TestSDK(null, null);
 
-// Entity ops return the bare record and raise on error.
-var model = client.Model().List(null);
-// model holds the mock response record
-Console.WriteLine(model);
+// List returns a list of entities, one per mock record; it raises on error.
+var modelList = (List<object?>)client.Model().List(null)!;
+foreach (var modelItem in modelList)
+{
+    Console.WriteLine(StructUtils.Jsonify(((IEntity)modelItem!).Data()));
+}
 ```
 
 ### Use a custom fetch function
@@ -225,8 +229,8 @@ All entities share the same interface.
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `List` | `(reqmatch, ctrl) -> object?` | List entities matching the criteria (an aggregate list). Raises on error. |
-| `Create` | `(reqdata, ctrl) -> object?` | Create a new entity. Raises on error. |
+| `List` | `(reqmatch, ctrl) -> object?` | List entities matching the criteria, one per record. Raises on error. |
+| `Create` | `(reqdata, ctrl) -> object?` | Create a new entity, and return it. Raises on error. |
 | `Data` | `(newdata) -> object?` | Get or set entity data. |
 | `Match` | `(newmatch) -> object?` | Get or set entity match criteria. |
 | `Make` | `() -> IEntity` | Create a new instance with the same options. |
@@ -234,9 +238,10 @@ All entities share the same interface.
 
 ### Result shape
 
-Entity operations return the bare result data (a `Dictionary` for
-single-entity ops, an aggregate list for `List`) as `object?` and raise on
-error. Wrap calls in `try`/`catch` to handle failures.
+Entity operations return the entity, and `List` a list of entities, one per
+record, as `object?`; an entity is an `IEntity`, whose `Data()` reads its
+record. They raise on error, so wrap calls in `try`/`catch` to handle
+failures.
 
 The `Direct()` escape hatch never raises — it returns a result
 `Dictionary<string, object?>` you branch on via `result["ok"]`:

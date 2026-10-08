@@ -302,9 +302,10 @@ fn commit(
         setp(&record, "currency", Value::str(t.currency.clone()));
         setp(&record, "source", Value::str(source));
         setp(&record, "attempts", Value::Num(attempts));
-
-        t.last = record.clone();
     }
+
+    let record = ctx.util().clean(ctx, &record);
+    track.borrow_mut().last = record.clone();
 
     let sink = getp(options, "sink");
     if let Value::Func(_) = sink {

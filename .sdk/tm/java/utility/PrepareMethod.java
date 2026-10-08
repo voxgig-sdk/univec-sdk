@@ -1,5 +1,6 @@
 package JAVAPACKAGE.utility;
 
+import java.util.Locale;
 import java.util.Map;
 
 import JAVAPACKAGE.core.Context;
@@ -25,7 +26,7 @@ final class PrepareMethod {
     // Only fall back to the op-name convention when the point has no method.
     Object pm = Struct.getprop(ctx.point, "method");
     if (pm instanceof String && !((String) pm).isEmpty()) {
-      return ((String) pm).toUpperCase();
+      return ((String) pm).toUpperCase(Locale.ROOT);
     }
 
     // No default: an op name outside the convention resolves to NO method,

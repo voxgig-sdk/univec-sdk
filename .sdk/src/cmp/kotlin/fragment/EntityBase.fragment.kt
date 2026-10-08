@@ -137,14 +137,32 @@ abstract class EntityBase(nm: String, clientIn: SdkClient, entoptsIn: MutableMap
 
       return out
     } catch (err: RuntimeException) {
-      // An error already finalised by makeError (e.g. via done) must not be
-      // wrapped a second time.
-      if (err === ctx.ctrl.err) {
-        throw err
-      }
-      return utility.makeError(ctx, err)
+      return unexpected(ctx, err)
     }
   }
+
+  // The catch path. An error already finalised by makeError (e.g. via done)
+  // must not be wrapped a second time.
+  private fun unexpected(ctx: Context, err: RuntimeException): Any? {
+    if (err === ctx.ctrl.err) {
+      throw err
+    }
+    try {
+      return this.utility.makeError(ctx, err)
+    } catch (thrown: RuntimeException) {
+      throw if (thrown === ctx.ctrl.err) thrown else cleanError(ctx, thrown)
+    }
+  }
+
+  // A source is called directly, not through featureHook, so its plain
+  // Exception is wrapped here as featureHook wraps a hook's.
+  private fun unexpectedSource(ctx: Context, err: Exception): Any? =
+    unexpected(ctx, err as? RuntimeException ?: RuntimeException(err))
+
+  // makeError fires PreUnexpected; an error a hook throws there escapes it,
+  // even under throw false, so it is cleaned here.
+  private fun cleanError(ctx: Context, err: RuntimeException): RuntimeException =
+    this.utility.clean(ctx, err) as? RuntimeException ?: err
 
   /**
    * Streaming operations. Runs `action` through the full pipeline and returns
@@ -168,7 +186,8 @@ abstract class EntityBase(nm: String, clientIn: SdkClient, entoptsIn: MutableMap
 
     val signal = opts["signal"]
 
-    val ctrl = Helpers.toMapAny(opts["ctrl"]) ?: linkedMapOf()
+    // A copy: the caller's ctrl gains no key, and explain stays its own record.
+    val ctrl: MutableMap<String, Any?> = LinkedHashMap(Helpers.toMapAny(opts["ctrl"]) ?: linkedMapOf())
     ctrl["stream"] = opts
 
     val ctxmap = linkedMapOf<String, Any?>()
@@ -195,7 +214,13 @@ abstract class EntityBase(nm: String, clientIn: SdkClient, entoptsIn: MutableMap
 
     // Inbound: prefer the streaming feature's incremental iterator; else fall
     // back to the materialised items so `stream` always yields.
-    val source: Iterator<Any?> = ctx.result?.stream?.get()
+    val streamed: Iterator<Any?>? = try {
+      ctx.result?.stream?.get()
+    } catch (err: Exception) {
+      unexpectedSource(ctx, err)
+      emptyList<Any?>().iterator()
+    }
+    val source: Iterator<Any?> = streamed
       ?: run {
         val items: List<Any?> = when (materialised) {
           is List<*> -> materialised
@@ -214,12 +239,21 @@ abstract class EntityBase(nm: String, clientIn: SdkClient, entoptsIn: MutableMap
       }
     }
 
+    // The caller iterates after runOp has returned, so a failing source takes
+    // the catch path here; under throw false the stream then ends.
+    val end = Any()
     return sequence {
-      while (source.hasNext()) {
-        if (aborted()) {
-          return@sequence
+      while (true) {
+        val item = try {
+          if (source.hasNext() && !aborted()) source.next() else end
+        } catch (err: Exception) {
+          unexpectedSource(ctx, err)
+          end
         }
-        yield(source.next())
+        if (item === end) {
+          break
+        }
+        yield(item)
       }
     }
   }

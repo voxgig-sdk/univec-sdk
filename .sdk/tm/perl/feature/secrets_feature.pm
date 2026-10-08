@@ -117,6 +117,9 @@ sub new {
   # chain is fail-closed, never silently unauthenticated.
   $self->{initerr} = undef;
 
+  # The root context, for registering what this feature resolves.
+  $self->{ctx} = undef;
+
   return $self;
 }
 
@@ -127,6 +130,7 @@ sub init {
   my ($self, $ctx, $options) = @_;
 
   $self->{client} = $ctx->{client};
+  $self->{ctx} = $ctx;
   $self->{options} = Voxgig::Struct::ismap($options) ? $options : {};
   $self->{active} = UnivecHelpers::is_true($self->{options}{active});
   $self->{liveopts} = Voxgig::Struct::ismap($ctx->{options}) ? $ctx->{options} : {};
@@ -219,6 +223,7 @@ sub _build {
   my @providers;
 
   if ('' ne $explicit) {
+    $self->_register($explicit);
     my $key = eval { Voxgig::Sekreto::envkey($self->{secretname}, '') };
     return _trim("$@") if !defined $key;
     push @providers, {
@@ -366,6 +371,7 @@ sub _resolve_once {
   my $ok = eval { $found = $self->{sek}->try($self->{secretname}); 1 };
   return (_trim(defined $@ && '' ne "$@" ? "$@" : 'secrets: provider failed'), 0)
     if !$ok;
+  $self->_register($found);
 
   if (!defined $self->{exchange}) {
     # An UNCACHED miss after an earlier hit is a REVOCATION: the chain now
@@ -529,7 +535,20 @@ sub _buy {
   $mode = '' unless defined $mode;
   return ('test-' . $self->{exchange}{response}, undef) if 'live' ne $mode;
 
-  return $self->_buy_once();
+  my ($token, $err) = $self->_buy_once();
+  $self->_register($token);
+  return ($token, $err);
+}
+
+
+# Every value this feature resolves or buys is a secret the SDK handles,
+# and none arrives under an option key the intake registration saw.
+sub _register {
+  my ($self, $value) = @_;
+  my $ctx = $self->{ctx};
+  return unless $ctx && $ctx->{utility} && ref $ctx->{utility}{clean_add} eq 'CODE';
+  $ctx->{utility}{clean_add}->($ctx, $value);
+  return;
 }
 
 

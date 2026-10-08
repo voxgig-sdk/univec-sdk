@@ -3,6 +3,7 @@
 from __future__ import annotations
 import os
 import re
+from urllib.parse import unquote, urlsplit
 
 from projectname_sdk.feature.base_feature import UnivecBaseFeature
 
@@ -27,6 +28,7 @@ class UnivecProxyFeature(UnivecBaseFeature):
         self.options = {}
         self.url = None
         self.no_proxy = []
+        self._ctx = None
 
     def init(self, ctx, options):
         self.client = ctx.client
@@ -53,6 +55,19 @@ class UnivecProxyFeature(UnivecBaseFeature):
         if isinstance(no_proxy, str):
             no_proxy = re.split(r"\s*,\s*", no_proxy)
         self.no_proxy = [s for s in (no_proxy or []) if s is not None and s != ""]
+
+        # A proxy URL may carry credentials as userinfo, from the option or
+        # the environment, and neither is under a sensitive key name.
+        self._ctx = ctx
+        if isinstance(self.url, str):
+            try:
+                parsed = urlsplit(self.url)
+                for part in (parsed.username, parsed.password):
+                    if part:
+                        ctx.utility.clean_add(ctx, part)
+                        ctx.utility.clean_add(ctx, unquote(part))
+            except Exception:
+                pass
 
         utility = ctx.utility
         inner = utility.fetcher
@@ -99,6 +114,8 @@ class UnivecProxyFeature(UnivecBaseFeature):
         client = self.client
         track = getattr(client, "_proxy", None)
         if track is None:
-            track = {"routed": 0, "url": self.url}
+            ctx = self._ctx
+            url = self.url if ctx is None else ctx.utility.clean(ctx, self.url)
+            track = {"routed": 0, "url": url}
             client._proxy = track
         track["routed"] += 1

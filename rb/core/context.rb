@@ -10,6 +10,10 @@ require_relative 'error'
 require_relative 'helpers'
 
 class UnivecContext
+  # Every context of a client shares its root's operation cache. CRuby's GVL
+  # makes each Hash operation atomic; a Ruby without one needs this lock.
+  OPMAP_LOCK = Mutex.new
+
   attr_accessor :id, :out, :client, :utility, :ctrl, :meta, :config,
                 :entopts, :options, :entity, :shared, :opmap,
                 :data, :reqdata, :match, :reqmatch, :point,
@@ -83,12 +87,13 @@ class UnivecContext
     # served to every subsequent entity's call.
     entname = @entity&.respond_to?(:get_name) ? @entity.get_name : "_"
     cache_key = "#{entname}:#{opname}"
-    return @opmap[cache_key] if @opmap[cache_key]
+    cached = OPMAP_LOCK.synchronize { @opmap[cache_key] }
+    return cached if cached
     return UnivecOperation.new({}) if opname.empty?
 
     opcfg = VoxgigStruct.getpath(@config, "entity.#{entname}.op.#{opname}")
 
-    input = (opname == "update" || opname == "create") ? "data" : "match"
+    input = (opname == "update" || opname == "create" || opname == "patch") ? "data" : "match"
 
     points = []
     if opcfg.is_a?(Hash)
@@ -102,11 +107,39 @@ class UnivecContext
       "input" => input,
       "points" => points,
     })
-    @opmap[cache_key] = op
-    op
+    # Racing requests get the Operation stored first.
+    OPMAP_LOCK.synchronize { @opmap[cache_key] ||= op }
   end
 
   def make_error(code, msg)
     UnivecError.new(code, msg, self)
+  end
+
+  # The serialised context leaves the pipeline (a logger, an error dump), so
+  # it is cleaned; the live fields stay raw for the pipeline's own use.
+  def to_h
+    record = {
+      "id" => @id,
+      "op" => @op,
+      "spec" => @spec,
+      "entity" => @entity,
+      "result" => @result,
+      "response" => @response,
+      "meta" => @meta,
+    }
+    clean = @utility.respond_to?(:clean) ? @utility.clean : nil
+    clean.respond_to?(:call) ? clean.call(self, record) : record
+  end
+
+  def to_json(*args)
+    to_h.to_json(*args)
+  end
+
+  def to_s
+    "Context " + VoxgigStruct.jsonify(to_h)
+  end
+
+  def inspect
+    to_s
   end
 end

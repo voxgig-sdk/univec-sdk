@@ -29,11 +29,11 @@ cd swift && swift build
   // generated SDK is a dependency-free SwiftPM package (Foundation + the
   // vendored Voxgig Struct port), so install it from the git release tag or a
   // local source checkout and build with SwiftPM.
-  const { releasesUrl } = repoInfo(model)
+  const { hostName, tagsUrl } = repoInfo(model)
   Content(`This package is not yet published to a SwiftPM registry. The generated SDK
 is a dependency-free SwiftPM package (Foundation only, plus the vendored
-Voxgig Struct port). Depend on it from the GitHub release tag
-(\`${target.name}/vX.Y.Z\`, see [Releases](${releasesUrl})) by adding it to
+Voxgig Struct port). Depend on it from the ${hostName} release tag
+(\`${target.name}/vX.Y.Z\`, see [Tags](${tagsUrl})) by adding it to
 your \`Package.swift\`:
 
 \`\`\`swift

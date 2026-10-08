@@ -50,7 +50,7 @@ static ConvertSetup convert_basic_setup(const Value& extra) {
 
   ConvertSetup s;
   s.client = client;
-  s.d = entity_data;
+  s.data = entity_data;
   s.idmap = idmap_resolved;
   s.env = env;
   s.live = live;
@@ -65,6 +65,27 @@ static void convert_entity_instance() {
   ASSERT_EQ(ent->getName(), std::string("convert"), "entity name");
 }
 
+
+static bool convert_has_feature(const std::string& name) {
+  Value fm = Helpers::toMapAny(getp(sharedConfig(), "feature"));
+  return fm.is_map() && !getp(fm, name).is_undef();
+}
+
+static void convert_entity_validate() {
+  if (!convert_has_feature("validate")) {
+    std::cerr << "skip: feature not present in this SDK: validate\n";
+    return;
+  }
+  auto vsdk = UnivecSDK::testSDK(Value::undef(), vmap({{"feature",
+      vmap({{"validate", vmap({{"active", Value(true)}})}})}}));
+  std::string code;
+  try {
+    vsdk->convert()->create(vmap({{"embeddings", Value("x")}, {"source_model", Value(1)}, {"target_model", Value("x")}}), Value::undef());
+  } catch (const SdkErrorPtr& err) {
+    code = err->code;
+  }
+  ASSERT_EQ(code, std::string("validate_failed"), "an invalid request fails with validate_failed");
+}
 
 static void convert_entity_basic() {
   auto setup = convert_basic_setup(Value::undef());
@@ -89,6 +110,7 @@ static void convert_entity_basic() {
 
 int main() {
   T_RUN(convert_entity_instance);
+  T_RUN(convert_entity_validate);
   T_RUN(convert_entity_basic);
   return sdktest::summary("convert_entity_test");
 }

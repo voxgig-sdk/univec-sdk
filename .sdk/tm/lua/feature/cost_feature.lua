@@ -301,7 +301,7 @@ function CostFeature:_commit(ctx, pending, entity, opname)
   self:_bump(cost.actors, actor, amount)
 
   self.seq = self.seq + 1
-  local record = {
+  local record = ctx.utility.clean(ctx, {
     seq = self.seq,
     entity = entity,
     op = opname,
@@ -310,7 +310,7 @@ function CostFeature:_commit(ctx, pending, entity, opname)
     currency = cost.currency,
     source = source,
     attempts = pending.attempts,
-  }
+  })
   cost.last = record
 
   local sink = self.options["sink"]

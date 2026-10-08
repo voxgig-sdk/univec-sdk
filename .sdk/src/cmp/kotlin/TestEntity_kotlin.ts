@@ -1,4 +1,4 @@
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable, invalidRequest } from '@voxgig/sdkgen'
 
 import {
   KIT,
@@ -18,7 +18,8 @@ import {
   each,
   buildIdNames,
   getMatchEntries,
-  isAuthActive, envName, envToken
+  isAuthActive, envName, envToken,
+  liveFlowNeeds, liveStrict, liveStrictNote,
 } from '@voxgig/sdkgen'
 
 
@@ -41,6 +42,49 @@ type GenCtx = {
 }
 
 type OpGen = (ctx: GenCtx, step: ModelEntityFlowStep, index: number) => void
+
+
+// The live prologue of a flow built from offline fixtures: blocked without
+// the ids it binds, a create-less load reading the first listed record, and
+// a lenient run observing its checks rather than failing on them.
+function liveFlowGate(entity: any, needs: any, entidEnv: string, accessor: string,
+  strict: boolean, hasSteps: boolean): string {
+  let out = ''
+  if (0 < needs.keys.length) {
+    out += `    if (setup.live) {
+      for (liveKey in arrayOf<String>(${needs.keys.map((k: string) => JSON.stringify(k)).join(', ')})) {
+        if (setup.syntheticOnly || setup.idmap?.get(liveKey) == null) {
+          RunnerSupport.liveMiss(LIVE_STRICT, "Live entity test blocked: needs " + liveKey + " via ${entidEnv}")
+        }
+      }
+    }
+`
+  }
+  if (null != needs.blocked) {
+    out += `    if (setup.live) {
+      RunnerSupport.liveMiss(LIVE_STRICT, "Live entity test blocked: " + ${JSON.stringify(needs.blocked)})
+    }
+`
+  }
+  if (!hasSteps) {
+    return out
+  }
+  out += '    val client = setup.client\n'
+  if (null != needs.discover) {
+    const match = Object.entries(needs.discover)
+      .map(([k, v]: any) => `${JSON.stringify(k)} to setup.idmap?.get(${JSON.stringify(v)})`).join(', ')
+    out += `    if (setup.live) {
+      RunnerSupport.liveExisting(setup.data!!, LIVE_STRICT, ${JSON.stringify(entity.name)}) {
+        client.${accessor}(null).list(linkedMapOf<String, Any?>(${match}), null)
+      }
+    }
+`
+  }
+  if (!strict) {
+    out += '    try {\n'
+  }
+  return out + '\n'
+}
 
 
 const TestEntity = cmp(function TestEntity(props: any) {
@@ -77,6 +121,9 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
   const genCtx: GenCtx = { model, entity, kotlinpackage, flow: basicflow, PROJUPPER, accessor }
 
+  const strict = liveStrict(model, target.name)
+  const needs = liveFlowNeeds(entity, basicflow)
+
   const stepOps = Array.from(new Set(
     (allSteps as any[]).map((s: any) => s.o).filter(Boolean)))
 
@@ -90,18 +137,26 @@ import java.nio.file.Paths
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 
+import ${kotlinpackage}.core.Config
+import ${kotlinpackage}.core.Context
 import ${kotlinpackage}.core.Helpers
 import ${kotlinpackage}.core.SdkEntity
+import ${kotlinpackage}.core.SdkError
 import ${kotlinpackage}.core.${SDK}
+import ${kotlinpackage}.feature.BaseFeature
 import ${kotlinpackage}.utility.Json
 import ${kotlinpackage}.utility.struct.Struct
 
 @Suppress("UNCHECKED_CAST", "UNUSED_VARIABLE", "UNUSED_VALUE")
 class ${entity.Name}EntityTest {
+
+${liveStrictNote(strict, '//', '  ')}
+  private val LIVE_STRICT = ${strict}
 
   @Test
   fun instance() {
@@ -122,11 +177,7 @@ class ${entity.Name}EntityTest {
         if (reason == null || "" == reason) "skipped via sdk-test-control.json" else reason,
       )
     }
-    Assumptions.assumeFalse(
-      setup.syntheticOnly,
-      "live entity test uses synthetic IDs from fixture — set ${entidEnvVar} JSON to run live",
-    )
-${allSteps.length > 0 ? `    val client = setup.client\n\n` : ''}`)
+${liveFlowGate(entity, needs, entidEnvVar, accessor, strict, allSteps.length > 0)}`)
 
     const flowHasCreate = allSteps.some((s: any) => s.o === 'create')
     if (!flowHasCreate) {
@@ -149,11 +200,16 @@ ${allSteps.length > 0 ? `    val client = setup.client\n\n` : ''}`)
       }
     })
 
-    Content(`  }
+    Content(`${strict || 0 === allSteps.length ? '' : `    } catch (err: Throwable) {
+      RunnerSupport.liveObserve(err, setup.live, LIVE_STRICT)
+    }
+`}  }
 
 `)
 
-    const flowHasList = allSteps.some((s: any) => s.o === 'list')
+    // The stream test lists with no match, so a bare call must reach a route.
+    const flowHasList = allSteps.some((s: any) => s.o === 'list') &&
+      opReachable((entity.op as any)?.list, [])
     if (flowHasList) {
       Content(`  @Test
   fun stream() {
@@ -191,6 +247,8 @@ ${allSteps.length > 0 ? `    val client = setup.client\n\n` : ''}`)
 `)
     }
 
+    Content(failureTests(SDK, entity, accessor))
+
     // Setup function (companion object).
     Content(`  companion object {
     fun ${accessor}BasicSetup(extra: MutableMap<String, Any?>?): RunnerSupport.EntityTestSetup {
@@ -225,7 +283,7 @@ ${allSteps.length > 0 ? `    val client = setup.client\n\n` : ''}`)
           "\\"\`\\$VAL\`\\": [\\"\`\\$FORMAT\`\\", \\"upper\\", \\"\`\\$COPY\`\\"]" +
           "}]}"))
 
-      // Detect ENTID env override before envOverride consumes it.
+      // Whether *_ENTID supplied the idmap, read before envOverride consumes it.
       val entidEnvRaw = RunnerSupport.getenv("${entidEnvVar}")
       val idmapOverridden = entidEnvRaw != null && entidEnvRaw.trim().startsWith("{")
 
@@ -556,6 +614,106 @@ const GENERATE_OP: Record<string, OpGen> = {
   update: generateUpdate,
   load: generateLoad,
   remove: generateRemove,
+}
+
+
+// A failed operation throws from a stream as it does from the operation: a
+// transport failure, and a hook that rejects the call. A throwing hook fires
+// PreUnexpected, under throw false too. The caller's ctrl stays its own. An
+// invalid request fails with validate's own error, before it is sent.
+function failureTests(SDK: string, entity: ModelEntity, accessor: string): string {
+  const hasList = opReachable((entity.op as any)?.list, [])
+  const bad = invalidRequest(entity)
+  if (!hasList && null == bad) {
+    return ''
+  }
+
+  let out = `  private fun hasFeature(name: String): Boolean {
+    val fm = Helpers.toMapAny(Config.sharedConfig()["feature"])
+    return fm != null && fm[name] != null
+  }
+
+`
+
+  if (hasList) {
+    out += `  class FailHook : BaseFeature("failhook", "0.0.1", true) {
+    var unexpected = 0
+    override fun preSpec(ctx: Context) { throw RuntimeException("${entity.name} hook failed") }
+    override fun preUnexpected(ctx: Context) { unexpected++ }
+  }
+
+  @Test
+  fun streamError() {
+    val offline = linkedMapOf<String, Any?>("net" to linkedMapOf<String, Any?>("offline" to true))
+    val err = assertThrows(RuntimeException::class.java) {
+      ${SDK}.testSDK(offline, null).${accessor}(null).stream("list", null, null).toList()
+    }
+    assertTrue(err.message.orEmpty().contains("offline"), err.message)
+
+    ${SDK}.testSDK(offline, null).${accessor}(null).stream("list", null,
+      linkedMapOf<String, Any?>("ctrl" to linkedMapOf<String, Any?>("throw" to false))).toList()
+
+    if (hasFeature("rbac")) {
+      val denied = ${SDK}.testSDK(null, linkedMapOf<String, Any?>(
+        "feature" to linkedMapOf<String, Any?>(
+          "rbac" to linkedMapOf<String, Any?>("active" to true, "deny" to true))))
+      val denyerr = assertThrows(SdkError::class.java) {
+        denied.${accessor}(null).stream("list", null, null).toList()
+      }
+      assertEquals("rbac_denied", denyerr.code)
+    }
+  }
+
+  @Test
+  fun streamCtrl() {
+    val explain = linkedMapOf<String, Any?>()
+    val ctrl = linkedMapOf<String, Any?>("explain" to explain)
+    ${SDK}.testSDK().${accessor}(null).stream("list", null,
+      linkedMapOf<String, Any?>("ctrl" to ctrl)).toList()
+    assertEquals(listOf("explain"), ctrl.keys.toList())
+    assertTrue(explain === ctrl["explain"] && explain.isNotEmpty())
+  }
+
+  @Test
+  fun unexpected() {
+    val hook = FailHook()
+    val client = ${SDK}(linkedMapOf<String, Any?>(
+      "feature" to linkedMapOf<String, Any?>("test" to linkedMapOf<String, Any?>("active" to true)),
+      "extend" to mutableListOf<Any?>(hook)))
+
+    val err = assertThrows(RuntimeException::class.java) {
+      client.${accessor}(null).list(null, null)
+    }
+    assertTrue(err.message.orEmpty().contains("hook failed"), err.message)
+    assertTrue(0 < hook.unexpected)
+
+    val fired = hook.unexpected
+    client.${accessor}(null).list(null, linkedMapOf<String, Any?>("throw" to false))
+    assertTrue(fired < hook.unexpected)
+  }
+
+`
+  }
+
+  if (null != bad) {
+    const args = Object.entries(bad.args)
+      .map(([k, v]) => JSON.stringify(k) + ' to ' + JSON.stringify(v)).join(', ')
+    out += `  @Test
+  fun validate() {
+    Assumptions.assumeTrue(hasFeature("validate"), "feature not present in this SDK: validate")
+    val client = ${SDK}.testSDK(null, linkedMapOf<String, Any?>(
+      "feature" to linkedMapOf<String, Any?>(
+        "validate" to linkedMapOf<String, Any?>("active" to true))))
+    val err = assertThrows(SdkError::class.java) {
+      client.${accessor}(null).${bad.op}(linkedMapOf<String, Any?>(${args}), null)
+    }
+    assertEquals("validate_failed", err.code)
+  }
+
+`
+  }
+
+  return out
 }
 
 

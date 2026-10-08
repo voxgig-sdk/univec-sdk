@@ -46,6 +46,8 @@ pub fn make_error_util(
         None => Value::Noval,
     };
 
+    crate::utility::done::clean_explain_util(ctx);
+
     let ctrl = ctx.ctrl.borrow().clone();
     {
         let c = ctrl.borrow();
@@ -59,7 +61,8 @@ pub fn make_error_util(
     }
 
     let mut sdk_err = UnivecError::new("", &msg);
-    sdk_err.code = err.code.clone();
+    // A hook's own error supplies the code as well as the message.
+    sdk_err.code = crate::utility::clean::clean_str(ctx, &err.code);
     sdk_err.result = crate::utility::clean::clean_util(ctx, &result.borrow().to_value());
     sdk_err.spec = crate::utility::clean::clean_util(ctx, &spec_val);
 

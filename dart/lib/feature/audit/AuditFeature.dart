@@ -63,7 +63,7 @@ class AuditFeature extends BaseFeature {
     }
     _seen.add(ctx);
     _seq++;
-    final record = <String, dynamic>{
+    final record = ctx.utility.clean(ctx, <String, dynamic>{
       'seq': _seq,
       'ts': _now(),
       'actor': (ctx.ctrl is Map ? ctx.ctrl['actor'] : null) ??
@@ -74,7 +74,7 @@ class AuditFeature extends BaseFeature {
       'outcome': outcome,
       'status': null == ctx.result ? null : ctx.result.status,
       'correlationId': ctx.id,
-    };
+    });
 
     final List recs = _client.track['audit']['records'];
     recs.add(record);

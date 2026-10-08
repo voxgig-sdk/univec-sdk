@@ -26,6 +26,8 @@ class Result {
     resmatch = vs.getprop(resmap, 'resmatch');
   }
 
+  Map<String, dynamic> toJson() => toJSON();
+
   Map<String, dynamic> toJSON() => {
         'ok': ok,
         'status': status,

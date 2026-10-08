@@ -21,6 +21,25 @@ defmodule Univec.Context do
 
   def make_error(ctx, code, msg), do: Error.new(code, msg, ctx)
 
+  # The serialised context leaves the pipeline (a logger, an error dump), so
+  # it is the cleaned record; the live fields stay raw for the pipeline's use.
+  # A context node itself inspects as a handle, so this is the SDK's own
+  # serialisation of one.
+  def to_data(ctx) do
+    record =
+      S.jm([
+        "id", S.getprop(ctx, "id"),
+        "op", S.getprop(ctx, "op"),
+        "spec", S.getprop(ctx, "spec"),
+        "entity", entity_name(S.getprop(ctx, "entity")),
+        "result", S.getprop(ctx, "result"),
+        "response", S.getprop(ctx, "response"),
+        "meta", S.getprop(ctx, "meta")
+      ])
+
+    Univec.Feature.clean(ctx, record)
+  end
+
   def new(ctxmap \\ nil, basectx \\ nil) do
     cm = if S.ismap(ctxmap), do: ctxmap, else: nil
     gp = fn k -> H.get_ctx_prop(cm, k) end
@@ -116,7 +135,7 @@ defmodule Univec.Context do
       true ->
         config = S.getprop(ctx, "config")
         opcfg = S.getpath(config, "entity." <> entname <> ".op." <> opname)
-        inpt = if opname == "update" or opname == "create", do: "data", else: "match"
+        inpt = if opname in ["update", "create", "patch"], do: "data", else: "match"
 
         points =
           if S.ismap(opcfg) do
@@ -131,6 +150,9 @@ defmodule Univec.Context do
             S.jm(["entity", entname, "name", opname, "input", inpt, "points", points])
           )
 
+        # Racing processes may each build and store an Operation, and an entry
+        # lost to a concurrent write is rebuilt; an Operation is a read-only
+        # descriptor, so a duplicate is harmless.
         S.setprop(opmap, cache_key, op)
         op
     end

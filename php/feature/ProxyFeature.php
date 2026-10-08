@@ -20,6 +20,7 @@ class UnivecProxyFeature extends UnivecBaseFeature
     private ?array $options;
     private ?string $url;
     private array $no_proxy;
+    private ?UnivecContext $ctx;
 
     public function __construct()
     {
@@ -31,6 +32,7 @@ class UnivecProxyFeature extends UnivecBaseFeature
         $this->options = null;
         $this->url = null;
         $this->no_proxy = [];
+        $this->ctx = null;
     }
 
     public function init(UnivecContext $ctx, array $options): void
@@ -64,6 +66,19 @@ class UnivecProxyFeature extends UnivecBaseFeature
             foreach ($no_proxy as $np) {
                 if (is_string($np) && $np !== '') {
                     $this->no_proxy[] = $np;
+                }
+            }
+        }
+
+        // A proxy URL may carry credentials as userinfo, from the option or
+        // the environment, and neither is under a sensitive key name.
+        $this->ctx = $ctx;
+        $parsed = is_string($this->url) ? parse_url($this->url) : null;
+        if (is_array($parsed)) {
+            foreach ([$parsed['user'] ?? '', $parsed['pass'] ?? ''] as $part) {
+                if (is_string($part) && '' !== $part) {
+                    ($ctx->utility->clean_add)($ctx, $part);
+                    ($ctx->utility->clean_add)($ctx, rawurldecode($part));
                 }
             }
         }
@@ -129,7 +144,11 @@ class UnivecProxyFeature extends UnivecBaseFeature
     {
         $client = $this->client;
         if (!isset($client->_proxy)) {
-            $client->_proxy = ['routed' => 0, 'url' => $this->url];
+            $ctx = $this->ctx;
+            $client->_proxy = [
+                'routed' => 0,
+                'url' => null === $ctx ? $this->url : ($ctx->utility->clean)($ctx, $this->url),
+            ];
         }
         $client->_proxy['routed']++;
     }

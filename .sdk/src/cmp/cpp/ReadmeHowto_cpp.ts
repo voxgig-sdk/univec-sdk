@@ -1,17 +1,18 @@
 
-import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape } from '@voxgig/sdkgen'
+import { cmp, Content, isAuthActive, envName, canonKey, canonScalarKey, entityIdField, pickExampleEntity, opRequestShape, requiredItems } from '@voxgig/sdkgen'
 
 import {
   KIT,
   getModelPath,
 } from '@voxgig/apidef'
 
-import { cppVarName } from './utility_cpp'
+import { cppVarName, cppEscape } from './utility_cpp'
 
 
 // A type-correct C++ literal for a field's canonical type.
 function cppLit(type: any): string {
   const k = canonScalarKey(type)
+  if ('NULL' === k) return 'Value(nullptr)'
   if ('INTEGER' === k || 'NUMBER' === k) return 'Value(1)'
   if ('BOOLEAN' === k) return 'Value(true)'
   if ('ARRAY' === k) return 'vlist()'
@@ -36,21 +37,29 @@ const ReadmeHowto = cmp(function ReadmeHowto(props: any) {
   let testArg = 'Value::undef()'
   if (exampleEntity && isMatchOp) {
     testArg = idF ? `vmap({{"${idF}", Value("test01")}})` : 'Value::undef()'
-  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp)) {
+  } else if (exampleEntity && 'list' === primaryOp && 0 < requiredItems(exampleEntity, 'list').length) {
+    const chosen = requiredItems(exampleEntity, 'list')
+    testArg = `vmap({${chosen.map((it: any) => `{"${cppEscape(it.name)}", ${cppLit(it.type)}}`).join(', ')}})`
+  } else if (exampleEntity && ('create' === primaryOp || 'update' === primaryOp || 'patch' === primaryOp)) {
     const items = opRequestShape(exampleEntity, primaryOp).items
       .filter((it: any) => it.name !== idF && it.name !== 'id')
     const required = items.filter((it: any) => !it.optional)
     const chosen = required.length ? required : items.slice(0, 3)
-    testArg = `vmap({${chosen.map((it: any) => `{"${it.name}", ${cppLit(it.type)}}`).join(', ')}})`
+    testArg = `vmap({${chosen.map((it: any) => `{"${cppEscape(it.name)}", ${cppLit(it.type)}}`).join(', ')}})`
   }
 
   // The op-driven test-mode line, shown only when the SDK has an entity op.
   // A direct()-only SDK (no ops anywhere) shows a direct() call instead.
-  const testModeExample = primaryOp
-    ? `// Entity ops return the bare record and throw on error.
-Value ${eVar} = client->${acc}()->${primaryOp}(${testArg}, Value::undef());
-// ${eVar} contains the mock response record
-std::cout << Struct::jsonify(${eVar}) << std::endl;`
+  const testModeExample = 'list' === primaryOp
+    ? `// list returns one entity per mock record, and throws on error.
+for (const auto& ${eVar} : client->${acc}()->list(${testArg}, Value::undef())) {
+  std::cout << Struct::jsonify(${eVar}->data()) << std::endl;
+}`
+    : primaryOp
+    ? `// Entity ops return the entity and throw on error.
+SdkEntityPtr ${eVar} = client->${acc}()->${primaryOp}(${testArg}, Value::undef());
+// ${eVar}->data() is the mock response record
+std::cout << Struct::jsonify(${eVar}->data()) << std::endl;`
     : `Value result = client->direct(vmap({
     {"path", Value("/api/resource")},
     {"method", Value("GET")},

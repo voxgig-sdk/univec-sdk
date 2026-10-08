@@ -8,6 +8,12 @@ private const val HEADER_AUTH = "authorization"
 private const val OPTION_APIKEY = "apikey"
 private const val NOT_FOUND = "__NOTFOUND__"
 
+// The client's auth.name option, when set, replaces the name the API declares.
+private fun prepareAuthName(options: Any?): String {
+  val name = Struct.getpath(options, listOf("auth", "name"))
+  return if (name is String && "" != name) name.lowercase() else HEADER_AUTH
+}
+
 fun prepareAuth(ctx: Context): Spec {
   val spec = ctx.spec
     ?: throw ctx.makeError("auth_no_spec", "Expected context spec property to be defined.")
@@ -21,6 +27,13 @@ fun prepareAuth(ctx: Context): Spec {
     return spec
   }
 
+  val name = prepareAuthName(options)
+
+  // A credential left under the declared name would travel beside the renamed one.
+  if (name != HEADER_AUTH) {
+    headers.remove(HEADER_AUTH)
+  }
+
   val apikey = Struct.getprop(options, OPTION_APIKEY, NOT_FOUND)
 
   var skip = false
@@ -31,7 +44,7 @@ fun prepareAuth(ctx: Context): Spec {
   }
 
   if (skip) {
-    headers.remove(HEADER_AUTH)
+    headers.remove(name)
   } else {
     var authPrefix = ""
     val ap = Struct.getpath(options, listOf("auth", "prefix"))
@@ -41,9 +54,9 @@ fun prepareAuth(ctx: Context): Spec {
     val apikeyVal = if (apikey is String) apikey else ""
     // Empty prefix (raw apiKey credential) must not add a leading space.
     if ("" == authPrefix) {
-      headers[HEADER_AUTH] = apikeyVal
+      headers[name] = apikeyVal
     } else {
-      headers[HEADER_AUTH] = "$authPrefix $apikeyVal"
+      headers[name] = "$authPrefix $apikeyVal"
     }
   }
 
