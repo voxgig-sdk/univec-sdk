@@ -14,6 +14,9 @@ import 'omni.dart';
 
 import '../lib/UnivecSDK.dart';
 import '../lib/Point.dart';
+import '../lib/UnivecError.dart';
+import '../lib/Result.dart';
+import '../lib/Spec.dart';
 import '../lib/utility/CleanUtility.dart' as cu;
 import '../lib/utility/ErrUtility.dart';
 import '../lib/utility/voxgig_struct.dart' as vs;
@@ -162,6 +165,32 @@ void tests() {
     test('fullurl-basic', (t) async {
       await _setup();
       await _sec('makeUrl.basic', _utility.makeUrl);
+    });
+
+    // An unfilled route is refused; a placeholder in the base is a server variable.
+    test('fullurl-unfilled', (t) async {
+      await _setup();
+      dynamic urlFor(String base, String path) {
+        final ctx = _utility.makeContext({});
+        ctx.spec = Spec({'base': base, 'path': path, 'params': <String, dynamic>{}});
+        ctx.result = Result({});
+        return _utility.makeUrl(ctx);
+      }
+
+      final err = urlFor('http://h', 'planet/{planet_id}/moon/{id}');
+      ok(err is UnivecError, 'a URL was built: ' + err.toString());
+      equal('url_param_missing', err.code);
+      equal('URL path has no value for {planet_id}, {id}.', err.message);
+
+      for (final base in [
+        'https://api.example.test/bot{token}',
+        'http://{{base_url}}',
+        'http://{test-base_url}/',
+      ]) {
+        ok(urlFor(base, 'planet') is String, base);
+      }
+      equal('URL path has no value for {id}.',
+          urlFor('http://{{base_url}}', 'planet/{id}').message);
     });
 
     test('operator-basic', (t) async {

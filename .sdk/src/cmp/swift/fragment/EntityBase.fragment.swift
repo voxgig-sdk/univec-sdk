@@ -206,7 +206,8 @@ open class ProjectNameEntityBase: Entity {
       "data": data,
     ]
     if let a = args {
-      for (k, v) in a.entries { ctxmap[k] = v }
+      // The context reads reqmatch and reqdata as a VMap, never a Value.
+      for (k, v) in a.entries { ctxmap[k] = v.asMap ?? v }
     }
 
     let ctx = utility.makeContext(ctxmap, entctx)

@@ -63,6 +63,7 @@ func TestEphemeralKeyEntity(t *testing.T) {
 			}
 		}
 		client := setup.client
+		_ = client
 
 		// CREATE
 		ephemeralKeyRef01Ent := client.EphemeralKey(nil)

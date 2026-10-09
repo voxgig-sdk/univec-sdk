@@ -364,13 +364,13 @@ const generateLoad: OpGen = (ctx, step, index) => {
 `)
   if (hasDataId) {
     Content(`      ${matchvar}.put("id", ${srcdatavar}.get("id"))
-      val ${datavar}Loaded = ${entvar}.load(${matchvar}, null)
+${parentMatch(step, matchvar)}      val ${datavar}Loaded = ${entvar}.load(${matchvar}, null)
       val ${datavar}LoadResult = Helpers.toMapAny(${datavar}Loaded match { case e: SdkEntity => e.data(); case o => o })
       rep.check("${ENTLOWER}.load.map", ${datavar}LoadResult != null, "expected load result to be a map")
       rep.eq("${ENTLOWER}.load.id", ${srcdatavar}.get("id"), ${datavar}LoadResult.get("id"))
 `)
   } else {
-    Content(`      val ${datavar}Loaded = ${entvar}.load(${matchvar}, null)
+    Content(`${parentMatch(step, matchvar)}      val ${datavar}Loaded = ${entvar}.load(${matchvar}, null)
       rep.check("${ENTLOWER}.load.nonnull", ${datavar}Loaded != null, "expected load result to be non-null")
 `)
   }
@@ -402,8 +402,18 @@ const generateRemove: OpGen = (ctx, step, index) => {
   }
   Content(`      val ${matchvar} = new LinkedHashMap[String, Object]()
       ${matchvar}.put("id", ${srcdatavar}.get("id"))
-      ${entvar}.remove(${matchvar}, null)
+${parentMatch(step, matchvar)}      ${entvar}.remove(${matchvar}, null)
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `      ${matchvar}.put("${key}", Option(idmap.get("${key}")).getOrElse(idmap.get("${val}")))
+`).join('')
 }
 
 

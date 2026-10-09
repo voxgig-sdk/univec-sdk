@@ -531,7 +531,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
     Content(`  $V{${matchvar}} = {
     'id' => $V{${srcdatavar}}{id},
   };
-  $V{${datavar}_loaded} = $V{${entvar}}->load($V{${matchvar}}, undef);
+${parentMatch(step, matchvar)}  $V{${datavar}_loaded} = $V{${entvar}}->load($V{${matchvar}}, undef);
   $V{${datavar}_load_result} = ${N}Helpers::to_map(ref($V{${datavar}_loaded}) && $V{${datavar}_loaded}->can('data_get') ? $V{${datavar}_loaded}->data_get : $V{${datavar}_loaded});
   ok(defined $V{${datavar}_load_result}, '${entity.name} load: data');
   is($V{${datavar}_load_result}{id}, $V{${srcdatavar}}{id}, '${entity.name} load: id');
@@ -539,7 +539,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
   }
   else {
     Content(`  $V{${matchvar}} = {};
-  $V{${datavar}_loaded} = $V{${entvar}}->load($V{${matchvar}}, undef);
+${parentMatch(step, matchvar)}  $V{${datavar}_loaded} = $V{${entvar}}->load($V{${matchvar}}, undef);
   ok(defined $V{${datavar}_loaded}, '${entity.name} load: data');
 `)
   }
@@ -567,9 +567,20 @@ const generateRemove: OpGen = (ctx, step, index) => {
   Content(`  $V{${matchvar}} = {
     'id' => $V{${srcdatavar}}{id},
   };
-  $V{${entvar}}->remove($V{${matchvar}}, undef);
+${parentMatch(step, matchvar)}  $V{${entvar}}->remove($V{${matchvar}}, undef);
   pass('${entity.name} remove: completed');
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `  $V{${matchvar}}{'${key}'} = $setup->{idmap}{'${key}'} // $setup->{idmap}{'${val}'};
+`).join('')
 }
 
 

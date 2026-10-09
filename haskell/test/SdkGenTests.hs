@@ -236,10 +236,11 @@ modelDirectTest c = runTest c "model.direct" $ do
 
 modelStreamTest :: Counters -> IO ()
 modelStreamTest c = do
-  let mkSeed = do
-        r1 <- jo [("id", VStr "S1"), ("name", VStr "a")]
-        r2 <- jo [("id", VStr "S2"), ("name", VStr "b")]
-        r3 <- jo [("id", VStr "S3"), ("name", VStr "c")]
+  let parentVals = []
+      mkSeed = do
+        r1 <- jo ([("id", VStr "S1"), ("name", VStr "a")] ++ parentVals)
+        r2 <- jo ([("id", VStr "S2"), ("name", VStr "b")] ++ parentVals)
+        r3 <- jo ([("id", VStr "S3"), ("name", VStr "c")] ++ parentVals)
         recs <- jo [("S1", r1), ("S2", r2), ("S3", r3)]
         jo [("model", recs)]
       hasStreaming = do
@@ -251,14 +252,14 @@ modelStreamTest c = do
     seed <- mkSeed; opts <- jo [("entity", seed)]
     sdk <- C.testSdk opts VNoval
     ent <- C.model sdk VNoval
-    em1 <- emptyMap
+    em1 <- jo parentVals
     items <- eStream ent "list" em1 VNoval
     pure (length items == 3 && (case items of (x : _) -> ismap x; [] -> False))
   runTest c "model.stream_signal" $ do
     seed <- mkSeed; opts <- jo [("entity", seed)]
     sdk <- C.testSdk opts VNoval
     ent <- C.model sdk VNoval
-    em1 <- emptyMap
+    em1 <- jo parentVals
     n <- newIORef (0 :: Int)
     let sig = vfunc0 (do modifyIORef n (+ 1); v <- readIORef n; pure (VBool (v >= 2)))
     co <- jo [("signal", sig)]
@@ -271,7 +272,7 @@ modelStreamTest c = do
       stg <- jo [("active", VBool True)]; strm <- jo [("streaming", stg)]; sopts <- jo [("feature", strm)]
       sdk <- C.testSdk opts sopts
       ent <- C.model sdk VNoval
-      em1 <- emptyMap
+      em1 <- jo parentVals
       items <- eStream ent "list" em1 VNoval
       pure (length items == 3)
   runTest c "model.stream_chunk" $ do
@@ -281,6 +282,6 @@ modelStreamTest c = do
       stg <- jo [("active", VBool True), ("chunkSize", VNum 2)]; strm <- jo [("streaming", stg)]; sopts <- jo [("feature", strm)]
       sdk <- C.testSdk opts sopts
       ent <- C.model sdk VNoval
-      em1 <- emptyMap
+      em1 <- jo parentVals
       batches <- eStream ent "list" em1 VNoval
       pure (length batches == 2)

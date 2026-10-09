@@ -282,6 +282,24 @@ def main : IO UInt32 := do
           "text/html, user-agent Probe/1.0, body: <p>down</p>)"))
         "resultBody: an HTTP failure keeps its error, the body described")
 
+    (do
+      let urlFor (base path : String) : SIO (Value × Option Value) := do
+        let spec ← newMap #[("base", .str base), ("path", .str path), ("params", ← emptyMap)]
+        SdkUtility.makeUrl (← newMap #[("spec", spec)])
+      let (_, e1) ← urlFor "http://h" "planet/{planet_id}/moon/{id}"
+      let (code, msg) ← match e1 with
+        | some e => pure (← gpS e "code", ← gpS e "message")
+        | none => pure ("", "")
+      check (code == "url_param_missing" && msg == "URL path has no value for {planet_id}, {id}.")
+        "makeUrl: an unfilled route is refused"
+      let mut kept := true
+      for base in ["https://api.example.test/bot{token}", "http://{{base_url}}", "http://{test-base_url}/"] do
+        if (← urlFor base "planet").2.isSome then kept := false
+      let (_, e2) ← urlFor "http://{{base_url}}" "planet/{id}"
+      let m2 ← match e2 with | some e => gpS e "message" | none => pure ""
+      check (kept && m2 == "URL path has no value for {id}.")
+        "makeUrl: a placeholder in the base is a server variable")
+
     patchInputCase
 
   go.run sctx

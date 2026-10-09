@@ -324,7 +324,8 @@ def main : IO UInt32 := do
         let existing ← SdkRuntime.gp (← SdkRuntime.gp seed "existing") "model"
         let ids ← keysof existing
         -- list returns every seeded entity
-        let items ← Model.list tclient (← emptyMap) (← emptyMap)
+        let lm ← emptyMap
+        let items ← Model.list tclient lm (← emptyMap)
         let n ← (match items with | Value.list lid => do pure (← listItems lid).size | _ => pure 0)
         if n == ids.size then pass s!"model.list offline -> {n} seeded"
         else fail s!"model.list offline: got {n}, want {ids.size}"

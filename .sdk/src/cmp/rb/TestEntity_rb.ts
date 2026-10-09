@@ -593,7 +593,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
     Content(`    ${matchvar} = {
       "id" => ${srcdatavar}["id"],
     }
-    ${datavar}_loaded = ${entvar}.load(${matchvar}, nil)
+${parentMatch(step, matchvar)}    ${datavar}_loaded = ${entvar}.load(${matchvar}, nil)
     ${datavar}_load_result = Helpers.to_map(${datavar}_loaded.respond_to?(:data_get) ? ${datavar}_loaded.data_get : ${datavar}_loaded)
     assert !${datavar}_load_result.nil?
     assert_equal ${datavar}_load_result["id"], ${srcdatavar}["id"]
@@ -601,7 +601,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
   }
   else {
     Content(`    ${matchvar} = {}
-    ${datavar}_loaded = ${entvar}.load(${matchvar}, nil)
+${parentMatch(step, matchvar)}    ${datavar}_loaded = ${entvar}.load(${matchvar}, nil)
     assert !${datavar}_loaded.nil?
 `)
   }
@@ -632,10 +632,21 @@ const generateRemove: OpGen = (ctx, step, index) => {
   Content(`    ${matchvar} = {
       "id" => ${srcdatavar}["id"],
     }
-    ${entvar}.remove(${matchvar}, nil)
+${parentMatch(step, matchvar)}    ${entvar}.remove(${matchvar}, nil)
 `)
 }
 
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `    ${matchvar}["${key}"] = setup[:idmap]["${key}"] || setup[:idmap]["${val}"]
+`).join('')
+}
 
 const GENERATE_OP: Record<string, OpGen> = {
   create: generateCreate,

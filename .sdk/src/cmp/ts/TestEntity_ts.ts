@@ -419,9 +419,11 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 `)
   }
 
+  // A parent id is keyed in idmap by its fixture name (step.d's value); a
+  // live ENTID may key it by the field name instead.
   each(step.d, (mi: any) => {
     if ('id' !== mi.key$) {
-      Content(`    ${datavar} ['${mi.key$}'] = setup.idmap['${mi.key$}']
+      Content(`    ${datavar}['${mi.key$}'] = setup.idmap['${mi.key$}'] ?? setup.idmap['${mi.val$}']
 `)
     }
   })
@@ -517,16 +519,20 @@ const generateLoad: OpGen = (ctx, step, index) => {
     Content(`    const ${srcdatavar} = Object.values(setup.data.existing.${entity.name})[0] as any
 `)
   }
+  Content(`    const ${matchvar}: any = {}
+`)
   if (hasEntId) {
-    Content(`    const ${matchvar}: any = {}
-    ${matchvar}.id = ${srcdatavar}.id
-    const ${datavar} = (await ${entvar}.load(${matchvar})).data()
+    Content(`    ${matchvar}.id = ${srcdatavar}.id
+`)
+  }
+  parentMatch(step, matchvar)
+  if (hasEntId) {
+    Content(`    const ${datavar} = (await ${entvar}.load(${matchvar})).data()
     assert(${datavar}.id === ${srcdatavar}.id)
 `)
   }
   else {
-    Content(`    const ${matchvar}: any = {}
-    const ${datavar} = (await ${entvar}.load(${matchvar})).data()
+    Content(`    const ${datavar} = (await ${entvar}.load(${matchvar})).data()
     assert(null != ${datavar})
 `)
   }
@@ -563,8 +569,22 @@ const generateRemove: OpGen = (ctx, step, index) => {
   // removes the first match in entmap, so without a specific id the
   // result depends on hash-sort order and flakes (see cheapshark).
   Content(`    const ${matchvar}: any = { id: ${srcdatavar}.id }
-    await ${entvar}.remove(${matchvar})
+`)
+  parentMatch(step, matchvar)
+  Content(`    await ${entvar}.remove(${matchvar})
   `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id.
+function parentMatch(step: any, matchvar: string) {
+  each(step.m, (mi: any) => {
+    if ('id' !== mi.key$ && !mi.key$.endsWith('$')) {
+      Content(`    ${matchvar}['${mi.key$}'] = setup.idmap['${mi.key$}'] ?? setup.idmap['${mi.val$}']
+`)
+    }
+  })
 }
 
 

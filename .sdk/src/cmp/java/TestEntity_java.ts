@@ -626,7 +626,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
 `)
   if (hasEntId) {
     Content(`    ${matchvar}.put("id", ${srcdatavar}.get("id"));
-    Object ${datavar}Loaded = ${entvar}.load(${matchvar}, null);
+${parentMatch(step, matchvar)}    Object ${datavar}Loaded = ${entvar}.load(${matchvar}, null);
     Map<String, Object> ${datavar}LoadResult = Helpers.toMapAny(${datavar}Loaded instanceof SdkEntity ? ((SdkEntity) ${datavar}Loaded).data() : ${datavar}Loaded);
     assertNotNull(${datavar}LoadResult, "expected load result to be a map");
     assertEquals(${srcdatavar}.get("id"), ${datavar}LoadResult.get("id"),
@@ -634,7 +634,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
 `)
   }
   else {
-    Content(`    Object ${datavar}Loaded = ${entvar}.load(${matchvar}, null);
+    Content(`${parentMatch(step, matchvar)}    Object ${datavar}Loaded = ${entvar}.load(${matchvar}, null);
     assertNotNull(${datavar}Loaded, "expected load result to be non-null");
 `)
   }
@@ -661,8 +661,20 @@ const generateRemove: OpGen = (ctx, step, index) => {
   // Always match the prior-created entity by id to avoid mock-order flakes.
   Content(`    Map<String, Object> ${matchvar} = new LinkedHashMap<>();
     ${matchvar}.put("id", ${srcdatavar}.get("id"));
-    ${entvar}.remove(${matchvar}, null);
+${parentMatch(step, matchvar)}    ${entvar}.remove(${matchvar}, null);
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `    ${matchvar}.put("${key}", null != setup.idmap.get("${key}")
+        ? setup.idmap.get("${key}") : setup.idmap.get("${val}"));
+`).join('')
 }
 
 

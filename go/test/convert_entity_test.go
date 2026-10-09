@@ -63,6 +63,7 @@ func TestConvertEntity(t *testing.T) {
 			}
 		}
 		client := setup.client
+		_ = client
 
 		// CREATE
 		convertRef01Ent := client.Convert(nil)

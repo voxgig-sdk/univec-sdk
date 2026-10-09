@@ -573,7 +573,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
     Content(`        ${matchvar} = {
             "id": ${srcdatavar}["id"],
         }
-        ${datavar}_loaded = ${entvar}.load(${matchvar}, None)
+${parentMatch(step, matchvar)}        ${datavar}_loaded = ${entvar}.load(${matchvar}, None)
         ${datavar}_load_result = helpers.to_map(runner.entity_data(${datavar}_loaded))
         assert ${datavar}_load_result is not None
         assert ${datavar}_load_result["id"] == ${srcdatavar}["id"]
@@ -581,7 +581,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
   }
   else {
     Content(`        ${matchvar} = {}
-        ${datavar}_loaded = ${entvar}.load(${matchvar}, None)
+${parentMatch(step, matchvar)}        ${datavar}_loaded = ${entvar}.load(${matchvar}, None)
         assert ${datavar}_loaded is not None
 `)
   }
@@ -612,10 +612,21 @@ const generateRemove: OpGen = (ctx, step, index) => {
   Content(`        ${matchvar} = {
             "id": ${srcdatavar}["id"],
         }
-        ${entvar}.remove(${matchvar}, None)
+${parentMatch(step, matchvar)}        ${entvar}.remove(${matchvar}, None)
 `)
 }
 
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `        ${matchvar}["${key}"] = setup["idmap"].get("${key}") or setup["idmap"].get("${val}")
+`).join('')
+}
 
 const GENERATE_OP: Record<string, OpGen> = {
   create: generateCreate,

@@ -152,7 +152,9 @@ def findListEntity : SIO (Option String) := do
       match (← gp (← gp (← gp e "op") "list") "points") with
       | .list i =>
         for pt in (← listItems i) do
-          if (← gpS pt "path").any (· == '{') then plain := false
+          match (← gp (← gp pt "args") "params") with
+          | .list ps => if 0 < (← listItems ps).size then plain := false
+          | _ => pure ()
       | _ => pure ()
       if plain then return some name
     | _ => pure ()

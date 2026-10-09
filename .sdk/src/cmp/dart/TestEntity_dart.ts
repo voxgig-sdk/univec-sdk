@@ -1,5 +1,5 @@
 import { buildIdNames } from '@voxgig/sdkgen'
-import { flowSteps } from '@voxgig/sdkgen'
+import { flowSteps, opReachable } from '@voxgig/sdkgen'
 
 import {
   flatten,
@@ -133,11 +133,12 @@ const TestEntity = cmp(function TestEntity(props: any) {
 
         const idlist = buildIdNames(entity, basicflow)
 
-        // The stream test drives the `list` op; only emit it when the entity
-        // actually has a list op (a create-only entity like a *_result has no
-        // list endpoint, so ent.stream('list', …) would throw point_no_points).
+        // The stream test drives the `list` op with no match; only emit it when
+        // a bare call can reach a list route (a create-only entity like a
+        // *_result has none, and a child's list route names its parents).
         const flowHasList = Object.values(flowSteps(basicflow))
-          .some((s: any) => 'list' === s.o)
+          .some((s: any) => 'list' === s.o) &&
+          opReachable((entity.op as any)?.list, [])
         Slot({ name: 'stream' }, () => {
           if (!flowHasList) {
             return
@@ -485,7 +486,7 @@ const generateUpdate: OpGen = (ctx, step, index) => {
 
   each(step.d, (mi: any) => {
     if ('id' !== mi.key$) {
-      Content(`      ${updvar}['${mi.key$}'] = setup['idmap']['${mi.key$}'];
+      Content(`      ${updvar}['${mi.key$}'] = setup['idmap']['${mi.key$}'] ?? setup['idmap']['${mi.val$}'];
 `)
     }
   })
@@ -597,13 +598,13 @@ const generateLoad: OpGen = (ctx, step, index) => {
   if (hasEntId) {
     Content(`      final ${matchvar} = <String, dynamic>{};
       ${matchvar}['id'] = ${srcdatavar}['id'];
-      final ${datavar} = (await ${entvar}.load(${matchvar})).data();
+${parentMatch(step, matchvar)}      final ${datavar} = (await ${entvar}.load(${matchvar})).data();
       ok(${datavar}['id'] == ${srcdatavar}['id']);
 `)
   }
   else {
     Content(`      final ${matchvar} = <String, dynamic>{};
-      final ${datavar} = (await ${entvar}.load(${matchvar})).data();
+${parentMatch(step, matchvar)}      final ${datavar} = (await ${entvar}.load(${matchvar})).data();
       ok(null != ${datavar});
 `)
   }
@@ -632,8 +633,19 @@ const generateRemove: OpGen = (ctx, step, index) => {
   // removes the first match in entmap, so without a specific id the
   // result depends on hash-sort order and flakes.
   Content(`      final ${matchvar} = <String, dynamic>{'id': ${srcdatavar}['id']};
-      await ${entvar}.remove(${matchvar});
+${parentMatch(step, matchvar)}      await ${entvar}.remove(${matchvar});
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: ModelEntityFlowStep, matchvar: string): string {
+  return Object.entries((step as any).m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `      ${matchvar}['${key}'] = setup['idmap']['${key}'] ?? setup['idmap']['${val}'];
+`).join('')
 }
 
 

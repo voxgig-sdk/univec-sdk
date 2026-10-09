@@ -76,8 +76,23 @@ function synthData(fields: any): any {
 }
 
 
+// A child's route names its parents, so each call gives them with its id.
+function parents(e: any, op: string): string[] {
+  return pointParams((e.op || {})[op]).filter((n) => 'id' !== n)
+}
+
+
+// Each parent of the op's route, copied into a match from a record.
+function fill(e: any, op: string, mv: string, from: string, indent: string): string {
+  return parents(e, op).map((n) =>
+    `${indent}SdkUtility.sp ${mv} "${n}" (← SdkUtility.gp ${from} "${n}")\n`).join('')
+}
+
+
 function patchField(e: any): string {
-  return Object.keys(e.fields || {}).find((k) => k !== 'id' && !k.endsWith('$')) || 'name'
+  const routed = parents(e, 'patch')
+  return Object.keys(e.fields || {}).find((k) =>
+    k !== 'id' && !k.endsWith('$') && !routed.includes(k)) || 'name'
 }
 
 
@@ -100,7 +115,10 @@ const Test = cmp(async function Test(props: any) {
 
     if (ops.list) {
       body += `        -- list returns every seeded entity
-        let items ← ${ns}.list tclient (← emptyMap) (← emptyMap)
+        let lm ← emptyMap
+${parents(e, 'list').length ? `        if ids.size > 0 then do
+          let rec0 ← SdkUtility.gp existing ids[0]!
+${fill(e, 'list', 'lm', 'rec0', '          ')}` : ''}        let items ← ${ns}.list tclient lm (← emptyMap)
         let n ← (match items with | Value.list lid => do pure (← listItems lid).size | _ => pure 0)
         if n == ids.size then pass s!"${e.name}.list offline -> {n} seeded"
         else fail s!"${e.name}.list offline: got {n}, want {ids.size}"
@@ -112,7 +130,8 @@ const Test = cmp(async function Test(props: any) {
         if ids.size > 0 then do
           let wid := ids[0]!
           let m ← newMap #[("id", Value.str wid)]
-          let got ← ${ns}.load tclient m (← emptyMap)
+${parents(e, 'load').length ? `          let rec0 ← SdkUtility.gp existing wid
+${fill(e, 'load', 'm', 'rec0', '          ')}` : ''}          let got ← ${ns}.load tclient m (← emptyMap)
           let gid ← SdkRuntime.gpS got "id"
           if gid == wid then pass s!"${e.name}.load offline (id={wid})"
           else fail s!"${e.name}.load offline: got {gid}, want {wid}"
@@ -125,7 +144,7 @@ const Test = cmp(async function Test(props: any) {
         let cid ← SdkRuntime.gpS created "id"
         if cid == "" then fail "${e.name}.create offline returned no id" else do
           let m2 ← newMap #[("id", Value.str cid)]
-          let back ← ${ns}.load tclient m2 (← emptyMap)
+${fill(e, 'load', 'm2', 'created', '          ')}          let back ← ${ns}.load tclient m2 (← emptyMap)
           if (← SdkRuntime.gpS back "id") == cid then
             pass s!"${e.name}.create/load offline (id={cid})"
           else fail s!"${e.name}.create/load offline mismatch"
@@ -146,7 +165,7 @@ def ${def} (tclient seed : Value) : SIO Unit := do
     let created ← ${ns}.create tclient (← newRefData seed "${e.name}") (← emptyMap)
     let cid ← SdkRuntime.gpS created "id"
     let m ← newMap #[("id", Value.str cid)]
-    let d ← newMap #[("id", Value.str cid), ("${field}", Value.str "PatchedMark")]
+${fill(e, 'patch', 'm', 'created', '    ')}    let d ← newMap #[("id", Value.str cid), ("${field}", Value.str "PatchedMark")]
     let patched ← ${ns}.patch tclient m d (← emptyMap)
     check (SdkUtility.isMapV patched && (← SdkRuntime.gpS patched "id") == cid
         && (← SdkRuntime.gpS patched "${field}") == "PatchedMark")
@@ -201,7 +220,7 @@ ${body})
       let nid ← SdkRuntime.gpS created "id"
       if nid == "" then fail "${e.name}.create returned no id" else do
         let m ← newMap #[("id", .str nid)]
-        let back ← ${ns}.load client m (← emptyMap)
+${fill(e, 'load', 'm', 'created', '        ')}        let back ← ${ns}.load client m (← emptyMap)
         let bid ← SdkRuntime.gpS back "id"
         if bid == nid then pass s!"${e.name}.create/load round-trip (id={nid})"
         else fail s!"${e.name}.load mismatch: {bid} != {nid}"

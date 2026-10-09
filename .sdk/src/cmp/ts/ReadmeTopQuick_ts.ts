@@ -96,8 +96,18 @@ console.log(${neVar}.data())
     }
 
     if (!hasCall && opnames.includes('load')) {
+      // The id and every required parameter: a load without them has no route.
+      const idF = entityIdField(exampleEntity)
+      const loadItems = opRequestShape(exampleEntity, 'load').items
+        .filter((it: any) => !it.optional || it.name === idF)
+        .sort((a: any, b: any) =>
+          (a.name === idF ? 1 : 0) - (b.name === idF ? 1 : 0))
+        .map((it: any) =>
+          `  ${jsKey(it.name)}: ${exampleValue(exampleEntity, exampleEntity.op && exampleEntity.op.load, it.name,
+            it.name === idF ? 'example_id' : 'example_' + it.name)},`)
+      const loadArg = 0 < loadItems.length ? `{\n${loadItems.join('\n')}\n}` : ''
       Content(`// Load a specific ${eName.toLowerCase()} (returns the entity, ${/^[aeiou]/i.test(eName) ? 'an' : 'a'} ${eName}Entity)
-const ${eVar} = await client.${eName}().load()
+const ${eVar} = await client.${eName}().load(${loadArg})
 console.log(${eVar}.data())
 `)
       hasCall = true

@@ -597,7 +597,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
     Content(`    local ${matchvar} = {
       id = ${srcdatavar}["id"],
     }
-    local ${datavar}_loaded, err = ${entvar}:load(${matchvar}, nil)
+${parentMatch(step, matchvar)}    local ${datavar}_loaded, err = ${entvar}:load(${matchvar}, nil)
     assert.is_nil(err)
     local ${datavar}_load_result = helpers.to_map(type(${datavar}_loaded) == 'table' and ${datavar}_loaded.data_get and ${datavar}_loaded:data_get() or ${datavar}_loaded)
     assert.is_not_nil(${datavar}_load_result)
@@ -606,7 +606,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
   }
   else {
     Content(`    local ${matchvar} = {}
-    local ${datavar}_loaded, err = ${entvar}:load(${matchvar}, nil)
+${parentMatch(step, matchvar)}    local ${datavar}_loaded, err = ${entvar}:load(${matchvar}, nil)
     assert.is_nil(err)
     assert.is_not_nil(${datavar}_loaded)
 `)
@@ -638,11 +638,22 @@ const generateRemove: OpGen = (ctx, step, index) => {
   Content(`    local ${matchvar} = {
       id = ${srcdatavar}["id"],
     }
-    local _, err = ${entvar}:remove(${matchvar}, nil)
+${parentMatch(step, matchvar)}    local _, err = ${entvar}:remove(${matchvar}, nil)
     assert.is_nil(err)
 `)
 }
 
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `    ${matchvar}["${key}"] = setup.idmap["${key}"] or setup.idmap["${val}"]
+`).join('')
+}
 
 const GENERATE_OP: Record<string, OpGen> = {
   create: generateCreate,

@@ -67,7 +67,22 @@ def hasOp (e : Value) (opname : String) : SIO Bool := do
   | .map _ => pure true
   | _ => pure false
 
-/-- The first entity that has a `list` op AND generated seed data: the feature
+/-- Does the entity have a `list` op whose points carry no path parameter,
+    so the pipeline can drive it with an empty match? -/
+def plainList (e : Value) : SIO Bool := do
+  match (← gp (← gp e "op") "list") with
+  | .map _ =>
+    match (← gp (← gp (← gp e "op") "list") "points") with
+    | .list i =>
+      for pt in (← listItems i) do
+        match (← gp (← gp pt "args") "params") with
+        | .list ps => if 0 < (← listItems ps).size then return false
+        | _ => pure ()
+      pure true
+    | _ => pure true
+  | _ => pure false
+
+/-- The first entity that has a plain `list` op AND generated seed data: the feature
     suite is entity-agnostic, so it discovers its subject from the config.
     Returns whether the subject also has `create` — the idempotency check is
     the one case that mutates, and a list-only entity (an API with a read-only
@@ -80,7 +95,7 @@ def findSubject : SIO (Option (String × Value × Bool)) := do
   let mut fallback : Option (String × Value × Bool) := none
   for name in (← keysof ents) do
     let e ← gp ents name
-    if ← hasOp e "list" then
+    if ← plainList e then
       let Name := name.capitalize
       let seedPath := "../.sdk/test/entity/" ++ name ++ "/" ++ Name ++ "TestData.json"
       if ← System.FilePath.pathExists seedPath then
@@ -106,17 +121,7 @@ def findListEntity : SIO (Option String) := do
   let config ← SdkJson.jsonRead SdkConfig.configJson
   let ents ← gp config "entity"
   for name in (← keysof ents) do
-    let e ← gp ents name
-    match (← gp (← gp e "op") "list") with
-    | .map _ =>
-      let mut plain := true
-      match (← gp (← gp (← gp e "op") "list") "points") with
-      | .list i =>
-        for pt in (← listItems i) do
-          if (← gpS pt "path").any (· == '{') then plain := false
-      | _ => pure ()
-      if plain then return some name
-    | _ => pure ()
+    if ← plainList (← gp ents name) then return some name
   return none
 
 -- ---------------------------------------------------------------------------

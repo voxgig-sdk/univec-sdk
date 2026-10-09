@@ -435,8 +435,11 @@ final class UnivecCleanTest: XCTestCase {
     for (label, extra) in streams {
       let explain = VMap()
       let streamed = UnivecCleanTest.makeSdk(UnivecCleanTest.scenarios[0], box, nil, extra)
+      let reqmatch = VMap()
+      for p in target.params { reqmatch.entries[p] = .string("p1") }
       XCTAssertNoThrow(try target.candidate.accessor(streamed).stream(
-        target.op, nil, vm(("ctrl", .map(vm(("explain", .map(explain))))))), label + ": the stream should not fail")
+        target.op, vm(("reqmatch", .map(reqmatch))),
+        vm(("ctrl", .map(vm(("explain", .map(explain))))))), label + ": the stream should not fail")
       XCTAssertFalse(explain.entries.isEmpty, label + ": the explain record was not filled")
       box.sinks += UnivecCleanTest.formsOf(label + ":explain", explain)
     }

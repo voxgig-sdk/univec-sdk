@@ -437,6 +437,31 @@ tests c alltests = do
     (urlV, merr) <- makeUrlUtil ctx
     pure (isNothing merr && substrContains (vstring urlV) "http://h/items/item01")
 
+  -- An unfilled route is refused; a placeholder in the base is a server variable.
+  let urlFor base path = do
+        cl <- C.testSdk0; ctx <- mkCtx cl "load"
+        p <- emptyMap
+        sp <- newSpec =<< jo [("base", VStr base), ("path", VStr path), ("params", p), ("method", VStr "GET")]
+        writeIORef (cSpec ctx) sp
+        res <- newResult =<< emptyMap; writeIORef (cResult ctx) res
+        makeUrlUtil ctx
+
+  runTest c "primary.make_url_unfilled_refused" $ do
+    (_, merr) <- urlFor "http://h" "planet/{planet_id}/moon/{id}"
+    case merr of
+      Just e -> do
+        code <- getp e "code"; msg <- getp e "message"
+        pure (vstring code == "url_param_missing"
+          && vstring msg == "URL path has no value for {planet_id}, {id}.")
+      Nothing -> pure False
+
+  runTest c "primary.make_url_base_variable_kept" $ do
+    results <- mapM (\b -> urlFor b "planet")
+      ["https://api.example.test/bot{token}", "http://{{base_url}}", "http://{test-base_url}/"]
+    (_, merr) <- urlFor "http://{{base_url}}" "planet/{id}"
+    msg <- maybe (pure VNoval) (\e -> getp e "message") merr
+    pure (all (isNothing . snd) results && vstring msg == "URL path has no value for {id}.")
+
   runTest c "primary.operator_basic" $ do
     pts <- emptyList
     op <- newOperation =<< jo [("entity", VStr "planet"), ("name", VStr "load"), ("input", VStr "match"), ("points", pts)]

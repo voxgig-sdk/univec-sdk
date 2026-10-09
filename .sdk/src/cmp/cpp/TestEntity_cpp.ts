@@ -545,14 +545,14 @@ const generateLoad: OpGen = (ctx, step: any, index) => {
   }
   if (hasEntId) {
     Content(`  Value ${matchvar} = vmap({{"id", getp(${srcdatavar}, "id")}});
-  Value ${datavar}_loaded = ${entvar}->load(Struct::clone(${matchvar}), Value::undef())->data();
+${parentMatch(step, matchvar, '  ')}  Value ${datavar}_loaded = ${entvar}->load(Struct::clone(${matchvar}), Value::undef())->data();
   Value ${datavar}_load_result = Helpers::toMapAny(${datavar}_loaded);
   ASSERT_TRUE(${datavar}_load_result.is_map(), "expected load result to be a map");
   ASSERT_EQ_VAL(getp(${datavar}_load_result, "id"), getp(${srcdatavar}, "id"), "expected load result id to match");
 `)
   } else {
     Content(`  Value ${matchvar} = vmap();
-  Value ${datavar}_loaded = ${entvar}->load(${matchvar}, Value::undef())->data();
+${parentMatch(step, matchvar, '  ')}  Value ${datavar}_loaded = ${entvar}->load(${matchvar}, Value::undef())->data();
   ASSERT_TRUE(!${datavar}_loaded.is_undef(), "expected load result to be non-nil");
 `)
   }
@@ -578,9 +578,24 @@ const generateRemove: OpGen = (ctx, step: any, index) => {
   }
   Content(`  {
     Value ${matchvar} = vmap({{"id", getp(${srcdatavar}, "id")}});
-    ${entvar}->remove(Struct::clone(${matchvar}), Value::undef());
+${parentMatch(step, matchvar, '    ')}    ${entvar}->remove(Struct::clone(${matchvar}), Value::undef());
   }
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string, indent: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `${indent}{
+${indent}  Value parent_id = getp(setup.idmap, "${key}");
+${indent}  if (parent_id.is_undef() || parent_id.is_null()) parent_id = getp(setup.idmap, "${val}");
+${indent}  setp(${matchvar}, "${key}", parent_id);
+${indent}}
+`).join('')
 }
 
 

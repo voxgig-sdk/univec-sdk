@@ -391,7 +391,8 @@ function liveFlowGate(entity: any, needs: any, strict: boolean, strictConst: str
 `
   }
   if (hasSteps) {
-    out += '\t\tclient := setup.client\n'
+    // A flow whose every step is skipped (a remove with no data id) uses none.
+    out += '\t\tclient := setup.client\n\t\t_ = client\n'
   }
   if (null != needs.discover) {
     const match = Object.entries(needs.discover)
@@ -698,7 +699,9 @@ const generateLoad: OpGen = (ctx, step, index) => {
     Content(`		${matchvar} := map[string]any{
 			"id": ${srcdatavar}["id"],
 		}
-		${datavar}Loaded, err := ${entvar}.Load(${matchvar}, nil)
+`)
+    parentMatch(step, matchvar)
+    Content(`		${datavar}Loaded, err := ${entvar}.Load(${matchvar}, nil)
 		if err != nil {
 			t.Fatalf("load failed: %v", err)
 		}
@@ -713,7 +716,9 @@ const generateLoad: OpGen = (ctx, step, index) => {
   }
   else {
     Content(`		${matchvar} := map[string]any{}
-		${datavar}Loaded, err := ${entvar}.Load(${matchvar}, nil)
+`)
+    parentMatch(step, matchvar)
+    Content(`		${datavar}Loaded, err := ${entvar}.Load(${matchvar}, nil)
 		if err != nil {
 			t.Fatalf("load failed: %v", err)
 		}
@@ -753,11 +758,30 @@ const generateRemove: OpGen = (ctx, step, index) => {
   Content(`		${matchvar} := map[string]any{
 			"id": ${srcdatavar}["id"],
 		}
-		_, err ${errOp} ${entvar}.Remove(${matchvar}, nil)
+`)
+  parentMatch(step, matchvar)
+  Content(`		_, err ${errOp} ${entvar}.Remove(${matchvar}, nil)
 		if err != nil {
 			t.Fatalf("remove failed: %v", err)
 		}
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string) {
+  const parents = Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+  for (const [key, val] of parents) {
+    Content(`		if v := setup.idmap["${key}"]; v != nil {
+			${matchvar}["${key}"] = v
+		} else {
+			${matchvar}["${key}"] = setup.idmap["${val}"]
+		}
+`)
+  }
 }
 
 

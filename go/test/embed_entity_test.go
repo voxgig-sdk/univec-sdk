@@ -63,6 +63,7 @@ func TestEmbedEntity(t *testing.T) {
 			}
 		}
 		client := setup.client
+		_ = client
 
 		// CREATE
 		embedRef01Ent := client.Embed(nil)

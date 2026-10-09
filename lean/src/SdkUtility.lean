@@ -1197,6 +1197,18 @@ def makeSpec (ctx : Value) : SIO (Value × Option Value) := do
   if isMapV explain then sp explain "spec" spec
   prepareAuth ctx
 
+/-- Each `{name}` in the text whose name holds no brace or slash. -/
+partial def placeholders : List Char → List String
+  | '{' :: rest =>
+    let name := rest.takeWhile (fun c => c != '{' && c != '}' && c != '/')
+    match rest.drop name.length with
+    | '}' :: more =>
+      if name.isEmpty then placeholders rest
+      else ("{" ++ String.ofList name ++ "}") :: placeholders more
+    | _ => placeholders rest
+  | _ :: rest => placeholders rest
+  | [] => []
+
 /-- base/prefix/path/suffix joined, `{param}` substituted, query appended. -/
 def makeUrl (ctx : Value) : SIO (Value × Option Value) := do
   let specV ← gp ctx "spec"
@@ -1217,6 +1229,16 @@ def makeUrl (ctx : Value) : SIO (Value × Option Value) := do
         let enc ← escurl (.str (← jsString v))
         sp resmatch k v
         url := url.replace ("{" ++ k ++ "}") (vs enc)
+    -- A placeholder left in the route would send the request to the wrong route.
+    -- The base's own placeholders are server variables, resolved with the options.
+    let base' := (base.toList.reverse.dropWhile (· == '/')).reverse
+    let chars := url.toList
+    let route := if base'.isPrefixOf chars then chars.drop base'.length else chars
+    let unfilled := placeholders route
+    if !unfilled.isEmpty then
+      let e ← mkErr "url_param_missing"
+        ("URL path has no value for " ++ ", ".intercalate unfilled ++ ".")
+      return (.str "", some e)
     let query ← gp specV "query"
     let mut qsep := "?"
     for k in (← keysof query) do

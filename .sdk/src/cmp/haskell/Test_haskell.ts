@@ -3,7 +3,7 @@ import type {
   ModelEntity
 } from '@voxgig/apidef'
 
-import { cmp, each, Folder, File, Content, entityCollection } from '@voxgig/sdkgen'
+import { cmp, each, Folder, File, Content, entityCollection, opParams } from '@voxgig/sdkgen'
 
 import { hsVarName } from './utility_haskell'
 import { ReadmeExamplesTest } from './ReadmeExamplesTest_haskell'
@@ -41,10 +41,17 @@ const Test = cmp(function Test(props: any) {
         const hasPatch = ops.includes('patch')
         const hasRemove = ops.includes('remove')
 
+        // A child's route names its parents, so each call gives them with its id.
+        const parents = (op: string) => null == e.op?.[op] ? [] :
+          [...new Set<string>(opParams(e.op[op]).map((p: any) => p.n))].filter((n) => 'id' !== n)
+        const fill = (mv: string, from: string, op: string, indent: string) =>
+          parents(op).map((n) => `${indent}setp ${mv} "${n}" =<< getp ${from} "${n}"\n`).join('')
+
         let updField = 'name'
         try {
           const nf = e.fields || {}
-          const cand = Object.keys(nf).find((k) => k !== 'id' && !k.endsWith('$'))
+          const routed = new Set([...parents('update'), ...parents('patch')])
+          const cand = Object.keys(nf).find((k) => k !== 'id' && !k.endsWith('$') && !routed.has(k))
           if (cand) updField = cand
         } catch (_e) { }
 
@@ -74,7 +81,9 @@ ${basicFn} c = do
     sdk <- C.testSdk opts VNoval
     ent <- C.${fn} sdk VNoval
     em1 <- emptyMap; em2 <- emptyMap
-    lst <- eList ent em1 em2
+${parents('list').length ? `    entmap <- getp existing "${e.name}"
+    rec0 <- keysof entmap >>= \\ids -> case ids of { (i : _) -> getp entmap i; [] -> emptyMap }
+` + fill('em1', 'rec0', 'list', '    ') : ''}    lst <- eList ent em1 em2
     -- \`list\` resolves to one ENTITY per record; the record is reached
     -- through eDataGet. See AGENTS.md "Entity operations return ENTITIES".
     ok <- mapM (\\en -> ismap <$> eDataGet en) lst
@@ -91,7 +100,7 @@ ${basicFn} c = do
       [] -> pure True
       (id0 : _) -> do
         m <- jo [("id", VStr id0)]; ctrl <- emptyMap
-        loaded <- eLoad ent m ctrl
+${parents('load').length ? '        rec0 <- getp entmap id0\n' + fill('m', 'rec0', 'load', '        ') : ''}        loaded <- eLoad ent m ctrl
         ld <- eDataGet loaded
         lid <- getp ld "id"
         pure (ismap ld && vstring lid == id0)
@@ -124,7 +133,7 @@ ${basicFn} c = do
     cd <- eDataGet created
     cid <- getp cd "id"
     upd <- jo [("id", cid), ("${updField}", VStr "UpdatedMark")]
-    ctrl2 <- emptyMap
+${fill('upd', 'cd', 'update', '    ')}    ctrl2 <- emptyMap
     updated <- eUpdate ent upd ctrl2
     ud <- eDataGet updated
     uv <- getp ud "${updField}"
@@ -143,7 +152,7 @@ ${basicFn} c = do
     cd <- eDataGet created
     cid <- getp cd "id"
     pat <- jo [("id", cid), ("${updField}", VStr "PatchedMark")]
-    ctrl2 <- emptyMap
+${fill('pat', 'cd', 'patch', '    ')}    ctrl2 <- emptyMap
     patched <- ePatch ent pat ctrl2
     pd <- eDataGet patched
     pv <- getp pd "${updField}"
@@ -162,7 +171,7 @@ ${basicFn} c = do
     cd <- eDataGet created
     cid <- getp cd "id"
     rm <- jo [("id", cid)]; ctrl2 <- emptyMap
-    -- \`remove\` resolves to the entity, marked. It KEEPS the data it held.
+${fill('rm', 'cd', 'remove', '    ')}    -- \`remove\` resolves to the entity, marked. It KEEPS the data it held.
     removed <- eRemove ent rm ctrl2
     gone <- readIORef (eDeleted removed)
     rd <- eDataGet removed
@@ -204,10 +213,11 @@ ${directFn} c = runTest c "${e.name}.direct" $ do
           defs += `
 ${streamFn} :: Counters -> IO ()
 ${streamFn} c = do
-  let mkSeed = do
-        r1 <- jo [("id", VStr "S1"), ("name", VStr "a")]
-        r2 <- jo [("id", VStr "S2"), ("name", VStr "b")]
-        r3 <- jo [("id", VStr "S3"), ("name", VStr "c")]
+  let parentVals = [${parents('list').map((n) => `("${n}", VStr "P1")`).join(', ')}]
+      mkSeed = do
+        r1 <- jo ([("id", VStr "S1"), ("name", VStr "a")] ++ parentVals)
+        r2 <- jo ([("id", VStr "S2"), ("name", VStr "b")] ++ parentVals)
+        r3 <- jo ([("id", VStr "S3"), ("name", VStr "c")] ++ parentVals)
         recs <- jo [("S1", r1), ("S2", r2), ("S3", r3)]
         jo [("${e.name}", recs)]
       hasStreaming = do
@@ -219,14 +229,14 @@ ${streamFn} c = do
     seed <- mkSeed; opts <- jo [("entity", seed)]
     sdk <- C.testSdk opts VNoval
     ent <- C.${fn} sdk VNoval
-    em1 <- emptyMap
+    em1 <- jo parentVals
     items <- eStream ent "list" em1 VNoval
     pure (length items == 3 && (case items of (x : _) -> ismap x; [] -> False))
   runTest c "${e.name}.stream_signal" $ do
     seed <- mkSeed; opts <- jo [("entity", seed)]
     sdk <- C.testSdk opts VNoval
     ent <- C.${fn} sdk VNoval
-    em1 <- emptyMap
+    em1 <- jo parentVals
     n <- newIORef (0 :: Int)
     let sig = vfunc0 (do modifyIORef n (+ 1); v <- readIORef n; pure (VBool (v >= 2)))
     co <- jo [("signal", sig)]
@@ -239,7 +249,7 @@ ${streamFn} c = do
       stg <- jo [("active", VBool True)]; strm <- jo [("streaming", stg)]; sopts <- jo [("feature", strm)]
       sdk <- C.testSdk opts sopts
       ent <- C.${fn} sdk VNoval
-      em1 <- emptyMap
+      em1 <- jo parentVals
       items <- eStream ent "list" em1 VNoval
       pure (length items == 3)
   runTest c "${e.name}.stream_chunk" $ do
@@ -249,7 +259,7 @@ ${streamFn} c = do
       stg <- jo [("active", VBool True), ("chunkSize", VNum 2)]; strm <- jo [("streaming", stg)]; sopts <- jo [("feature", strm)]
       sdk <- C.testSdk opts sopts
       ent <- C.${fn} sdk VNoval
-      em1 <- emptyMap
+      em1 <- jo parentVals
       batches <- eStream ent "list" em1 VNoval
       pure (length batches == 2)
 `

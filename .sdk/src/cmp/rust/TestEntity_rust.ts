@@ -662,7 +662,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
   }
   if (hasEntId) {
     Content(`    let ${matchvar} = jo(vec![("id", getp(&${srcdatavar}, "id"))]);
-    let ${datavar}_loaded = ${entvar}
+${parentMatch(step, matchvar)}    let ${datavar}_loaded = ${entvar}
         .load(${matchvar}.clone(), Value::Noval)
         .expect("load failed");
     let ${datavar}_load_result = to_map(&${datavar}_loaded.data(None));
@@ -679,7 +679,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
   }
   else {
     Content(`    let ${matchvar} = Value::empty_map();
-    let ${datavar}_loaded = ${entvar}
+${parentMatch(step, matchvar)}    let ${datavar}_loaded = ${entvar}
         .load(${matchvar}.clone(), Value::Noval)
         .expect("load failed");
     // load resolves to the ENTITY; the record is reached through data().
@@ -711,10 +711,24 @@ const generateRemove: OpGen = (ctx, step, index) => {
   }
   // Always match the prior-created entity by id to avoid mock-order flakes.
   Content(`    let ${matchvar} = jo(vec![("id", getp(&${srcdatavar}, "id"))]);
-    ${entvar}
+${parentMatch(step, matchvar)}    ${entvar}
         .remove(${matchvar}.clone(), Value::Noval)
         .expect("remove failed");
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `    setp(&${matchvar}, "${key}", match getp(&setup.idmap, "${key}") {
+        v if v.is_nullish() => getp(&setup.idmap, "${val}"),
+        v => v,
+    });
+`).join('')
 }
 
 

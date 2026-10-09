@@ -570,14 +570,14 @@ const generateLoad: OpGen = (ctx, step, index) => {
 `)
   if (hasEntId) {
     Content(`    ${matchvar}["id"] = ${srcdatavar}["id"]
-    val ${datavar}Loaded = ${entvar}.load(${matchvar}, null)
+${parentMatch(step, matchvar)}    val ${datavar}Loaded = ${entvar}.load(${matchvar}, null)
     val ${datavar}LoadResult = Helpers.toMapAny(if (${datavar}Loaded is SdkEntity) ${datavar}Loaded.data() else ${datavar}Loaded) ?: linkedMapOf()
     assertNotNull(${datavar}LoadResult, "expected load result to be a map")
     assertEquals(${srcdatavar}["id"], ${datavar}LoadResult["id"],
         "expected load result id to match")
 `)
   } else {
-    Content(`    val ${datavar}Loaded = ${entvar}.load(${matchvar}, null)
+    Content(`${parentMatch(step, matchvar)}    val ${datavar}Loaded = ${entvar}.load(${matchvar}, null)
     assertNotNull(${datavar}Loaded, "expected load result to be non-null")
 `)
   }
@@ -603,8 +603,19 @@ const generateRemove: OpGen = (ctx, step, index) => {
   }
   Content(`    val ${matchvar} = linkedMapOf<String, Any?>()
     ${matchvar}["id"] = ${srcdatavar}["id"]
-    ${entvar}.remove(${matchvar}, null)
+${parentMatch(step, matchvar)}    ${entvar}.remove(${matchvar}, null)
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `    ${matchvar}["${key}"] = setup.idmap?.get("${key}") ?: setup.idmap?.get("${val}")
+`).join('')
 }
 
 

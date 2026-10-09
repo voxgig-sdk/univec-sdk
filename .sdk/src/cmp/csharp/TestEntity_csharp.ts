@@ -648,7 +648,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
         {
             ["id"] = ${srcdatavar}!["id"],
         };
-        var ${datavar}Loaded = ${entvar}.Load(${matchvar}, null);
+${parentMatch(step, matchvar)}        var ${datavar}Loaded = ${entvar}.Load(${matchvar}, null);
         var ${datavar}LoadResult = Helpers.ToMapAny(${datavar}Loaded is IEntity le ? le.Data() : ${datavar}Loaded);
         Assert.True(${datavar}LoadResult != null, "expected load result to be a map");
         Assert.True(StructRunner.DeepEqual(${datavar}LoadResult!["id"], ${srcdatavar}["id"]),
@@ -657,7 +657,7 @@ const generateLoad: OpGen = (ctx, step, index) => {
   }
   else {
     Content(`        var ${matchvar} = new Dictionary<string, object?>();
-        var ${datavar}Loaded = ${entvar}.Load(${matchvar}, null);
+${parentMatch(step, matchvar)}        var ${datavar}Loaded = ${entvar}.Load(${matchvar}, null);
         Assert.True(${datavar}Loaded != null, "expected load result to be non-null");
 `)
   }
@@ -686,8 +686,19 @@ const generateRemove: OpGen = (ctx, step, index) => {
         {
             ["id"] = ${srcdatavar}!["id"],
         };
-        ${entvar}.Remove(${matchvar}, null);
+${parentMatch(step, matchvar)}        ${entvar}.Remove(${matchvar}, null);
 `)
+}
+
+
+// A child's route names its parents, and an entity no earlier step has
+// filled knows none of them, so the call itself gives each parent id. A live
+// ENTID may key a parent by its field name, the fixture by its own name.
+function parentMatch(step: any, matchvar: string): string {
+  return Object.entries(step.m || {})
+    .filter(([k]: any) => k !== 'id' && !k.endsWith('$'))
+    .map(([key, val]: any) => `        ${matchvar}["${key}"] = StructUtils.GetProp(setup.Idmap, "${key}") ?? StructUtils.GetProp(setup.Idmap, "${val}");
+`).join('')
 }
 
 

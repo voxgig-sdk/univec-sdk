@@ -15,7 +15,7 @@ import Control.Monad (forM_, when)
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (chr, isAlphaNum, isHexDigit, isSpace, digitToInt, ord, toLower, toUpper)
 import Data.IORef
-import Data.List (dropWhileEnd, intercalate, isInfixOf, isSuffixOf, nub, sortBy)
+import Data.List (dropWhileEnd, intercalate, isInfixOf, isPrefixOf, isSuffixOf, nub, sortBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
 import Data.Ord (Down (..), comparing)
@@ -1462,16 +1462,32 @@ makeUrlUtil ctx = do
           v <- getp params k
           if isNoval v then pure u
           else do enc <- escurlS (vstring v); setp resmatch k v; pure (strReplaceAll u ("{" ++ k ++ "}") enc)
-        query <- getp specV "query"
-        qks <- keysof query
-        (url2, _) <- foldMS2 (url1, "?") qks $ \(u, qsep) k -> do
-          v <- getp query k
-          if isNoval v then pure (u, qsep)
-          else do ek <- escurlS k; ev <- escurlS (vstring v); setp resmatch k v; pure (u ++ qsep ++ ek ++ "=" ++ ev, "&")
-        setp resultV "resmatch" resmatch
-        pure (VStr url2, Nothing)
+        -- A placeholder left in the route would send the request to the wrong route.
+        -- The base's own placeholders are server variables, resolved with the options.
+        let base' = dropWhileEnd (== '/') base
+            route = if base' `isPrefixOf` url1 then drop (length base') url1 else url1
+            unfilled = placeholders route
+        if not (null unfilled)
+          then do e <- mkErr "url_param_missing" ("URL path has no value for " ++ intercalate ", " unfilled ++ "."); pure (VStr "", Just e)
+          else do
+            query <- getp specV "query"
+            qks <- keysof query
+            (url2, _) <- foldMS2 (url1, "?") qks $ \(u, qsep) k -> do
+              v <- getp query k
+              if isNoval v then pure (u, qsep)
+              else do ek <- escurlS k; ev <- escurlS (vstring v); setp resmatch k v; pure (u ++ qsep ++ ek ++ "=" ++ ev, "&")
+            setp resultV "resmatch" resmatch
+            pure (VStr url2, Nothing)
       _ -> do e <- mkErr "url_no_result" "Expected context result property to be defined."; pure (VStr "", Just e)
     _ -> do e <- mkErr "url_no_spec" "Expected context spec property to be defined."; pure (VStr "", Just e)
+
+-- Each {name} in the text whose name holds no brace or slash.
+placeholders :: String -> [String]
+placeholders ('{' : rest) = case break (`elem` "{}/") rest of
+  (name, '}' : more) | not (null name) -> ("{" ++ name ++ "}") : placeholders more
+  _ -> placeholders rest
+placeholders (_ : rest) = placeholders rest
+placeholders [] = []
 
 foldMS :: b -> [a] -> (b -> a -> IO b) -> IO b
 foldMS z xs f = go z xs where go acc [] = pure acc; go acc (y : ys) = do acc' <- f acc y; go acc' ys
