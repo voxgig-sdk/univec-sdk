@@ -62,9 +62,14 @@ object SecretsTestMain {
   // let the prefix be whatever this SDK's API declares - pinning the whole
   // header value passes only for a prefix-less API, and this file ships to
   // every project that selects the feature.
+  // HTTP Basic carries base64(key:secret) instead, and scala ships this suite
+  // untrimmed, so it also runs for a Basic API.
   private def credentialIs(name: String, header: String, token: String): Unit = {
     val got = if (header == null) "" else header
-    check(name, got == token || got.endsWith(" " + token),
+    val basic = got.startsWith("Basic ") && (try {
+      new String(java.util.Base64.getDecoder.decode(got.substring(6)), "UTF-8").startsWith(token + ":")
+    } catch { case _: IllegalArgumentException => false })
+    check(name, got == token || got.endsWith(" " + token) || basic,
       "expected the authorization header to carry " + token + ", got \"" + got + "\"")
   }
 
@@ -264,7 +269,7 @@ object SecretsTestMain {
     var done = false
     // A plain while, not a for-comprehension: a `return` out of a
     // for-comprehension is a NON-LOCAL return, which scala 3 has deprecated.
-    val ops = entities(client).flatMap(ent => List(() => ent.list(null, null), () => ent.load(null, null)))
+    val ops = entities(client).flatMap(ent => List(() => ent.list(null, null), () => ent.load(jmap("id" -> "x"), null)))
     var index = 0
     while (!done && index < ops.length) {
       try ops(index)()

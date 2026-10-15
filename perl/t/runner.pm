@@ -75,12 +75,14 @@ sub entity_list_to_data {
   my ($list) = @_;
   my $out = [];
   for my $item (@{ $list || [] }) {
-    if (Voxgig::Struct::ismap($item)) {
-      push @$out, $item;
-    }
-    elsif (Scalar::Util::blessed($item) && $item->can('data_get')) {
+    # An entity is a blessed hash, which ismap also accepts, so it is asked
+    # for its data first.
+    if (Scalar::Util::blessed($item) && $item->can('data_get')) {
       my $d = $item->data_get;
       push @$out, $d if Voxgig::Struct::ismap($d);
+    }
+    elsif (Voxgig::Struct::ismap($item)) {
+      push @$out, $item;
     }
   }
   return $out;

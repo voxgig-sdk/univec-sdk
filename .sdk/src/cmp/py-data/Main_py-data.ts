@@ -486,6 +486,13 @@ const EntityFramesTest = cmp(function EntityFramesTest(props: any) {
   const accessors = frameEnts.map((e: any) => pluralAccessor(e))
   const singles = seriesEnts.map((e: any) => singularAccessor(e))
 
+  // The test-mode cases call an accessor with no match, so they need one whose
+  // list route names no parent.
+  const vals = (x: any): any[] => null == x ? [] : Array.isArray(x) ? x : Object.values(x)
+  const unrouted = frameEnts.find((e: any) => vals(e.op?.list?.points).some((pt: any) =>
+    null != pt && false !== pt.a && 0 === vals(pt.g?.params).filter((p: any) => null != p && false !== p.a).length))
+  const testAccessor = unrouted ? pluralAccessor(unrouted) : null
+
   File({ name: 'test/test_entity_frames.py' }, () => Content(
     `# Generated accessor tests.
 #
@@ -503,6 +510,7 @@ from ${dataModule}.entity_frames import EntityFrames
 
 FRAME_ACCESSORS = ${pyList(accessors)}
 SERIES_ACCESSORS = ${pyList(singles)}
+TEST_ACCESSOR = ${null == testAccessor ? 'None' : JSON.stringify(testAccessor)}
 
 
 class TestAccessorSurface:
@@ -531,8 +539,8 @@ class TestAccessorSurface:
                 f"accessor {a} would shadow the client surface"
 
 
-@pytest.mark.skipif(len(FRAME_ACCESSORS) == 0,
-                    reason="this API exposes no list operations")
+@pytest.mark.skipif(TEST_ACCESSOR is None,
+                    reason="this API exposes no list operation without a parent")
 class TestFramesAgainstTestMode:
 
     def _client(self):
@@ -541,20 +549,20 @@ class TestFramesAgainstTestMode:
 
     def test_first_frame_accessor_returns_a_dataframe(self):
         ad = self._client()
-        df = getattr(ad, FRAME_ACCESSORS[0])(quiet=True)
+        df = getattr(ad, TEST_ACCESSOR)(quiet=True)
         assert isinstance(df, pd.DataFrame)
 
     def test_declared_columns_have_their_model_dtypes(self):
         # Any column the model declared AND the API returned must carry the
         # model's dtype — this is what makes groupby/merge behave.
         ad = self._client()
-        df = getattr(ad, FRAME_ACCESSORS[0])(quiet=True)
+        df = getattr(ad, TEST_ACCESSOR)(quiet=True)
         for col in df.columns:
             assert str(df[col].dtype) != "float64" or True  # dtypes applied
 
     def test_limit_is_respected(self):
         ad = self._client()
-        df = getattr(ad, FRAME_ACCESSORS[0])(limit=1, quiet=True)
+        df = getattr(ad, TEST_ACCESSOR)(limit=1, quiet=True)
         assert len(df) <= 1
 `))
 })

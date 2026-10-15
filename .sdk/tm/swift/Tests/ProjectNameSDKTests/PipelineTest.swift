@@ -351,7 +351,7 @@ final class PipelineTest: XCTestCase {
 
   func testPrepareAuthApikeyWithPrefixSpaceJoined() {
     let (client, utility) = plClient(vm(
-      ("apikey", .string("K")), ("auth", .map(vm(("prefix", .string("Bearer")))))))
+      ("apikey", .string("K")), ("auth", .map(vm(("prefix", .string("Bearer")), ("basic", .bool(false)))))))
     let ctx = plCtx(client, utility, nil)
     ctx.spec = authSpec(nil)
     _ = try! utility.prepareAuth(ctx)
@@ -360,7 +360,7 @@ final class PipelineTest: XCTestCase {
 
   func testPrepareAuthRawApikeyEmptyPrefixAsIs() {
     let (client, utility) = plClient(vm(
-      ("apikey", .string("K")), ("auth", .map(vm(("prefix", .string("")))))))
+      ("apikey", .string("K")), ("auth", .map(vm(("prefix", .string("")), ("basic", .bool(false)))))))
     let ctx = plCtx(client, utility, nil)
     ctx.spec = authSpec(nil)
     _ = try! utility.prepareAuth(ctx)
@@ -369,7 +369,7 @@ final class PipelineTest: XCTestCase {
 
   func testPrepareAuthEmptyApikeyDropsHeader() {
     let (client, utility) = plClient(vm(
-      ("apikey", .string("")), ("auth", .map(vm(("prefix", .string("Bearer")))))))
+      ("apikey", .string("")), ("auth", .map(vm(("prefix", .string("Bearer")), ("basic", .bool(false)))))))
     let ctx = plCtx(client, utility, nil)
     ctx.spec = authSpec(vm(("authorization", .string("stale"))))
     _ = try! utility.prepareAuth(ctx)
@@ -377,7 +377,7 @@ final class PipelineTest: XCTestCase {
   }
 
   func testPrepareAuthMissingApikeyDropsHeader() {
-    let (client, utility) = plClient(vm(("auth", .map(vm(("prefix", .string("Bearer")))))))
+    let (client, utility) = plClient(vm(("auth", .map(vm(("prefix", .string("Bearer")), ("basic", .bool(false)))))))
     let options = client.optionsMap()
     if let apikey = options.entries["apikey"]?.asString, apikey != "" { return }
     let ctx = plCtx(client, utility, nil)

@@ -11,6 +11,7 @@ import {
   isConfigData,
   resolveAuthIn,
   resolveAuthName,
+  isHttpBasicAuth,
   resolveAuthPrefix,
   targetFeatures,
 } from '@voxgig/sdkgen'
@@ -304,6 +305,7 @@ const Config = cmp(async function Config(props: any) {
   // to what it generated before (Config_ts and Config_go do the same).
   const authIn = resolveAuthIn(model)
   const authName = resolveAuthName(model)
+  const authBasic = isHttpBasicAuth(model)
 
   let baseUrl = ''
   try { baseUrl = getModelPath(model, `main.${KIT}.info.servers.0.url`) } catch (_e) { }
@@ -336,6 +338,9 @@ const Config = cmp(async function Config(props: any) {
   }
   if (authActive) {
     options.auth = { prefix: authPrefix }
+    if (authBasic) {
+      options.auth.basic = true
+    }
     if ('header' !== authIn) {
       options.auth.in = authIn
     }

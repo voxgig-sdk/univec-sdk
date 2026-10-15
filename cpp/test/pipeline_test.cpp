@@ -390,7 +390,7 @@ static void prepareAuth_guardsMissingSpec() {
 }
 
 static void prepareAuth_apikeyWithPrefixSpaceJoined() {
-  auto client = plClient(fhMap({{"apikey", Value("K")}, {"auth", fhMap({{"prefix", Value("Bearer")}})}}));
+  auto client = plClient(fhMap({{"apikey", Value("K")}, {"auth", fhMap({{"prefix", Value("Bearer")}, {"basic", Value(false)}})}}));
   UtilityPtr utility = client->getUtility();
   CtxPtr ctx = plCtx(client, utility, Value::undef());
   ctx->spec = authSpec(Value::undef());
@@ -399,7 +399,7 @@ static void prepareAuth_apikeyWithPrefixSpaceJoined() {
 }
 
 static void prepareAuth_rawApikeyEmptyPrefixAsIs() {
-  auto client = plClient(fhMap({{"apikey", Value("K")}, {"auth", fhMap({{"prefix", Value("")}})}}));
+  auto client = plClient(fhMap({{"apikey", Value("K")}, {"auth", fhMap({{"prefix", Value("")}, {"basic", Value(false)}})}}));
   UtilityPtr utility = client->getUtility();
   CtxPtr ctx = plCtx(client, utility, Value::undef());
   ctx->spec = authSpec(Value::undef());
@@ -408,7 +408,7 @@ static void prepareAuth_rawApikeyEmptyPrefixAsIs() {
 }
 
 static void prepareAuth_emptyApikeyDropsHeader() {
-  auto client = plClient(fhMap({{"apikey", Value("")}, {"auth", fhMap({{"prefix", Value("Bearer")}})}}));
+  auto client = plClient(fhMap({{"apikey", Value("")}, {"auth", fhMap({{"prefix", Value("Bearer")}, {"basic", Value(false)}})}}));
   UtilityPtr utility = client->getUtility();
   CtxPtr ctx = plCtx(client, utility, Value::undef());
   ctx->spec = authSpec(fhMap({{"authorization", Value("stale")}}));
@@ -417,7 +417,7 @@ static void prepareAuth_emptyApikeyDropsHeader() {
 }
 
 static void prepareAuth_missingApikeyDropsHeader() {
-  auto client = plClient(fhMap({{"auth", fhMap({{"prefix", Value("Bearer")}})}}));
+  auto client = plClient(fhMap({{"auth", fhMap({{"prefix", Value("Bearer")}, {"basic", Value(false)}})}}));
   Value options = client->optionsMap();
   Value apikey = getp(options, "apikey");
   if (apikey.is_string() && !apikey.as_string().empty()) {

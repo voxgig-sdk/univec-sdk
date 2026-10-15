@@ -47,6 +47,12 @@ const Test = cmp(function Test(props: any) {
         const fill = (mv: string, from: string, op: string, indent: string) =>
           parents(op).map((n) => `${indent}setp ${mv} "${n}" =<< getp ${from} "${n}"\n`).join('')
 
+        // A child's create gives its parents too, from a seeded record as list
+        // does: the fixture's new records carry no parent ids.
+        const createFill = parents('create').length ? `    entmap <- getp existing "${e.name}"
+    rec0 <- keysof entmap >>= \\ids -> case ids of { (i : _) -> getp entmap i; [] -> emptyMap }
+` + fill('d', 'rec0', 'create', '    ') : ''
+
         let updField = 'name'
         try {
           const nf = e.fields || {}
@@ -111,7 +117,7 @@ ${parents('load').length ? '        rec0 <- getp entmap id0\n' + fill('m', 'rec0
     sdk <- C.testSdk opts VNoval
     ent <- C.${fn} sdk VNoval
     d <- newRefData fixture "${e.name}"
-    ctrl <- emptyMap
+${createFill}    ctrl <- emptyMap
     created <- eCreate ent d ctrl
     cd <- eDataGet created
     -- The create RESULT is a map. Deliberately NOT "and it carries an id":
@@ -128,7 +134,7 @@ ${parents('load').length ? '        rec0 <- getp entmap id0\n' + fill('m', 'rec0
     sdk <- C.testSdk opts VNoval
     ent <- C.${fn} sdk VNoval
     d <- newRefData fixture "${e.name}"
-    ctrl <- emptyMap
+${createFill}    ctrl <- emptyMap
     created <- eCreate ent d ctrl
     cd <- eDataGet created
     cid <- getp cd "id"
@@ -147,7 +153,7 @@ ${fill('upd', 'cd', 'update', '    ')}    ctrl2 <- emptyMap
     sdk <- C.testSdk opts VNoval
     ent <- C.${fn} sdk VNoval
     d <- newRefData fixture "${e.name}"
-    ctrl <- emptyMap
+${createFill}    ctrl <- emptyMap
     created <- eCreate ent d ctrl
     cd <- eDataGet created
     cid <- getp cd "id"
@@ -166,7 +172,7 @@ ${fill('pat', 'cd', 'patch', '    ')}    ctrl2 <- emptyMap
     sdk <- C.testSdk opts VNoval
     ent <- C.${fn} sdk VNoval
     d <- newRefData fixture "${e.name}"
-    ctrl <- emptyMap
+${createFill}    ctrl <- emptyMap
     created <- eCreate ent d ctrl
     cd <- eDataGet created
     cid <- getp cd "id"

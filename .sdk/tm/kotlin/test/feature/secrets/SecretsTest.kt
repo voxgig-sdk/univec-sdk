@@ -270,7 +270,7 @@ class SecretsTest {
 
       for (op in listOf<(SdkEntity) -> Any?>(
         { it.list(null, null) },
-        { it.load(null, null) },
+        { it.load(mutableMapOf<String, Any?>("id" to "x"), null) },
       )) {
         try {
           op(ent)

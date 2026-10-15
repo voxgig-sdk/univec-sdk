@@ -225,7 +225,7 @@ local function drive_entity_op_until(client, what, stop)
     for _, opname in ipairs({ "list", "load" }) do
       if type(ent[opname]) == "function" then
         last_res, last_err = ent[opname](ent, { id = "id01" })
-        if stop() then return last_res, last_err end
+        if stop(last_res, last_err) then return last_res, last_err end
       end
     end
   end
@@ -539,7 +539,11 @@ describe("secrets", function()
         "expected sekreto's own message (" .. fragment .. "), got: " .. tostring(res.err))
       assert.are.equal(0, #w.api(), "nothing may reach the wire")
 
-      local err = drive_refusal(client, function() return true end)
+      -- An op whose route the call cannot fill fails before the chain is
+      -- consulted, so drive until one refuses with sekreto's message.
+      local err = drive_refusal(client, function(_, e)
+        return nil ~= e and nil ~= tostring(e):find(fragment, 1, true)
+      end)
       assert.is_table(err, "the entity path must refuse too")
       assert.is_truthy(tostring(err):find(fragment, 1, true), "got: " .. tostring(err))
       assert.are.equal(0, #w.api())

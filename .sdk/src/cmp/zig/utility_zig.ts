@@ -26,23 +26,34 @@ function zigVarName(name: string): string {
 }
 
 
+// A name zig would refuse as too long keeps its head and gains a hash of the whole.
+const ZIG_NAME_MAX = 32
+
+
 function zigModuleName(model: any): string {
-  const name = `${model.name}_sdk`.toLowerCase().replace(/[^a-z0-9_]/g, '_')
-  return /^[0-9]/.test(name) ? '_' + name : name
+  const snake = `${model.name}_sdk`.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  const name = /^[0-9]/.test(snake) ? '_' + snake : snake
+  return name.length <= ZIG_NAME_MAX ? name :
+    name.slice(0, ZIG_NAME_MAX - 9) + '_' + crc32(name).toString(16).padStart(8, '0')
 }
 
 
-function zigPackageFingerprint(name: string): string {
-  // CRC-32 (IEEE 802.3, reflected, poly 0xEDB88320) — the one zig's
-  // std.hash.Crc32 and zlib both compute.
+// CRC-32 (IEEE 802.3, reflected, poly 0xEDB88320) — the one zig's
+// std.hash.Crc32 and zlib both compute.
+function crc32(text: string): number {
   let crc = 0xffffffff
-  for (let i = 0; i < name.length; i++) {
-    crc ^= name.charCodeAt(i) & 0xff
+  for (let i = 0; i < text.length; i++) {
+    crc ^= text.charCodeAt(i) & 0xff
     for (let b = 0; b < 8; b++) {
       crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1))
     }
   }
-  const checksum = (crc ^ 0xffffffff) >>> 0
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+
+function zigPackageFingerprint(name: string): string {
+  const checksum = crc32(name)
 
   // FNV-1a 32-bit, folded into the 1..0xfffffffe zig accepts.
   let fnv = 0x811c9dc5

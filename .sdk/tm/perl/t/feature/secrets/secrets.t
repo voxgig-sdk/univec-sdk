@@ -209,7 +209,15 @@ sub listable_op {
   my ($sdk) = @_;
   my $entities = UnivecHelpers::to_map(
     UnivecHelpers::gp($sdk->options_map, 'entity')) || {};
+  my $config = UnivecConfig::make_config();
   for my $name (sort keys %$entities) {
+    # A list called with no match can take only a route naming no path
+    # parameter.
+    my $points = UnivecHelpers::gpath($config, "entity.$name.op.list.points");
+    next unless 'ARRAY' eq ref($points) && grep {
+      my $ps = 'HASH' eq ref($_) ? UnivecHelpers::gpath($_, 'args.params') : undef;
+      'ARRAY' ne ref($ps) || 0 == scalar(@$ps)
+    } @$points;
     my $accessor = ucfirst($name);
     next unless $sdk->can($accessor);
     my $ent = eval { $sdk->$accessor() };

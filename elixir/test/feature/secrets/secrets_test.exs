@@ -1066,7 +1066,8 @@ defmodule Univec.SecretsTest do
       nil
     else
       Enum.find_value(S.keysof(ents), fn name ->
-        if S.ismap(S.getpath(ents, name <> ".op.list")) do
+        if S.ismap(S.getpath(ents, name <> ".op.list")) and
+             unrouted?(S.getpath(ents, name <> ".op.list.points")) do
           factory = existing_atom(name)
 
           if factory != nil and
@@ -1081,6 +1082,15 @@ defmodule Univec.SecretsTest do
         end
       end)
     end
+  end
+
+  # A list called with no match can take only a route naming no path parameter.
+  defp unrouted?(points) do
+    is_list(points) and
+      Enum.any?(points, fn pt ->
+        params = S.getpath(pt, "args.params")
+        not is_list(params) or params == []
+      end)
   end
 
   # Run an entity op and answer with its failure MESSAGE ("" when it

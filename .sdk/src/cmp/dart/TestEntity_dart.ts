@@ -1,5 +1,5 @@
 import { buildIdNames } from '@voxgig/sdkgen'
-import { flowSteps, opReachable } from '@voxgig/sdkgen'
+import { flowSteps, opReachable, opParams } from '@voxgig/sdkgen'
 
 import {
   flatten,
@@ -99,8 +99,15 @@ const TestEntity = cmp(function TestEntity(props: any) {
           if (!entops.includes('create') || !entops.includes('patch')) {
             return
           }
+          // A child's route names its parents: the create takes them from a
+          // seeded record, since the fixture's new records carry none, and
+          // the patch from the record it made.
+          const parents = (op: string) => [...new Set<string>(
+            opParams((entity as any).op?.[op]).map((p: any) => p.n))].filter((n) => 'id' !== n)
+          const createParents = parents('create')
+          const patchParents = parents('patch')
           const field = Object.keys((entity as any).fields || {})
-            .find((k) => k !== 'id' && !k.endsWith('$')) || 'name'
+            .find((k) => k !== 'id' && !k.endsWith('$') && !patchParents.includes(k)) || 'name'
           Content(`    test('patch', (t) async {
       final fixture = jsonDecode(File(resolveTestPath(
               '../.sdk/test/entity/${entity.name}/${nom(entity, 'Name')}TestData.json'))
@@ -108,12 +115,16 @@ const TestEntity = cmp(function TestEntity(props: any) {
       final news = (fixture['new']?['${entity.name}'] ?? <String, dynamic>{}) as Map;
       final ent = ${model.Name}SDK.test(<String, dynamic>{'entity': fixture['existing']})
           .${nom(entity, 'Name')}();
-      final created = (await ent.create(
-              news.isEmpty ? <String, dynamic>{} : news.values.first))
-          .data();
+      final cdata = Map<String, dynamic>.from(
+          news.isEmpty ? <String, dynamic>{} : news.values.first as Map);
+${createParents.length ? `      final seeded = (fixture['existing']?['${entity.name}'] ?? <String, dynamic>{}) as Map;
+      final rec0 = seeded.isEmpty ? <String, dynamic>{} : seeded.values.first as Map;
+` + createParents.map((n) => `      cdata['${n}'] = rec0['${n}'];
+`).join('') : ''}      final created = (await ent.create(cdata)).data();
       final patched = await ent.patch(<String, dynamic>{
         'id': created['id'],
-        '${field}': 'PatchedMark',
+${patchParents.map((n) => `        '${n}': created['${n}'],
+`).join('')}        '${field}': 'PatchedMark',
       });
       final data = patched.data();
       ok(data is Map);

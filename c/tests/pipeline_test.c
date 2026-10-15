@@ -403,7 +403,7 @@ static void test_prepare_auth_guards_missing_spec(void) {
 }
 
 static void test_prepare_auth_apikey_with_prefix_space_joined(void) {
-  pl_client(cmap(2, "apikey", v_str("K"), "auth", cmap(1, "prefix", v_str("Bearer"))));
+  pl_client(cmap(2, "apikey", v_str("K"), "auth", cmap(2, "prefix", v_str("Bearer"), "basic", v_bool(false))));
   Context* ctx = pl_ctx(NULL);
   ctx->spec = auth_spec(v_undef());
   PNError* err = NULL;
@@ -413,7 +413,7 @@ static void test_prepare_auth_apikey_with_prefix_space_joined(void) {
 }
 
 static void test_prepare_auth_raw_apikey_empty_prefix_as_is(void) {
-  pl_client(cmap(2, "apikey", v_str("K"), "auth", cmap(1, "prefix", v_str(""))));
+  pl_client(cmap(2, "apikey", v_str("K"), "auth", cmap(2, "prefix", v_str(""), "basic", v_bool(false))));
   Context* ctx = pl_ctx(NULL);
   ctx->spec = auth_spec(v_undef());
   PNError* err = NULL;
@@ -422,7 +422,7 @@ static void test_prepare_auth_raw_apikey_empty_prefix_as_is(void) {
 }
 
 static void test_prepare_auth_empty_apikey_drops_header(void) {
-  pl_client(cmap(2, "apikey", v_str(""), "auth", cmap(1, "prefix", v_str("Bearer"))));
+  pl_client(cmap(2, "apikey", v_str(""), "auth", cmap(2, "prefix", v_str("Bearer"), "basic", v_bool(false))));
   Context* ctx = pl_ctx(NULL);
   ctx->spec = auth_spec(cmap(1, "authorization", v_str("stale")));
   PNError* err = NULL;
@@ -432,7 +432,7 @@ static void test_prepare_auth_empty_apikey_drops_header(void) {
 }
 
 static void test_prepare_auth_missing_apikey_drops_header(void) {
-  pl_client(cmap(1, "auth", cmap(1, "prefix", v_str("Bearer"))));
+  pl_client(cmap(1, "auth", cmap(2, "prefix", v_str("Bearer"), "basic", v_bool(false))));
   voxgig_value* options = sdk_options_map(PL_CLIENT);
   const char* k = get_str(options, "apikey");
   if (k && k[0] != '\0') {

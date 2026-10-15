@@ -599,7 +599,7 @@ fn pipeline_prepare_auth_guards_missing_spec() {
 fn pipeline_prepare_auth_apikey_with_prefix_space_joined() {
     let (client, utility) = pl_client(jo(vec![
         ("apikey", Value::str("K")),
-        ("auth", jo(vec![("prefix", Value::str("Bearer"))])),
+        ("auth", jo(vec![("prefix", Value::str("Bearer")), ("basic", Value::Bool(false))])),
     ]));
     let ctx = pl_ctx(&client, &utility, None);
     *ctx.spec.borrow_mut() = Some(auth_spec(Value::Noval));
@@ -613,7 +613,7 @@ fn pipeline_prepare_auth_apikey_with_prefix_space_joined() {
 fn pipeline_prepare_auth_raw_apikey_empty_prefix_as_is() {
     let (client, utility) = pl_client(jo(vec![
         ("apikey", Value::str("K")),
-        ("auth", jo(vec![("prefix", Value::str(""))])),
+        ("auth", jo(vec![("prefix", Value::str("")), ("basic", Value::Bool(false))])),
     ]));
     let ctx = pl_ctx(&client, &utility, None);
     *ctx.spec.borrow_mut() = Some(auth_spec(Value::Noval));
@@ -627,7 +627,7 @@ fn pipeline_prepare_auth_raw_apikey_empty_prefix_as_is() {
 fn pipeline_prepare_auth_empty_apikey_drops_header() {
     let (client, utility) = pl_client(jo(vec![
         ("apikey", Value::str("")),
-        ("auth", jo(vec![("prefix", Value::str("Bearer"))])),
+        ("auth", jo(vec![("prefix", Value::str("Bearer")), ("basic", Value::Bool(false))])),
     ]));
     let ctx = pl_ctx(&client, &utility, None);
     *ctx.spec.borrow_mut() = Some(auth_spec(jo(vec![(
@@ -647,7 +647,7 @@ fn pipeline_prepare_auth_empty_apikey_drops_header() {
 fn pipeline_prepare_auth_missing_apikey_drops_header() {
     let (client, utility) = pl_client(jo(vec![(
         "auth",
-        jo(vec![("prefix", Value::str("Bearer"))]),
+        jo(vec![("prefix", Value::str("Bearer")), ("basic", Value::Bool(false))]),
     )]));
     let options = client.options_map();
     if get_str(&options, "apikey")

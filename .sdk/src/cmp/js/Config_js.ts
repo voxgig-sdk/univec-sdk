@@ -16,6 +16,7 @@ import {
   isConfigData,
   resolveAuthIn,
   resolveAuthName,
+  isHttpBasicAuth,
   resolveAuthPrefix,
   serverVariables,
   targetFeatures,
@@ -57,9 +58,11 @@ const Config = cmp(async function Config(props: any) {
   // what it generated before.
   const authIn = resolveAuthIn(model)
   const authName = resolveAuthName(model)
+  const authBasic = isHttpBasicAuth(model)
   const authBlock = authActive
     ? `auth: {
-      prefix: '${authPrefix}',${'header' === authIn ? '' : `
+      prefix: '${authPrefix}',${authBasic ? `
+      basic: true,` : ''}${'header' === authIn ? '' : `
       in: '${authIn}',`}${'Authorization' === authName ? '' : `
       name: '${authName}',`}
     },

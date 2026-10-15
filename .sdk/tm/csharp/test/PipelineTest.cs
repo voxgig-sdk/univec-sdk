@@ -559,7 +559,7 @@ public class PipelineTest
         var (client, utility) = PlClient(new Dictionary<string, object?>
         {
             ["apikey"] = "K",
-            ["auth"] = new Dictionary<string, object?> { ["prefix"] = "Bearer" },
+            ["auth"] = new Dictionary<string, object?> { ["prefix"] = "Bearer", ["basic"] = false },
         });
         var ctx = PlCtx(client, utility, null);
         ctx.Spec = AuthSpec(null);
@@ -573,7 +573,7 @@ public class PipelineTest
         var (client, utility) = PlClient(new Dictionary<string, object?>
         {
             ["apikey"] = "K",
-            ["auth"] = new Dictionary<string, object?> { ["prefix"] = "" },
+            ["auth"] = new Dictionary<string, object?> { ["prefix"] = "", ["basic"] = false },
         });
         var ctx = PlCtx(client, utility, null);
         ctx.Spec = AuthSpec(null);
@@ -587,7 +587,7 @@ public class PipelineTest
         var (client, utility) = PlClient(new Dictionary<string, object?>
         {
             ["apikey"] = "",
-            ["auth"] = new Dictionary<string, object?> { ["prefix"] = "Bearer" },
+            ["auth"] = new Dictionary<string, object?> { ["prefix"] = "Bearer", ["basic"] = false },
         });
         var ctx = PlCtx(client, utility, null);
         ctx.Spec = AuthSpec(new Dictionary<string, object?>
@@ -604,7 +604,7 @@ public class PipelineTest
     {
         var (client, utility) = PlClient(new Dictionary<string, object?>
         {
-            ["auth"] = new Dictionary<string, object?> { ["prefix"] = "Bearer" },
+            ["auth"] = new Dictionary<string, object?> { ["prefix"] = "Bearer", ["basic"] = false },
         });
         var options = client.OptionsMap();
         if (options.TryGetValue("apikey", out var apikey) &&

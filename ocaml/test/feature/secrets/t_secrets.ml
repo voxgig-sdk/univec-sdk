@@ -288,9 +288,10 @@ let drive_entity (client : sdk_client) (r : recorder) : (unit, string) Stdlib.re
                 out := Ok ();
                 if before < List.length (api_calls r) then () else ops more
               | exception Sdk_error_exc e ->
-                (* An op the entity does not define fails before the chain
-                 * is consulted: keep going. Anything else is the answer. *)
-                if e.err_code = "unsupported_op" then ops more
+                (* An op the entity does not define, or a route the call
+                 * cannot fill, fails before the chain is consulted: keep
+                 * going. Anything else is the answer. *)
+                if e.err_code = "unsupported_op" || e.err_code = "url_param_missing" then ops more
                 else (out := Error e.err_msg)
               | exception e -> out := Error (Printexc.to_string e))
          in

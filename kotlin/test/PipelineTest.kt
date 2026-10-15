@@ -495,7 +495,7 @@ class PipelineTest {
 
   @Test
   fun prepareAuth_apikeyWithPrefixSpaceJoined() {
-    val client = plClient(fhMap("apikey", "K", "auth", fhMap("prefix", "Bearer")))
+    val client = plClient(fhMap("apikey", "K", "auth", fhMap("prefix", "Bearer", "basic", false)))
     val utility = client.getUtility()
     val ctx = plCtx(client, utility, null)
     ctx.spec = authSpec(null)
@@ -505,7 +505,7 @@ class PipelineTest {
 
   @Test
   fun prepareAuth_rawApikeyEmptyPrefixAsIs() {
-    val client = plClient(fhMap("apikey", "K", "auth", fhMap("prefix", "")))
+    val client = plClient(fhMap("apikey", "K", "auth", fhMap("prefix", "", "basic", false)))
     val utility = client.getUtility()
     val ctx = plCtx(client, utility, null)
     ctx.spec = authSpec(null)
@@ -515,7 +515,7 @@ class PipelineTest {
 
   @Test
   fun prepareAuth_emptyApikeyDropsHeader() {
-    val client = plClient(fhMap("apikey", "", "auth", fhMap("prefix", "Bearer")))
+    val client = plClient(fhMap("apikey", "", "auth", fhMap("prefix", "Bearer", "basic", false)))
     val utility = client.getUtility()
     val ctx = plCtx(client, utility, null)
     ctx.spec = authSpec(fhMap("authorization", "stale"))
@@ -525,7 +525,7 @@ class PipelineTest {
 
   @Test
   fun prepareAuth_missingApikeyDropsHeader() {
-    val client = plClient(fhMap("auth", fhMap("prefix", "Bearer")))
+    val client = plClient(fhMap("auth", fhMap("prefix", "Bearer", "basic", false)))
     val options = client.optionsMap()
     val apikey = options["apikey"]
     if (apikey is String && "" != apikey) {

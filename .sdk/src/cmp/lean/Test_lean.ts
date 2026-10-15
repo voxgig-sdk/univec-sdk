@@ -89,6 +89,18 @@ function fill(e: any, op: string, mv: string, from: string, indent: string): str
 }
 
 
+// A child's create gives its parents too, from a seeded record as list does:
+// the seed's new records carry no parent ids.
+function createData(e: any, indent: string): string {
+  const routed = parents(e, 'create')
+  return `${indent}let cd ← newRefData seed "${e.name}"\n` + (routed.length
+    ? `${indent}if ids.size > 0 then do\n` +
+      `${indent}  let rec0 ← SdkUtility.gp existing ids[0]!\n` +
+      fill(e, 'create', 'cd', 'rec0', indent + '  ')
+    : '')
+}
+
+
 function patchField(e: any): string {
   const routed = parents(e, 'patch')
   return Object.keys(e.fields || {}).find((k) =>
@@ -140,7 +152,7 @@ ${fill(e, 'load', 'm', 'rec0', '          ')}` : ''}          let got ← ${ns}.
 
     if (ops.create && ops.load && ops.remove) {
       body += `        -- create -> load back -> remove, all in the store
-        let created ← ${ns}.create tclient (← newRefData seed "${e.name}") (← emptyMap)
+${createData(e, '        ')}        let created ← ${ns}.create tclient cd (← emptyMap)
         let cid ← SdkRuntime.gpS created "id"
         if cid == "" then fail "${e.name}.create offline returned no id" else do
           let m2 ← newMap #[("id", Value.str cid)]
@@ -162,7 +174,9 @@ ${fill(e, 'load', 'm2', 'created', '          ')}          let back ← ${ns}.lo
       patchDefs += `/-- ${e.name}: a patch changes the field it sends, in the store. -/
 def ${def} (tclient seed : Value) : SIO Unit := do
   try
-    let created ← ${ns}.create tclient (← newRefData seed "${e.name}") (← emptyMap)
+${parents(e, 'create').length ? `    let existing ← SdkRuntime.gp (← SdkRuntime.gp seed "existing") "${e.name}"
+    let ids ← keysof existing
+` : ''}${createData(e, '    ')}    let created ← ${ns}.create tclient cd (← emptyMap)
     let cid ← SdkRuntime.gpS created "id"
     let m ← newMap #[("id", Value.str cid)]
 ${fill(e, 'patch', 'm', 'created', '    ')}    let d ← newMap #[("id", Value.str cid), ("${field}", Value.str "PatchedMark")]

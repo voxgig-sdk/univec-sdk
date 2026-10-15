@@ -273,18 +273,22 @@ fn drive_entity(client: *sdk.SDK) Drive {
                     {
                         const ent = @field(sdk.SDK, d.name)(client, vnull());
                         const ops = h.getpath(&.{ "entity", ent.name, "op" }, cfg);
+                        // A call whose route it cannot fill is refused before
+                        // the chain is consulted, so the next entity is tried.
                         if (h.getp(ops, "load") == .object) {
                             const res = ent.load(h.jo(&.{.{ "id", h.vstr("s01") }}), vnull());
-                            return switch (res) {
-                                .err => |e| .{ .ran = true, .ok = false, .msg = e.msg },
-                                .ok => .{ .ran = true, .ok = true, .msg = "" },
-                            };
+                            switch (res) {
+                                .err => |e| if (!std.mem.eql(u8, e.code, "url_param_missing"))
+                                    return .{ .ran = true, .ok = false, .msg = e.msg },
+                                .ok => return .{ .ran = true, .ok = true, .msg = "" },
+                            }
                         } else if (h.getp(ops, "list") == .object) {
                             const res = ent.list(h.omap(), vnull());
-                            return switch (res) {
-                                .err => |e| .{ .ran = true, .ok = false, .msg = e.msg },
-                                .ok => .{ .ran = true, .ok = true, .msg = "" },
-                            };
+                            switch (res) {
+                                .err => |e| if (!std.mem.eql(u8, e.code, "url_param_missing"))
+                                    return .{ .ran = true, .ok = false, .msg = e.msg },
+                                .ok => return .{ .ran = true, .ok = true, .msg = "" },
+                            }
                         }
                     }
                 }
